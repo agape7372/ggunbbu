@@ -1,0 +1,212 @@
+// 드로우 오케스트레이션 + 이벤트 소비(셰이크/플래시/사운드/진동/의성어).
+// core는 events만 발행 — 여기서 프레임마다 소비 후 클리어.
+
+import type { GameState } from '../core/types';
+import { JUICE, JUICE_SYS, HAPTIC, PALETTE, VIEW } from '../config';
+import {
+  initSprites, drawPlayer, drawStack, drawBoss, drawEntity,
+  drawGroundRocks, drawStackShadow,
+} from './sprites';
+import { playSfx, type SfxNameOf } from '../audio/bridge';
+
+let trauma = 0;
+let flashTicks = 0;
+let flashColor = '#FFFFFF';
+let shakeSeed = 0;
+let hitHapticCount = 0;
+let shakeLevel: 0 | 1 | 2 = 2;
+let vibrationOn = true;
+
+interface Popup { text: string; x: number; y: number; ticks: number; scale: number }
+const popups: Popup[] = [];
+
+export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: boolean }): void {
+  if (o.shakeLevel !== undefined) shakeLevel = o.shakeLevel;
+  if (o.vibration !== undefined) vibrationOn = o.vibration;
+}
+
+export function initRenderer(): void {
+  initSprites();
+}
+
+function onomatopoeia(kind: string, combo: number): string | null {
+  switch (kind) {
+    case 'hit':
+      return combo >= 500 ? '빠샤아아!!!' : combo >= 100 ? '콰지지직!!' : combo >= 50 ? '콰지직!' : '콰직';
+    case 'floorCollapse': return '우르르';
+    case 'stackDestroy': return '쾅!!';
+    case 'butterCollapse': return '팟!';
+    case 'special': return '천지개벽!!!';
+    case 'bossDefeat': return '작전성공';
+    default: return null;
+  }
+}
+
+const SFX_MAP: Record<string, SfxNameOf> = {
+  hit: 'hit', floorCollapse: 'floorCollapse', stackDestroy: 'destroy',
+  butterCollapse: 'butterPop', special: 'special', hurt: 'pinned',
+  guardBounce: 'guardGround', bossHit: 'bossHit', bossDefeat: 'bossDefeat',
+  boltCue: 'boltCue', boltStrike: 'boltStrike', gaugeFull: 'gaugeFull',
+  comboBreak: 'guardBreak', jump: 'jump', land: 'land', laneMove: 'laneMove',
+  guardDenied: 'gaugeWarn', lifeLost: 'lifeLost', bonusEnter: 'perfect',
+  bonusPerfect: 'perfect', phaseClear: 'gaugeFull', chapterUnlock: 'gaugeFull',
+};
+
+/** 이벤트 소비: 셰이크/플래시/의성어/사운드/진동. 소비 후 clear는 호출자가. */
+export function consumeEvents(s: GameState): void {
+  for (const e of s.events) {
+    const spec = JUICE[e.kind];
+    if (spec) {
+      trauma = Math.min(1, Math.max(trauma, spec.shake / JUICE_SYS.SHAKE_MAX_AMP));
+      if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#FFFFFF'; }
+      if (s.hitstop < spec.hitstop) s.hitstop = spec.hitstop;
+    }
+    // 의성어 (동시 3개 상한)
+    const word = onomatopoeia(e.kind, e.combo ?? s.combo);
+    if (word) {
+      if (popups.length >= JUICE_SYS.ONOMATOPOEIA_MAX) popups.shift();
+      const esc = e.combo ?? s.combo;
+      popups.push({
+        text: word,
+        x: VIEW.LANE_X[e.lane ?? 1] + ((esc * 13) % 30) - 15,
+        y: VIEW.GROUND_Y - (e.y ?? 100) - 30,
+        ticks: 24,
+        scale: e.kind === 'special' || e.kind === 'bossDefeat' ? 2 : 1 + Math.min(esc / 500, 0.8),
+      });
+    }
+    // 사운드 (콤보 10단위 반음 상승)
+    const sfx = SFX_MAP[e.kind];
+    if (sfx) {
+      const semis = e.kind === 'hit' ? Math.floor(((e.combo ?? 0) / 10) % 12) : 0;
+      playSfx(sfx, semis);
+    }
+    // 진동 (연타 스로틀)
+    if (vibrationOn && 'vibrate' in navigator) {
+      const pat = (HAPTIC as unknown as Record<string, number | readonly number[] | undefined>)[e.kind];
+      if (pat !== undefined) {
+        if (e.kind === 'hit') {
+          hitHapticCount += 1;
+          if (hitHapticCount % HAPTIC.HIT_THROTTLE !== 0) continue;
+        }
+        try { navigator.vibrate(pat as number | number[]); } catch { /* 미지원 무시 */ }
+      }
+    }
+  }
+}
+
+function shakeOffset(): [number, number] {
+  if (trauma <= 0 || shakeLevel === 0) return [0, 0];
+  const amp = trauma * trauma * JUICE_SYS.SHAKE_MAX_AMP * (shakeLevel === 1 ? 0.5 : 1);
+  shakeSeed += 1;
+  return [Math.sin(shakeSeed * 1.3) * amp, Math.cos(shakeSeed * 1.7) * amp * 0.7];
+}
+
+export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
+  // 감쇠
+  trauma = Math.max(0, trauma - 0.693 / JUICE_SYS.SHAKE_HALF_LIFE_F * trauma);
+  if (flashTicks > 0) flashTicks -= 1;
+
+  const [sx, sy] = shakeOffset();
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // 배경 (챕터/페이즈별 색 — 배경 아트는 위임 산출물로 교체 예정)
+  ctx.fillStyle = bgColor(s);
+  ctx.fillRect(-16, -16, VIEW.W + 32, VIEW.H + 32);
+  // 지면
+  ctx.fillStyle = '#1A2142';
+  ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
+
+  const g = VIEW.GROUND_Y;
+  if (s.stack) { drawStackShadow(ctx, s.stack, g); drawStack(ctx, s.stack, g); }
+  drawGroundRocks(ctx, s.groundRocks, g);
+  for (const e of s.entities) if (e.kind !== 'stack') drawEntity(ctx, e, g);
+  if (s.boss) drawBoss(ctx, s.boss, g);
+
+  // 플레이어 (피격 무적 점멸)
+  if (s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
+    drawPlayer(ctx, s.player.pose, s.tick, VIEW.LANE_X[s.player.lane], g - s.player.y);
+  }
+
+  drawHud(ctx, s);
+  drawPopups(ctx);
+  ctx.restore();
+
+  // 전화면 플래시
+  if (flashTicks > 0) {
+    ctx.globalAlpha = 0.35 * (flashTicks / 4);
+    ctx.fillStyle = flashColor;
+    ctx.fillRect(0, 0, VIEW.W, VIEW.H);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function bgColor(s: GameState): string {
+  if (s.mode === 'bonus') return '#2A2240';
+  if (s.act2Phase === 'moon') return '#070B1E';
+  if (s.mode === 'act2') return '#101736';
+  const by = ['#0D1330', '#14203A', '#0F1A2E', '#181230'];
+  return by[s.chapter % 4];
+}
+
+function drawPopups(ctx: CanvasRenderingContext2D): void {
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    p.ticks -= 1;
+    if (p.ticks <= 0) { popups.splice(i, 1); continue; }
+    const a = Math.min(1, p.ticks / 8);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(p.x, p.y - (24 - p.ticks) * 0.8);
+    ctx.rotate(-0.08);
+    ctx.font = `bold ${Math.round(14 * p.scale)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#0A0A14';
+    ctx.strokeText(p.text, 0, 0);
+    ctx.fillStyle = PALETTE.YELLOW;
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+}
+
+function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'left';
+  // 점수 (8자리)
+  ctx.fillStyle = PALETTE.WHITE;
+  ctx.fillText(String(s.score).padStart(8, '0'), 8, 20);
+  // 라이프
+  for (let i = 0; i < s.lives; i++) {
+    ctx.fillStyle = PALETTE.RED;
+    ctx.fillRect(8 + i * 14, 28, 10, 10);
+  }
+  // 콤보
+  if (s.combo > 0) {
+    const big = 16 + Math.min(s.combo / 50, 10);
+    ctx.font = `bold ${Math.round(big)}px monospace`;
+    ctx.fillStyle = s.combo >= 999 ? PALETTE.RED : PALETTE.YELLOW;
+    ctx.textAlign = 'right';
+    ctx.fillText(`${s.combo} COMBO`, VIEW.W - 8, 24);
+  }
+  // 게이지 바
+  const gw = 120;
+  ctx.fillStyle = '#22284A';
+  ctx.fillRect(VIEW.W - gw - 8, 32, gw, 8);
+  ctx.fillStyle = s.gauge >= 100 ? PALETTE.RED : '#29E0E6';
+  ctx.fillRect(VIEW.W - gw - 8, 32, gw * (s.gauge / 100), 8);
+  // 보스 HP
+  if (s.boss && s.act2Phase === 'moon') {
+    ctx.fillStyle = '#22284A';
+    ctx.fillRect(40, 48, VIEW.W - 80, 6);
+    ctx.fillStyle = PALETTE.RED;
+    ctx.fillRect(40, 48, (VIEW.W - 80) * (s.boss.hp / 230), 6);
+  }
+  // 보너스 타이머
+  if (s.mode === 'bonus' && s.bonus) {
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = PALETTE.YELLOW;
+    ctx.fillText(`버터바 타임! ${Math.ceil(s.bonus.ticksLeft / 60)}s`, VIEW.W / 2, 70);
+  }
+}

@@ -192,8 +192,9 @@ export interface BonusState {
   /** 파괴한 버터바 수 / 총 수 (PERFECT 판정) */
   destroyed: number;
   total: number;
-  /** 복귀할 본편 상태 스냅샷 키 (scenes 레이어 관리) — core는 미사용 */
   perfect: boolean;
+  /** 종료 후 복귀 모드 (act1 본편 / tokoton) */
+  returnMode: 'act1' | 'tokoton';
 }
 
 export interface GameState {

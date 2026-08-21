@@ -263,14 +263,25 @@ function trySpawn(s: GameState): void {
 // ── 토코톤 ──────────────────────────────────────────────────────
 function stepTokoton(s: GameState): void {
   const elapsedMin = s.tick / 3600;
-  s.p = Math.min(TOKOTON.P_MAX, s.score / ACT1.UNLOCK_SCORE + elapsedMin * TOKOTON.P_PER_MIN * 10 / 10);
-  // 챕터 순환 (2분 주기)
-  s.chapter = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS) % ACT1.CHAPTER_THEMES.length;
+  s.p = Math.min(TOKOTON.P_MAX, s.score / ACT1.UNLOCK_SCORE + elapsedMin * TOKOTON.P_PER_MIN);
+  // 챕터 순환 (2분 주기) + 순환 경계마다 100겹 버터바 타임
+  const cycle = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS);
+  const newChapter = cycle % ACT1.CHAPTER_THEMES.length;
+  if (s.tick > 0 && s.tick % TOKOTON.CHAPTER_CYCLE_TICKS === 0) {
+    s.chapter = newChapter;
+    enterBonusTokoton(s);
+    return;
+  }
+  s.chapter = newChapter;
   trySpawn(s);
 }
 
+function enterBonusTokoton(s: GameState): void {
+  enterBonus(s, BONUS.ROUNDS.length + 1, 'tokoton'); // 4회차+ = 100겹 반복
+}
+
 // ── 버터바 이벤트 스테이지 ──────────────────────────────────────
-export function enterBonus(s: GameState, round: number): void {
+export function enterBonus(s: GameState, round: number, returnMode: 'act1' | 'tokoton' = 'act1'): void {
   const idx = Math.min(round, BONUS.ROUNDS.length) - 1;
   const queue = idx >= 0 && round <= BONUS.ROUNDS.length
     ? [...BONUS.ROUNDS[idx]]
@@ -283,6 +294,7 @@ export function enterBonus(s: GameState, round: number): void {
     destroyed: 0,
     total: queue.length,
     perfect: false,
+    returnMode,
   };
   s.stack = null;
   s.stackSpawnCd = BONUS.BANNER_TICKS; // 배너 시간만큼 첫 스폰 지연
@@ -313,7 +325,7 @@ function stepBonus(s: GameState): void {
     }
     s.events.push({ kind: 'phaseClear', n: b.round });
     // 본편 복귀 — 진행도·게이지·콤보 유지 [설계]
-    s.mode = 'act1';
+    s.mode = b.returnMode;
     s.bonus = null;
     s.stack = null;
     s.stackSpawnCd = STACK.RESPAWN_TICKS;
