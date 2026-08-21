@@ -61,6 +61,15 @@ SW/manifest/아이콘은 podoal 검증본 이식.
   첫 버터바 이벤트(2.5M)는 인간 ~2~3분 — 이벤트 노출 페이싱 양호.
 - 곡선 가드 테스트 상설화: 10분 ≥1M(노잼 방지) + 3분 내 미해금(순삭 방지) + 토코톤 왕복.
 
+**배포 (폰 접속)**:
+- LAN 접속(`vite --host`)은 실패 — 네트워크 프로필이 **공용**이라 Windows 인바운드 차단.
+  기존 node.exe 허용 규칙은 다른 경로(khidi_dashboard)의 바이너리를 가리켜 무효. 방화벽 변경 대신 Pages 채택.
+- **GitHub Pages 배포 완료**: https://agape7372.github.io/ggunbbu/
+  `gh api -X POST repos/…/pages -f build_type=workflow`로 활성화 + `.github/workflows/deploy.yml`(push마다 test→build→deploy).
+- 실검증: HTTPS 200, manifest/sw.js/아이콘 전부 200, **서비스워커 등록 1건**, 터치 버튼 6개,
+  타이틀→1막 실동작(점수/콤보/라이프). base `'./'` 덕에 서브경로(`/ggunbbu/`) 호환 — SW 스코프·manifest start_url 정상.
+- 이로써 M8 잔여였던 오프라인/설치 경로가 실환경에서 확인됨(HTTP LAN에선 iOS가 SW를 막아 불가했던 부분).
+
 **잔여(M9 후보)**:
 - 오프라인 리로드 실기 확인(SW는 검증된 이식본 — 리스크 낮음).
 - 점수 곡선 실측(2막 해금까지 체감 시간) — 디버그 +1M 버튼으로 우회 가능.
