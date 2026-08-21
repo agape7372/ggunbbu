@@ -10,9 +10,11 @@ export const VIEW = {
   W: 360,
   H: 640,
   FIELD_H: 470,          // 상단 게임 필드, 하단은 조작 존
-  LANE_W: 120,
-  LANE_X: [60, 180, 300] as const,  // 레인 중심
-  FLOOR_H: 40,
+  // 원작 실측 비율 이식: 건물 1채 = 화면폭 75%(480/640), 층 높이 = 화면높이 25%(120/480),
+  // 캐릭터 높이 = 층의 0.82배(98/120). 세로 화면(360폭)에 균일 스케일 0.5625 적용.
+  LANE_W: 90,
+  LANE_X: [90, 180, 270] as const,  // 레인 중심 (건물 270px = 360의 75%)
+  FLOOR_H: 68,                       // 120 × 0.5625
   GROUND_Y: 470,         // 캔버스 픽셀상 지면 라인 (렌더 변환용)
 } as const;
 
@@ -20,10 +22,13 @@ export const VIEW = {
 export const PLAYER = {
   GRAVITY: 1780,          // px/s²
   JUMP_V0: 800,           // 정점 ≈180px, 체공 ≈0.9s — "매우 높은 점프" [정본 느낌]
-  W: 40, H: 48,
+  W: 46, H: 55,          // 원작 82×98 × 0.5625
   LANE_TWEEN_MS: 60,      // 시각 보간 전용 (논리 즉시)
-  ATTACK_REACH: 128,      // 발 기준 위
-  ATTACK_PRE: 2, ATTACK_ACTIVE: 4, ATTACK_POST: 3,  // 총 9f = 150ms
+  // 원작은 한 번의 참격이 "한 층"에 닿는다(참격 스프라이트 67px vs 층 120px).
+  // 기존 128px는 40px 층 기준 3.2개 층을 동시에 때려 위치 선정을 무의미하게 만들었다.
+  ATTACK_REACH: 68,       // = FLOOR_H (층 1개)
+  // 원작 slash.wav = 88ms → 연타 주기 ~100ms(10타/s). 총 6f.
+  ATTACK_PRE: 1, ATTACK_ACTIVE: 3, ATTACK_POST: 2,
   INPUT_BUFFER: 3,        // f
   GUARD_STARTUP_GROUND: 4, // f — "착지 직후 점프가드 불가"의 근원
   GUARD_STARTUP_AIR: 0,
@@ -37,23 +42,25 @@ export const PLAYER = {
 
 // ── 스택(건물) 물리 ─────────────────────────────────────────────
 export const STACK = {
-  HIT_LIFT_V: 170,        // 타격 밀어올림: vy = max(vy, +170)
-  GUARD_GROUND_V: 700,    // 지면 가드 바운스 [정본: 높이 띄움]
-  GUARD_AIR_V: 400,       // 공중 가드 바운스 [정본: 낮게 띄움]
-  PIN_ESCAPE_V: 500,      // 깔림 '하' 탈출 띄우기
-  PIN_MERCY_V: 400,       // 깔림 Z 실패 자비 바운스
-  GUARD_ZONE_GROUND: 56,  // building.y ≤ 56 에서 지면 가드 판정
-  GUARD_ZONE_AIR: 12,     // |building.y − (footY+48)| ≤ 12
-  SPAWN_Y: 660,           // 화면 밖 위
+  // 타격 밀어올림. 원작 설명서 "방어를 콤보보다 먼저 익혀라" = 연타만으로는 못 버티고
+  // 가드 바운스가 주 방어 수단이어야 한다 → 연타 주기(100ms) 대비 작게.
+  HIT_LIFT_V: 136,
+  GUARD_GROUND_V: 1190,    // 지면 가드 바운스 [정본: 높이 띄움]
+  GUARD_AIR_V: 680,       // 공중 가드 바운스 [정본: 낮게 띄움]
+  PIN_ESCAPE_V: 850,      // 깔림 '하' 탈출 띄우기
+  PIN_MERCY_V: 680,       // 깔림 Z 실패 자비 바운스
+  GUARD_ZONE_GROUND: 66,  // building.y ≤ 66(플레이어 키 55 + 여유) 에서 지면 가드 판정
+  GUARD_ZONE_AIR: 12,     // |building.y − (footY + PLAYER.H)| ≤ 12
+  SPAWN_Y: 720,           // 화면 밖 위
   RESPAWN_TICKS: 45,      // 완파 후 다음 스폰
   // 페이즈별 낙하 물리 [g_b px/s², V_TERM px/s]
-  ACT1_G: [900, 2000] as const,       // p=0 → p=1 선형
-  ACT1_VTERM: [140, 420] as const,    // 140 + 280·p^0.7
-  BUTTER_G: 600, BUTTER_VTERM: 90,
-  CATHEDRAL_G: 2400, CATHEDRAL_VTERM: 560,
-  TOWER_G: 700, TOWER_VTERM: 100,
-  ROCK_G: 1000, ROCK_VTERM: 320,
-  TOKOTON_G_MAX: 2400, TOKOTON_VTERM_MAX: 560,
+  ACT1_G: [1530, 3400] as const,       // p=0 → p=1 선형
+  ACT1_VTERM: [238, 714] as const,    // 140 + 280·p^0.7
+  BUTTER_G: 1020, BUTTER_VTERM: 153,
+  CATHEDRAL_G: 4080, CATHEDRAL_VTERM: 952,
+  TOWER_G: 1190, TOWER_VTERM: 170,
+  ROCK_G: 1700, ROCK_VTERM: 544,
+  TOKOTON_G_MAX: 4080, TOKOTON_VTERM_MAX: 952,
 } as const;
 
 // ── 재질 HP 테이블 [정본 구조] ──────────────────────────────────
@@ -82,15 +89,25 @@ export const ACT1 = {
 } as const;
 
 // ── 게이지 경제 [획득식만 정본 제약] ────────────────────────────
-export const GAUGE = {
+// 원작은 게이지가 2개다 (개발자 설명서 + 에셋 bougyobar.bmp / wazabar.bmp 로 확인):
+//   방어 게이지(핑크) = 가드 전용 자원, 떨어지면 가드 불가 → 피해
+//   기술 게이지(황색) = 콤보로 충전, 필살기 전용
+// 두 자원을 합치면 "가드할 때마다 필살기가 깎이는" 전혀 다른 게임이 된다.
+export const GUARD_GAUGE = {
+  MAX: 100,
+  HOLD_DRAIN_PER_S: 22,    // 홀드 중 지속 소모 [정본]
+  BOUNCE_COST_GROUND: 12,  // 바운스 성공 시 추가 소모 [정본]
+  BOUNCE_COST_AIR: 8,      // 공중 가드가 더 싸다 (숙련 보상)
+  REGEN_PER_S: 14,         // 가드를 놓고 있으면 회복 — 가드는 반복 사용 전제
+  REGEN_DELAY_TICKS: 24,   // 가드 해제 후 회복 시작까지
+  MIN_TO_GUARD: 8,
+} as const;
+
+export const WAZA_GAUGE = {
   MAX: 100,
   // min(10, 1 + floor(combo/10)) — 콤보 90+에서 10/타 = 10타 풀 [정본 충족]
   PER_HIT_BASE: 1, PER_HIT_DIV: 10, PER_HIT_MAX: 10,
-  HOLD_DRAIN_PER_S: 20,   // [정본: 지속 소모]
-  BOUNCE_COST_GROUND: 15, // [정본: 성공 시 추가 소모]
-  BOUNCE_COST_AIR: 10,
-  MIN_TO_GUARD: 10,       // [정본: 최소 게이지 필요]
-  SPECIAL_COST: 100,
+  COST: 100,
 } as const;
 
 // ── 필살기 ──────────────────────────────────────────────────────

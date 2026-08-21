@@ -3,7 +3,7 @@
 
 import type { GameState, Lane } from './types';
 import { damageStack } from './building';
-import { GAUGE, PLAYER, SCORE, STACK } from '../config';
+import { GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK } from '../config';
 
 export function addScore(s: GameState, n: number): void {
   s.score = Math.min(s.score + n, SCORE.CAP);
@@ -21,13 +21,13 @@ export function breakCombo(s: GameState): void {
 }
 
 export function gaugePerHit(combo: number): number {
-  return Math.min(GAUGE.PER_HIT_MAX, GAUGE.PER_HIT_BASE + Math.floor(combo / GAUGE.PER_HIT_DIV));
+  return Math.min(WAZA_GAUGE.PER_HIT_MAX, WAZA_GAUGE.PER_HIT_BASE + Math.floor(combo / WAZA_GAUGE.PER_HIT_DIV));
 }
 
 export function addGauge(s: GameState, n: number): void {
-  const before = s.gauge;
-  s.gauge = Math.max(0, Math.min(GAUGE.MAX, s.gauge + n));
-  if (before < GAUGE.MAX && s.gauge >= GAUGE.MAX) s.events.push({ kind: 'gaugeFull' });
+  const before = s.wazaGauge;
+  s.wazaGauge = Math.max(0, Math.min(WAZA_GAUGE.MAX, s.wazaGauge + n));
+  if (before < WAZA_GAUGE.MAX && s.wazaGauge >= WAZA_GAUGE.MAX) s.events.push({ kind: 'gaugeFull' });
 }
 
 /** 유효 타격 공통 처리: 콤보 +1 → 점수 → 게이지 */
@@ -106,7 +106,8 @@ export function tryGuardBounce(
     if (stack.y <= STACK.GUARD_ZONE_GROUND) {
       stack.vy = STACK.GUARD_GROUND_V;
       stack.resting = false;
-      s.gauge = Math.max(0, s.gauge - GAUGE.BOUNCE_COST_GROUND);
+      s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_GROUND);
+      s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
       breakCombo(s); // [정본] 지면 가드 = 콤보 단절
       s.events.push({ kind: 'guardBounce', y: stack.y });
       return true;
@@ -117,7 +118,8 @@ export function tryGuardBounce(
     if (crossed || Math.abs(stack.y - plane) <= STACK.GUARD_ZONE_AIR) {
       stack.vy = STACK.GUARD_AIR_V;
       stack.resting = false;
-      s.gauge = Math.max(0, s.gauge - GAUGE.BOUNCE_COST_AIR);
+      s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_AIR);
+      s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
       // [정본] 점프 가드 = 콤보 유지
       s.events.push({ kind: 'guardBounce', y: stack.y });
       return true;

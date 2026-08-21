@@ -7,7 +7,7 @@ import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive } fro
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, BONUS, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, GAUGE } from '../config';
+import { ACT1, BONUS, GUARD_GAUGE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, WAZA_GAUGE } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { specialHitBoss } from './boss';
 
@@ -28,7 +28,9 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     act2c: null,
     combo: 0,
     score: 0,
-    gauge: 0,
+    guardGauge: GUARD_GAUGE.MAX,
+    wazaGauge: 0,
+    guardRegenCd: 0,
     lives: PLAYER.LIVES,
     hitstop: 0,
     p: 0,
@@ -51,7 +53,7 @@ export function advance(s: GameState, input: InputFrame): void {
   }
 
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
-  if (input.special && s.gauge >= GAUGE.SPECIAL_COST
+  if (input.special && s.wazaGauge >= WAZA_GAUGE.COST
     && s.player.pose !== 'dead' && s.player.pose !== 'special') {
     triggerSpecial(s);
   }
@@ -61,6 +63,19 @@ export function advance(s: GameState, input: InputFrame): void {
     stepPinned(s, input);
   } else {
     stepPlayer(s, input, TICK);
+  }
+
+  // [정본] 점프 무적의 이면: 지면에 놓인 스택 위/옆에 착지하면 그때 깔린다
+  if (s.player.y <= 0 && s.player.pose !== 'pinned' && s.player.pose !== 'dead'
+    && s.stack?.resting && s.player.invulnTicks <= 0 && s.player.pose !== 'special'
+    && s.mode !== 'bonus') {
+    onPlayerCrushed(s);
+  }
+
+  // ── 방어 게이지 회복 (가드를 놓고 있을 때만) ──
+  if (s.guardRegenCd > 0) s.guardRegenCd -= 1;
+  else if (s.guardGauge < GUARD_GAUGE.MAX) {
+    s.guardGauge = Math.min(GUARD_GAUGE.MAX, s.guardGauge + GUARD_GAUGE.REGEN_PER_S * TICK);
   }
 
   // ── 스택 물리 + 접지 ──
@@ -98,7 +113,7 @@ export function advance(s: GameState, input: InputFrame): void {
 // ── 필살기 ──────────────────────────────────────────────────────
 function triggerSpecial(s: GameState): void {
   const p = s.player;
-  s.gauge -= GAUGE.SPECIAL_COST;
+  s.wazaGauge -= WAZA_GAUGE.COST;
   p.pose = 'special';
   p.poseTick = 0;
   p.invulnTicks = SPECIAL.IFRAMES;
@@ -212,6 +227,10 @@ function onStackGrounded(s: GameState): void {
 
   if (s.player.invulnTicks > 0 || s.player.pose === 'special') return; // 무적 중 접지 무시
 
+  // [정본] "점프 중에는 짓눌리지 않음" — 공중이면 피해 없음.
+  // 착지 시점에 스택이 아직 지면에 있으면 그때 깔린다(sim 루프의 착지 검사).
+  if (s.player.y > 0) return;
+
   if (s.mode === 'bonus') {
     // 버터바는 뭉개질 뿐 — 라이프 무손실, 콤보만 단절 [설계]
     breakCombo(s);
@@ -221,7 +240,11 @@ function onStackGrounded(s: GameState): void {
     return;
   }
 
-  // 깔림 진입 [정본: 접지 = 라이프 1 손실]
+  onPlayerCrushed(s);
+}
+
+/** 깔림 진입 [정본: 접지 = 라이프 1 손실] */
+function onPlayerCrushed(s: GameState): void {
   loseLife(s);
   if (s.over) return;
   breakCombo(s);

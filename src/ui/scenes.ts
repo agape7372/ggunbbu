@@ -5,7 +5,7 @@
 import type { GameState, InputFrame } from '../core/types';
 import { makeState, advance, enterBonus } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
-import { PALETTE, VIEW, GAUGE } from '../config';
+import { PALETTE, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, consumeEvents, initRenderer, setFeedbackOptions } from '../render/renderer';
 import { loadSave, saveSave, type SaveData } from '../storage';
 import type { InputSource } from '../input/input';
@@ -53,7 +53,7 @@ export function createApp(
 
   function startArcade(): void {
     state = makeState({ seed: (Date.now() ^ 0x9e3779b9) >>> 0 });
-    if (save.buddhaMode) { enterAct2Phase(state, 'cathedral'); state.gauge = 0; }
+    if (save.buddhaMode) { enterAct2Phase(state, 'cathedral'); state.wazaGauge = 0; }
     butterChallenge = false;
     scene = 'play';
   }
@@ -66,7 +66,7 @@ export function createApp(
 
   function startButterChallenge(round: number): void {
     state = makeState({ seed: (Date.now() ^ 0xabcdef) >>> 0 });
-    state.gauge = GAUGE.MAX;
+    state.wazaGauge = WAZA_GAUGE.MAX;
     enterBonus(state, round);
     butterChallenge = true;
     scene = 'play';
@@ -155,7 +155,7 @@ export function createApp(
         if (overlayTicks > 0) break;
         if (f.attack) {
           const s = state!;
-          if (s.mode === 'act2' && s.checkpoint > 0) { continueFromCheckpoint(s); s.gauge = 0; scene = 'play'; }
+          if (s.mode === 'act2' && s.checkpoint > 0) { continueFromCheckpoint(s); s.wazaGauge = 0; scene = 'play'; }
           else { scene = 'title'; state = null; menuIndex = 0; }
         } else if (f.special) {
           scene = 'title'; state = null; menuIndex = 0;
@@ -333,7 +333,8 @@ export function mountDebugPanel(getState: () => GameState | null): void {
   mk('화산탄', (s) => enterAct2Phase(s, 'rock'));
   mk('보스', (s) => enterAct2Phase(s, 'moon'));
   mk('+1M', (s) => { s.score = Math.min(s.score + 1_000_000, 99_999_999); });
-  mk('게이지', (s) => { s.gauge = 100; });
+  mk('기술풀', (s) => { s.wazaGauge = 100; });
+  mk('방어풀', (s) => { s.guardGauge = 100; });
   mk('버터1', (s) => enterBonus(s, 1));
   // 부처버전 토글 (상태 불필요 — 저장만)
   const bb = document.createElement('button');

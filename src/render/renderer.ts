@@ -189,12 +189,17 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
     ctx.textAlign = 'right';
     ctx.fillText(`${s.combo} COMBO`, VIEW.W - 8, 24);
   }
-  // 게이지 바
+  // 게이지 2종 [원작] — 방어(핑크, 길다) / 기술(황색, 짧다)
   const gw = 120;
   ctx.fillStyle = '#22284A';
-  ctx.fillRect(VIEW.W - gw - 8, 32, gw, 8);
-  ctx.fillStyle = s.gauge >= 100 ? PALETTE.RED : '#29E0E6';
-  ctx.fillRect(VIEW.W - gw - 8, 32, gw * (s.gauge / 100), 8);
+  ctx.fillRect(VIEW.W - gw - 8, 30, gw, 7);
+  ctx.fillStyle = '#FF6FA8';
+  ctx.fillRect(VIEW.W - gw - 8, 30, gw * (s.guardGauge / 100), 7);
+  const ww = 72;
+  ctx.fillStyle = '#22284A';
+  ctx.fillRect(VIEW.W - ww - 8, 40, ww, 5);
+  ctx.fillStyle = s.wazaGauge >= 100 ? PALETTE.RED : PALETTE.YELLOW;
+  ctx.fillRect(VIEW.W - ww - 8, 40, ww * (s.wazaGauge / 100), 5);
   // 보스 HP
   if (s.boss && s.act2Phase === 'moon') {
     ctx.fillStyle = '#22284A';

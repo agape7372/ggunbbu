@@ -3,7 +3,7 @@
 // GUARD_AIR 유지 중 착지 → GUARD_GROUND로 자동 전이(선딜 재적용).
 
 import type { GameState, InputFrame, PlayerState } from './types';
-import { GAUGE, PLAYER } from '../config';
+import { GUARD_GAUGE, PLAYER } from '../config';
 
 export function makePlayer(): PlayerState {
   return {
@@ -90,8 +90,9 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     case 'guardA': {
       p.poseTick += 1;
       // 게이지 지속 소모 [정본]
-      s.gauge = Math.max(0, s.gauge - GAUGE.HOLD_DRAIN_PER_S * dt);
-      if (s.gauge <= 0) {
+      s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.HOLD_DRAIN_PER_S * dt);
+      s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
+      if (s.guardGauge <= 0) {
         p.pose = 'guardBreak';
         p.poseTick = 0;
         s.events.push({ kind: 'guardDenied' });
@@ -151,7 +152,7 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
 
 function tryEnterGuard(s: GameState, airborne: boolean): void {
   const p = s.player;
-  if (s.gauge < GAUGE.MIN_TO_GUARD) {
+  if (s.guardGauge < GUARD_GAUGE.MIN_TO_GUARD) {
     // 최소 게이지 미달 — 경고 (엣지에서만 울리도록 buf 사용)
     if (p.bufGuard === PLAYER.INPUT_BUFFER - 1) s.events.push({ kind: 'guardDenied' });
     return;

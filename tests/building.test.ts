@@ -1,6 +1,7 @@
 // 건물 데이터 모델 규칙: 레인 세그먼트 독립 HP, 층 전체 붕괴, 밀어올림.
 import { describe, it, expect } from 'vitest';
 import { makeFloor, makeStack, damageStack, stepStack, floorSpan } from '../src/core/building';
+import { VIEW } from '../src/config';
 
 function stack3() {
   return makeStack({
@@ -60,7 +61,8 @@ describe('세그먼트/붕괴 규칙 [정본]', () => {
   it('floorSpan: 층 수직 범위 누적', () => {
     const st = stack3();
     st.y = 10;
-    expect(floorSpan(st, 0)).toEqual([10, 50]);
-    expect(floorSpan(st, 2)).toEqual([90, 130]);
+    const H = VIEW.FLOOR_H;
+    expect(floorSpan(st, 0)).toEqual([10, 10 + H]);
+    expect(floorSpan(st, 2)).toEqual([10 + 2 * H, 10 + 3 * H]);
   });
 });

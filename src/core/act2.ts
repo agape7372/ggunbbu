@@ -12,7 +12,7 @@ import { initBoss, stepBoss, tryHitBoss } from './boss';
 export function enterAct2(s: GameState): void {
   s.mode = 'act2';
   s.act2Phase = 'cathedral';
-  s.gauge = 0; // [정본] 게이지 리셋
+  s.wazaGauge = 0; // [정본] 기술 게이지 리셋 (방어 게이지는 유지)
   if (!SCORE.CARRY_COMBO_TO_ACT2) s.combo = 0;
   s.stack = null;
   s.stackSpawnCd = ACT2.INTERLUDE_TICKS;
@@ -260,7 +260,7 @@ export function continueFromCheckpoint(s: GameState): void {
   const cp = s.checkpoint;
   s.over = null;
   s.lives = 3;
-  s.gauge = 0;
+  s.wazaGauge = 0;
   s.fullCombo = false;
   s.player = { ...s.player, pose: 'idle', poseTick: 0, y: 0, vy: 0, invulnTicks: 60, pinTick: 0 };
   if (cp >= 168) { enterAct2Phase(s, 'bolt'); s.combo = 168; }

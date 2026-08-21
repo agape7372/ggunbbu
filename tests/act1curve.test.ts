@@ -13,7 +13,7 @@ function act1Policy(s: GameState): InputFrame {
   if (p.pose === 'pinned') { i.guard = true; return i; }
   const st = s.stack;
   if (!st) { i.attack = true; return i; }
-  if (p.y <= 0 && st.vy < 0 && st.y <= 56 && s.gauge >= 25) i.guard = true;
+  if (p.y <= 0 && st.vy < 0 && st.y <= 56 && s.guardGauge >= 25) i.guard = true;
   else i.attack = true;
   return i;
 }
@@ -28,7 +28,7 @@ function run(s: GameState, ticks: number): void {
 describe('1막 곡선/토코톤', () => {
   it('10분 실측: 점수가 2막 해금 사거리(±1자릿수) 안', () => {
     const s = makeState({ seed: 99 });
-    s.gauge = 50;
+    s.guardGauge = 50;
     run(s, 60 * 60 * 10);
     // 실측 로그 (DEVLOG 기록용)
     // eslint-disable-next-line no-console
@@ -40,14 +40,14 @@ describe('1막 곡선/토코톤', () => {
 
   it('3분 시점에 순삭 해금되지 않는다 (최소 플레이 타임 보장)', () => {
     const s = makeState({ seed: 7 });
-    s.gauge = 50;
+    s.guardGauge = 50;
     run(s, 60 * 60 * 3);
     expect(s.score).toBeLessThan(ACT1.UNLOCK_SCORE);
   }, 30_000);
 
   it('토코톤: 챕터 순환 경계에서 버터바 타임 진입 → 토코톤 복귀', () => {
     const s = makeState({ seed: 3, mode: 'tokoton' });
-    s.gauge = 100;
+    s.guardGauge = 100;
     let sawBonus = false;
     for (let t = 0; t < TOKOTON.CHAPTER_CYCLE_TICKS + 60 * 60 && !s.over; t++) {
       advance(s, act1Policy(s));

@@ -218,8 +218,12 @@ export interface GameState {
   act2c: { spawned: boolean; bolts: number; rocks: number; cd: number; t: number } | null;
   combo: number;
   score: number;
-  /** 0~100 */
-  gauge: number;
+  /** 방어 게이지 0~100 (원작 핑크 bougyobar) — 가드 전용. 0이면 가드 불가 */
+  guardGauge: number;
+  /** 기술 게이지 0~100 (원작 황색 wazabar) — 타격으로만 충전, 필살기 전용 */
+  wazaGauge: number;
+  /** 방어 게이지 회복 대기 틱 (가드 사용 직후 잠시 회복 정지) */
+  guardRegenCd: number;
   lives: number;
   /** 히트스톱 남은 틱 (sim 스킵, 버퍼는 수집) */
   hitstop: number;
