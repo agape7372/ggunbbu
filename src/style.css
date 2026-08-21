@@ -1,0 +1,7 @@
+/* M0 임시 — Haiku 위임 산출물이 교체 예정 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #000; overflow: hidden; touch-action: none; }
+#app { display: flex; align-items: center; justify-content: center; height: 100%; }
+#stage { position: relative; width: 360px; height: 640px; transform-origin: center; }
+#game { width: 360px; height: 640px; image-rendering: pixelated; }
+#touch-layer { position: absolute; inset: 0; pointer-events: none; }
