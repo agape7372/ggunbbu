@@ -20,6 +20,24 @@ let vibrationOn = true;
 interface Popup { text: string; x: number; y: number; ticks: number; scale: number }
 const popups: Popup[] = [];
 
+/** 콤보 숫자 팝업 — 원작은 타격마다 하나씩 생겨 여러 개가 동시에 흩뿌려진다. */
+interface NumPopup { n: number; x: number; y: number; vx: number; vy: number; ticks: number; scale: number; color: string }
+const numPopups: NumPopup[] = [];
+let popupSeed = 0;
+
+/** 결정적 흩뿌림 — rngState는 core 전용이라 여기선 카운터 해시를 쓴다. */
+function scatter(): number {
+  popupSeed = (popupSeed * 1103515245 + 12345) & 0x7fffffff;
+  return (popupSeed >>> 8) / 0x7fffff - 1; // −1..1
+}
+
+function comboColor(n: number): string {
+  if (n >= 500) return PALETTE.RED;
+  if (n >= 100) return PALETTE.YELLOW;
+  if (n >= 50) return '#7CE8FF';
+  return PALETTE.WHITE;
+}
+
 export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: boolean }): void {
   if (o.shakeLevel !== undefined) shakeLevel = o.shakeLevel;
   if (o.vibration !== undefined) vibrationOn = o.vibration;
@@ -60,6 +78,23 @@ export function consumeEvents(s: GameState): void {
       trauma = Math.min(1, Math.max(trauma, spec.shake / JUICE_SYS.SHAKE_MAX_AMP));
       if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#FFFFFF'; }
       if (s.hitstop < spec.hitstop) s.hitstop = spec.hitstop;
+    }
+    // 콤보 숫자 팝업 (타격마다 1개, 상한까지 누적)
+    if (e.kind === 'hit' || e.kind === 'bossHit') {
+      const n = e.combo ?? s.combo;
+      if (n > 0) {
+        if (numPopups.length >= JUICE_SYS.COMBO_POPUP_MAX) numPopups.shift();
+        numPopups.push({
+          n,
+          x: VIEW.LANE_X[e.lane ?? 1] + scatter() * 22,
+          y: VIEW.GROUND_Y - (e.y ?? 100) - 12 + scatter() * 10,
+          vx: scatter() * 0.9,
+          vy: -1.4 - Math.abs(scatter()) * 0.8,
+          ticks: JUICE_SYS.COMBO_POPUP_LIFE_F,
+          scale: 1 + Math.min(n / 400, 1.1),
+          color: comboColor(n),
+        });
+      }
     }
     // 의성어 (동시 3개 상한)
     const word = onomatopoeia(e.kind, e.combo ?? s.combo);
@@ -129,6 +164,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   }
 
   drawHud(ctx, s);
+  drawNumPopups(ctx);
   drawPopups(ctx);
   ctx.restore();
 
@@ -147,6 +183,30 @@ function bgColor(s: GameState): string {
   if (s.mode === 'act2') return '#101736';
   const by = ['#0D1330', '#14203A', '#0F1A2E', '#181230'];
   return by[s.chapter % 4];
+}
+
+function drawNumPopups(ctx: CanvasRenderingContext2D): void {
+  for (let i = numPopups.length - 1; i >= 0; i--) {
+    const p = numPopups[i];
+    p.ticks -= 1;
+    if (p.ticks <= 0) { numPopups.splice(i, 1); continue; }
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.09;            // 살짝 떨어지며 사라짐
+    const t = p.ticks / JUICE_SYS.COMBO_POPUP_LIFE_F;
+    const pop = p.ticks > JUICE_SYS.COMBO_POPUP_LIFE_F - 3 ? 1.35 : 1; // 등장 순간 튐
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, t * 2.2);
+    ctx.translate(p.x, p.y);
+    ctx.font = `bold ${Math.round(13 * p.scale * pop)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#0A0A14';
+    ctx.strokeText(String(p.n), 0, 0);
+    ctx.fillStyle = p.color;
+    ctx.fillText(String(p.n), 0, 0);
+    ctx.restore();
+  }
 }
 
 function drawPopups(ctx: CanvasRenderingContext2D): void {

@@ -217,6 +217,8 @@ export const JUICE_SYS = {
   SHAKE_HALF_LIFE_F: 6,
   PARTICLE_POOL: 256,
   ONOMATOPOEIA_MAX: 3,    // 동시 의성어 팝업 상한
+  COMBO_POPUP_MAX: 16,    // 동시 콤보 숫자 팝업 상한 (원작: 타격마다 숫자가 흩뿌려짐)
+  COMBO_POPUP_LIFE_F: 26, // 숫자 팝업 수명(프레임)
   PITCH_JITTER: 0.06,     // SFX 피치 ±6%
   PITCH_STEP_PER_10_COMBO: 1, // 반음
 } as const;
