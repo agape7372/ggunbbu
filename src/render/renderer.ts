@@ -27,8 +27,8 @@ let popupSeed = 0;
 
 /** 결정적 흩뿌림 — rngState는 core 전용이라 여기선 카운터 해시를 쓴다. */
 function scatter(): number {
-  popupSeed = (popupSeed * 1103515245 + 12345) & 0x7fffffff;
-  return (popupSeed >>> 8) / 0x7fffff - 1; // −1..1
+  popupSeed = (Math.imul(popupSeed, 1103515245) + 12345) & 0x7fffffff;
+  return ((popupSeed >>> 8) / 0x7fffff) * 2 - 1; // −1..1
 }
 
 function comboColor(n: number): string {
