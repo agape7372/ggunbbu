@@ -103,9 +103,9 @@ export const SPECIAL = {
 
 // ── 점수 [산술 검증: 1,500타 ≈ 7~9분에 9,999,999] ──────────────
 export const SCORE = {
-  BASE_HIT: 10,           // 타격 = 10 × min(combo, 999)
-  FLOOR_BONUS: 500,
-  DESTROY_BONUS: 2000,
+  BASE_HIT: 20,           // 타격 = 20 × min(combo, 999) (실측 튜닝: 10→20, DEVLOG 참조)
+  FLOOR_BONUS: 1000,
+  DESTROY_BONUS: 5000,
   BOLT_BONUS: 1000,
   CANCEL_BONUS: 1000,
   BOSS_BONUS: 1_000_000,

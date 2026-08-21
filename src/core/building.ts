@@ -25,6 +25,7 @@ export interface StackOpts {
   specialImmune?: boolean;
   sharedHp?: boolean;
   y?: number;
+  vy?: number;
 }
 
 export function makeStack(o: StackOpts): FallingStack {
@@ -34,7 +35,7 @@ export function makeStack(o: StackOpts): FallingStack {
     theme: o.theme,
     floors: o.floors,
     y: o.y ?? STACK.SPAWN_Y,
-    vy: 0,
+    vy: o.vy ?? 0,
     specialImmune: o.specialImmune ?? false,
     sharedHp: o.sharedHp ?? false,
     resting: false,

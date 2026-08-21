@@ -180,6 +180,11 @@ export function createApp(
       showOverlay(STORY.intro, 60 * 6);
       return;
     }
+    // 토코톤 주기 버터바: 챕터 내레이션 없이 배너만
+    if (s.mode === 'bonus' && wasMode === 'tokoton') {
+      showOverlay(['— 버터바 타임! —'], 60 * 2);
+      return;
+    }
     // 챕터 해금 내레이션 조각
     if (s.mode === 'bonus' && wasMode === 'act1') {
       const ch = s.chapter;

@@ -54,7 +54,8 @@ export function spawnAct1Building(s: GameState): void {
     }
     floors.push(f);
   }
-  s.stack = makeStack({ variant: 'building', theme, floors });
+  // 접근 데드타임 절감: 스폰 시 초기 낙하속도 부여 (아키텍처 명세 반영)
+  s.stack = makeStack({ variant: 'building', theme, floors, vy: -70 });
 }
 
 function pickMat(s: GameState, dist: [number, number, number]): Material {
