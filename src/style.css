@@ -1,7 +1,178 @@
-/* M0 임시 — Haiku 위임 산출물이 교체 예정 */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; background: #000; overflow: hidden; touch-action: none; }
-#app { display: flex; align-items: center; justify-content: center; height: 100%; }
-#stage { position: relative; width: 360px; height: 640px; transform-origin: center; }
-#game { width: 360px; height: 640px; image-rendering: pixelated; }
-#touch-layer { position: absolute; inset: 0; pointer-events: none; }
+/* 건뿌 스타일 — 반응형 레터박스 + 터치 UI 레이어 */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* 논리 캔버스 360×640, 스케일은 JS가 설정 */
+#stage {
+  position: relative;
+  width: 360px;
+  height: 640px;
+  transform-origin: center;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* 터치 조작 존 — 캔버스 하단 26% (y 470~640px) */
+#touch-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 터치 버튼 공통 스타일 */
+.tbtn {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f1e8;
+  font-family: system-ui, sans-serif;
+  font-weight: bold;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: none;
+  touch-action: manipulation;
+}
+
+/* 히트 영역 확장 (-8px) */
+.tbtn::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  pointer-events: auto;
+  z-index: -1;
+}
+
+/* 버튼 활성화 상태 */
+.tbtn.active {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(0.92);
+}
+
+/* 버튼 배치 (절대 px, 360×640 논리 좌표) */
+#btn-left {
+  left: 12px;
+  top: 528px;
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}
+
+#btn-right {
+  left: 84px;
+  top: 528px;
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}
+
+#btn-jump {
+  left: 244px;
+  top: 476px;
+  width: 60px;
+  height: 60px;
+  font-size: 11px;
+}
+
+#btn-guard {
+  left: 214px;
+  top: 540px;
+  width: 60px;
+  height: 60px;
+  font-size: 11px;
+}
+
+#btn-attack {
+  left: 284px;
+  top: 556px;
+  width: 72px;
+  height: 72px;
+  font-size: 12px;
+}
+
+#btn-special {
+  left: 160px;
+  top: 480px;
+  width: 52px;
+  height: 52px;
+  font-size: 9px;
+}
+
+/* 왼손잡이 모드: 좌우 반전 배치 */
+#touch-layer.mirror #btn-left {
+  left: auto;
+  right: 12px;
+}
+
+#touch-layer.mirror #btn-right {
+  left: auto;
+  right: 84px;
+}
+
+#touch-layer.mirror #btn-jump {
+  left: auto;
+  right: 244px;
+}
+
+#touch-layer.mirror #btn-guard {
+  left: auto;
+  right: 214px;
+}
+
+#touch-layer.mirror #btn-attack {
+  left: auto;
+  right: 284px;
+}
+
+#touch-layer.mirror #btn-special {
+  left: auto;
+  right: 160px;
+}
+
+/* Safe-area inset 미적용 사유: #stage가 transform scale 기반이므로
+   전체 뷰포트 스케일링이 안전 영역과 충돌 가능.
+   버튼은 절대 px로 고정되어 있으므로 safe-area inset 불필요.
+   필요 시 별도 모달/메뉴에서만 적용. */

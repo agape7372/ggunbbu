@@ -41,6 +41,8 @@ export interface FallingStack {
   sharedHp: boolean;
   /** 접지 후 정지 상태 (깔림) */
   resting: boolean;
+  /** 스폰 시 총 층수 (완파 보너스 계산용) */
+  totalFloors: number;
 }
 
 export interface Bolt {
@@ -105,7 +107,7 @@ export interface PlayerState {
   y: number;
   vy: number;
   pose: PlayerPose;
-  /** attack 진행 틱 (0=시작) */
+  /** 현재 pose 진행 틱 (0=시작). guard 선딜/attack 프레임/스턴 카운트에 사용 */
   poseTick: number;
   invulnTicks: number;
   /** 공격 입력 버퍼 남은 틱 */
@@ -114,6 +116,10 @@ export interface PlayerState {
   bufGuard: number;
   /** 깔림 반복 라이프 손실 타이머 */
   pinTick: number;
+  /** 이번 attack 판정 묶음에서 이미 명중했는가 (묶음당 1히트) */
+  attackHit: boolean;
+  /** attack 종료 후 복귀할 상태가 공중인가 */
+  attackFromAir: boolean;
 }
 
 export type Act2Phase = 'cathedral' | 'tower' | 'bolt' | 'rock' | 'moon';
@@ -207,6 +213,8 @@ export interface GameState {
   groundRocks: [number, number, number];
   boss: BossState | null;
   bonus: BonusState | null;
+  /** 2막 페이즈 진행 카운터 (act2.ts 전용) */
+  act2c: { spawned: boolean; bolts: number; rocks: number; cd: number; t: number } | null;
   combo: number;
   score: number;
   /** 0~100 */
