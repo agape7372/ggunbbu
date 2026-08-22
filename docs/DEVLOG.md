@@ -196,3 +196,9 @@ kaminari(번개) 268ms / waza(필살기) 947ms.
 ### 남은 리스크
 - 회피 수단이 사라져 **번개·화산탄 구간 인간 난이도 상승**. 폰 실기 테스트에서 확인 필요.
   노브: `BOLT_ZONE_TICKS`(16f 창), `ROCK_GAP_END`, `GUARD_GAUGE.REGEN_PER_S`.
+## 2026-08-22 — 손맛 갭
+
+- HIT_LIFT_V 136→80. 연타로 건물 안 뜸 (combat 테스트).
+- 층 붕괴 잔해 박스 3개 낙하. destroy(hakai)와 gorogoro 레이어 분리.
+- 공중가드 성공을 `guardAirBounce` 로 분리. 지면가드는 콤보 단절 유지. GUARD_AIR_V·HIT_LIFT 불변.
+

@@ -141,7 +141,7 @@ export function tryGuardBounce(
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_AIR);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
       // [정본] 점프 가드 = 콤보 유지
-      s.events.push({ kind: 'guardBounce', y: stack.y });
+      s.events.push({ kind: 'guardAirBounce', y: stack.y });
       return true;
     }
   }

@@ -170,7 +170,7 @@ export type Mode = 'act1' | 'act2' | 'tokoton' | 'bonus';
 /** 타격감 이벤트 — core가 발행, 렌더/오디오/햅틱이 소비 (JUICE 매트릭스 키) */
 export type JuiceKind =
   | 'hit' | 'floorCollapse' | 'stackDestroy' | 'butterCollapse'
-  | 'special' | 'hurt' | 'guardBounce' | 'bossHit' | 'bossDefeat'
+  | 'special' | 'hurt' | 'guardBounce' | 'guardAirBounce' | 'bossHit' | 'bossDefeat'
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'guardDenied' | 'lifeLost';

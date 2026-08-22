@@ -213,6 +213,7 @@ export const JUICE: Record<string, JuiceSpec> = {
   special:        { hitstop: 10, shake: 10, flash: 2, particles: 24 },
   hurt:           { hitstop: 4, shake: 8, flash: 3, particles: 4 },
   guardBounce:    { hitstop: 1, shake: 2, flash: 2, particles: 3 },
+  guardAirBounce: { hitstop: 2, shake: 3, flash: 3, particles: 5 },
   bossHit:        { hitstop: 2, shake: 1, flash: 2, particles: 4 },
   bossDefeat:     { hitstop: 30, shake: 12, flash: 4, particles: 64 },
 };

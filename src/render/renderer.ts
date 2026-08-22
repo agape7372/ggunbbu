@@ -56,6 +56,7 @@ function onomatopoeia(kind: string, combo: number): string | null {
     case 'butterCollapse': return '팟!';
     case 'special': return '천지개벽!!!';
     case 'bossDefeat': return '작전성공';
+    case 'guardAirBounce': return '탁!';
     default: return null;
   }
 }
@@ -63,7 +64,7 @@ function onomatopoeia(kind: string, combo: number): string | null {
 const SFX_MAP: Record<string, SfxNameOf> = {
   hit: 'hit', floorCollapse: 'floorCollapse', stackDestroy: 'destroy',
   butterCollapse: 'butterPop', special: 'special', hurt: 'pinned',
-  guardBounce: 'guardGround', bossHit: 'bossHit', bossDefeat: 'bossDefeat',
+  guardBounce: 'guardGround', guardAirBounce: 'guardAir', bossHit: 'bossHit', bossDefeat: 'bossDefeat',
   boltCue: 'boltCue', boltStrike: 'boltStrike', gaugeFull: 'gaugeFull',
   comboBreak: 'guardBreak', jump: 'jump', land: 'land',
   guardDenied: 'gaugeWarn', lifeLost: 'lifeLost', bonusEnter: 'perfect',
