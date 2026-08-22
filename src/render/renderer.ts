@@ -11,7 +11,7 @@ import { playSfx, type SfxNameOf } from '../audio/bridge';
 
 let trauma = 0;
 let flashTicks = 0;
-let flashColor = '#FFFFFF';
+let flashColor = '#1A1A20';
 let shakeSeed = 0;
 let hitHapticCount = 0;
 let shakeLevel: 0 | 1 | 2 = 2;
@@ -34,8 +34,8 @@ function scatter(): number {
 function comboColor(n: number): string {
   if (n >= 500) return PALETTE.RED;
   if (n >= 100) return PALETTE.YELLOW;
-  if (n >= 50) return '#7CE8FF';
-  return PALETTE.WHITE;
+  if (n >= 50) return PALETTE.BLUE;
+  return PALETTE.INK;
 }
 
 export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: boolean }): void {
@@ -62,7 +62,7 @@ function onomatopoeia(kind: string, combo: number): string | null {
 }
 
 const SFX_MAP: Record<string, SfxNameOf> = {
-  hit: 'hit', floorCollapse: 'floorCollapse', stackDestroy: 'destroy',
+  slash: 'hit', hit: 'hit', floorCollapse: 'floorCollapse', stackDestroy: 'destroy',
   butterCollapse: 'butterPop', special: 'special', hurt: 'pinned',
   guardBounce: 'guardGround', guardAirBounce: 'guardAir', bossHit: 'bossHit', bossDefeat: 'bossDefeat',
   boltCue: 'boltCue', boltStrike: 'boltStrike', gaugeFull: 'gaugeFull',
@@ -77,7 +77,7 @@ export function consumeEvents(s: GameState): void {
     const spec = JUICE[e.kind];
     if (spec) {
       trauma = Math.min(1, Math.max(trauma, spec.shake / JUICE_SYS.SHAKE_MAX_AMP));
-      if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#FFFFFF'; }
+      if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#1A1A20'; }
       if (s.hitstop < spec.hitstop) s.hitstop = spec.hitstop;
     }
     // 콤보 숫자 팝업 (타격마다 1개, 상한까지 누적)
@@ -151,7 +151,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.fillStyle = bgColor(s);
   ctx.fillRect(-16, -16, VIEW.W + 32, VIEW.H + 32);
   // 지면
-  ctx.fillStyle = '#1A2142';
+  ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
 
   const g = VIEW.GROUND_Y;
@@ -163,7 +163,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
 
   // 플레이어 (피격 무적 점멸)
   if (s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
-    drawPlayer(ctx, s.player.pose, s.tick, VIEW.LANE_X[s.player.lane], g - s.player.y);
+    drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
   }
 
   drawHud(ctx, s);
@@ -195,10 +195,10 @@ function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number
 }
 
 function bgColor(s: GameState): string {
-  if (s.mode === 'bonus') return '#2A2240';
-  if (s.act2Phase === 'moon') return '#070B1E';
-  if (s.mode === 'act2') return '#101736';
-  const by = ['#0D1330', '#14203A', '#0F1A2E', '#181230'];
+  if (s.mode === 'bonus') return '#FFF8DC';
+  if (s.act2Phase === 'moon') return '#E4E0D6';
+  if (s.mode === 'act2') return '#EAE6DA';
+  const by = ['#F4F1E8', '#F0EEE4', '#F2EDE2', '#EFEDE6'];
   return by[s.chapter % 4];
 }
 
@@ -218,7 +218,7 @@ function drawNumPopups(ctx: CanvasRenderingContext2D): void {
     ctx.font = `bold ${Math.round(13 * p.scale * pop)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.lineWidth = 3;
-    ctx.strokeStyle = '#0A0A14';
+    ctx.strokeStyle = '#F4F1E8';
     ctx.strokeText(String(p.n), 0, 0);
     ctx.fillStyle = p.color;
     ctx.fillText(String(p.n), 0, 0);
@@ -239,7 +239,7 @@ function drawPopups(ctx: CanvasRenderingContext2D): void {
     ctx.font = `bold ${Math.round(14 * p.scale)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.lineWidth = 3;
-    ctx.strokeStyle = '#0A0A14';
+    ctx.strokeStyle = '#F4F1E8';
     ctx.strokeText(p.text, 0, 0);
     ctx.fillStyle = PALETTE.YELLOW;
     ctx.fillText(p.text, 0, 0);
@@ -251,7 +251,7 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.font = 'bold 14px monospace';
   ctx.textAlign = 'left';
   // 점수 (8자리)
-  ctx.fillStyle = PALETTE.WHITE;
+  ctx.fillStyle = PALETTE.INK;
   ctx.fillText(String(s.score).padStart(8, '0'), 8, 20);
   // 라이프
   for (let i = 0; i < s.lives; i++) {
@@ -268,18 +268,18 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
   }
   // 게이지 2종 [원작] — 방어(핑크, 길다) / 기술(황색, 짧다)
   const gw = 120;
-  ctx.fillStyle = '#22284A';
+  ctx.fillStyle = '#D5D0C4';
   ctx.fillRect(VIEW.W - gw - 8, 30, gw, 7);
   ctx.fillStyle = '#FF6FA8';
   ctx.fillRect(VIEW.W - gw - 8, 30, gw * (s.guardGauge / 100), 7);
   const ww = 72;
-  ctx.fillStyle = '#22284A';
+  ctx.fillStyle = '#D5D0C4';
   ctx.fillRect(VIEW.W - ww - 8, 40, ww, 5);
   ctx.fillStyle = s.wazaGauge >= 100 ? PALETTE.RED : PALETTE.YELLOW;
   ctx.fillRect(VIEW.W - ww - 8, 40, ww * (s.wazaGauge / 100), 5);
   // 보스 HP
   if (s.boss && s.act2Phase === 'moon') {
-    ctx.fillStyle = '#22284A';
+    ctx.fillStyle = '#D5D0C4';
     ctx.fillRect(40, 48, VIEW.W - 80, 6);
     ctx.fillStyle = PALETTE.RED;
     ctx.fillRect(40, 48, (VIEW.W - 80) * (s.boss.hp / 230), 6);

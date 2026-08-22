@@ -302,3 +302,26 @@ describe('층 붕괴 잔해', () => {
     expect(s.debris.some((d) => d.life > 60)).toBe(true);
   });
 });
+
+describe('헛스윙', () => {
+  it('사거리 밖 연타도 6f마다 slash가 나고 히트스톱·콤보는 없다', () => {
+    const s = makeState();
+    s.stack = null;
+    s.stackSpawnCd = 9999;
+    const slashes: number[] = [];
+    for (let i = 0; i < 24; i++) {
+      s.events.length = 0;
+      advance(s, inp({ attack: true }));
+      if (s.events.some((e) => e.kind === 'slash')) slashes.push(s.tick);
+      expect(s.events.some((e) => e.kind === 'hit')).toBe(false);
+      expect(s.hitstop).toBe(0);
+    }
+    expect(s.combo).toBe(0);
+    expect(slashes.length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < slashes.length; i++) {
+      const d = slashes[i] - slashes[i - 1];
+      expect(d).toBeGreaterThanOrEqual(6);
+      expect(d).toBeLessThanOrEqual(7);
+    }
+  });
+});

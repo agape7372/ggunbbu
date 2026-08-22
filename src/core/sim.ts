@@ -7,7 +7,7 @@ import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive } fro
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, BONUS, GUARD_GAUGE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, WAZA_GAUGE } from '../config';
+import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, WAZA_GAUGE } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { specialHitBoss } from './boss';
 
@@ -53,22 +53,6 @@ export function advance(s: GameState, input: InputFrame): void {
     return;
   }
 
-  /* stepDebris lives below */ if (false) { function stepDebris(s: GameState): void {
-  if (s.debris.length === 0) return;
-  const g = 1780;
-  const dt = TICK;
-  for (let i = s.debris.length - 1; i >= 0; i--) {
-    const d = s.debris[i];
-    d.vy -= g * dt;
-    d.y += d.vy * dt;
-    d.x += d.vx * dt;
-    d.life -= 1;
-    if (d.y <= 0) { d.y = 0; d.vy *= -0.25; d.vx *= 0.7; }
-    if (d.life <= 0) s.debris.splice(i, 1);
-  }
-}
-  stepDebris(s);
-  }
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
   if (input.special && s.wazaGauge >= WAZA_GAUGE.COST
     && s.player.pose !== 'dead' && s.player.pose !== 'special') {
@@ -119,6 +103,9 @@ export function advance(s: GameState, input: InputFrame): void {
     if (tryHitAct2Targets(s)) s.player.attackHit = true;
     else if (tryHitStack(s, s.player.lane, s.player.y)) s.player.attackHit = true;
   }
+  if (s.player.pose === 'attack' && s.player.poseTick === PLAYER.ATTACK_PRE && !s.player.attackHit) {
+    s.events.push({ kind: 'slash' });
+  }
 
   stepDebris(s);
 
@@ -131,7 +118,7 @@ export function advance(s: GameState, input: InputFrame): void {
 
 function stepDebris(s: GameState): void {
   if (s.debris.length === 0) return;
-  const g = 1780;
+  const g = DEBRIS.GRAVITY;
   const dt = TICK;
   for (let i = s.debris.length - 1; i >= 0; i--) {
     const d = s.debris[i];
@@ -139,7 +126,7 @@ function stepDebris(s: GameState): void {
     d.y += d.vy * dt;
     d.x += d.vx * dt;
     d.life -= 1;
-    if (d.y <= 0) { d.y = 0; d.vy *= -0.25; d.vx *= 0.7; }
+    if (d.y <= 0) { d.y = 0; d.vy *= DEBRIS.BOUNCE_VY; d.vx *= DEBRIS.BOUNCE_VX; }
     if (d.life <= 0) s.debris.splice(i, 1);
   }
 }

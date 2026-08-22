@@ -64,6 +64,14 @@ export const STACK = {
   TOKOTON_G_MAX: 4080, TOKOTON_VTERM_MAX: 952,
 } as const;
 
+// ── 잔해(파편) 물리 ─────────────────────────────────────────────
+export const DEBRIS = {
+  GRAVITY: 1780,     // px/s²
+  BOUNCE_VY: -0.25,  // 지면 반사 시 vy 감쇠 배수
+  BOUNCE_VX: 0.7,    // 지면 반사 시 vx 감쇠 배수
+  LIFE_F: 90,        // 소멸까지 수명(프레임)
+} as const;
+
 // ── 재질 HP 테이블 [정본 구조] ──────────────────────────────────
 export const MAT_HP: Record<string, number> = {
   weak: 1, mid: 2, hard: 3,
@@ -206,6 +214,7 @@ export interface JuiceSpec {
   particles: number;
 }
 export const JUICE: Record<string, JuiceSpec> = {
+  slash:          { hitstop: 0, shake: 0, flash: 0, particles: 0 },
   hit:            { hitstop: 2, shake: 1, flash: 2, particles: 5 },
   floorCollapse:  { hitstop: 3, shake: 3, flash: 2, particles: 10 },
   stackDestroy:   { hitstop: 6, shake: 6, flash: 0, particles: 24 },
@@ -238,7 +247,8 @@ export const HAPTIC = {
 
 // ── 브랜드 팔레트 ───────────────────────────────────────────────
 export const PALETTE = {
-  BG: '#0D1330',
+  BG: '#F4F1E8',
+  INK: '#1A1A20',
   RED: '#E5302E', YELLOW: '#FFD200', BLUE: '#1E62D0',
   WHITE: '#F4F1E8',
 } as const;

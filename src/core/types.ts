@@ -173,7 +173,7 @@ export type JuiceKind =
   | 'special' | 'hurt' | 'guardBounce' | 'guardAirBounce' | 'bossHit' | 'bossDefeat'
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
-  | 'jump' | 'land' | 'guardDenied' | 'lifeLost';
+  | 'jump' | 'land' | 'guardDenied' | 'lifeLost' | 'slash';
 
 export interface JuiceEvent {
   kind: JuiceKind;
