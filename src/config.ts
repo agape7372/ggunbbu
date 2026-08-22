@@ -45,7 +45,7 @@ export const PLAYER = {
 export const STACK = {
   // 타격 밀어올림. 원작 설명서 "방어를 콤보보다 먼저 익혀라" = 연타만으로는 못 버티고
   // 가드 바운스가 주 방어 수단이어야 한다 → 연타 주기(100ms) 대비 작게.
-  HIT_LIFT_V: 136,
+  HIT_LIFT_V: 80,
   GUARD_GROUND_V: 1190,    // 지면 가드 바운스 [정본: 높이 띄움]
   GUARD_AIR_V: 680,       // 공중 가드 바운스 [정본: 낮게 띄움]
   PIN_ESCAPE_V: 850,      // 깔림 '하' 탈출 띄우기

@@ -275,3 +275,21 @@ describe('1막 → 2막 전환 [정본]', () => {
     expect(s.combo).toBe(123);
   });
 });
+describe('연타 밀어올림', () => {
+  it('같은 스택을 연타해도 y가 시작보다 떠오르지 않는다', () => {
+    const s = makeState();
+    withStack(s, 80, 'hard', 40);
+    s.stack!.vy = 0;
+    const held = s.stack!;
+    const y0 = held.y;
+    let yMax = y0;
+    for (let i = 0; i < 180; i++) {
+      advance(s, inp({ attack: true }));
+      if (s.stack !== held) break;
+      yMax = Math.max(yMax, held.y);
+    }
+    expect(s.stack).toBe(held);
+    expect(yMax).toBeLessThanOrEqual(y0 + 8);
+    expect(held.y).toBeLessThan(y0);
+  });
+});
