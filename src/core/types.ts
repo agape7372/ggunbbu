@@ -26,6 +26,16 @@ export interface Floor {
 
 export type StackVariant = 'building' | 'butterbar' | 'cathedral' | 'skyscraper';
 
+export interface DebrisPiece {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  w: number;
+  h: number;
+  life: number;
+}
+
 export interface FallingStack {
   kind: 'stack';
   variant: StackVariant;
@@ -213,6 +223,8 @@ export interface GameState {
   /** 다음 스택 스폰까지 틱 */
   stackSpawnCd: number;
   entities: Entity[];
+  /** 층 붕괴 후 남아 떨어지는 박스 */
+  debris: DebrisPiece[];
   /** 레인별 바닥 적재 화산탄 수 */
   groundRocks: number;
   boss: BossState | null;

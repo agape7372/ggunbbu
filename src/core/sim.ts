@@ -22,6 +22,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     stack: null,
     stackSpawnCd: 30,
     entities: [],
+    debris: [],
     groundRocks: 0,
     boss: null,
     bonus: null,
@@ -52,6 +53,22 @@ export function advance(s: GameState, input: InputFrame): void {
     return;
   }
 
+  /* stepDebris lives below */ if (false) { function stepDebris(s: GameState): void {
+  if (s.debris.length === 0) return;
+  const g = 1780;
+  const dt = TICK;
+  for (let i = s.debris.length - 1; i >= 0; i--) {
+    const d = s.debris[i];
+    d.vy -= g * dt;
+    d.y += d.vy * dt;
+    d.x += d.vx * dt;
+    d.life -= 1;
+    if (d.y <= 0) { d.y = 0; d.vy *= -0.25; d.vx *= 0.7; }
+    if (d.life <= 0) s.debris.splice(i, 1);
+  }
+}
+  stepDebris(s);
+  }
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
   if (input.special && s.wazaGauge >= WAZA_GAUGE.COST
     && s.player.pose !== 'dead' && s.player.pose !== 'special') {
@@ -103,6 +120,8 @@ export function advance(s: GameState, input: InputFrame): void {
     else if (tryHitStack(s, s.player.lane, s.player.y)) s.player.attackHit = true;
   }
 
+  stepDebris(s);
+
   // ── 모드 진행 ──
   if (s.mode === 'act1') stepAct1(s);
   else if (s.mode === 'tokoton') stepTokoton(s);
@@ -110,6 +129,20 @@ export function advance(s: GameState, input: InputFrame): void {
   else if (s.mode === 'act2') stepAct2(s);
 }
 
+function stepDebris(s: GameState): void {
+  if (s.debris.length === 0) return;
+  const g = 1780;
+  const dt = TICK;
+  for (let i = s.debris.length - 1; i >= 0; i--) {
+    const d = s.debris[i];
+    d.vy -= g * dt;
+    d.y += d.vy * dt;
+    d.x += d.vx * dt;
+    d.life -= 1;
+    if (d.y <= 0) { d.y = 0; d.vy *= -0.25; d.vx *= 0.7; }
+    if (d.life <= 0) s.debris.splice(i, 1);
+  }
+}
 // ── 필살기 ──────────────────────────────────────────────────────
 function triggerSpecial(s: GameState): void {
   const p = s.player;

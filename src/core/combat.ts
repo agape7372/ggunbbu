@@ -4,6 +4,8 @@
 import type { GameState, Lane } from './types';
 import { damageStack } from './building';
 import { GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK } from '../config';
+import { VIEW } from '../config';
+import { rand } from './rng';
 
 export function addScore(s: GameState, n: number): void {
   s.score = Math.min(s.score + n, SCORE.CAP);
@@ -65,6 +67,7 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
       lane, y: yHit, mat, combo: s.combo + 1,
     });
     registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS });
+    spawnFloorDebris(s, yHit);
     if (stack.floors.length === 0) {
       destroyStack(s);
     }
@@ -76,6 +79,23 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
 }
 
 /** 스택 완파 처리 (마지막 층 붕괴 or 필살기) */
+function spawnFloorDebris(s: GameState, yHit: number): void {
+  const cx = VIEW.LANE_X[0];
+  const fw = VIEW.LANE_W;
+  const fh = VIEW.FLOOR_H;
+  for (let i = 0; i < 3; i++) {
+    s.debris.push({
+      x: cx - fw / 2 + fw * (0.2 + 0.3 * i) + (rand(s) - 0.5) * 16,
+      y: yHit + fh * 0.4,
+      vx: (i - 1) * 90 + (rand(s) - 0.5) * 40,
+      vy: 80 + rand(s) * 60,
+      w: 28 + rand(s) * 18,
+      h: 22 + rand(s) * 14,
+      life: 90,
+    });
+  }
+}
+
 export function destroyStack(s: GameState): void {
   const stack = s.stack;
   if (!stack) return;

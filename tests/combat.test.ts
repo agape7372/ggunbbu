@@ -293,3 +293,12 @@ describe('연타 밀어올림', () => {
     expect(held.y).toBeLessThan(y0);
   });
 });
+describe('층 붕괴 잔해', () => {
+  it('붕괴 후 박스가 남아 떨어진다', () => {
+    const s = makeState();
+    withStack(s, 30, 'weak', 2);
+    for (let i = 0; i < 20; i++) advance(s, inp({ attack: i % 6 === 0 }));
+    expect(s.debris.length).toBeGreaterThanOrEqual(3);
+    expect(s.debris.some((d) => d.life > 60)).toBe(true);
+  });
+});

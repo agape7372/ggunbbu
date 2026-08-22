@@ -155,6 +155,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
 
   const g = VIEW.GROUND_Y;
   if (s.stack) { drawStackShadow(ctx, s.stack, g); drawStack(ctx, s.stack, g); }
+  drawDebris(ctx, s, g);
   drawGroundRocks(ctx, s.groundRocks, g);
   for (const e of s.entities) if (e.kind !== 'stack') drawEntity(ctx, e, g);
   if (s.boss) drawBoss(ctx, s.boss, g);
@@ -175,6 +176,20 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     ctx.fillStyle = flashColor;
     ctx.fillRect(0, 0, VIEW.W, VIEW.H);
     ctx.globalAlpha = 1;
+  }
+}
+
+function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number): void {
+  for (const d of s.debris) {
+    const a = Math.min(1, d.life / 18);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#3A3A42';
+    ctx.fillRect(d.x - d.w / 2, groundY - d.y - d.h, d.w, d.h);
+    ctx.strokeStyle = '#1A1A20';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(d.x - d.w / 2, groundY - d.y - d.h, d.w, d.h);
+    ctx.restore();
   }
 }
 
