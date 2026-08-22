@@ -114,6 +114,7 @@ export function consumeEvents(s: GameState): void {
     if (sfx) {
       const semis = e.kind === 'hit' ? Math.floor(((e.combo ?? 0) / 10) % 12) : 0;
       playSfx(sfx, semis);
+      if (e.kind === 'stackDestroy') playSfx('gorogoro');
     }
     // 진동 (연타 스로틀)
     if (vibrationOn && 'vibrate' in navigator) {

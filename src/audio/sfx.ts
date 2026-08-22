@@ -2,7 +2,7 @@
 // 사이드이펙트 없음: 노이즈 버퍼도 모듈 내부에서 lazy 생성.
 
 export type SfxName =
-  | 'hit' | 'hitStrong' | 'floorCollapse' | 'destroy' | 'butterPop'
+  | 'hit' | 'hitStrong' | 'floorCollapse' | 'destroy' | 'gorogoro' | 'butterPop'
   | 'guardGround' | 'guardAir' | 'guardBreak' | 'gaugeWarn'
   | 'jump' | 'land' | 'gaugeFull' | 'special'
   | 'pinned' | 'lifeLost' | 'boltCue' | 'boltStrike' | 'cancel'
@@ -102,6 +102,7 @@ type SfxPreset = (ctx: AudioContext, dest: AudioNode, t: number, rate: number) =
 export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   hit: (ctx, dest, t, rate) => {
     playOsc(ctx, dest, t, 'square', 220, 0.04, 0.35, rate, { freqEnd: 140, attack: 0.002 });
+    playOsc(ctx, dest, t + 0.04, 'square', 140, 0.048, 0.12, rate, { freqEnd: 90, attack: 0.001 });
   },
 
   hitStrong: (ctx, dest, t, rate) => {
@@ -126,6 +127,15 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
       playOsc(ctx, dest, d, 'sawtooth', c.freq, 0.1, c.peak * 0.9, rate, { freqEnd: c.freqEnd });
     });
     playOsc(ctx, dest, t, 'sine', 50, 0.2, 0.5, rate, { freqEnd: 30 });
+  },
+
+  gorogoro: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 42, 1.9, 0.18, rate, { freqEnd: 22, attack: 0.04 });
+    for (let i = 0; i < 9; i++) {
+      const d = t + i * 0.2;
+      const peak = 0.12 * (1 - i / 9);
+      playNoise(ctx, dest, d, 0.28, peak, { filterType: 'lowpass', freqStart: 900 - i * 70, freqEnd: 140 });
+    }
   },
 
   butterPop: (ctx, dest, t, rate) => {
