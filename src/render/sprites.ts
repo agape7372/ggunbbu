@@ -314,7 +314,8 @@ function drawTileInstance(
 }
 
 // ══════════════════════════════════════════════════════════════
-// 플레이어 "뿌뿌" (32×48 발 기준 논리 규격, 실제 캔버스는 앵커 포함 여유폭)
+// 플레이어 "뿌뿌" — 졸라맨 라인아트. 얼굴 없음(빈 원 머리), 선+원 조합만 사용.
+// 원작(대불·사무라이) 도상 금지 — 순수 창작 도안.
 // ══════════════════════════════════════════════════════════════
 interface PFrame { cv: HTMLCanvasElement; ax: number; ay: number; }
 type PlayerFrameKey =
@@ -323,170 +324,194 @@ type PlayerFrameKey =
 
 const STAND_W = 44, STAND_H = 60;
 const CX = 22;
-const HELMET_Y = 10;
-const TORSO_Y = 30;
-const HIP_Y = 44;
-const LEG_H = 12;
-const FOOT_Y = HIP_Y + LEG_H + 4; // 60
 
 const WIDE_W = 64, WIDE_H = 60;
 const WCX = 22;
 
 const FLAT_W = 48, FLAT_H = 28;
 
-function strokeInk(c: CanvasRenderingContext2D): void {
-  c.strokeStyle = PALETTE.INK;
-  c.fillStyle = PALETTE.INK;
-  c.lineWidth = 2.4;
+// 신체 랜드마크 (STAND/WIDE 공통, CX=WCX=22 기준)
+const HEAD_R = 6;
+const HEAD_Y = 12;       // 머리 중심
+const SHOULDER_Y = 23;   // 팔이 갈라지는 지점
+const HIP_Y = 38;        // 다리가 갈라지는 지점
+const FOOT_Y = 60;       // 바닥선 (= STAND_H = WIDE_H, 기존 프레임 발 높이와 동일)
+
+const LINE = '#1A1A20';
+const LINE_W = 2;
+const ARC = '#FFD200';
+
+/** pts를 순서대로 잇는 폴리라인 획. 관절 굽힘은 점 3개 이상으로 표현. */
+function stroke(c: CanvasRenderingContext2D, pts: [number, number][]): void {
+  if (pts.length < 2) return;
+  c.strokeStyle = LINE;
+  c.lineWidth = LINE_W;
   c.lineCap = 'round';
   c.lineJoin = 'round';
-}
-
-function inkLine(c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
   c.beginPath();
-  c.moveTo(x1, y1);
-  c.lineTo(x2, y2);
+  c.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
   c.stroke();
 }
 
-function inkHead(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, special: boolean): void {
+/** 윤곽선 원. fill이 주어지면 채우고 나서 윤곽선을 그린다. */
+function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill?: string): void {
   c.beginPath();
   c.arc(cx, cy, r, 0, Math.PI * 2);
-  c.stroke();
-  if (special) {
-    inkLine(c, cx - 3, cy - 2, cx + 3, cy + 2);
-    inkLine(c, cx + 3, cy - 2, cx - 3, cy + 2);
-  } else {
-    c.beginPath();
-    c.arc(cx - 2.2, cy - 0.5, 0.8, 0, Math.PI * 2);
-    c.arc(cx + 2.2, cy - 0.5, 0.8, 0, Math.PI * 2);
+  if (fill) {
+    c.fillStyle = fill;
     c.fill();
   }
+  c.strokeStyle = LINE;
+  c.lineWidth = LINE_W;
+  c.stroke();
 }
 
-function inkBat(c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
-  c.lineWidth = 3.2;
-  inkLine(c, x1, y1, x2, y2);
-  c.lineWidth = 2.4;
-  c.beginPath();
-  c.arc(x2, y2, 3.2, 0, Math.PI * 2);
-  c.stroke();
+/** 무기: 손잡이→칼끝 직선 1개 + 손잡이 위치에 반지름 1.5 원. */
+function weapon(c: CanvasRenderingContext2D, hx: number, hy: number, tx: number, ty: number): void {
+  stroke(c, [[hx, hy], [tx, ty]]);
+  circle(c, hx, hy, 1.5);
 }
 
 function buildIdle(): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  strokeInk(c);
-  const hip = HIP_Y, head = HELMET_Y + 8;
-  inkLine(c, CX, head + 7, CX, hip);
-  inkLine(c, CX, hip, CX - 7, FOOT_Y);
-  inkLine(c, CX, hip, CX + 7, FOOT_Y);
-  inkLine(c, CX, TORSO_Y + 4, CX - 10, TORSO_Y + 16);
-  inkLine(c, CX, TORSO_Y + 4, CX + 8, TORSO_Y - 2);
-  inkBat(c, CX + 8, TORSO_Y - 2, CX + 12, 6);
-  inkHead(c, CX, head, 7, false);
+  circle(c, CX, HEAD_Y, HEAD_R);
+  stroke(c, [[CX, HEAD_Y + HEAD_R], [CX, HIP_Y]]);              // 목~골반
+  stroke(c, [[CX, HIP_Y], [CX - 7, FOOT_Y]]);                   // 왼다리
+  stroke(c, [[CX, HIP_Y], [CX + 7, FOOT_Y]]);                   // 오른다리(살짝 벌림)
+  stroke(c, [[CX, SHOULDER_Y], [CX - 9, 34]]);                  // 왼팔 — 자연스럽게 늘어짐
+  stroke(c, [[CX, SHOULDER_Y], [CX + 9, 30]]);                  // 오른팔 — 칼을 다리 바깥쪽으로
+  weapon(c, CX + 9, 30, CX + 13, 55);
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
 function buildJump(): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  strokeInk(c);
-  const hip = HIP_Y + 2, head = HELMET_Y + 6;
-  inkLine(c, CX, head + 7, CX, hip);
-  inkLine(c, CX, hip, CX - 9, FOOT_Y - 8);
-  inkLine(c, CX, hip, CX + 8, FOOT_Y - 6);
-  inkLine(c, CX, TORSO_Y + 2, CX - 12, TORSO_Y + 12);
-  inkLine(c, CX, TORSO_Y + 2, CX + 11, TORSO_Y + 14);
-  inkBat(c, CX + 11, TORSO_Y + 14, CX + 14, TORSO_Y + 28);
-  inkHead(c, CX, head, 7, false);
+  circle(c, CX, HEAD_Y - 1, HEAD_R);
+  stroke(c, [[CX, HEAD_Y - 1 + HEAD_R], [CX, HIP_Y - 2]]);
+  stroke(c, [[CX, HIP_Y - 2], [CX - 9, HIP_Y + 2], [CX - 7, 50]]); // 무릎을 몸쪽으로 접음
+  stroke(c, [[CX, HIP_Y - 2], [CX + 8, HIP_Y + 4], [CX + 10, 52]]);
+  stroke(c, [[CX, SHOULDER_Y - 1], [CX - 10, 30]]);
+  stroke(c, [[CX, SHOULDER_Y - 1], [CX + 9, 30]]);
+  weapon(c, CX + 9, 30, CX + 16, 44);                              // 칼은 뒤로 흘림
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
 function buildAttack(stage: 0 | 1 | 2): PFrame {
   const { cv, c } = mkCanvas(WIDE_W, WIDE_H);
-  strokeInk(c);
-  const hip = HIP_Y, head = HELMET_Y + 8;
-  inkLine(c, WCX, head + 7, WCX, hip);
-  inkLine(c, WCX, hip, WCX - 7 - (stage === 1 ? 2 : 0), FOOT_Y);
-  inkLine(c, WCX, hip, WCX + 7 + (stage === 1 ? 2 : 0), FOOT_Y);
-  inkLine(c, WCX, TORSO_Y + 4, WCX - 10, TORSO_Y + 16);
   if (stage === 0) {
-    inkLine(c, WCX, TORSO_Y + 4, WCX + 8, TORSO_Y - 8);
-    inkBat(c, WCX + 8, TORSO_Y - 8, WCX + 10, 4);
+    // 예열 — 몸을 뒤로 살짝 젖히고 칼을 머리 위로. 궤적 없음.
+    circle(c, WCX - 3, HEAD_Y - 3, HEAD_R);
+    stroke(c, [[WCX - 3, HEAD_Y - 3 + HEAD_R], [WCX, HIP_Y]]);
+    stroke(c, [[WCX, HIP_Y], [WCX - 7, FOOT_Y]]);
+    stroke(c, [[WCX, HIP_Y], [WCX + 7, FOOT_Y]]);
+    stroke(c, [[WCX, SHOULDER_Y], [WCX - 9, 32]]);
+    stroke(c, [[WCX, SHOULDER_Y], [WCX + 7, 9]]);
+    weapon(c, WCX + 7, 9, WCX + 11, 1);
   } else if (stage === 1) {
-    inkLine(c, WCX, TORSO_Y + 4, WCX + 16, TORSO_Y + 6);
-    inkBat(c, WCX + 16, TORSO_Y + 6, WCX + 38, TORSO_Y + 2);
+    // 타격 — 깊은 런지, 앞무릎 굽힘·뒷다리 뻗음, 칼이 아래로. 여기에만 참격 궤적.
+    circle(c, WCX + 14, HEAD_Y + 1, HEAD_R);
+    stroke(c, [[WCX + 14, HEAD_Y + 1 + HEAD_R], [WCX + 6, HIP_Y]]);
+    stroke(c, [[WCX + 6, HIP_Y], [WCX + 16, 48], [WCX + 20, FOOT_Y]]); // 앞다리(굽힘)
+    stroke(c, [[WCX + 6, HIP_Y], [WCX - 4, 50], [WCX - 14, 58]]);      // 뒷다리(뻗음)
+    stroke(c, [[WCX + 10, SHOULDER_Y], [WCX - 2, 18]]);                // 반대팔(균형)
+    stroke(c, [[WCX + 10, SHOULDER_Y], [WCX + 22, 34]]);               // 칼 든 팔
+    weapon(c, WCX + 22, 34, WCX + 30, 50);
+    c.strokeStyle = ARC;
+    c.lineWidth = 3;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(WCX + 30, 50);
+    c.quadraticCurveTo(WCX + 34, 26, WCX + 18, 10); // 칼끝에서 시작해 위로 휘어지는 참격 호 (하나만)
+    c.stroke();
   } else {
-    inkLine(c, WCX, TORSO_Y + 4, WCX + 10, TORSO_Y + 16);
-    inkBat(c, WCX + 10, TORSO_Y + 16, WCX + 12, TORSO_Y + 34);
+    // 여운 — 런지 유지, 칼이 끝까지 내려간 상태. 궤적 없음.
+    circle(c, WCX + 14, HEAD_Y + 3, HEAD_R);
+    stroke(c, [[WCX + 14, HEAD_Y + 3 + HEAD_R], [WCX + 6, HIP_Y]]);
+    stroke(c, [[WCX + 6, HIP_Y], [WCX + 16, 48], [WCX + 20, FOOT_Y]]);
+    stroke(c, [[WCX + 6, HIP_Y], [WCX - 4, 50], [WCX - 14, 58]]);
+    stroke(c, [[WCX + 10, SHOULDER_Y], [WCX - 4, 20]]);
+    stroke(c, [[WCX + 10, SHOULDER_Y], [WCX + 16, 44]]);
+    weapon(c, WCX + 16, 44, WCX + 10, 58);
   }
-  inkHead(c, WCX + (stage === 1 ? 2 : 0), head, 7, false);
   return { cv, ax: WCX, ay: FOOT_Y };
 }
 
 function buildGuard(air: boolean): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  strokeInk(c);
-  const hip = HIP_Y + (air ? 3 : 0), head = HELMET_Y + 10;
-  inkLine(c, CX, head + 7, CX, hip);
-  inkLine(c, CX, hip, CX - (air ? 9 : 7), FOOT_Y - (air ? 4 : 0));
-  inkLine(c, CX, hip, CX + (air ? 9 : 7), FOOT_Y - (air ? 4 : 0));
-  inkLine(c, CX, TORSO_Y + 2, CX - 11, TORSO_Y - 6);
-  inkLine(c, CX, TORSO_Y + 2, CX + 11, TORSO_Y - 6);
-  inkBat(c, CX - 14, HELMET_Y + 2, CX + 16, HELMET_Y + 2);
-  inkHead(c, CX, head, 7, false);
+  const hip = air ? HIP_Y - 4 : HIP_Y - 2;
+  const legEndY = air ? 48 : FOOT_Y;                 // 공중가드는 발이 지면에서 떨어짐
+  const spreadIn = air ? 6 : 9, spreadOut = air ? 11 : 9; // 공중가드는 무릎이 더 접혀 실루엣이 다름
+  circle(c, CX, HEAD_Y, HEAD_R);
+  stroke(c, [[CX, HEAD_Y + HEAD_R], [CX, hip]]);
+  stroke(c, [[CX, hip], [CX - spreadIn, legEndY]]);  // 다리 — 반드시 선 2개로만(면 채우기 금지)
+  stroke(c, [[CX, hip], [CX + spreadOut, legEndY]]);
+  if (air) {
+    stroke(c, [[CX, SHOULDER_Y - 1], [CX - 10, HEAD_Y + 2]]);
+    stroke(c, [[CX, SHOULDER_Y - 1], [CX + 10, HEAD_Y + 2]]);
+    stroke(c, [[CX - 14, HEAD_Y - 2], [CX, HEAD_Y - 2]]);
+    weapon(c, CX, HEAD_Y - 2, CX + 14, HEAD_Y - 2);
+  } else {
+    // 지면가드: 팔이 머리 원을 관통하지 않게 바깥으로 벌리고 칼은 머리 위
+    stroke(c, [[CX, SHOULDER_Y - 1], [CX - 16, HEAD_Y + 2], [CX - 14, 4]]);
+    stroke(c, [[CX, SHOULDER_Y - 1], [CX + 16, HEAD_Y + 2], [CX + 14, 4]]);
+    weapon(c, CX - 10, 3, CX + 16, 3);
+  }
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
 function buildGuardBreak(): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  strokeInk(c);
-  const hip = HIP_Y, head = HELMET_Y + 12;
-  inkLine(c, CX + 2, head + 7, CX, hip);
-  inkLine(c, CX, hip, CX - 8, FOOT_Y);
-  inkLine(c, CX, hip, CX + 10, FOOT_Y);
-  inkLine(c, CX, TORSO_Y + 6, CX - 14, TORSO_Y + 16);
-  inkLine(c, CX, TORSO_Y + 6, CX + 12, TORSO_Y + 18);
-  inkBat(c, CX - 16, FOOT_Y - 2, CX + 8, FOOT_Y - 4);
-  inkHead(c, CX + 3, head, 7, false);
+  circle(c, CX - 6, HEAD_Y + 3, HEAD_R);                     // 뒤로 젖혀진 머리
+  stroke(c, [[CX - 6, HEAD_Y + 3 + HEAD_R], [CX, HIP_Y]]);   // 몸이 뒤로 기울어짐
+  stroke(c, [[CX, HIP_Y], [CX - 10, FOOT_Y - 2]]);
+  stroke(c, [[CX, HIP_Y], [CX + 6, FOOT_Y]]);
+  stroke(c, [[CX, SHOULDER_Y], [CX - 16, 18]]);              // 팔이 벌어짐
+  stroke(c, [[CX, SHOULDER_Y], [CX + 14, 28]]);
+  weapon(c, CX + 14, 28, CX + 22, 42);                       // 칼을 놓칠 듯 뒤로 젖혀짐
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
 function buildSpecial(): PFrame {
   const { cv, c } = mkCanvas(WIDE_W, WIDE_H);
-  strokeInk(c);
-  const hip = HIP_Y, head = HELMET_Y + 10;
-  inkLine(c, WCX, head + 7, WCX, hip);
-  inkLine(c, WCX, hip, WCX - 10, FOOT_Y);
-  inkLine(c, WCX, hip, WCX + 10, FOOT_Y);
-  inkLine(c, WCX, TORSO_Y + 6, WCX - 12, TORSO_Y + 16);
-  inkLine(c, WCX, TORSO_Y + 6, WCX + 12, TORSO_Y + 16);
-  inkBat(c, WCX + 12, TORSO_Y + 16, WCX + 10, FOOT_Y - 4);
-  inkHead(c, WCX, head, 7, true);
-  c.strokeStyle = PALETTE.INK;
-  inkLine(c, WCX - 6, FOOT_Y, WCX - 16, FOOT_Y - 4);
-  inkLine(c, WCX + 20, FOOT_Y, WCX + 32, FOOT_Y - 4);
+  circle(c, WCX, HEAD_Y, HEAD_R);
+  stroke(c, [[WCX, HEAD_Y + HEAD_R], [WCX, HIP_Y]]);
+  stroke(c, [[WCX, HIP_Y], [WCX - 8, FOOT_Y]]);
+  stroke(c, [[WCX, HIP_Y], [WCX + 8, FOOT_Y]]);
+  stroke(c, [[WCX, SHOULDER_Y], [WCX - 6, 10]]);
+  stroke(c, [[WCX, SHOULDER_Y], [WCX + 6, 10]]);
+  weapon(c, WCX, 10, WCX, 0);                                // 두 손으로 칼을 머리 위에 세워 듦
+  const burstCx = WCX, burstCy = 28, r1 = 15, r2 = 20;        // 기 모으는 방사선 6개
+  for (const deg of [0, 60, 120, 180, 240, 300]) {
+    const rad = (deg * Math.PI) / 180;
+    stroke(c, [
+      [burstCx + Math.cos(rad) * r1, burstCy + Math.sin(rad) * r1],
+      [burstCx + Math.cos(rad) * r2, burstCy + Math.sin(rad) * r2],
+    ]);
+  }
   return { cv, ax: WCX, ay: FOOT_Y };
 }
 
 function buildPinned(): PFrame {
   const { cv, c } = mkCanvas(FLAT_W, FLAT_H);
-  strokeInk(c);
   const fy = FLAT_H - 4;
-  inkLine(c, 8, fy - 2, FLAT_W - 8, fy - 2);
-  inkLine(c, 6, fy - 6, 14, fy);
-  inkLine(c, FLAT_W - 6, fy - 6, FLAT_W - 14, fy);
-  inkHead(c, FLAT_W / 2, 8, 6, false);
+  circle(c, FLAT_W / 2, 8, 6);
+  stroke(c, [[10, fy - 4], [FLAT_W - 10, fy - 4]]);          // 납작해진 몸통
+  stroke(c, [[18, fy - 4], [4, fy - 10]]);                   // 팔다리가 좌우로 쫙 펴짐
+  stroke(c, [[18, fy - 4], [6, fy]]);
+  stroke(c, [[FLAT_W - 18, fy - 4], [FLAT_W - 4, fy - 10]]);
+  stroke(c, [[FLAT_W - 18, fy - 4], [FLAT_W - 6, fy]]);
   return { cv, ax: FLAT_W / 2, ay: fy + 4 };
 }
 
 function buildDead(): PFrame {
   const { cv, c } = mkCanvas(FLAT_W, FLAT_H);
-  strokeInk(c);
   const fy = FLAT_H - 6;
-  inkLine(c, 8, fy, FLAT_W - 10, fy - 4);
-  inkLine(c, 8, fy, 4, fy - 8);
-  inkLine(c, FLAT_W - 10, fy - 4, FLAT_W - 4, fy - 10);
-  inkHead(c, 12, fy - 10, 6, false);
+  circle(c, 10, fy - 6, 6);                                  // 머리가 한쪽으로 기울어짐
+  stroke(c, [[14, fy - 4], [FLAT_W - 8, fy - 10]]);          // 등을 대고 벌렁 누움(대각) — pinned와 실루엣 차별화
+  stroke(c, [[20, fy - 3], [16, fy + 2]]);                   // 팔다리가 힘없이 늘어짐(비대칭)
+  stroke(c, [[FLAT_W - 12, fy - 8], [FLAT_W - 6, fy - 1]]);
+  stroke(c, [[FLAT_W - 20, fy - 9], [FLAT_W - 22, fy - 18]]);
   return { cv, ax: FLAT_W / 2, ay: fy + 4 };
 }
 
