@@ -238,25 +238,25 @@ export function createApp(
     }
     if (scene === 'story') {
       if (state) drawGame(ctx, state);
-      ctx.fillStyle = 'rgba(7, 9, 24, 0.82)';
+      ctx.fillStyle = 'rgba(244, 241, 232, 0.90)';
       ctx.fillRect(0, 0, VIEW.W, VIEW.H);
-      ctx.fillStyle = PALETTE.WHITE;
+      ctx.fillStyle = PALETTE.INK;
       ctx.font = '13px sans-serif';
       ctx.textAlign = 'center';
       overlayText.forEach((line, k) => ctx.fillText(line, VIEW.W / 2, 200 + k * 22));
-      ctx.fillStyle = '#8890B0';
+      ctx.fillStyle = '#8A857A';
       ctx.fillText('(공격 버튼으로 넘기기)', VIEW.W / 2, VIEW.H - 200);
       return;
     }
     if (scene === 'gameover' && state) {
       drawGame(ctx, state);
-      ctx.fillStyle = 'rgba(20, 4, 8, 0.8)';
+      ctx.fillStyle = 'rgba(250, 236, 232, 0.92)';
       ctx.fillRect(0, 0, VIEW.W, VIEW.H);
       ctx.fillStyle = PALETTE.RED;
       ctx.font = 'bold 26px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('철거 실패', VIEW.W / 2, 240);
-      ctx.fillStyle = PALETTE.WHITE;
+      ctx.fillStyle = PALETTE.INK;
       ctx.font = '13px sans-serif';
       ctx.fillText('건물주가 당신을 고소했습니다', VIEW.W / 2, 270);
       ctx.fillText(`점수 ${state.score.toLocaleString()}`, VIEW.W / 2, 300);
@@ -270,13 +270,13 @@ export function createApp(
       return;
     }
     if (scene === 'ending') {
-      ctx.fillStyle = '#101736';
+      ctx.fillStyle = '#EAE6DA';
       ctx.fillRect(0, 0, VIEW.W, VIEW.H);
       ctx.fillStyle = PALETTE.YELLOW;
       ctx.font = 'bold 28px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('작전성공', VIEW.W / 2, 260);
-      ctx.fillStyle = PALETTE.WHITE;
+      ctx.fillStyle = PALETTE.INK;
       ctx.font = '13px sans-serif';
       ctx.fillText('민들레 홀씨가 흩날린다…', VIEW.W / 2, 300);
       return;
@@ -298,10 +298,10 @@ export function createApp(
     ];
     ctx.font = '15px sans-serif';
     items.forEach((it, k) => {
-      ctx.fillStyle = k === menuIndex ? PALETTE.YELLOW : '#8890B0';
+      ctx.fillStyle = k === menuIndex ? PALETTE.YELLOW : '#8A857A';
       ctx.fillText(`${k === menuIndex ? '▶ ' : ''}${it}`, VIEW.W / 2, 280 + k * 34);
     });
-    ctx.fillStyle = '#8890B0';
+    ctx.fillStyle = '#8A857A';
     ctx.font = '11px sans-serif';
     ctx.fillText('점프/가드 = 선택 이동 · 공격 = 확정 · 필살 = 소리 토글', VIEW.W / 2, 400);
     ctx.fillText(`동네 최고: ${save.bestArcade.toLocaleString()}  |  소리: ${save.settings.sound ? '켜짐' : '꺼짐'}`, VIEW.W / 2, 430);

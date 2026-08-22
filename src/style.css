@@ -9,7 +9,7 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: #000;
+  background: #E8E4D8;
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: none;
@@ -58,9 +58,9 @@ html, body {
 .tbtn {
   position: absolute;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f4f1e8;
+  border: 2px solid rgba(26, 26, 32, 0.22);
+  background: rgba(26, 26, 32, 0.06);
+  color: #1A1A20;
   font-family: system-ui, sans-serif;
   font-weight: bold;
   font-size: 12px;
@@ -87,8 +87,8 @@ html, body {
 
 /* 버튼 활성화 상태 */
 .tbtn.active {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(26, 26, 32, 0.14);
+  border-color: rgba(26, 26, 32, 0.35);
   transform: scale(0.92);
 }
 
