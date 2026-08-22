@@ -11,15 +11,6 @@ import { VIEW, PALETTE, PLAYER, BOSS, ACT2, STACK } from '../config';
 
 // ── 공통 색상 ────────────────────────────────────────────────────
 const OUTLINE = '#0A0A14';
-const SKIN = '#3FA34D';
-const SKIN_DK = '#2C7A38';
-const HORN = '#B8BEC6';
-const HELMET = PALETTE.WHITE;
-const HELMET_DK = '#C9C6BC';
-const WOOD = '#7A4B2A';
-const WOOD_DK = '#4A2E18';
-const SPIKE = '#241408';
-const FOOT_DK = '#1A1A24';
 const ROCK_BASE = '#5A5A5F';
 const ROCK_CRACK = '#D9782E';
 
@@ -39,18 +30,6 @@ function block(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: 
   c.fillRect(x - 1, y - 1, w + 2, h + 2);
   c.fillStyle = color;
   c.fillRect(x, y, w, h);
-}
-
-/** 무표정 가로선 눈(기본) / special=true면 흰 원 뒤집힌 눈 — 브랜드 갭 개그 축, 항상 이 함수만 사용 */
-function drawFace(c: CanvasRenderingContext2D, cx: number, eyeY: number, special: boolean): void {
-  if (special) {
-    block(c, cx - 7, eyeY - 2, 4, 4, PALETTE.WHITE);
-    block(c, cx + 3, eyeY - 2, 4, 4, PALETTE.WHITE);
-  } else {
-    c.fillStyle = OUTLINE;
-    c.fillRect(cx - 7, eyeY, 4, 1);
-    c.fillRect(cx + 3, eyeY, 4, 1);
-  }
 }
 
 /** 결정론적 의사난수 (시간 무관 — 같은 입력엔 항상 같은 크랙 패턴) */
@@ -106,35 +85,42 @@ const TIERS: Tier[] = ['weak', 'mid', 'hard'];
 const SPECIAL_MATS: Array<Exclude<Material, Tier>> = ['butter', 'cathedral', 'lobby', 'office', 'penthouse'];
 
 // 색약 안전 3중 부호화: weak=어둡고 낡음(저채도) / mid=중간 / hard=밝고 단단(고채도) — 밝기 단계로 색+패턴 보완
+// 먼지톤 전환 [2026-08 아이보리 배경 대응]: base는 지정값 그대로, dark/light/accent는
+// base 대비 밝기 배율(dark×0.84 / light×1.08 / accent×0.55)로 기계적 도출.
+// accent = 창문·창틀용(가장 어두움) — 밝은 배경에서 창문이 뚫린 구멍이 아니라 창으로 읽히려면
+// 반드시 base보다 확연히 어두워야 한다.
 const THEME_TIERS: Record<Theme, Record<Tier, TierColors>> = {
   europe: {
-    weak: { base: '#8f8168', dark: '#6b6049', light: '#a89873', accent: '#5b4f3a' }, // 낡은 회반죽+덧창
-    mid: { base: '#a3543a', dark: '#7a3c28', light: '#c07050', accent: '#e8dcc8' }, // 벽돌+아치창
-    hard: { base: '#8a95a3', dark: '#5f6b78', light: '#c3ccd6', accent: '#3d4650' }, // 석조 성벽+총안
+    weak: { base: '#C9C2B4', dark: '#a9a397', light: '#d9d2c2', accent: '#6f6b63' }, // 낡은 회반죽+덧창
+    mid: { base: '#BCAA9C', dark: '#9e8f83', light: '#cbb8a8', accent: '#675e56' }, // 벽돌+아치창
+    hard: { base: '#ABA69E', dark: '#908b85', light: '#b9b3ab', accent: '#5e5b57' }, // 석조 성벽+총안
   },
   asia: {
-    weak: { base: '#b89a5e', dark: '#8f7444', light: '#d4bb82', accent: '#6b5530' }, // 대나무 골조+발
-    mid: { base: '#a3763f', dark: '#7a5730', light: '#c69a5c', accent: '#5c431f' }, // 흙벽+격자창
-    hard: { base: '#d9c48f', dark: '#b09960', light: '#f0e0b8', accent: '#8a6f3a' }, // 사암 아치+돔 문양
+    weak: { base: '#C6BCA8', dark: '#a69e8d', light: '#d6cbb5', accent: '#6d675c' }, // 대나무 골조+발
+    mid: { base: '#B7A68F', dark: '#9a8b78', light: '#c6b39a', accent: '#655b4f' }, // 흙벽+격자창
+    hard: { base: '#A29B8E', dark: '#888277', light: '#afa799', accent: '#59554e' }, // 사암 아치+돔 문양
   },
   eastasia: {
-    weak: { base: '#8a6f4f', dark: '#5f4a33', light: '#a88a63', accent: '#403020' }, // 낡은 목조+한지창
-    mid: { base: '#5c4632', dark: '#3d2e1f', light: '#7a604a', accent: '#a02e2e' }, // 기와+단청 띠
-    hard: { base: '#94918a', dark: '#68655e', light: '#bcb8ae', accent: '#4a4842' }, // 석탑 기단
+    weak: { base: '#CAC4B6', dark: '#aaa599', light: '#dad4c5', accent: '#6f6c64' }, // 낡은 목조+한지창
+    mid: { base: '#AFA292', dark: '#93887b', light: '#bdaf9e', accent: '#605950' }, // 기와+단청 띠
+    hard: { base: '#98928A', dark: '#807b74', light: '#a49e95', accent: '#54504c' }, // 석탑 기단
   },
   modern: {
-    weak: { base: '#7d8188', dark: '#585c62', light: '#9ea2a8', accent: '#a04430' }, // 조립 패널+녹 줄눈
-    mid: { base: '#4a6a7a', dark: '#324c58', light: '#7fa4b5', accent: '#cfe8f0' }, // 유리 커튼월 격자
-    hard: { base: '#6b7580', dark: '#454d56', light: '#9aa5b0', accent: '#d0d5da' }, // 강철 리벳+대각 보강재
+    weak: { base: '#C0BEB8', dark: '#a1a09b', light: '#cfcdc7', accent: '#6a6965' }, // 조립 패널+녹 줄눈
+    mid: { base: '#AEB0B2', dark: '#929496', light: '#bcbec0', accent: '#606162' }, // 유리 커튼월 격자
+    hard: { base: '#989A9D', dark: '#808184', light: '#a4a6aa', accent: '#545556' }, // 강철 리벳+대각 보강재
   },
 };
 
+// office/cathedral/lobby/penthouse는 modern 계열 먼지톤(약→중→강)에 각각 맞춰 동일 배율로 도출.
+// butter만 원래대로 유지(게임 내 유일한 채도 높은 색 — 사용자 지시).
+// penthouse는 톤 다운하되 최상층 표식인 금색 포인트(light/accent)는 원래 값 유지.
 const SPECIAL_COLORS: Record<Exclude<Material, Tier>, TierColors> = {
   butter: { base: PALETTE.YELLOW, dark: '#C79E00', light: '#FFF07A', accent: '#E8E8E8' },
-  cathedral: { base: '#8a95a3', dark: '#5f6b78', light: '#c3ccd6', accent: '#c05050' },
-  lobby: { base: '#6b6f75', dark: '#4a4d52', light: '#9a9ea3', accent: '#2a2c2f' },
-  office: { base: '#7fa4b5', dark: '#5a7a88', light: '#cfe8f0', accent: '#2f3a3f' },
-  penthouse: { base: '#8a95a3', dark: '#5f6b78', light: '#FFD200', accent: '#C79E00' },
+  cathedral: { base: '#AEB0B2', dark: '#929496', light: '#bcbec0', accent: '#606162' },
+  lobby: { base: '#989A9D', dark: '#808184', light: '#a4a6aa', accent: '#545556' },
+  office: { base: '#C0BEB8', dark: '#a1a09b', light: '#cfcdc7', accent: '#6a6965' },
+  penthouse: { base: '#989A9D', dark: '#808184', light: '#FFD200', accent: '#C79E00' },
 };
 
 function fillBase(c: CanvasRenderingContext2D, w: number, h: number, t: TierColors): void {
@@ -236,7 +222,7 @@ function drawThemeDetail(c: CanvasRenderingContext2D, w: number, h: number, mat:
         c.stroke();
       }
       c.globalAlpha = 0.3;
-      c.fillStyle = t.light;
+      c.fillStyle = t.accent; // 유리 커튼월 — 밝은 배경에서 창문으로 읽히려면 어두워야 함
       c.fillRect(0, 0, w, h);
       c.globalAlpha = 1;
     } else {
@@ -348,154 +334,159 @@ const WCX = 22;
 
 const FLAT_W = 48, FLAT_H = 28;
 
-function legsBlock(c: CanvasRenderingContext2D, cx: number, hipY: number, legH: number, spread = 0): void {
-  block(c, cx - 8 - spread, hipY, 6, legH, SKIN_DK);
-  block(c, cx + 2 + spread, hipY, 6, legH, SKIN_DK);
-  block(c, cx - 9 - spread, hipY + legH, 8, 4, FOOT_DK);
-  block(c, cx + 1 + spread, hipY + legH, 8, 4, FOOT_DK);
+function strokeInk(c: CanvasRenderingContext2D): void {
+  c.strokeStyle = PALETTE.INK;
+  c.fillStyle = PALETTE.INK;
+  c.lineWidth = 2.4;
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
 }
 
-function torsoBlock(c: CanvasRenderingContext2D, cx: number, y: number): void {
-  block(c, cx - 9, y, 18, 14, SKIN_DK);
-  block(c, cx - 7, y + 2, 14, 9, SKIN);
+function inkLine(c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
+  c.beginPath();
+  c.moveTo(x1, y1);
+  c.lineTo(x2, y2);
+  c.stroke();
 }
 
-function armBlock(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
-  block(c, x, y, w, h, SKIN);
+function inkHead(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, special: boolean): void {
+  c.beginPath();
+  c.arc(cx, cy, r, 0, Math.PI * 2);
+  c.stroke();
+  if (special) {
+    inkLine(c, cx - 3, cy - 2, cx + 3, cy + 2);
+    inkLine(c, cx + 3, cy - 2, cx - 3, cy + 2);
+  } else {
+    c.beginPath();
+    c.arc(cx - 2.2, cy - 0.5, 0.8, 0, Math.PI * 2);
+    c.arc(cx + 2.2, cy - 0.5, 0.8, 0, Math.PI * 2);
+    c.fill();
+  }
 }
 
-function headBlock(c: CanvasRenderingContext2D, cx: number, topY: number, special: boolean, tilt: number): void {
-  block(c, cx - 10 + tilt, topY, 20, 6, HELMET); // 안전모
-  block(c, cx - 11 + tilt, topY + 5, 22, 3, HELMET_DK); // 챙 (삐딱하게)
-  block(c, cx + 6, topY - 5, 4, 5, HORN); // 외뿔
-  block(c, cx - 8, topY + 8, 16, 10, SKIN); // 얼굴
-  drawFace(c, cx, topY + 13, special);
-}
-
-function weaponHandle(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
-  block(c, x, y, w, h, WOOD);
-}
-
-function spikeDots(c: CanvasRenderingContext2D, x: number, y: number, h: number): void {
-  c.fillStyle = SPIKE;
-  for (let i = 0; i < 3; i++) c.fillRect(x + 2 + i * 3, y - 1, 1, 2);
-  for (let i = 0; i < 3; i++) c.fillRect(x + 2 + i * 3, y + h - 1, 1, 2);
-}
-
-function weaponHead(c: CanvasRenderingContext2D, x: number, y: number): void {
-  block(c, x, y, 10, 8, WOOD_DK);
-  spikeDots(c, x, y, 8);
+function inkBat(c: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
+  c.lineWidth = 3.2;
+  inkLine(c, x1, y1, x2, y2);
+  c.lineWidth = 2.4;
+  c.beginPath();
+  c.arc(x2, y2, 3.2, 0, Math.PI * 2);
+  c.stroke();
 }
 
 function buildIdle(): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  legsBlock(c, CX, HIP_Y, LEG_H);
-  torsoBlock(c, CX, TORSO_Y);
-  armBlock(c, CX - 13, TORSO_Y, 5, 12);
-  armBlock(c, CX + 8, TORSO_Y - 2, 5, 10);
-  weaponHandle(c, CX + 9, 2, 3, 26); // 자루 — 어깨에 걸침
-  weaponHead(c, CX + 5, 0);
-  headBlock(c, CX, HELMET_Y, false, 1);
+  strokeInk(c);
+  const hip = HIP_Y, head = HELMET_Y + 8;
+  inkLine(c, CX, head + 7, CX, hip);
+  inkLine(c, CX, hip, CX - 7, FOOT_Y);
+  inkLine(c, CX, hip, CX + 7, FOOT_Y);
+  inkLine(c, CX, TORSO_Y + 4, CX - 10, TORSO_Y + 16);
+  inkLine(c, CX, TORSO_Y + 4, CX + 8, TORSO_Y - 2);
+  inkBat(c, CX + 8, TORSO_Y - 2, CX + 12, 6);
+  inkHead(c, CX, head, 7, false);
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
 function buildJump(): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  legsBlock(c, CX, HIP_Y + 4, LEG_H - 6, 2); // 다리 굽힘
-  torsoBlock(c, CX, TORSO_Y - 2);
-  armBlock(c, CX - 14, TORSO_Y, 5, 10);
-  armBlock(c, CX + 9, TORSO_Y + 2, 5, 10);
-  weaponHandle(c, CX + 10, TORSO_Y + 4, 3, 16); // 방망이 뒤로
-  weaponHead(c, CX + 6, TORSO_Y + 16);
-  headBlock(c, CX, HELMET_Y - 2, false, 0);
+  strokeInk(c);
+  const hip = HIP_Y + 2, head = HELMET_Y + 6;
+  inkLine(c, CX, head + 7, CX, hip);
+  inkLine(c, CX, hip, CX - 9, FOOT_Y - 8);
+  inkLine(c, CX, hip, CX + 8, FOOT_Y - 6);
+  inkLine(c, CX, TORSO_Y + 2, CX - 12, TORSO_Y + 12);
+  inkLine(c, CX, TORSO_Y + 2, CX + 11, TORSO_Y + 14);
+  inkBat(c, CX + 11, TORSO_Y + 14, CX + 14, TORSO_Y + 28);
+  inkHead(c, CX, head, 7, false);
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
-/** 공격 3단계: 0=풀스윙 준비, 1=타격 순간(최대 리치), 2=팔로우스루 */
 function buildAttack(stage: 0 | 1 | 2): PFrame {
   const { cv, c } = mkCanvas(WIDE_W, WIDE_H);
-  legsBlock(c, WCX, HIP_Y, LEG_H, stage === 1 ? 2 : 0);
-  torsoBlock(c, WCX, TORSO_Y);
-  armBlock(c, WCX - 13, TORSO_Y, 5, 12);
+  strokeInk(c);
+  const hip = HIP_Y, head = HELMET_Y + 8;
+  inkLine(c, WCX, head + 7, WCX, hip);
+  inkLine(c, WCX, hip, WCX - 7 - (stage === 1 ? 2 : 0), FOOT_Y);
+  inkLine(c, WCX, hip, WCX + 7 + (stage === 1 ? 2 : 0), FOOT_Y);
+  inkLine(c, WCX, TORSO_Y + 4, WCX - 10, TORSO_Y + 16);
   if (stage === 0) {
-    armBlock(c, WCX + 8, TORSO_Y - 8, 5, 10);
-    weaponHandle(c, WCX + 9, 2, 3, 20);
-    weaponHead(c, WCX + 4, 0);
+    inkLine(c, WCX, TORSO_Y + 4, WCX + 8, TORSO_Y - 8);
+    inkBat(c, WCX + 8, TORSO_Y - 8, WCX + 10, 4);
   } else if (stage === 1) {
-    armBlock(c, WCX + 10, TORSO_Y + 2, 5, 10);
-    weaponHandle(c, WCX + 14, TORSO_Y + 4, 22, 4);
-    weaponHead(c, WCX + 34, TORSO_Y);
+    inkLine(c, WCX, TORSO_Y + 4, WCX + 16, TORSO_Y + 6);
+    inkBat(c, WCX + 16, TORSO_Y + 6, WCX + 38, TORSO_Y + 2);
   } else {
-    armBlock(c, WCX + 9, TORSO_Y + 6, 5, 12);
-    weaponHandle(c, WCX + 12, TORSO_Y + 10, 4, 20);
-    weaponHead(c, WCX + 9, TORSO_Y + 28);
+    inkLine(c, WCX, TORSO_Y + 4, WCX + 10, TORSO_Y + 16);
+    inkBat(c, WCX + 10, TORSO_Y + 16, WCX + 12, TORSO_Y + 34);
   }
-  headBlock(c, WCX, HELMET_Y, false, stage === 1 ? 2 : 0);
+  inkHead(c, WCX + (stage === 1 ? 2 : 0), head, 7, false);
   return { cv, ax: WCX, ay: FOOT_Y };
 }
 
 function buildGuard(air: boolean): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  legsBlock(c, CX, HIP_Y + (air ? 3 : 0), LEG_H - (air ? 4 : 0), air ? 3 : 0);
-  torsoBlock(c, CX, TORSO_Y);
-  armBlock(c, CX - 12, TORSO_Y - 6, 5, 10);
-  armBlock(c, CX + 7, TORSO_Y - 6, 5, 10);
-  weaponHandle(c, CX - 14, 4, 28, 3); // 방망이 머리 위 수평
-  weaponHead(c, CX + 12, 0);
-  headBlock(c, CX, HELMET_Y + 2, false, 0);
+  strokeInk(c);
+  const hip = HIP_Y + (air ? 3 : 0), head = HELMET_Y + 10;
+  inkLine(c, CX, head + 7, CX, hip);
+  inkLine(c, CX, hip, CX - (air ? 9 : 7), FOOT_Y - (air ? 4 : 0));
+  inkLine(c, CX, hip, CX + (air ? 9 : 7), FOOT_Y - (air ? 4 : 0));
+  inkLine(c, CX, TORSO_Y + 2, CX - 11, TORSO_Y - 6);
+  inkLine(c, CX, TORSO_Y + 2, CX + 11, TORSO_Y - 6);
+  inkBat(c, CX - 14, HELMET_Y + 2, CX + 16, HELMET_Y + 2);
+  inkHead(c, CX, head, 7, false);
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
 function buildGuardBreak(): PFrame {
   const { cv, c } = mkCanvas(STAND_W, STAND_H);
-  legsBlock(c, CX, HIP_Y, LEG_H, 1);
-  torsoBlock(c, CX, TORSO_Y + 2);
-  armBlock(c, CX - 15, TORSO_Y + 6, 5, 10);
-  armBlock(c, CX + 10, TORSO_Y + 8, 5, 10);
-  weaponHandle(c, CX - 18, FOOT_Y - 6, 20, 3); // 방망이 떨어뜨림 (발밑에 눕힘)
-  weaponHead(c, CX + 2, FOOT_Y - 9);
-  headBlock(c, CX, HELMET_Y + 3, false, -3); // 비틀린 각도
+  strokeInk(c);
+  const hip = HIP_Y, head = HELMET_Y + 12;
+  inkLine(c, CX + 2, head + 7, CX, hip);
+  inkLine(c, CX, hip, CX - 8, FOOT_Y);
+  inkLine(c, CX, hip, CX + 10, FOOT_Y);
+  inkLine(c, CX, TORSO_Y + 6, CX - 14, TORSO_Y + 16);
+  inkLine(c, CX, TORSO_Y + 6, CX + 12, TORSO_Y + 18);
+  inkBat(c, CX - 16, FOOT_Y - 2, CX + 8, FOOT_Y - 4);
+  inkHead(c, CX + 3, head, 7, false);
   return { cv, ax: CX, ay: FOOT_Y };
 }
 
 function buildSpecial(): PFrame {
   const { cv, c } = mkCanvas(WIDE_W, WIDE_H);
-  legsBlock(c, WCX, HIP_Y, LEG_H, 3);
-  torsoBlock(c, WCX, TORSO_Y + 2);
-  armBlock(c, WCX - 14, TORSO_Y + 4, 5, 12);
-  armBlock(c, WCX + 9, TORSO_Y + 4, 5, 12);
-  weaponHandle(c, WCX + 12, TORSO_Y + 12, 4, 24); // 방망이 지면 강타
-  weaponHead(c, WCX + 6, FOOT_Y - 10);
-  headBlock(c, WCX, HELMET_Y + 2, true, 0); // 눈 뒤집힘(흰 원)
-  c.strokeStyle = PALETTE.YELLOW;
-  c.lineWidth = 1;
-  c.beginPath();
-  c.moveTo(WCX - 6, FOOT_Y);
-  c.lineTo(WCX - 16, FOOT_Y - 4);
-  c.moveTo(WCX + 20, FOOT_Y);
-  c.lineTo(WCX + 32, FOOT_Y - 4);
-  c.stroke(); // 강타 충격선
+  strokeInk(c);
+  const hip = HIP_Y, head = HELMET_Y + 10;
+  inkLine(c, WCX, head + 7, WCX, hip);
+  inkLine(c, WCX, hip, WCX - 10, FOOT_Y);
+  inkLine(c, WCX, hip, WCX + 10, FOOT_Y);
+  inkLine(c, WCX, TORSO_Y + 6, WCX - 12, TORSO_Y + 16);
+  inkLine(c, WCX, TORSO_Y + 6, WCX + 12, TORSO_Y + 16);
+  inkBat(c, WCX + 12, TORSO_Y + 16, WCX + 10, FOOT_Y - 4);
+  inkHead(c, WCX, head, 7, true);
+  c.strokeStyle = PALETTE.INK;
+  inkLine(c, WCX - 6, FOOT_Y, WCX - 16, FOOT_Y - 4);
+  inkLine(c, WCX + 20, FOOT_Y, WCX + 32, FOOT_Y - 4);
   return { cv, ax: WCX, ay: FOOT_Y };
 }
 
 function buildPinned(): PFrame {
   const { cv, c } = mkCanvas(FLAT_W, FLAT_H);
+  strokeInk(c);
   const fy = FLAT_H - 4;
-  block(c, 6, fy - 6, FLAT_W - 12, 8, SKIN_DK); // 납작 눌린 몸통
-  block(c, 2, fy - 4, 10, 5, SKIN);
-  block(c, FLAT_W - 12, fy - 4, 10, 5, SKIN); // 가로로 퍼진 팔
-  block(c, 10, fy - 2, 8, 4, SKIN_DK);
-  block(c, FLAT_W - 18, fy - 2, 8, 4, SKIN_DK); // 다리
-  headBlock(c, FLAT_W / 2, 2, false, 0);
+  inkLine(c, 8, fy - 2, FLAT_W - 8, fy - 2);
+  inkLine(c, 6, fy - 6, 14, fy);
+  inkLine(c, FLAT_W - 6, fy - 6, FLAT_W - 14, fy);
+  inkHead(c, FLAT_W / 2, 8, 6, false);
   return { cv, ax: FLAT_W / 2, ay: fy + 4 };
 }
 
 function buildDead(): PFrame {
   const { cv, c } = mkCanvas(FLAT_W, FLAT_H);
+  strokeInk(c);
   const fy = FLAT_H - 6;
-  block(c, 4, fy - 8, FLAT_W - 8, 8, SKIN_DK); // 뒤집혀 누움
-  block(c, FLAT_W - 14, fy - 10, 10, 6, SKIN);
-  headBlock(c, 10, fy - 16, false, 0);
+  inkLine(c, 8, fy, FLAT_W - 10, fy - 4);
+  inkLine(c, 8, fy, 4, fy - 8);
+  inkLine(c, FLAT_W - 10, fy - 4, FLAT_W - 4, fy - 10);
+  inkHead(c, 12, fy - 10, 6, false);
   return { cv, ax: FLAT_W / 2, ay: fy + 4 };
 }
 
@@ -630,6 +621,9 @@ function buildBoltCueIcon(): HTMLCanvasElement {
   c.lineTo(8, 0);
   c.closePath();
   c.fill();
+  c.strokeStyle = OUTLINE;
+  c.lineWidth = 1;
+  c.stroke();
   return cv;
 }
 
@@ -644,8 +638,8 @@ function buildRockIcon(): HTMLCanvasElement {
   c.lineTo(14, 12);
   c.lineTo(10, 16);
   c.stroke();
-  block(c, 7, 9, 3, 3, PALETTE.WHITE); // 눈 (코믹 암석)
-  block(c, 14, 9, 3, 3, PALETTE.WHITE);
+  block(c, 7, 9, 3, 3, '#FFFFFF'); // 눈 (코믹 암석)
+  block(c, 14, 9, 3, 3, '#FFFFFF');
   c.fillStyle = OUTLINE;
   c.fillRect(8, 10, 1, 1);
   c.fillRect(15, 10, 1, 1);
@@ -659,6 +653,9 @@ function buildShotIcon(cancellable: boolean): HTMLCanvasElement {
   c.beginPath();
   c.arc(11, 5, 4, 0, Math.PI * 2);
   c.fill();
+  c.strokeStyle = OUTLINE;
+  c.lineWidth = 1;
+  c.stroke();
   c.fillRect(0, 4, 8, 2); // 꼬리
   return cv;
 }
@@ -666,7 +663,7 @@ function buildShotIcon(cancellable: boolean): HTMLCanvasElement {
 function buildRabbitIcon(): HTMLCanvasElement {
   const { cv, c } = mkCanvas(28, 20);
   block(c, 6, 8, 16, 8, '#8a8f94'); // 정찰 드론 몸통
-  c.strokeStyle = '#c7cbce';
+  c.strokeStyle = '#5a5f64';
   c.lineWidth = 1;
   c.beginPath();
   c.moveTo(0, 9);
@@ -854,7 +851,7 @@ export function drawBoss(ctx: CanvasRenderingContext2D, boss: BossState, groundY
     if (blinkOn) {
       ctx.save();
       ctx.globalAlpha = 0.85;
-      ctx.fillStyle = PALETTE.WHITE;
+      ctx.fillStyle = PALETTE.RED;
       ctx.beginPath();
       ctx.arc(x, cy, 3, 0, Math.PI * 2);
       ctx.fill();
