@@ -42,15 +42,13 @@ export function spawnAct1Building(s: GameState): void {
   const theme = chapterTheme(s.chapter);
   const floors: Floor[] = [];
   for (let i = 0; i < floorCount; i++) {
-    // 층 대표 재질 추첨 후, 세그별로 ±1 단계 변형 확률 30%
+    // 층 재질 추첨 후 30% 확률로 재추첨(±1 단계 변형) — 세그먼트 분할이 없어진 뒤의 층 단위 변형
     const base = pickMat(s, dist);
     const f = makeFloor(base);
-    for (let lane = 0; lane < 3; lane++) {
-      if (rand(s) < 0.3) {
-        const alt = pickMat(s, dist);
-        const hp = alt === 'weak' ? 1 : alt === 'mid' ? 2 : 3;
-        f.segs[lane] = { hp, maxHp: hp };
-      }
+    if (rand(s) < 0.3) {
+      const alt = pickMat(s, dist);
+      const hp = alt === 'weak' ? 1 : alt === 'mid' ? 2 : 3;
+      f.segs[0] = { hp, maxHp: hp };
     }
     floors.push(f);
   }

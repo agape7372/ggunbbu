@@ -2,7 +2,7 @@
 // [정본] HP 230 (= 원문 50+100+80), 티어 임계 누적대미지 50/150, 230+타 격파.
 // 패턴: 돌진/영거리(B)/강화돌진(C)/번개5/번개9(C)/드론5/대포3(C).
 
-import type { BossPattern, BossState, GameState, Lane } from './types';
+import type { BossPattern, BossState, GameState } from './types';
 import { registerHit, hurtPlayer, addScore } from './combat';
 import { guardActive } from './player';
 import { rand, randInt } from './rng';
@@ -14,7 +14,7 @@ export function initBoss(): BossState {
     hp: BOSS.HP, dmg: 0, tier: 0,
     st: 'enter', stTick: 0,
     pattern: null, lastPattern: null, step: 0,
-    y: VIEW.H + 80, targetLane: 1, hittable: false,
+    y: VIEW.H + 80, targetLane: 0, hittable: false,
   };
 }
 
@@ -176,15 +176,15 @@ function stepAttackPattern(s: GameState, b: BossState): void {
   if (pat === 'riseBolt5') {
     b.hittable = false;
     if (b.step < 5 && b.stTick % BOSS.RISE.BOLT_GAP_5 === 1) {
-      spawnBolt(s, randInt(s, 3) as Lane);
+      spawnBolt(s, 0);  // 단일 레인 — 이동 회피 불가, 존 16f 창에서 베어라 [정본]
       b.step += 1;
     }
     if (b.step >= 5 && !s.entities.some((e) => e.kind === 'bolt')) setSt(b, 'stagger');
   } else if (pat === 'riseBolt9') {
     b.hittable = false;
     if (b.step < 3 && b.stTick % BOSS.RISE.WAVE_GAP_9 === 1) {
-      // [정본] 3레인 동시 × 3웨이브
-      spawnBolt(s, 0); spawnBolt(s, 1); spawnBolt(s, 2);
+      // [정본 재해석] 9발 유지. 원작 3레인 동시 → 단일 레인에선 12f 시차 3연발로 흩는다.
+      spawnBolt(s, 0, 0); spawnBolt(s, 0, 12); spawnBolt(s, 0, 24);
       b.step += 1;
     }
     if (b.step >= 3 && !s.entities.some((e) => e.kind === 'bolt')) setSt(b, 'stagger');
@@ -208,9 +208,11 @@ function stepAttackPattern(s: GameState, b: BossState): void {
   } else if (pat === 'cannons') {
     b.hittable = false;
     if (b.step < BOSS.CANNON.COUNT && b.stTick % BOSS.CANNON.AIM_GAP === 1) {
-      const lane = randInt(s, 3) as Lane;
-      s.entities.push({ kind: 'cannon', lane, hp: BOSS.CANNON.HP, fireTicks: BOSS.CANNON.AIM_TELE });
-      s.events.push({ kind: 'boltCue', lane });
+      // 좌/중/우 고정 설치 [정본 재해석]: 가운데 대포만 수직탄이 직격,
+      // 양옆은 착탄 스파크로 위협한다 → "대포 하나를 잡고 빠르게 없애라"가 그대로 성립.
+      const cx = BOSS.CANNON.X[b.step];
+      s.entities.push({ kind: 'cannon', lane: 0, x: cx, hp: BOSS.CANNON.HP, fireTicks: BOSS.CANNON.AIM_TELE });
+      s.events.push({ kind: 'boltCue', lane: 0 });
       b.step += 1;
     }
     stepCannons(s, b);
@@ -268,7 +270,7 @@ function stepCannons(s: GameState, b: BossState): void {
       // 수직 전기탄 [정본: 가드 불가]
       s.entities.push({
         kind: 'shot', lane: e.lane,
-        x: VIEW.LANE_X[e.lane], y: 260,
+        x: e.x, y: 260,
         vx: 0, vy: -BOSS.CANNON.SHOT_V,
         guardable: false, cancellable: false,
       });
@@ -293,7 +295,8 @@ export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
       s.events.push({ kind: 'bossHit', y: e.y });
       return true;
     }
-    if (e.kind === 'cannon' && e.lane === s.player.lane && 260 >= lo && 260 <= hi) {
+    // 참격 가로 리치 = 건물 폭 절반 → 벌려 놓은 대포도 전부 벨 수 있다
+    if (e.kind === 'cannon' && Math.abs(e.x - px) <= VIEW.LANE_W / 2 && 260 >= lo && 260 <= hi) {
       e.hp -= 1;
       if (e.hp <= 0) s.entities.splice(i, 1);
       registerHit(s);

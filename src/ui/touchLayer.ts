@@ -1,7 +1,8 @@
 // 건뿌 터치 입력 레이어 — Pointer Events 기반 버튼 관리
 // 포인터별 상태 추적, 슬라이드 감지, 라이프사이클 관리 (visibilitychange/blur)
 
-export type TouchAction = 'left' | 'right' | 'jump' | 'guard' | 'attack' | 'special';
+// 원작에 좌우 이동이 없다 → 왼손 점프 / 오른손 타격·가드·필살 4버튼.
+export type TouchAction = 'jump' | 'guard' | 'attack' | 'special';
 
 export interface TouchInput {
   /** 현재 홀드 중인 버튼들 (레벨) */
@@ -19,8 +20,6 @@ export interface TouchInput {
 }
 
 const BUTTON_IDS = {
-  left: 'btn-left',
-  right: 'btn-right',
   jump: 'btn-jump',
   guard: 'btn-guard',
   attack: 'btn-attack',
@@ -28,8 +27,6 @@ const BUTTON_IDS = {
 } as const;
 
 const BUTTON_LABELS = {
-  left: '◀',
-  right: '▶',
   jump: '점프',
   guard: '가드',
   attack: '공격',
@@ -41,12 +38,10 @@ const BUTTON_PINNED_LABEL = '⬆탈출';
 export function initTouchLayer(container: HTMLElement): TouchInput {
   // 상태 초기화
   const held: Record<TouchAction, boolean> = {
-    left: false, right: false, jump: false,
-    guard: false, attack: false, special: false,
+    jump: false, guard: false, attack: false, special: false,
   };
   const pressed: Record<TouchAction, boolean> = {
-    left: false, right: false, jump: false,
-    guard: false, attack: false, special: false,
+    jump: false, guard: false, attack: false, special: false,
   };
 
   // Pointer 추적: Map<pointerId, action>
@@ -104,30 +99,9 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     btn.classList.add('active');
   };
 
-  const onPointerMove = (event: PointerEvent) => {
-    const btn = (event.target as HTMLElement).closest('.tbtn');
-    const action = pointerMap.get(event.pointerId);
-
-    if (!action) return;
-
-    // 슬라이드 감지: 이동 버튼(left/right)끼리만 경계 통과 시 재발동
-    if ((action === 'left' || action === 'right') && btn) {
-      const newAction = btn.getAttribute('data-action') as TouchAction;
-      if (newAction && (newAction === 'left' || newAction === 'right') && newAction !== action) {
-        // 이전 버튼 해제
-        const oldBtn = buttonElements.get(action);
-        if (oldBtn) oldBtn.classList.remove('active');
-        held[action] = false;
-
-        // 새 버튼 활성화
-        held[newAction] = true;
-        pressed[newAction] = true;
-        pointerMap.set(event.pointerId, newAction);
-        btn.classList.add('active');
-        event.preventDefault();
-      }
-    }
-  };
+  // 슬라이드 재발동은 좌우 이동 버튼 전용이었다 — 이동이 사라져 함께 폐기.
+  // (점프/공격을 슬라이드로 흘려 누르면 오히려 오입력이 된다)
+  const onPointerMove = (event: PointerEvent) => { void event; };
 
   const onPointerUp = (event: PointerEvent) => {
     const action = pointerMap.get(event.pointerId);

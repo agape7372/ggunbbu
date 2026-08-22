@@ -65,7 +65,7 @@ const SFX_MAP: Record<string, SfxNameOf> = {
   butterCollapse: 'butterPop', special: 'special', hurt: 'pinned',
   guardBounce: 'guardGround', bossHit: 'bossHit', bossDefeat: 'bossDefeat',
   boltCue: 'boltCue', boltStrike: 'boltStrike', gaugeFull: 'gaugeFull',
-  comboBreak: 'guardBreak', jump: 'jump', land: 'land', laneMove: 'laneMove',
+  comboBreak: 'guardBreak', jump: 'jump', land: 'land',
   guardDenied: 'gaugeWarn', lifeLost: 'lifeLost', bonusEnter: 'perfect',
   bonusPerfect: 'perfect', phaseClear: 'gaugeFull', chapterUnlock: 'gaugeFull',
 };
@@ -86,7 +86,7 @@ export function consumeEvents(s: GameState): void {
         if (numPopups.length >= JUICE_SYS.COMBO_POPUP_MAX) numPopups.shift();
         numPopups.push({
           n,
-          x: VIEW.LANE_X[e.lane ?? 1] + scatter() * 22,
+          x: VIEW.LANE_X[0] + scatter() * 22,
           y: VIEW.GROUND_Y - (e.y ?? 100) - 12 + scatter() * 10,
           vx: scatter() * 0.9,
           vy: -1.4 - Math.abs(scatter()) * 0.8,
@@ -103,7 +103,7 @@ export function consumeEvents(s: GameState): void {
       const esc = e.combo ?? s.combo;
       popups.push({
         text: word,
-        x: VIEW.LANE_X[e.lane ?? 1] + ((esc * 13) % 30) - 15,
+        x: VIEW.LANE_X[0] + ((esc * 13) % 30) - 15,
         y: VIEW.GROUND_Y - (e.y ?? 100) - 30,
         ticks: 24,
         scale: e.kind === 'special' || e.kind === 'bossDefeat' ? 2 : 1 + Math.min(esc / 500, 0.8),

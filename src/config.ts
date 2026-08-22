@@ -12,8 +12,10 @@ export const VIEW = {
   FIELD_H: 470,          // 상단 게임 필드, 하단은 조작 존
   // 원작 실측 비율 이식: 건물 1채 = 화면폭 75%(480/640), 층 높이 = 화면높이 25%(120/480),
   // 캐릭터 높이 = 층의 0.82배(98/120). 세로 화면(360폭)에 균일 스케일 0.5625 적용.
-  LANE_W: 90,
-  LANE_X: [90, 180, 270] as const,  // 레인 중심 (건물 270px = 360의 75%)
+  // 원작에 좌우 이동이 없다(사용자 원작 대조) → 레인 1개. 건물이 화면폭 75%를 통째로 차지한다.
+  LANE_W: 270,                // 건물/세그먼트 폭 = 360의 75%
+  LANE_X: [180] as const,     // 레인 중심 (단일)
+  BUTTER_W: 90,               // 버터바 폭 (좁은 낙하물 — 건물과 구분)
   FLOOR_H: 68,                       // 120 × 0.5625
   GROUND_Y: 470,         // 캔버스 픽셀상 지면 라인 (렌더 변환용)
 } as const;
@@ -23,7 +25,6 @@ export const PLAYER = {
   GRAVITY: 1780,          // px/s²
   JUMP_V0: 800,           // 정점 ≈180px, 체공 ≈0.9s — "매우 높은 점프" [정본 느낌]
   W: 46, H: 55,          // 원작 82×98 × 0.5625
-  LANE_TWEEN_MS: 60,      // 시각 보간 전용 (논리 즉시)
   // 원작은 한 번의 참격이 "한 층"에 닿는다(참격 스프라이트 67px vs 층 120px).
   // 기존 128px는 40px 층 기준 3.2개 층을 동시에 때려 위치 선정을 무의미하게 만들었다.
   ATTACK_REACH: 68,       // = FLOOR_H (층 1개)
@@ -150,7 +151,7 @@ export const ACT2 = {
   ROCK_COUNT: 24, ROCK_HP: 2,              // +48 = 228 ∈ [220,230]
   ROCK_GAP_START: 120, ROCK_GAP_END: 60,
   ROCK_TIMEBOX_TICKS: 2400,                // 40s
-  ROCK_STACK_MAX: 3,                       // 레인당 적재 상한
+  ROCK_STACK_MAX: 3,                       // 지면 적재 상한 (단일 레인)
   CHECKPOINTS: [40, 148, 168] as const,    // 이어하기 콤보 재설정 값
 } as const;
 
@@ -168,7 +169,10 @@ export const BOSS = {
   MULTI_CHARGE: { COUNT: 3, REAIM: 20, STAGGER: 75 },
   RISE: { UP: 60, BOLT_GAP_5: 45, WAVE_GAP_9: 60, DOWN_WINDOW: 90 },
   RABBIT: { COUNT: 5, ENTER_GAP: 30, FIRE_DELAY: 20, LEAVE: 30, HP: 1, SHOT_V: 480 },
-  CANNON: { COUNT: 3, AIM_GAP: 40, AIM_TELE: 30, SHOT_V: 700, SPARK_V: 300, SPARK_H: 24, HP: 2 },
+  CANNON: {
+    COUNT: 3, AIM_GAP: 40, AIM_TELE: 30, SHOT_V: 700, SPARK_V: 300, SPARK_H: 24, HP: 2,
+    X: [80, 180, 280] as const,  // 좌/중/우 설치 x — 가운데만 직격, 양옆은 스파크 위협
+  },
   DEFEAT_SLOW: 0.2, DEFEAT_SLOW_S: 3,
 } as const;
 

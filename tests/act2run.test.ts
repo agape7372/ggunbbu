@@ -32,19 +32,24 @@ function policy(s: GameState): InputFrame {
       && (b.pattern === 'charge' || b.pattern === 'pbCharge' || b.pattern === 'multiCharge'))) {
       if (p.y <= 0) { i.guard = true; return i; }
     }
+    const px = VIEW.LANE_X[0];
+    // 대포는 좌우로 벌려 설치된다 — 이동이 없으니 예고(30f) 안에 점프해서 베는 것이 유일 대응
     for (const e of s.entities) {
-      if (e.kind === 'shot' && !e.guardable && Math.abs(e.vy) > 1 && e.lane === p.lane && e.y < 300) {
-        if (p.lane > 0) i.left = true; else i.right = true;
+      if (e.kind === 'cannon' && e.fireTicks > 0 && Math.abs(e.x - px) <= VIEW.LANE_W / 2) {
+        if (p.y <= 0) i.jump = true; else i.attack = true;
         return i;
       }
+    }
+    for (const e of s.entities) {
+      // 지면 스파크 = 점프 회피 [정본]
       if (e.kind === 'shot' && !e.guardable && Math.abs(e.vy) < 1
-        && Math.abs(e.x - VIEW.LANE_X[p.lane]) < 70 && p.y <= 0) {
+        && Math.abs(e.x - px) < 70 && p.y <= 0) {
         i.jump = true;
         return i;
       }
       // 가드 가능한 드론탄 접근 → 지면 가드로 무상 방어 (보스전은 스택 없음 — 콤보 안전)
       if (e.kind === 'shot' && e.guardable
-        && Math.hypot(e.x - VIEW.LANE_X[p.lane], e.y - p.y - 24) < 110 && p.y <= 0) {
+        && Math.hypot(e.x - px, e.y - p.y - 24) < 110 && p.y <= 0) {
         i.guard = true;
         return i;
       }
@@ -54,20 +59,15 @@ function policy(s: GameState): InputFrame {
   }
 
   if (s.act2Phase === 'bolt' || s.act2Phase === 'rock') {
-    let targetLane: number | null = null;
+    // 단일 레인 — 전탄이 머리 위로 떨어진다. 회피가 없으니 존 통과 창에 베는 것이 전부.
     let lowest = Infinity;
     for (const e of s.entities) {
-      if ((e.kind === 'bolt' || e.kind === 'rock') && e.y < lowest) { lowest = e.y; targetLane = e.lane; }
+      if ((e.kind === 'bolt' || e.kind === 'rock') && e.y < lowest) lowest = e.y;
     }
-    if (targetLane !== null && targetLane !== p.lane) {
-      if (targetLane < p.lane) i.left = true; else i.right = true;
-      i.attack = true;
-      return i;
-    }
-    // 자기 레인 화산탄이 임박했는데 HP가 남았으면 지면 가드로 무상 적재 (콤보 유지)
-    if (s.act2Phase === 'rock' && targetLane === p.lane && lowest < 80 && p.y <= 0) {
+    // 화산탄이 착지 직전인데 HP가 남았으면 지면 가드로 무상 적재 (콤보 유지)
+    if (s.act2Phase === 'rock' && lowest < 80 && p.y <= 0) {
       for (const e of s.entities) {
-        if (e.kind === 'rock' && e.lane === p.lane && e.y === lowest && e.hp > 0 && e.y < 60) {
+        if (e.kind === 'rock' && e.y === lowest && e.hp > 0 && e.y < 60) {
           i.guard = true;
           return i;
         }
@@ -81,7 +81,7 @@ function policy(s: GameState): InputFrame {
   const st = s.stack;
   if (!st) { i.attack = true; return i; }
   const bottomHp = st.floors.length > 0
-    ? (st.sharedHp ? st.floors[0].segs[0].hp : st.floors[0].segs[p.lane].hp)
+    ? st.floors[0].segs[0].hp
     : 0;
   const heavy = s.act2Phase === 'cathedral';
   if (p.y > 0) {

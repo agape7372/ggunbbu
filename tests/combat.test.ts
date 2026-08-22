@@ -29,7 +29,7 @@ describe('타격', () => {
       liftSeen = Math.max(liftSeen, s.stack!.vy);
     }
     expect(s.combo).toBe(1);
-    expect(s.stack!.floors[0].segs[1].hp).toBe(2);
+    expect(s.stack!.floors[0].segs[0].hp).toBe(2);
     expect(liftSeen).toBeGreaterThan(0); // HIT_LIFT로 한 번은 위로 밀렸다
   });
 

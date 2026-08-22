@@ -5,7 +5,6 @@ import type { GameState, Lane } from './types';
 import { makeFloor, makeStack } from './building';
 import { registerHit, hurtPlayer, addScore, addGauge, gaugePerHit } from './combat';
 import { guardActive } from './player';
-import { randInt } from './rng';
 import { ACT2, SCORE, STACK, TICK, VIEW } from '../config';
 import { initBoss, stepBoss, tryHitBoss } from './boss';
 
@@ -28,7 +27,7 @@ export function enterAct2Phase(s: GameState, phase: NonNullable<GameState['act2P
   s.act2Phase = phase;
   s.stack = null;
   s.entities = [];
-  s.groundRocks = [0, 0, 0];
+  s.groundRocks = 0;
   s.boss = null;
   s.act2c = { spawned: false, bolts: 0, rocks: 0, cd: 0, t: 0 };
   s.stackSpawnCd = ACT2.INTERLUDE_TICKS;
@@ -96,7 +95,7 @@ export function stepAct2(s: GameState): void {
       const timeUp = c.t >= ACT2.ROCK_TIMEBOX_TICKS;
       const allDone = c.rocks >= ACT2.ROCK_COUNT && !s.entities.some((e) => e.kind === 'rock');
       if (timeUp || allDone) {
-        s.groundRocks = [0, 0, 0]; // 더미 소멸 → 보스 인트로
+        s.groundRocks = 0; // 더미 소멸 → 보스 인트로
         nextPhase(s);
       }
       break;
@@ -115,13 +114,14 @@ function stepBoltSpawner(s: GameState, c: { bolts: number; cd: number }): void {
   if (c.bolts >= ACT2.BOLT_COUNT) return;
   if (s.stackSpawnCd > 0) { s.stackSpawnCd -= 1; return; } // 인터루드
   if (c.cd > 0) { c.cd -= 1; return; }
-  spawnBolt(s, randInt(s, 3) as Lane);
+  spawnBolt(s, 0);  // 단일 레인 — 12발 전부 플레이어 머리 위 [정본 180 = 전탄 격파]
   c.bolts += 1;
   c.cd = c.bolts <= ACT2.BOLT_EARLY ? ACT2.BOLT_EARLY_GAP : ACT2.BOLT_RHYTHM_GAP;
 }
 
-export function spawnBolt(s: GameState, lane: Lane): void {
-  s.entities.push({ kind: 'bolt', lane, y: VIEW.H, vy: 0, cueTicks: ACT2.BOLT_CUE_TICKS });
+/** cueDelay = 큐 지연(틱). 단일 레인에서 다발 볼트를 시차로 흩기 위해 사용. */
+export function spawnBolt(s: GameState, lane: Lane, cueDelay = 0): void {
+  s.entities.push({ kind: 'bolt', lane, y: VIEW.H, vy: 0, cueTicks: ACT2.BOLT_CUE_TICKS + cueDelay });
   s.events.push({ kind: 'boltCue', lane });
 }
 
@@ -130,9 +130,8 @@ function stepRockSpawner(s: GameState, c: { rocks: number; cd: number; t: number
   if (c.rocks >= ACT2.ROCK_COUNT) return;
   if (s.stackSpawnCd > 0) { s.stackSpawnCd -= 1; return; }
   if (c.cd > 0) { c.cd -= 1; return; }
-  // 적재 3단 초과 레인 제외 재추첨
-  const candidates: Lane[] = ([0, 1, 2] as Lane[]).filter((l) => s.groundRocks[l] < ACT2.ROCK_STACK_MAX);
-  const lane = candidates.length > 0 ? candidates[randInt(s, candidates.length)] : (randInt(s, 3) as Lane);
+  // 단일 레인 — 전탄이 플레이어 머리 위. 지면 적재는 ROCK_STACK_MAX(3)에서 포화한다.
+  const lane: Lane = 0;
   s.entities.push({ kind: 'rock', lane, y: VIEW.H, vy: 0, hp: ACT2.ROCK_HP });
   s.events.push({ kind: 'boltCue', lane }); // 낙하 예고 재사용 (렌더는 kind로 구분 불가하므로 rockWhistle은 스폰 시)
   c.rocks += 1;
@@ -150,9 +149,8 @@ export function stepEntities(s: GameState): void {
       e.vy = e.y > ACT2.BOLT_ZONE_Y ? -ACT2.BOLT_FALL_V : -ACT2.BOLT_ZONE_V;
       e.y += e.vy * TICK;
       if (e.y <= 0) {
-        // 낙뢰 [정본: 가드 불가]
-        if (e.lane === s.player.lane) hurtPlayer(s);
-        else s.fullCombo = false; // 타 레인 무해, 풀콤보만 소멸
+        // 낙뢰 [정본: 가드 불가]. 단일 레인이라 회피 불가 — 존 16f 창에서 베는 것이 유일 해법.
+        hurtPlayer(s);
         s.events.push({ kind: 'boltStrike', lane: e.lane });
         remove.push(i);
       }
@@ -161,10 +159,10 @@ export function stepEntities(s: GameState): void {
       if (e.vy < -STACK.ROCK_VTERM) e.vy = -STACK.ROCK_VTERM;
       e.y += e.vy * TICK;
       if (e.y <= 0) {
-        if (e.lane === s.player.lane && s.player.y <= 4 && !guardActive(s.player)) {
-          hurtPlayer(s); // 가드 중이면 무해하게 적재 [원작 공략 재현]
+        if (s.player.y <= 4 && !guardActive(s.player)) {
+          hurtPlayer(s); // 가드 중이거나 공중이면 무해하게 적재 [원작 공략 재현]
         }
-        if (s.groundRocks[e.lane] < ACT2.ROCK_STACK_MAX) s.groundRocks[e.lane] += 1;
+        if (s.groundRocks < ACT2.ROCK_STACK_MAX) s.groundRocks += 1;
         s.events.push({ kind: 'land', lane: e.lane });
         remove.push(i);
       }
@@ -242,7 +240,7 @@ export function tryHitAct2Targets(s: GameState): boolean {
   // 4) 보스 본체 / 드론 / 대포
   if (s.boss && tryHitBoss(s, lo, hi)) return true;
   // 5) 바닥 화산탄 더미 파밍 [정본: 반복 점수. 콤보는 플래그(기본 off)]
-  if (s.groundRocks[p.lane] > 0 && lo <= s.groundRocks[p.lane] * 40) {
+  if (s.groundRocks > 0 && lo <= s.groundRocks * 40) {
     if (SCORE.GROUND_ROCK_COMBO) {
       registerHit(s);
     } else {

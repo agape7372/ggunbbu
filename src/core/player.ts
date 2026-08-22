@@ -7,7 +7,7 @@ import { GUARD_GAUGE, PLAYER } from '../config';
 
 export function makePlayer(): PlayerState {
   return {
-    lane: 1, y: 0, vy: 0,
+    lane: 0, y: 0, vy: 0,
     pose: 'idle', poseTick: 0,
     invulnTicks: 0,
     bufAttack: 0, bufJump: 0, bufGuard: 0,
@@ -40,10 +40,7 @@ export function collectBuffers(p: PlayerState, input: InputFrame): void {
   if (input.guard) p.bufGuard = PLAYER.INPUT_BUFFER;
 }
 
-/**
- * 플레이어 1틱. pinned/dead는 sim이 별도 처리(여기선 무시).
- * 좌우 이동 이벤트는 s.events에 laneMove로 기록.
- */
+/** 플레이어 1틱. pinned/dead는 sim이 별도 처리(여기선 무시). */
 export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   const p = s.player;
   if (p.invulnTicks > 0) p.invulnTicks -= 1;
@@ -53,18 +50,6 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   if (p.pose === 'pinned' || p.pose === 'dead') return;
 
   const airborne = p.y > 0;
-
-  // ── 레인 이동 (attack/guardBreak 중 불가, 가드 중 가능 [정본]) ──
-  if (p.pose !== 'attack' && p.pose !== 'guardBreak') {
-    if (input.left && p.lane > 0) {
-      p.lane = (p.lane - 1) as typeof p.lane;
-      s.events.push({ kind: 'laneMove', lane: p.lane });
-    }
-    if (input.right && p.lane < 2) {
-      p.lane = (p.lane + 1) as typeof p.lane;
-      s.events.push({ kind: 'laneMove', lane: p.lane });
-    }
-  }
 
   // ── 상태별 진행 ──
   switch (p.pose) {

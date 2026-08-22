@@ -114,7 +114,7 @@ export function createApp(
           else if (menuIndex === 1 && save.act2Cleared) startTokoton();
           else if (menuIndex === 2 && save.butterTierReached > 0) startButterChallenge(save.butterTierReached);
         }
-        if (f.left && f.right) debug = true; // 좌+우 동시 = 디버그 (모바일용)
+        if (f.guard && f.special) debug = true; // 가드+필살 동시 = 디버그 (모바일용)
         break;
       }
       case 'story': {

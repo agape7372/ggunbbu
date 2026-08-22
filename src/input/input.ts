@@ -1,12 +1,10 @@
 // 키보드 + 터치 → InputFrame 통합. 엣지(눌림)/홀드(가드) 구분.
-// 매핑 [정본]: ←→↑↓ + Z(공격) X(필살) / 병행 WASD + J/K, Space=점프, S/Shift=가드.
+// 원작에 좌우 이동이 없어 ←→(A/D) 매핑은 폐기. ↑(점프)·↓(가드)·Z(공격)·X(필살)만 남는다.
 
 import type { InputFrame } from '../core/types';
 import type { TouchInput } from '../ui/touchLayer';
 
 const EDGE_KEYS: Record<string, keyof InputFrame> = {
-  ArrowLeft: 'left', KeyA: 'left',
-  ArrowRight: 'right', KeyD: 'right',
   ArrowUp: 'jump', KeyW: 'jump', Space: 'jump',
   KeyZ: 'attack', KeyJ: 'attack',
   KeyX: 'special', KeyK: 'special',
@@ -51,8 +49,6 @@ export function createInput(touch: TouchInput | null): InputSource {
     sample(): InputFrame {
       const t = touch;
       const f: InputFrame = {
-        left: edges.has('left') || (t?.pressed.left ?? false),
-        right: edges.has('right') || (t?.pressed.right ?? false),
         jump: edges.has('jump') || (t?.pressed.jump ?? false),
         attack: edges.has('attack') || (t?.pressed.attack ?? false),
         special: edges.has('special') || (t?.pressed.special ?? false),

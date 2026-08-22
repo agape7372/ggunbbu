@@ -2,7 +2,8 @@
 // 이 파일은 전 모듈(코어/렌더/오디오/UI)과 서브에이전트 위임 계약의 근간이다.
 // 제약: DOM 타입 사용 금지(순수 데이터). GameState는 완전 직렬화 가능해야 한다.
 
-export type Lane = 0 | 1 | 2;
+/** 원작에 좌우 이동이 없다 → 레인 1개. 배선(entity.lane 등)은 유지하되 값은 항상 0. */
+export type Lane = 0;
 
 /** 1막 챕터(스토리 해금) — 시각 스킨 전용, HP 규칙은 Material이 결정 */
 export type Theme = 'europe' | 'asia' | 'eastasia' | 'modern';
@@ -17,7 +18,7 @@ export interface FloorSeg { hp: number; maxHp: number; }
 
 export interface Floor {
   /** 레인 0/1/2 독립 HP. 마천루(tower)는 층 공유 HP 특례 — sharedHp 사용 */
-  segs: [FloorSeg, FloorSeg, FloorSeg];
+  segs: [FloorSeg];
   mat: Material;
   /** 층 높이 px (기본 FLOOR_H) */
   h: number;
@@ -90,6 +91,8 @@ export interface Rabbit {
 export interface Cannon {
   kind: 'cannon';
   lane: Lane;
+  /** 설치 x — 단일 레인이라 대포는 좌/중/우로 벌려 설치된다 (가운데 것이 플레이어 직격) */
+  x: number;
   hp: number;
   /** 다음 발사까지 틱 */
   fireTicks: number;
@@ -160,7 +163,7 @@ export type JuiceKind =
   | 'special' | 'hurt' | 'guardBounce' | 'bossHit' | 'bossDefeat'
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
-  | 'jump' | 'land' | 'laneMove' | 'guardDenied' | 'lifeLost';
+  | 'jump' | 'land' | 'guardDenied' | 'lifeLost';
 
 export interface JuiceEvent {
   kind: JuiceKind;
@@ -211,7 +214,7 @@ export interface GameState {
   stackSpawnCd: number;
   entities: Entity[];
   /** 레인별 바닥 적재 화산탄 수 */
-  groundRocks: [number, number, number];
+  groundRocks: number;
   boss: BossState | null;
   bonus: BonusState | null;
   /** 2막 페이즈 진행 카운터 (act2.ts 전용) */
@@ -241,8 +244,6 @@ export interface GameState {
 
 /** 프레임 입력 — input 레이어가 생성해 sim에 주입 */
 export interface InputFrame {
-  left: boolean;    // 엣지 (이번 틱 눌림)
-  right: boolean;   // 엣지
   jump: boolean;    // 엣지
   guard: boolean;   // 홀드 (레벨)
   attack: boolean;  // 엣지
@@ -250,6 +251,5 @@ export interface InputFrame {
 }
 
 export const EMPTY_INPUT: InputFrame = {
-  left: false, right: false, jump: false,
-  guard: false, attack: false, special: false,
+  jump: false, guard: false, attack: false, special: false,
 };

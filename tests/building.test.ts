@@ -11,40 +11,37 @@ function stack3() {
   });
 }
 
-describe('세그먼트/붕괴 규칙 [정본]', () => {
-  it('플레이어 레인 세그 HP 0 → 층 전체 붕괴, 타 레인 부분 대미지 소멸', () => {
+describe('세그먼트/붕괴 규칙 [정본 — 단일 레인]', () => {
+  it('최하층 세그 HP 0 → 층 전체 붕괴, 위층은 온전', () => {
     const st = stack3();
-    // 레인 0에 2대미지 (hard HP3 → 1 남음)
+    // hard HP3 → 2타로 1 남음
     expect(damageStack(st, 0, -1, 10, 1)).toBe('hit');
     expect(damageStack(st, 0, -1, 10, 1)).toBe('hit');
-    // 레인 2에도 1대미지 (독립)
-    expect(damageStack(st, 2, -1, 10, 1)).toBe('hit');
     expect(st.floors[0].segs[0].hp).toBe(1);
-    expect(st.floors[0].segs[2].hp).toBe(2);
-    // 레인 0 마지막 타 → 층 전체 제거 (레인 2의 부분 대미지도 함께 소멸)
+    // 마지막 타 → 층 제거
     expect(damageStack(st, 0, -1, 10, 1)).toBe('collapse');
     expect(st.floors.length).toBe(2);
     expect(st.floors[0].mat).toBe('mid');
-    expect(st.floors[0].segs[2].hp).toBe(2); // 새 최하층은 온전
+    expect(st.floors[0].segs[0].hp).toBe(2); // 새 최하층은 온전
   });
 
   it('히트박스와 겹치는 가장 낮은 층만 타격', () => {
     const st = stack3();
     st.y = 100;
     // 히트박스 [0, 128] → 최하층(100~140)과 교차
-    expect(damageStack(st, 1, 0, 128, 1)).toBe('hit');
-    expect(st.floors[0].segs[1].hp).toBe(2);
-    expect(st.floors[1].segs[1].hp).toBe(2); // 위층 무손상
+    expect(damageStack(st, 0, 0, 128, 1)).toBe('hit');
+    expect(st.floors[0].segs[0].hp).toBe(2);
+    expect(st.floors[1].segs[0].hp).toBe(2); // 위층 무손상
     // 히트박스가 스택보다 아래 → miss
-    expect(damageStack(st, 1, 0, 90, 1)).toBe('miss');
+    expect(damageStack(st, 0, 0, 90, 1)).toBe('miss');
   });
 
-  it('sharedHp(마천루 특례): 레인 무관 층 공유 HP', () => {
+  it('마천루 로비 HP10: 10타째에 붕괴', () => {
     const st = makeStack({
       variant: 'skyscraper', theme: 'modern',
       floors: [makeFloor('lobby')], sharedHp: true, y: 0,
     });
-    for (let i = 0; i < 9; i++) expect(damageStack(st, (i % 3) as 0 | 1 | 2, -1, 50, 1)).toBe('hit');
+    for (let i = 0; i < 9; i++) expect(damageStack(st, 0, -1, 50, 1)).toBe('hit');
     expect(damageStack(st, 0, -1, 50, 1)).toBe('collapse'); // 10타째
   });
 

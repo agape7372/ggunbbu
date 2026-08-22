@@ -22,7 +22,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     stack: null,
     stackSpawnCd: 30,
     entities: [],
-    groundRocks: [0, 0, 0],
+    groundRocks: 0,
     boss: null,
     bonus: null,
     act2c: null,
@@ -147,8 +147,8 @@ function triggerSpecial(s: GameState): void {
     if (e.kind === 'rock') { cleared += 1; return false; }
     return true;
   });
-  cleared += s.groundRocks[0] + s.groundRocks[1] + s.groundRocks[2];
-  s.groundRocks = [0, 0, 0];
+  cleared += s.groundRocks;
+  s.groundRocks = 0;
   if (cleared > 0) addScore(s, cleared * SCORE.FLOOR_BONUS);
   // 보스: 소량 대미지 + 무적 (주 용도는 회피 [정본])
   if (s.boss) specialHitBoss(s);

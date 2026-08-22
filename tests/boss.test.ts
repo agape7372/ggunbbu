@@ -66,6 +66,42 @@ describe('달 보스 [정본]', () => {
     expect(s.over).toBe('cleared');
   });
 
+  // ── 단일 레인 재해석 가드 ([정본] 수치는 유지, 레인 차원만 붕괴) ──
+  function tier2(): GameState {
+    const s = bossState();
+    s.lives = 9999;              // 패턴 도달만 보는 구조 검증
+    const b = s.boss!;
+    b.dmg = 150; b.tier = 2; b.st = 'idle';
+    return s;
+  }
+
+  it('대포 3문이 좌/중/우로 벌려 설치된다 (가운데만 직격)', () => {
+    const s = tier2();
+    const xs = new Set<number>();
+    for (let i = 0; i < 60 * 300 && xs.size < 3; i++) {
+      advance(s, { ...EMPTY_INPUT, attack: i % 6 === 0 });
+      for (const e of s.entities) if (e.kind === 'cannon') xs.add(e.x);
+      s.events.length = 0;
+      if (s.over) break;
+    }
+    expect([...xs].sort((a, b) => a - b)).toEqual([...BOSS.CANNON.X]);
+  }, 60_000);
+
+  it('강화번개 9발 = 단일 레인 3연발 × 3웨이브 (큐 시차 0/+12/+24)', () => {
+    const s = tier2();
+    const cues = new Set<number>();
+    for (let i = 0; i < 60 * 300 && cues.size < 3; i++) {
+      advance(s, { ...EMPTY_INPUT, attack: i % 6 === 0 });
+      const bolts = s.entities.filter((e) => e.kind === 'bolt');
+      if (bolts.length >= 3) for (const b of bolts) if (b.kind === 'bolt') cues.add(b.cueTicks);
+      s.events.length = 0;
+      if (s.over) break;
+    }
+    const sorted = [...cues].sort((a, b) => a - b);
+    expect(sorted.length).toBe(3);
+    expect(sorted[2] - sorted[0]).toBe(24);
+  }, 60_000);
+
   it('시드 결정론: 같은 시드 → 같은 패턴 선택', () => {
     const a = bossState();
     const b = bossState();

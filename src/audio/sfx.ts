@@ -4,7 +4,7 @@
 export type SfxName =
   | 'hit' | 'hitStrong' | 'floorCollapse' | 'destroy' | 'butterPop'
   | 'guardGround' | 'guardAir' | 'guardBreak' | 'gaugeWarn'
-  | 'jump' | 'land' | 'laneMove' | 'gaugeFull' | 'special'
+  | 'jump' | 'land' | 'gaugeFull' | 'special'
   | 'pinned' | 'lifeLost' | 'boltCue' | 'boltStrike' | 'cancel'
   | 'rockWhistle' | 'rockLand' | 'bossTele' | 'bossPbTele' | 'zap'
   | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect';
@@ -158,10 +158,6 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   land: (ctx, dest, t, rate) => {
     playOsc(ctx, dest, t, 'sine', 150, 0.1, 0.45, rate, { freqEnd: 60, attack: 0.002 });
     playNoise(ctx, dest, t, 0.05, 0.15, { filterType: 'lowpass', freqStart: 500 });
-  },
-
-  laneMove: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'square', 900, 0.03, 0.2, rate, { freqEnd: 500, attack: 0.001 });
   },
 
   gaugeFull: (ctx, dest, t, rate) => {

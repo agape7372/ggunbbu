@@ -1,5 +1,5 @@
 // FallingStack 생성·물리·타격·붕괴 규칙.
-// 핵심 [정본]: 플레이어 레인의 층 세그먼트 HP가 0이 되면 층 전체 붕괴(타 레인 부분 대미지 소멸).
+// 원작에 좌우 이동이 없으므로 층은 세그먼트 1개다(레인 분할 폐기) — HP 0이면 층 전체 붕괴.
 
 import type { FallingStack, Floor, GameState, Lane, Material, Theme } from './types';
 import { MAT_HP, STACK, VIEW } from '../config';
@@ -8,11 +8,7 @@ export function makeFloor(mat: Material, sharedHp = false): Floor {
   const hp = MAT_HP[mat];
   void sharedHp;
   return {
-    segs: [
-      { hp, maxHp: hp },
-      { hp, maxHp: hp },
-      { hp, maxHp: hp },
-    ],
+    segs: [{ hp, maxHp: hp }],
     mat,
     h: VIEW.FLOOR_H,
   };
@@ -90,7 +86,6 @@ export function stackHeight(stack: FallingStack): number {
 
 /**
  * 히트박스 [lo, hi]와 겹치는 가장 낮은 층에 dmg. 층 붕괴 시 true 반환.
- * sharedHp면 레인 무관 층 공유 HP(segs 전체 동기 감소).
  * 반환: 'miss' | 'hit' | 'collapse'
  */
 export function damageStack(
@@ -101,14 +96,9 @@ export function damageStack(
     if (t < lo) continue;
     if (b > hi) return 'miss';
     const f = stack.floors[i];
-    if (stack.sharedHp) {
-      const hp = f.segs[0].hp - dmg;
-      for (const seg of f.segs) seg.hp = hp;
-    } else {
-      f.segs[lane].hp -= dmg;
-    }
-    const remaining = stack.sharedHp ? f.segs[0].hp : f.segs[lane].hp;
-    if (remaining <= 0) {
+    void lane; // 단일 레인 — 세그먼트는 항상 1개
+    f.segs[0].hp -= dmg;
+    if (f.segs[0].hp <= 0) {
       stack.floors.splice(i, 1);
       return 'collapse';
     }

@@ -813,14 +813,13 @@ export function drawPlayer(
 }
 
 /** groundY = 캔버스상 지면 y. floors[0]=최하층이 stack.y(물리, 지면0·위+)에서 시작해 위로 쌓임.
- *  일반 variant: segs[0..2]가 레인 0..2에 대응, 전폭(360) 렌더.
- *  variant='butterbar': lane 정보 없이 중앙 1레인 폭(120)에 배치하되, segs 3개를 각 40px로
- *  나눠 옆으로 이어 그려("segs는 전부 그리되 폭만 좁게") 개별 hp 크랙을 유지한다. */
+ *  단일 레인이라 층은 세그먼트 1개 — 일반 variant는 건물 폭(LANE_W=270) 중앙 정렬,
+ *  butterbar는 좁은 폭(BUTTER_W=90)으로 같은 자리에 그린다. */
 export function drawStack(ctx: CanvasRenderingContext2D, stack: FallingStack, groundY: number): void {
   initSprites();
   const isButter = stack.variant === 'butterbar';
-  const totalW = isButter ? VIEW.LANE_W : VIEW.LANE_W * 3;
-  const baseX = isButter ? VIEW.LANE_X[1] - VIEW.LANE_W / 2 : 0;
+  const totalW = isButter ? VIEW.BUTTER_W : VIEW.LANE_W;
+  const baseX = VIEW.LANE_X[0] - totalW / 2;
   const bottomY = groundY - stack.y;
 
   ctx.save();
@@ -834,17 +833,7 @@ export function drawStack(ctx: CanvasRenderingContext2D, stack: FallingStack, gr
   let cumH = 0;
   for (const floor of stack.floors) {
     const floorTopY = bottomY - cumH - floor.h;
-    if (isButter) {
-      const subW = totalW / 3;
-      for (let i = 0; i < 3; i++) {
-        drawTileInstance(ctx, baseX + i * subW, floorTopY, subW, floor.h, floor.mat, stack.theme, floor.segs[i]);
-      }
-    } else {
-      for (let lane = 0; lane < 3; lane++) {
-        const sx = VIEW.LANE_X[lane] - VIEW.LANE_W / 2;
-        drawTileInstance(ctx, sx, floorTopY, VIEW.LANE_W, floor.h, floor.mat, stack.theme, floor.segs[lane]);
-      }
-    }
+    drawTileInstance(ctx, baseX, floorTopY, totalW, floor.h, floor.mat, stack.theme, floor.segs[0]);
     cumH += floor.h;
   }
   ctx.restore();
@@ -886,17 +875,15 @@ export function drawEntity(ctx: CanvasRenderingContext2D, e: Entity, groundY: nu
   }
 }
 
-export function drawGroundRocks(ctx: CanvasRenderingContext2D, rocks: readonly [number, number, number], groundY: number): void {
+export function drawGroundRocks(ctx: CanvasRenderingContext2D, rocks: number, groundY: number): void {
   initSprites();
   const cv = entityCache!.get('rock')!;
-  for (let lane = 0; lane < 3; lane++) {
-    const count = Math.min(rocks[lane], ACT2.ROCK_STACK_MAX);
-    const cx = VIEW.LANE_X[lane];
-    for (let i = 0; i < count; i++) {
-      const w = 20, h = 16;
-      const y = groundY - 4 - i * 12;
-      ctx.drawImage(cv, cx - w / 2 + (i % 2 === 0 ? -4 : 4), y - h, w, h);
-    }
+  const count = Math.min(rocks, ACT2.ROCK_STACK_MAX);
+  const cx = VIEW.LANE_X[0];
+  for (let i = 0; i < count; i++) {
+    const w = 20, h = 16;
+    const y = groundY - 4 - i * 12;
+    ctx.drawImage(cv, cx - w / 2 + (i % 2 === 0 ? -4 : 4), y - h, w, h);
   }
 }
 
@@ -904,8 +891,8 @@ export function drawGroundRocks(ctx: CanvasRenderingContext2D, rocks: readonly [
 export function drawStackShadow(ctx: CanvasRenderingContext2D, stack: FallingStack, groundY: number): void {
   initSprites();
   const isButter = stack.variant === 'butterbar';
-  const w = isButter ? VIEW.LANE_W : VIEW.LANE_W * 3;
-  const cx = isButter ? VIEW.LANE_X[1] : VIEW.W / 2;
+  const w = isButter ? VIEW.BUTTER_W : VIEW.LANE_W;
+  const cx = VIEW.LANE_X[0];
   const heightFrac = Math.max(0, Math.min(1, stack.y / STACK.SPAWN_Y));
   const scale = 1 - 0.4 * heightFrac;
   const alpha = 0.35 * (1 - 0.6 * heightFrac);

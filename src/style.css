@@ -93,83 +93,61 @@ html, body {
 }
 
 /* 버튼 배치 (절대 px, 360×640 논리 좌표) */
-#btn-left {
-  left: 12px;
-  top: 528px;
-  width: 64px;
-  height: 64px;
-  font-size: 20px;
-}
+/* 좌이동 제거 — 왼손은 점프 단독, 오른손은 공격/가드/필살 3버튼 부채꼴 */
 
-#btn-right {
-  left: 84px;
-  top: 528px;
-  width: 64px;
-  height: 64px;
-  font-size: 20px;
-}
-
+/* 왼손: 점프 전용, 엄지 가동범위 크게(96px) */
 #btn-jump {
-  left: 244px;
-  top: 476px;
-  width: 60px;
-  height: 60px;
-  font-size: 11px;
+  left: 20px;
+  top: 506px;
+  width: 96px;
+  height: 96px;
+  font-size: 14px;
+}
+
+/* 오른손 부채꼴: 공격(주력, 최대) 하단-바깥, 가드/필살은 그 위로 겹치지 않게 배치 */
+#btn-attack {
+  left: 256px;
+  top: 540px;
+  width: 88px;
+  height: 88px;
+  font-size: 13px;
 }
 
 #btn-guard {
-  left: 214px;
-  top: 540px;
-  width: 60px;
-  height: 60px;
+  left: 200px;
+  top: 496px;
+  width: 64px;
+  height: 64px;
   font-size: 11px;
 }
 
-#btn-attack {
-  left: 284px;
-  top: 556px;
-  width: 72px;
-  height: 72px;
-  font-size: 12px;
-}
-
 #btn-special {
-  left: 160px;
-  top: 480px;
-  width: 52px;
-  height: 52px;
-  font-size: 9px;
+  left: 152px;
+  top: 450px;
+  width: 56px;
+  height: 56px;
+  font-size: 10px;
 }
 
-/* 왼손잡이 모드: 좌우 반전 배치 */
-#touch-layer.mirror #btn-left {
-  left: auto;
-  right: 12px;
-}
-
-#touch-layer.mirror #btn-right {
-  left: auto;
-  right: 84px;
-}
-
+/* 왼손잡이 모드: 좌우 반전 배치 — 점프는 오른쪽, 3버튼 부채꼴은 왼쪽 */
 #touch-layer.mirror #btn-jump {
   left: auto;
-  right: 244px;
-}
-
-#touch-layer.mirror #btn-guard {
-  left: auto;
-  right: 214px;
+  right: 20px;
 }
 
 #touch-layer.mirror #btn-attack {
   left: auto;
-  right: 284px;
+  right: 256px;
+}
+
+#touch-layer.mirror #btn-guard {
+  left: auto;
+  right: 200px;
 }
 
 #touch-layer.mirror #btn-special {
   left: auto;
-  right: 160px;
+  right: 152px;
 }
 
 /* Safe-area inset 미적용 사유: #stage가 transform scale 기반이므로
