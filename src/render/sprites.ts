@@ -725,8 +725,8 @@ function drawRabbitEntity(ctx: CanvasRenderingContext2D, e: Rabbit, groundY: num
 }
 
 function drawCannonEntity(ctx: CanvasRenderingContext2D, e: Cannon, _groundY: number): void {
-  const x = VIEW.LANE_X[e.lane];
-  ctx.drawImage(entityCache!.get('cannon')!, x - 12, 6); // 레인 상단 고정(지면 변환 무관)
+  // 대포는 좌/중/우로 벌려 설치된다 — 레인이 아니라 e.x가 실제 위치(수직탄·스파크 발생점)
+  ctx.drawImage(entityCache!.get('cannon')!, e.x - 12, 6); // 화면 상단 고정(지면 변환 무관)
 }
 
 // ══════════════════════════════════════════════════════════════
