@@ -60,4 +60,15 @@ describe('1막 곡선/토코톤', () => {
     expect(s.over).not.toBe('gameover');
     expect(s.bonus).toBeNull();
   }, 60_000);
+
+  it('토코톤 p>1 구간은 현대 테마 고정', () => {
+    const s = makeState({ seed: 3, mode: 'tokoton' });
+    s.score = ACT1.UNLOCK_SCORE + 1;
+    s.stackSpawnCd = 1;
+    advance(s, EMPTY_INPUT);
+    expect(s.p).toBeGreaterThan(1);
+    expect(s.chapter).toBe(ACT1.CHAPTER_THEMES.length - 1);
+    for (let t = 0; t < 40 && !s.stack; t++) advance(s, EMPTY_INPUT);
+    expect(s.stack?.theme).toBe('modern');
+  });
 });

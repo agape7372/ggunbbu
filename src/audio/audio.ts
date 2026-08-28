@@ -13,9 +13,12 @@ let bgmBus: GainNode | null = null;
 let soundOn = true;
 
 let currentTrack: BgmTrack | null = null;
+/** startBgm이 요청한 트랙 — ctx 미생성·음소거여도 기억했다가 언락/ON 시 재생 */
+let wantedTrack: BgmTrack | null = null;
 let schedulerId: number | null = null;
 let nextStepTime = 0;
 let stepIndex = 0;
+let unlockArmed = false;
 
 const LOOKAHEAD_MS = 50;
 const SCHEDULE_AHEAD_S = 0.1;
@@ -51,14 +54,44 @@ export function initAudio(): void {
   silentSrc.start(0);
 
   if (c.state === 'suspended') {
-    c.resume();
+    c.resume().then(() => {
+      snapSchedulerClock();
+      beginScheduler();
+    });
+  } else {
+    beginScheduler();
   }
+}
+
+/**
+ * 모바일/iOS: 첫 pointer/touch/keydown에서 AudioContext 생성.
+ * 버튼 외 캔버스 탭도 언락되도록 window 캡처로 건다 (input 로직과 독립).
+ */
+export function armAudioUnlock(): void {
+  if (unlockArmed) return;
+  unlockArmed = true;
+  const go = (): void => {
+    initAudio();
+    window.removeEventListener('pointerdown', go, true);
+    window.removeEventListener('touchstart', go, true);
+    window.removeEventListener('keydown', go, true);
+  };
+  window.addEventListener('pointerdown', go, { capture: true });
+  window.addEventListener('touchstart', go, { capture: true, passive: true });
+  window.addEventListener('keydown', go, { capture: true });
+}
+
+function snapSchedulerClock(): void {
+  if (ctx) nextStepTime = ctx.currentTime;
 }
 
 /** visibilitychange로 포그라운드 복귀 시 호출: suspended면 resume. */
 export function resumeIfNeeded(): void {
-  if (ctx && ctx.state === 'suspended') {
-    ctx.resume();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(snapSchedulerClock);
+  } else {
+    snapSchedulerClock();
   }
 }
 
@@ -67,7 +100,8 @@ export function resumeIfNeeded(): void {
 export function setSoundOn(on: boolean): void {
   soundOn = on;
   if (masterGain) masterGain.gain.value = on ? 1 : 0;
-  if (!on) stopBgm();
+  if (!on) haltScheduler();
+  else beginScheduler();
 }
 
 export function isSoundOn(): boolean {
@@ -204,25 +238,36 @@ function scheduler(): void {
   }
 }
 
-/** 트랙 교체(같은 트랙이면 무시). 이전 예약은 정리하고 스케줄러를 재시작한다. */
-export function startBgm(track: BgmTrack): void {
-  if (!ctx || !bgmBus || !soundOn) return;
-  if (currentTrack === track) return;
+function haltScheduler(): void {
+  if (schedulerId !== null) {
+    window.clearInterval(schedulerId);
+    schedulerId = null;
+  }
+  currentTrack = null;
+}
+
+function beginScheduler(): void {
+  if (!ctx || !bgmBus || !soundOn || !wantedTrack) return;
+  if (currentTrack === wantedTrack && schedulerId !== null) return;
   if (ctx.state === 'suspended') ctx.resume();
-  stopBgm();
-  currentTrack = track;
+  haltScheduler();
+  currentTrack = wantedTrack;
   stepIndex = 0;
   nextStepTime = ctx.currentTime;
   schedulerId = window.setInterval(scheduler, LOOKAHEAD_MS);
   scheduler();
 }
 
+/** 트랙 교체(같은 트랙이면 무시). ctx가 아직 없어도 언락 후 이어서 재생한다. */
+export function startBgm(track: BgmTrack): void {
+  if (wantedTrack === track && currentTrack === track && schedulerId !== null) return;
+  wantedTrack = track;
+  beginScheduler();
+}
+
 export function stopBgm(): void {
-  if (schedulerId !== null) {
-    window.clearInterval(schedulerId);
-    schedulerId = null;
-  }
-  currentTrack = null;
+  wantedTrack = null;
+  haltScheduler();
 }
 
 // ─── 시각 동기 ────────────────────────────────────────────────

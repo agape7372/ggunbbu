@@ -71,6 +71,8 @@ export interface Rock {
   y: number;
   vy: number;
   hp: number;
+  /** 격파 연출 잔해 — 타격 시 콤보만, 착지 무해 [정본] */
+  remnant?: boolean;
 }
 
 export interface Shot {

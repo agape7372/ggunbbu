@@ -2,11 +2,12 @@
 // 사이드이펙트 없음: 노이즈 버퍼도 모듈 내부에서 lazy 생성.
 
 export type SfxName =
-  | 'hit' | 'hitStrong' | 'floorCollapse' | 'destroy' | 'gorogoro' | 'butterPop'
-  | 'guardGround' | 'guardAir' | 'guardBreak' | 'gaugeWarn'
+  | 'hit' | 'hitStrong' | 'whiff' | 'floorCollapse' | 'destroy' | 'gorogoro' | 'butterPop'
+  | 'guardGround' | 'guardAir' | 'guardBreak' | 'gaugeWarn' | 'comboDrop'
   | 'jump' | 'land' | 'gaugeFull' | 'special'
   | 'pinned' | 'lifeLost' | 'boltCue' | 'boltStrike' | 'cancel'
-  | 'rockWhistle' | 'rockLand' | 'bossTele' | 'bossPbTele' | 'zap'
+  | 'rockWhistle' | 'rockLand' | 'bossTele' | 'bossPbTele'
+  | 'zap' | 'zap2' | 'zap3'
   | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect';
 
 export type BgmTrack = 'title' | 'act1' | 'act2a' | 'butter' | 'bolt' | 'boss' | 'ending';
@@ -95,6 +96,39 @@ function playNoise(
   src.stop(t + dur + 0.02);
 }
 
+function playZap(
+  ctx: AudioContext,
+  dest: AudioNode,
+  t: number,
+  rate: number,
+  freq: number,
+  lfoHz: number,
+  lfoDepth: number,
+  dur: number,
+  peak: number,
+): void {
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(freq * rate, t);
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+  lfo.type = 'square';
+  lfo.frequency.setValueAtTime(lfoHz, t);
+  lfoGain.gain.setValueAtTime(lfoDepth * rate, t);
+  lfo.connect(lfoGain);
+  lfoGain.connect(o.frequency);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g);
+  g.connect(dest);
+  o.start(t);
+  lfo.start(t);
+  o.stop(t + dur + 0.02);
+  lfo.stop(t + dur + 0.02);
+}
+
 // ─── SFX 프리셋 테이블 ──────────────────────────────────────────
 
 type SfxPreset = (ctx: AudioContext, dest: AudioNode, t: number, rate: number) => void;
@@ -108,6 +142,11 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   hitStrong: (ctx, dest, t, rate) => {
     playOsc(ctx, dest, t, 'square', 160, 0.06, 0.4, rate, { freqEnd: 90, attack: 0.002 });
     playNoise(ctx, dest, t, 0.05, 0.25, { filterType: 'highpass', freqStart: 800 });
+  },
+
+  // 헛스윙 — 타격보다 얇고 짧게 (slash 이벤트)
+  whiff: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'square', 520, 0.045, 0.16, rate, { freqEnd: 240, attack: 0.001 });
   },
 
   floorCollapse: (ctx, dest, t, rate) => {
@@ -158,6 +197,12 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   gaugeWarn: (ctx, dest, t, rate) => {
     [0, 0.15].forEach((d) => {
       playOsc(ctx, dest, t + d, 'square', 300, 0.08, 0.3, rate, { attack: 0.003 });
+    });
+  },
+
+  comboDrop: (ctx, dest, t, rate) => {
+    [392, 311.13, 246.94].forEach((f, i) => {
+      playOsc(ctx, dest, t + i * 0.05, 'triangle', f, 0.1, 0.18, rate, { attack: 0.004 });
     });
   },
 
@@ -229,26 +274,19 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   },
 
   zap: (ctx, dest, t, rate) => {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'square';
-    o.frequency.setValueAtTime(500 * rate, t);
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.type = 'square';
-    lfo.frequency.setValueAtTime(40, t);
-    lfoGain.gain.setValueAtTime(200 * rate, t);
-    lfo.connect(lfoGain);
-    lfoGain.connect(o.frequency);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.35, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    o.connect(g);
-    g.connect(dest);
-    o.start(t);
-    lfo.start(t);
-    o.stop(t + 0.2);
-    lfo.stop(t + 0.2);
+    playZap(ctx, dest, t, rate, 500, 40, 200, 0.18, 0.35);
+  },
+
+  // 대포 조준/발사 — 더 낮고 긴 zap
+  zap2: (ctx, dest, t, rate) => {
+    playZap(ctx, dest, t, rate, 220, 18, 140, 0.28, 0.4);
+    playOsc(ctx, dest, t, 'sawtooth', 90, 0.22, 0.22, rate, { freqEnd: 160, attack: 0.02 });
+  },
+
+  // 지면 스파크 — 짧은 노이즈 크랙
+  zap3: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.07, 0.4, { filterType: 'highpass', freqStart: 2500 });
+    playOsc(ctx, dest, t, 'square', 2400, 0.04, 0.18, rate, { freqEnd: 900, attack: 0.001 });
   },
 
   bossHit: (ctx, dest, t, rate) => {

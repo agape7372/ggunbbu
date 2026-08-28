@@ -3,9 +3,9 @@
 
 import type { GameState, Lane } from './types';
 import { makeFloor, makeStack } from './building';
-import { registerHit, hurtPlayer, addScore, addGauge, gaugePerHit } from './combat';
-import { guardActive } from './player';
-import { ACT2, SCORE, STACK, TICK, VIEW } from '../config';
+import { registerHit, hurtPlayer, addScore, addGauge, addCombo, gaugePerHit } from './combat';
+import { guardActive, makePlayer } from './player';
+import { ACT2, GUARD_GAUGE, PLAYER, SCORE, STACK, TICK, VIEW } from '../config';
 import { initBoss, stepBoss, tryHitBoss } from './boss';
 
 export function enterAct2(s: GameState): void {
@@ -14,6 +14,10 @@ export function enterAct2(s: GameState): void {
   s.wazaGauge = 0; // [정본] 기술 게이지 리셋 (방어 게이지는 유지)
   if (!SCORE.CARRY_COMBO_TO_ACT2) s.combo = 0;
   s.stack = null;
+  s.entities = [];
+  s.debris = [];
+  s.groundRocks = 0;
+  s.boss = null;
   s.stackSpawnCd = ACT2.INTERLUDE_TICKS;
   s.act2c = { spawned: false, bolts: 0, rocks: 0, cd: 0, t: 0 };
   s.fullCombo = true; // 2막 로컬 풀콤보 판정 시작
@@ -27,8 +31,10 @@ export function enterAct2Phase(s: GameState, phase: NonNullable<GameState['act2P
   s.act2Phase = phase;
   s.stack = null;
   s.entities = [];
+  s.debris = [];
   s.groundRocks = 0;
   s.boss = null;
+  s.hitstop = 0;
   s.act2c = { spawned: false, bolts: 0, rocks: 0, cd: 0, t: 0 };
   s.stackSpawnCd = ACT2.INTERLUDE_TICKS;
   if (phase === 'moon') { s.boss = initBoss(); s.combo = 0; }
@@ -40,11 +46,14 @@ function nextPhase(s: GameState): void {
   s.events.push({ kind: 'phaseClear', n: i + 1 });
   const next = order[i + 1];
   s.act2Phase = next;
+  s.stack = null;
+  s.entities = [];
+  s.groundRocks = 0;
   s.act2c = { spawned: false, bolts: 0, rocks: 0, cd: 0, t: 0 };
   s.stackSpawnCd = ACT2.INTERLUDE_TICKS;
   if (next === 'moon') {
     s.boss = initBoss();
-    s.combo = 0; // [정본] 달 개시 시 콤보 리셋 (단절 이벤트 아님)
+    s.combo = 0; // [정본] 달 개시 시 콤보 리셋 (단절 이벤트 아님, fullCombo 유지)
   }
 }
 
@@ -93,9 +102,10 @@ export function stepAct2(s: GameState): void {
     case 'rock': {
       stepRockSpawner(s, c);
       const timeUp = c.t >= ACT2.ROCK_TIMEBOX_TICKS;
-      const allDone = c.rocks >= ACT2.ROCK_COUNT && !s.entities.some((e) => e.kind === 'rock');
+      const allDone = c.rocks >= ACT2.ROCK_COUNT && !s.entities.some((e) => e.kind === 'rock' && !e.remnant);
       if (timeUp || allDone) {
-        s.groundRocks = 0; // 더미 소멸 → 보스 인트로
+        s.groundRocks = 0;
+        s.entities = s.entities.filter((e) => e.kind !== 'rock' && e.kind !== 'bolt');
         nextPhase(s);
       }
       break;
@@ -159,12 +169,16 @@ export function stepEntities(s: GameState): void {
       if (e.vy < -STACK.ROCK_VTERM) e.vy = -STACK.ROCK_VTERM;
       e.y += e.vy * TICK;
       if (e.y <= 0) {
-        if (s.player.y <= 4 && !guardActive(s.player)) {
-          hurtPlayer(s); // 가드 중이거나 공중이면 무해하게 적재 [원작 공략 재현]
+        if (e.remnant) {
+          remove.push(i); // 격파 잔해: 착지 무해, 적재 없음
+        } else {
+          if (s.player.y <= 4 && !guardActive(s.player)) {
+            hurtPlayer(s); // 가드 중이거나 공중이면 무해하게 적재 [원작 공략 재현]
+          }
+          if (s.groundRocks < ACT2.ROCK_STACK_MAX) s.groundRocks += 1;
+          s.events.push({ kind: 'land', lane: e.lane });
+          remove.push(i);
         }
-        if (s.groundRocks < ACT2.ROCK_STACK_MAX) s.groundRocks += 1;
-        s.events.push({ kind: 'land', lane: e.lane });
-        remove.push(i);
       }
     } else if (e.kind === 'shot') {
       e.x += e.vx * TICK;
@@ -215,14 +229,16 @@ export function tryHitAct2Targets(s: GameState): boolean {
       return true;
     }
   }
-  // 2) 공중 화산탄
+  // 2) 공중 화산탄 / 격파 잔해
   for (let i = 0; i < s.entities.length; i++) {
     const e = s.entities[i];
     if (e.kind === 'rock' && e.lane === p.lane && e.y >= lo && e.y <= hi) {
       e.hp -= 1;
       e.vy = Math.max(e.vy, STACK.HIT_LIFT_V);
+      const remnant = !!e.remnant;
       if (e.hp <= 0) s.entities.splice(i, 1);
-      registerHit(s);
+      if (remnant) addCombo(s); // [정본] 격파 잔해 = 콤보만, 점수 없음
+      else registerHit(s);
       s.events.push({ kind: 'hit', lane: p.lane, y: e.y, combo: s.combo });
       return true;
     }
@@ -257,15 +273,20 @@ export function tryHitAct2Targets(s: GameState): boolean {
 export function continueFromCheckpoint(s: GameState): void {
   const cp = s.checkpoint;
   s.over = null;
-  s.lives = 3;
+  s.lives = PLAYER.LIVES;
   s.wazaGauge = 0;
+  s.guardGauge = GUARD_GAUGE.MAX;
+  s.hitstop = 0;
+  s.debris = [];
+  s.events = [];
+  s.bonus = null;
   s.fullCombo = false;
-  s.player = { ...s.player, pose: 'idle', poseTick: 0, y: 0, vy: 0, invulnTicks: 60, pinTick: 0 };
-  if (cp >= 168) { enterAct2Phase(s, 'bolt'); s.combo = 168; }
+  s.player = makePlayer();
+  s.player.invulnTicks = 60;
+  if (cp >= 168) { enterAct2Phase(s, 'bolt'); s.combo = 168; s.checkpoint = 168; }
   else if (cp >= 148) {
     enterAct2Phase(s, 'tower');
     s.combo = 148;
-    // 펜트하우스만 남은 타워 재구성
     const floors = [makeFloor('penthouse')];
     s.stack = makeStack({ variant: 'skyscraper', theme: 'modern', floors, specialImmune: true, sharedHp: true });
     s.act2c!.spawned = true;

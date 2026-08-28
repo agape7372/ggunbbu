@@ -1,9 +1,12 @@
 // 건뿌 부트스트랩: 캔버스 스케일링 + 고정 타임스텝 루프 + 씬/입력/터치 배선.
 import './style.css';
 import { VIEW, TICK } from './config';
-import { initTouchLayer } from './ui/touchLayer';
+import { initTouchLayer } from './input/touch';
 import { createInput } from './input/input';
 import { createApp, mountDebugPanel } from './ui/scenes';
+import { preloadAssets } from './render/assets';
+import { loadSave } from './storage';
+import { mountInstallPrompt } from './ui/installPrompt';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -20,6 +23,7 @@ function setupCanvas(): void {
 // 레터박스
 function fitStage(): void {
   const stage = document.getElementById('stage')!;
+  stage.style.setProperty('--field-h', `${VIEW.FIELD_H}px`);
   const scale = Math.min(window.innerWidth / VIEW.W, window.innerHeight / VIEW.H);
   stage.style.transform = `scale(${scale})`;
 }
@@ -29,13 +33,19 @@ fitStage();
 window.addEventListener('resize', () => { setupCanvas(); fitStage(); });
 
 const touch = initTouchLayer(document.getElementById('touch-layer')!);
+touch.setLeftHanded(loadSave().settings.leftHanded);
 const input = createInput(touch);
 const app = createApp(ctx, input, touch);
+mountInstallPrompt();
 
 if (new URLSearchParams(location.search).has('debug')) {
   mountDebugPanel(() => app.getState());
   (window as unknown as { __app: typeof app }).__app = app; // 브라우저 검증용
 }
+
+// PNG 에셋 프리로드 — 개별 실패는 assets.ts가 삼키므로 여기선 폴백만 방어적으로 감싼다.
+// 로딩 실패/미존재 파일이어도 게임은 그대로 시작된다.
+await preloadAssets().catch(() => {});
 
 // ── 고정 타임스텝 루프 ──
 let acc = 0;
