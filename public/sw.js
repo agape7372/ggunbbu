@@ -1,15 +1,33 @@
 // 캐시 버전: 변경 시점마다 갱신해야 한다 (배포 시 사용자 캐시 무효화)
-const CACHE_VERSION = 'gunbbu-v1';
+const CACHE_VERSION = 'gunbbu-v4';
 const CACHE_PREFIX = 'gunbbu-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // 앱 셸: 게임 로드에 필요한 정적 자산 (Vite 해시 파일명은 runtime 캐시 → cache-first)
-const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
+// 상대 경로 = SW 스코프 기준 → GitHub Pages 서브경로(/ggunbbu/)에서도 유효
+const APP_SHELL = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './img/bg/europe.png',
+  './img/bg/asia.png',
+  './img/bg/eastasia.png',
+  './img/bg/modern.png',
+  './img/bg/act2.png',
+  './img/bg/moon.png',
+];
+
+function addShell(cache) {
+  // addAll은 하나라도 404면 설치 전체가 실패한다. 아이콘 부재 때도 SW가 살아있게 개별 add.
+  return Promise.all(APP_SHELL.map((url) => cache.add(url).catch(() => {})));
+}
 
 // 설치: 앱 셸 프리캐시
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then(addShell)
   );
   self.skipWaiting();
 });
@@ -32,6 +50,17 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 });
+
+function isCacheableAsset(url) {
+  if (url.origin !== self.location.origin) return false;
+  const path = url.pathname;
+  // SW 스크립트는 브라우저 업데이트 검사가 가로채면 안 됨
+  if (path.endsWith('/sw.js')) return false;
+  // 루트 앵커(/^\/icons/)는 Pages 서브경로에서 실패 → 경로 어디에든 매칭
+  if (path.endsWith('manifest.webmanifest') || path.endsWith('.webmanifest')) return true;
+  if (/\/(icons|assets|img)\//.test(path)) return true;
+  return /\.(svg|png|jpg|jpeg|webp|ico|woff2?|js|css)$/.test(path);
+}
 
 // Fetch: 네비게이션은 네트워크-우선(3초 레이스 → 캐시 폴백), 정적 자산은 캐시-우선
 self.addEventListener('fetch', (event) => {
@@ -84,12 +113,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 정적 자산(이미지, 폰트 등): 캐시-우선
-  const isCacheableAsset =
-    /^\/(icons|assets)\//.test(url.pathname) ||
-    /\.(svg|png|jpg|jpeg|webp|ico|woff2?)$/.test(url.pathname) ||
-    url.pathname === '/manifest.webmanifest';
-  if (url.origin === self.location.origin && isCacheableAsset) {
+  if (isCacheableAsset(url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;

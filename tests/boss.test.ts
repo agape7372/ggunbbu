@@ -102,6 +102,33 @@ describe('달 보스 [정본]', () => {
     expect(sorted[2] - sorted[0]).toBe(24);
   }, 60_000);
 
+  it('영거리 돌진은 점프로 회피 불가 [정본]', () => {
+    const s = bossState();
+    const b = s.boss!;
+    b.pattern = 'pbCharge';
+    b.st = 'charging';
+    b.stTick = Math.floor(BOSS.PB_CHARGE.DASH / 2) - 1;
+    b.hittable = true;
+    b.y = 64;
+    s.player.y = 140;
+    s.player.vy = 0;
+    s.player.pose = 'jump';
+    const lives = s.lives;
+    advance(s, EMPTY_INPUT);
+    expect(s.lives).toBe(lives - 1);
+  });
+
+  it('영거리 돌진 예고 중 순간이동한다', () => {
+    const s = bossState();
+    const b = s.boss!;
+    b.pattern = 'pbCharge';
+    b.st = 'telegraph';
+    b.stTick = 0;
+    b.y = BOSS.HOVER_HIGH;
+    advance(s, EMPTY_INPUT);
+    expect(b.y).toBe(64);
+  });
+
   it('시드 결정론: 같은 시드 → 같은 패턴 선택', () => {
     const a = bossState();
     const b = bossState();

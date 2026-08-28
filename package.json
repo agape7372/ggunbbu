@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:lan": "vite --host",
+    "icons": "node scripts/gen-icons.mjs",
+    "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "test": "vitest run",

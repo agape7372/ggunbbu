@@ -5,7 +5,7 @@
 import type { GameState, InputFrame } from './types';
 import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
-import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from './combat';
+import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, hurtPlayer } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
 import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, WAZA_GAUGE } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
@@ -60,6 +60,7 @@ export function advance(s: GameState, input: InputFrame): void {
   }
 
   // ── 깔림 상태 ──
+  const wasAirborne = s.player.y > 0;
   if (s.player.pose === 'pinned') {
     stepPinned(s, input);
   } else {
@@ -71,6 +72,14 @@ export function advance(s: GameState, input: InputFrame): void {
     && s.stack?.resting && s.player.invulnTicks <= 0 && s.player.pose !== 'special'
     && s.mode !== 'bonus') {
     onPlayerCrushed(s);
+  }
+
+  // 화산탄 더미 위 착지 깔림 — 공중이면 무해, 착지 순간에만 피격 (가드 적재와 구분)
+  if (wasAirborne && s.player.y <= 0 && s.groundRocks > 0
+    && s.player.pose !== 'pinned' && s.player.pose !== 'dead'
+    && s.player.invulnTicks <= 0 && s.player.pose !== 'special'
+    && s.mode !== 'bonus') {
+    hurtPlayer(s);
   }
 
   // ── 방어 게이지 회복 (가드를 놓고 있을 때만) ──
@@ -307,15 +316,13 @@ function trySpawn(s: GameState): void {
 function stepTokoton(s: GameState): void {
   const elapsedMin = s.tick / 3600;
   s.p = Math.min(TOKOTON.P_MAX, s.score / ACT1.UNLOCK_SCORE + elapsedMin * TOKOTON.P_PER_MIN);
-  // 챕터 순환 (2분 주기) + 순환 경계마다 100겹 버터바 타임
-  const cycle = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS);
-  const newChapter = cycle % ACT1.CHAPTER_THEMES.length;
+  // p>1 은 현대 테마 고정. 그 전에는 2분 주기 챕터 순환 [설계]
+  if (s.p > 1) s.chapter = ACT1.CHAPTER_THEMES.length - 1;
+  else s.chapter = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS) % ACT1.CHAPTER_THEMES.length;
   if (s.tick > 0 && s.tick % TOKOTON.CHAPTER_CYCLE_TICKS === 0) {
-    s.chapter = newChapter;
     enterBonusTokoton(s);
     return;
   }
-  s.chapter = newChapter;
   trySpawn(s);
 }
 

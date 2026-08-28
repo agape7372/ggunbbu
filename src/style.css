@@ -44,14 +44,27 @@ html, body {
   image-rendering: crisp-edges;
 }
 
-/* 터치 조작 존 — 캔버스 하단 26% (y 470~640px) */
+/* 터치 조작 존 — VIEW.FIELD_H(470) 아래만. 필드를 가리지 않는다.
+   --field-h 는 main이 config.VIEW.FIELD_H 로 주입. */
 #touch-layer {
   position: absolute;
-  top: 0;
+  top: var(--field-h, 470px);
   left: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - var(--field-h, 470px));
   pointer-events: none;
+  overflow: hidden;
+  z-index: 3;
+}
+
+#touch-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(244, 241, 232, 0.45), rgba(244, 241, 232, 0.12));
+  border-top: 1px solid rgba(26, 26, 32, 0.18);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* 터치 버튼 공통 스타일 */
@@ -59,7 +72,7 @@ html, body {
   position: absolute;
   border-radius: 50%;
   border: 2px solid rgba(26, 26, 32, 0.22);
-  background: rgba(26, 26, 32, 0.06);
+  background: rgba(26, 26, 32, 0.16);
   color: #1A1A20;
   font-family: system-ui, sans-serif;
   font-weight: bold;
@@ -72,7 +85,8 @@ html, body {
   user-select: none;
   -webkit-user-select: none;
   transition: none;
-  touch-action: manipulation;
+  touch-action: none;
+  z-index: 1;
 }
 
 /* 히트 영역 확장 (-8px) */
@@ -87,62 +101,62 @@ html, body {
 
 /* 버튼 활성화 상태 */
 .tbtn.active {
-  background: rgba(26, 26, 32, 0.14);
-  border-color: rgba(26, 26, 32, 0.35);
+  background: rgba(26, 26, 32, 0.32);
+  border-color: rgba(26, 26, 32, 0.5);
   transform: scale(0.92);
 }
 
-/* 버튼 배치 (절대 px, 360×640 논리 좌표) */
-/* 좌이동 제거 — 왼손은 점프 단독, 오른손은 공격/가드/필살 3버튼 부채꼴 */
+/* 버튼 배치 — 좌표는 #touch-layer(필드 아래 170px) 기준.
+   왼손: 점프(탭) + 가드(홀드) — 공중가드 후 오른손 연타가 가능해야 한다.
+   오른손: 공격(엄지 홈) + 필살(원거리, 오발 방지). */
 
-/* 왼손: 점프 전용, 엄지 가동범위 크게(96px) */
 #btn-jump {
-  left: 20px;
-  top: 506px;
+  left: 12px;
+  top: 8px;
   width: 96px;
   height: 96px;
   font-size: 14px;
 }
 
-/* 오른손 부채꼴: 공격(주력, 최대) 하단-바깥, 가드/필살은 그 위로 겹치지 않게 배치 */
-#btn-attack {
-  left: 256px;
-  top: 540px;
-  width: 88px;
-  height: 88px;
-  font-size: 13px;
+#btn-guard {
+  left: 16px;
+  top: 112px;
+  width: 76px;
+  height: 50px;
+  border-radius: 18px;
+  font-size: 12px;
 }
 
-#btn-guard {
-  left: 200px;
-  top: 496px;
-  width: 64px;
-  height: 64px;
-  font-size: 11px;
+#btn-attack {
+  left: 248px;
+  top: 66px;
+  width: 96px;
+  height: 96px;
+  font-size: 14px;
 }
 
 #btn-special {
   left: 152px;
-  top: 450px;
-  width: 56px;
-  height: 56px;
+  top: 8px;
+  width: 52px;
+  height: 52px;
   font-size: 10px;
 }
 
-/* 왼손잡이 모드: 좌우 반전 배치 — 점프는 오른쪽, 3버튼 부채꼴은 왼쪽 */
+/* 왼손잡이: 점프·가드는 오른쪽, 공격·필살은 왼쪽 */
 #touch-layer.mirror #btn-jump {
   left: auto;
-  right: 20px;
-}
-
-#touch-layer.mirror #btn-attack {
-  left: auto;
-  right: 256px;
+  right: 12px;
 }
 
 #touch-layer.mirror #btn-guard {
   left: auto;
-  right: 200px;
+  right: 16px;
+}
+
+#touch-layer.mirror #btn-attack {
+  left: auto;
+  right: 248px;
 }
 
 #touch-layer.mirror #btn-special {
@@ -154,3 +168,502 @@ html, body {
    전체 뷰포트 스케일링이 안전 영역과 충돌 가능.
    버튼은 절대 px로 고정되어 있으므로 safe-area inset 불필요.
    필요 시 별도 모달/메뉴에서만 적용. */
+
+/* ── UI 레이어 (HUD / 오버레이) ─────────────────────────────── */
+.ui-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#hud-layer {
+  visibility: hidden;
+  z-index: 2;
+}
+
+#touch-layer {
+  z-index: 3;
+  visibility: hidden;
+}
+
+#overlay-layer {
+  z-index: 10;
+  visibility: hidden;
+}
+
+#overlay-layer.is-open {
+  visibility: visible;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+#stage.playing > #touch-layer {
+  visibility: visible;
+}
+
+#stage.playing > #hud-layer,
+#stage.paused > #hud-layer {
+  visibility: visible;
+}
+
+/* HUD — 상단 스트립이 캔버스 drawHud를 가림 (렌더러 패치 전 이중 표시 방지) */
+.hud {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: 6px 8px 8px;
+  background: rgba(244, 241, 232, 0.94);
+  border-bottom: 2px solid #1A1A20;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  color: #1A1A20;
+  pointer-events: none;
+}
+
+.hud-pause {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  width: 44px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #1A1A20;
+  background: #F4F1E8;
+  color: #1A1A20;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  pointer-events: auto;
+  touch-action: manipulation;
+  z-index: 1;
+}
+
+.hud-pause:active {
+  background: #1A1A20;
+  color: #F4F1E8;
+}
+
+.hud-row-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  padding-left: 52px;
+  min-height: 36px;
+}
+
+.hud-col-left { flex: 0 0 auto; }
+.hud-col-mid { flex: 1 1 auto; text-align: center; min-width: 0; }
+.hud-col-right { flex: 0 0 124px; text-align: right; }
+
+.hud-score {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.hud-lives {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.life {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid #1A1A20;
+  background: transparent;
+}
+
+.life.on {
+  background: #E5302E;
+}
+
+.hud-mode {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.hud-floor {
+  font-size: 10px;
+  color: #6E695F;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-combo {
+  font-size: 12px;
+  font-weight: 800;
+  height: 16px;
+  line-height: 16px;
+  color: #1A1A20;
+}
+
+.hud-combo.hi { color: #1A1A20; }
+.hud-combo.mid {
+  display: inline-block;
+  background: #FFD200;
+  padding: 0 4px;
+}
+.hud-combo.hot { color: #E5302E; }
+.hud-combo.cap {
+  animation: hud-rainbow 0.6s linear infinite;
+}
+.hud-combo.punch {
+  animation: hud-punch 80ms cubic-bezier(0.27, 1.64, 0.42, 0.64);
+}
+.hud-combo.broke {
+  color: #8A857A;
+  transform: translateY(6px);
+  opacity: 0.7;
+}
+
+.hud-gauges {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+}
+
+.bar {
+  position: relative;
+  height: 7px;
+  width: 110px;
+  background: #D5D0C4;
+  overflow: hidden;
+  border: 1px solid #1A1A20;
+}
+
+.bar-waza { width: 72px; height: 5px; }
+.bar-boss { width: 100%; height: 6px; margin-top: 3px; }
+
+.bar .ghost,
+.bar .fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+}
+
+.bar .ghost {
+  background: rgba(26, 26, 32, 0.18);
+  transition: width 180ms linear 80ms;
+}
+
+.bar .fill { transition: none; }
+.bar-guard .fill { background: #FF6FA8; }
+.bar-waza .fill { background: #FFD200; }
+.bar-waza.full .fill { background: #E5302E; }
+.bar-boss .fill { background: #E5302E; }
+
+.hud-boss,
+.hud-bonus,
+.hud-cap,
+.hud-pin,
+.hud-waza-ready {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.hud-bonus { color: #1A1A20; font-size: 12px; }
+.hud-cap { color: #E5302E; }
+.hud-pin {
+  position: absolute;
+  left: 50%;
+  top: 418px;
+  transform: translateX(-50%);
+  width: 240px;
+  padding: 4px 8px;
+  border: 2px solid #1A1A20;
+  background: #F4F1E8;
+  font-size: 11px;
+}
+.hud-waza-ready { color: #1A1A20; }
+
+/* 오버레이 스크린 */
+.ov-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 18px 20px;
+  box-sizing: border-box;
+  font-family: system-ui, 'Malgun Gothic', sans-serif;
+  color: #1A1A20;
+  touch-action: manipulation;
+}
+
+.ov-screen[hidden] { display: none !important; }
+
+.ov-boot {
+  justify-content: center;
+  background: #F4F1E8;
+}
+
+.ov-boot-mark {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.ov-boot-title {
+  font-family: Batang, Gungsuh, serif;
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.ov-boot-cta {
+  margin-top: 18px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ov-title {
+  background: #F4F1E8;
+  justify-content: flex-start;
+}
+
+.ov-logo {
+  font-family: Batang, Gungsuh, serif;
+  font-size: 52px;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  margin-top: 12px;
+  pointer-events: auto;
+}
+
+.ov-logo span { color: #FFD200; -webkit-text-stroke: 1px #1A1A20; }
+
+.ov-logo-en {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: #6E695F;
+  margin-top: 4px;
+}
+
+.ov-tag {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 10px 0 16px;
+  text-align: center;
+}
+
+.ov-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 280px;
+}
+
+.flyer-btn {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px solid #1A1A20;
+  background: #F4F1E8;
+  color: #1A1A20;
+  box-shadow: 3px 3px 0 #1A1A20;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
+.flyer-btn[hidden] { display: none !important; }
+.flyer-btn.primary { background: #FFD200; }
+.flyer-btn.selected { outline: 2px solid #1A1A20; outline-offset: 2px; }
+.flyer-btn.locked,
+.flyer-btn:disabled {
+  opacity: 0.42;
+  box-shadow: none;
+  cursor: default;
+}
+
+.flyer-btn:not(:disabled):active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #1A1A20;
+}
+
+.ov-records {
+  width: 280px;
+  margin-top: 16px;
+  padding: 8px 10px;
+  border: 2px solid #1A1A20;
+  font-size: 11px;
+  text-align: center;
+}
+
+.ov-records-h {
+  font-weight: 800;
+  margin-bottom: 4px;
+  letter-spacing: 0.08em;
+}
+
+.ov-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: 280px;
+  margin-top: 12px;
+}
+
+.ov-stamp {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 6px;
+  border: 1.5px dashed #8A857A;
+  color: #8A857A;
+}
+
+.ov-stamp.open {
+  border-style: solid;
+  border-color: #1A1A20;
+  color: #1A1A20;
+}
+
+.ov-hint {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 10px;
+  color: #6E695F;
+  text-align: center;
+}
+
+.ov-buddha {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.ov-dim {
+  justify-content: center;
+  background: rgba(244, 241, 232, 0.88);
+}
+
+.ov-pause { background: rgba(244, 241, 232, 0.72); }
+.ov-over { background: rgba(250, 236, 232, 0.92); }
+
+.ov-story-lines {
+  width: 300px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.ov-story-lines .ov-gap { height: 10px; }
+
+.ui-card {
+  width: 300px;
+  padding: 18px 16px 16px;
+  border: 3px solid #1A1A20;
+  background: #F4F1E8;
+  box-shadow: 5px 5px 0 #1A1A20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.ui-card h2 {
+  font-family: Batang, Gungsuh, serif;
+  font-size: 26px;
+  margin-bottom: 4px;
+}
+
+.ui-card-fail h2 { color: #E5302E; }
+
+.ui-card-manual {
+  text-align: left;
+}
+
+.ov-manual-lead {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #6E695F;
+  margin-bottom: 4px;
+}
+
+.ov-manual-keys {
+  font-size: 10px;
+  color: #6E695F;
+  line-height: 1.4;
+}
+
+.ov-pause-stats,
+.ov-over-score,
+.ov-over-line {
+  font-size: 12px;
+}
+
+.ov-ending {
+  background: #EAE6DA;
+  justify-content: center;
+}
+
+.ov-end-stamp {
+  font-family: Batang, Gungsuh, serif;
+  font-size: 36px;
+  font-weight: 900;
+}
+
+.ov-end-sub {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.ov-end-score {
+  margin-top: 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ov-end-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6E695F;
+  text-align: center;
+}
+
+.blink {
+  animation: hud-blink 1s step-end infinite;
+}
+
+@keyframes hud-punch {
+  from { transform: scale(1.4); }
+  to { transform: scale(1); }
+}
+
+@keyframes hud-rainbow {
+  0% { color: #E5302E; }
+  33% { color: #1E62D0; }
+  66% { color: #1A1A20; }
+  100% { color: #E5302E; }
+}
+
+@keyframes hud-blink {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-combo.punch,
+  .hud-combo.cap,
+  .blink {
+    animation: none;
+  }
+}

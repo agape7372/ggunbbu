@@ -8,6 +8,8 @@ import type {
   FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon,
 } from '../core/types';
 import { VIEW, PALETTE, PLAYER, BOSS, ACT2, STACK } from '../config';
+import { drawAsset } from './assets';
+import { bossSheetFrame, entityAssetKey, playerSheetFrame } from './frames';
 
 // ── 공통 색상 ────────────────────────────────────────────────────
 const OUTLINE = '#0A0A14';
@@ -714,33 +716,44 @@ function buildCannonIcon(): HTMLCanvasElement {
 function drawBoltEntity(ctx: CanvasRenderingContext2D, e: Bolt, groundY: number): void {
   const x = VIEW.LANE_X[e.lane];
   if (e.cueTicks > 0) {
-    ctx.drawImage(entityCache!.get('boltCue')!, x - 6, 20); // 예고: ⚡만 표시
+    if (!drawAsset(ctx, entityAssetKey('boltCue'), x, 26)) {
+      ctx.drawImage(entityCache!.get('boltCue')!, x - 6, 20); // 예고: ⚡만 표시
+    }
     return;
   }
   const y = groundY - e.y;
-  ctx.drawImage(entityCache!.get('bolt')!, x - 6, y - 20);
+  if (!drawAsset(ctx, entityAssetKey('bolt'), x, y)) {
+    ctx.drawImage(entityCache!.get('bolt')!, x - 6, y - 20);
+  }
 }
 
 function drawRockEntity(ctx: CanvasRenderingContext2D, e: Rock, groundY: number): void {
   const x = VIEW.LANE_X[e.lane];
   const y = groundY - e.y;
-  ctx.drawImage(entityCache!.get('rock')!, x - 12, y - 20, 24, 20);
+  if (!drawAsset(ctx, entityAssetKey('rock'), x, y - 10)) {
+    ctx.drawImage(entityCache!.get('rock')!, x - 12, y - 20, 24, 20);
+  }
 }
 
 function drawShotEntity(ctx: CanvasRenderingContext2D, e: Shot, groundY: number): void {
-  const key = e.cancellable ? 'shotOk' : 'shotCancel';
-  ctx.drawImage(entityCache!.get(key)!, e.x - 8, groundY - e.y - 5);
+  const y = groundY - e.y;
+  const pngKey = entityAssetKey(e.cancellable ? 'shotOk' : 'shotNo');
+  if (!drawAsset(ctx, pngKey, e.x, y)) {
+    const key = e.cancellable ? 'shotOk' : 'shotCancel';
+    ctx.drawImage(entityCache!.get(key)!, e.x - 8, y - 5);
+  }
 }
 
 function drawRabbitEntity(ctx: CanvasRenderingContext2D, e: Rabbit, groundY: number): void {
   const cv = entityCache!.get('rabbit')!;
   const y = groundY - e.y - 10;
+  const cy = y + 10;
   ctx.save();
   if (e.side === -1) {
     ctx.translate(e.x, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(cv, -14, y);
-  } else {
+    if (!drawAsset(ctx, entityAssetKey('rabbit'), 0, cy)) ctx.drawImage(cv, -14, y);
+  } else if (!drawAsset(ctx, entityAssetKey('rabbit'), e.x, cy)) {
     ctx.drawImage(cv, e.x - 14, y);
   }
   ctx.restore();
@@ -748,7 +761,9 @@ function drawRabbitEntity(ctx: CanvasRenderingContext2D, e: Rabbit, groundY: num
 
 function drawCannonEntity(ctx: CanvasRenderingContext2D, e: Cannon, _groundY: number): void {
   // 대포는 좌/중/우로 벌려 설치된다 — 레인이 아니라 e.x가 실제 위치(수직탄·스파크 발생점)
-  ctx.drawImage(entityCache!.get('cannon')!, e.x - 12, 6); // 화면 상단 고정(지면 변환 무관)
+  if (!drawAsset(ctx, entityAssetKey('cannon'), e.x, 20)) {
+    ctx.drawImage(entityCache!.get('cannon')!, e.x - 12, 6); // 화면 상단 고정(지면 변환 무관)
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -822,14 +837,17 @@ export function drawPlayer(
   initSprites();
   const frame = pickPlayerFrame(pose, animTick);
   const bob = pose === 'idle' && Math.floor(animTick / 20) % 2 === 1 ? -1 : 0; // 2f 숨쉬기
-  const drawY = footCanvasY - frame.ay + bob;
+  const footY = footCanvasY + bob;
+  const sheet = playerSheetFrame(pose, animTick);
   ctx.save();
   if (facing === -1) {
     ctx.translate(x, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(frame.cv, -frame.ax, drawY);
-  } else {
-    ctx.drawImage(frame.cv, x - frame.ax, drawY);
+    if (!drawAsset(ctx, 'player', 0, footY, sheet)) {
+      ctx.drawImage(frame.cv, -frame.ax, footY - frame.ay);
+    }
+  } else if (!drawAsset(ctx, 'player', x, footY, sheet)) {
+    ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay);
   }
   ctx.restore();
 }
@@ -870,7 +888,9 @@ export function drawBoss(ctx: CanvasRenderingContext2D, boss: BossState, groundY
   const cv = bossCache!.get(kind)!;
   const x = bossX(boss);
   const cy = groundY - boss.y; // boss.y = 표시 고도(본체 중심 기준)
-  ctx.drawImage(cv, x - BOSS.W / 2, cy - BOSS.H / 2);
+  if (!drawAsset(ctx, 'boss', x, cy, bossSheetFrame(boss.st))) {
+    ctx.drawImage(cv, x - BOSS.W / 2, cy - BOSS.H / 2);
+  }
   if (boss.hittable) {
     const blinkOn = Math.floor(boss.stTick / 8) % 2 === 0;
     if (blinkOn) {
@@ -905,7 +925,10 @@ export function drawGroundRocks(ctx: CanvasRenderingContext2D, rocks: number, gr
   for (let i = 0; i < count; i++) {
     const w = 20, h = 16;
     const y = groundY - 4 - i * 12;
-    ctx.drawImage(cv, cx - w / 2 + (i % 2 === 0 ? -4 : 4), y - h, w, h);
+    const ox = cx + (i % 2 === 0 ? -4 : 4);
+    if (!drawAsset(ctx, entityAssetKey('rock'), ox, y - h / 2)) {
+      ctx.drawImage(cv, ox - w / 2, y - h, w, h);
+    }
   }
 }
 

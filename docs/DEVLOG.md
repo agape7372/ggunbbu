@@ -202,3 +202,33 @@ kaminari(번개) 268ms / waza(필살기) 947ms.
 - 층 붕괴 잔해 박스 3개 낙하. destroy(hakai)와 gorogoro 레이어 분리.
 - 공중가드 성공을 `guardAirBounce` 로 분리. 지면가드는 콤보 단절 유지. GUARD_AIR_V·HIT_LIFT 불변.
 
+## 2026-08-23 — PNG 에셋 로딩 파이프라인
+
+IMAGE 봇 산출물을 붙일 자리를 미리 뚫어둠. 이번 패스는 로더만 — 실제로 PNG를 쓰는 렌더 코드는 아직 없음
+(현재 렌더는 전부 프로시저럴, `sprites.ts` 무변경).
+
+- `src/assets/manifest.json` 신설: `{version, basePath, images: {key: {src,w,h,anchor,frames?,slice9?}}}`.
+  `bg-europe`/`bg-asia` 2건만 등록(파일은 없음 — 아래 폴백으로 그래도 됨).
+- `src/render/assets.ts` 신설: `preloadAssets()`(전 이미지 병렬 로드, 개별 실패 삼킴) /
+  `img(key)`(미로드·실패면 null) / `drawAsset(ctx,key,x,y,frame?)`(이미지 없으면 아무것도 안 그리고
+  false 반환 — 호출부가 기존 스프라이트로 폴백). w/h는 논리 크기, 실제 PNG는 그 크기로 축소해 그림.
+  `anchor:'center'`면 x,y가 중심. `frames`는 가로 시트 n등분.
+- `tsconfig.json`에 `resolveJsonModule: true` 추가(manifest.json import용). JSON 리터럴 추론이
+  `anchor`를 string으로 좁히길 거부해서 `as unknown as Manifest`로 우회.
+- `src/main.ts`: 루프 시작 직전에 `await preloadAssets()` 삽입(top-level await, 기존 초기화 순서 불변).
+
+**검증**: `npm test` 53개 green / `tsc --noEmit` 클린 / `vite build` 성공. 브라우저(375×812, PNG 파일
+없는 상태)에서 `preloadAssets()` 완주 확인 — dev 서버가 없는 경로에 SPA 폴백으로 index.html(200)을
+주지만 이미지로 디코드는 실패하므로 `onerror`가 정상 발동, `img('bg-europe')`/`img('bg-asia')` 둘 다
+null, 콘솔 에러 0, 캔버스 360×640 정상 렌더. 프로덕션(진짜 404)에서도 동일 `onerror` 경로.
+
+## 2026-08-28 — M6–M9 연출·UI·에셋
+
+체크포인트 산술(30/40/148/168/180/228/230)은 그대로. 시뮬 leftover 규칙을 닫고 이벤트 스트림을 PNG·DOM HUD·오디오·터치에 연결한다.
+
+- core: 콤보 전수 주석 정본화, 격파 잔해(remnant)=콤보만/착지 무해, 달 격파 잔해, 영거리 돌진은 점프 회피 불가, 체크포인트 이어하기 상태 초기화, 화산탄 더미 착지 깔림, 특공 p>1 현대 테마 고정.
+- 렌더: manifest+preloadAssets, 챕터 배경 4장(public/img/bg), 프레임 시트·파티클.
+- 오디오: consumeAudio가 GameState.events만 소비.
+- UI: DOM HUD/오버레이/설정/갤러리/디버그, 카피 단일 출구(src/content), 터치 레이어 분리.
+- PWA: manifest·SW 캐시, 배포 전 scripts/gen-icons.mjs.
+- 테스트: act2 이어하기/잔해 흐름, input merge, render pipeline.

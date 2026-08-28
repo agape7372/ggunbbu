@@ -59,7 +59,10 @@ export function stepBoss(s: GameState): void {
     }
     case 'telegraph': {
       b.hittable = false;
-      const dur = b.pattern === 'pbCharge' ? BOSS.PB_CHARGE.TELE
+      if (b.pattern === 'pbCharge' && b.stTick <= BOSS.PB_CHARGE.TELEPORT) {
+        b.y = 64; // [정본] 영거리 순간이동
+      }
+      const dur = b.pattern === 'pbCharge' ? BOSS.PB_CHARGE.TELEPORT + BOSS.PB_CHARGE.TELE
         : b.pattern === 'cannons' ? BOSS.CANNON.AIM_TELE
         : BOSS.CHARGE.TELE;
       if (b.stTick >= dur) {
@@ -95,7 +98,11 @@ export function stepBoss(s: GameState): void {
             setSt(b, 'stagger');
             s.events.push({ kind: 'guardBounce', y: 64 });
           }
-        } else if (p.y < 80 && p.invulnTicks <= 0 && p.pose !== 'special') {
+        } else if (
+          (b.pattern === 'pbCharge' || p.y < 80)
+          && p.invulnTicks <= 0 && p.pose !== 'special'
+        ) {
+          // [정본] 영거리 돌진은 점프 회피 불가 — 지면가드/필살 무적만
           hurtPlayer(s);
           if (b.pattern === 'multiCharge' && b.step < BOSS.MULTI_CHARGE.COUNT - 1) {
             b.step += 1;
@@ -149,7 +156,7 @@ export function stepBoss(s: GameState): void {
     }
     case 'defeated': {
       b.y += 60 * TICK;
-      if (b.stTick >= 180) s.over = 'cleared';
+      if (b.stTick >= Math.round(BOSS.DEFEAT_SLOW_S / TICK)) s.over = 'cleared';
       break;
     }
   }
@@ -280,6 +287,23 @@ function stepCannons(s: GameState, b: BossState): void {
   for (let i = remove.length - 1; i >= 0; i--) s.entities.splice(remove[i], 1);
 }
 
+function defeatBoss(s: GameState): void {
+  const b = s.boss;
+  if (!b || b.st === 'defeated') return;
+  setSt(b, 'defeated');
+  b.hittable = false;
+  s.hitstop = 30;
+  addScore(s, SCORE.BOSS_BONUS);
+  if (s.fullCombo) s.score = SCORE.CAP; // [정본] 2막 풀콤보 = 99,999,999 고정
+  s.events.push({ kind: 'bossDefeat' });
+  // 격파 연출 낙하 잔해: 타격 가능, 콤보만, 점수 없음 [정본]
+  for (let i = 0; i < BOSS.DEFEAT_REMNANT; i++) {
+    s.entities.push({
+      kind: 'rock', lane: 0, y: VIEW.H + i * 48, vy: -40, hp: 1, remnant: true,
+    });
+  }
+}
+
 /** 보스·드론·대포 타격 시도. [정본] 드론/대포 격파는 달 HP 미산입 */
 export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
   const b = s.boss;
@@ -312,12 +336,7 @@ export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
     registerHit(s);
     s.events.push({ kind: 'bossHit', y: b.y, n: b.hp });
     if (b.hp <= 0 && b.st !== 'defeated') {
-      setSt(b, 'defeated');
-      b.hittable = false;
-      s.hitstop = 30; // 슬로우 연출 대체 (렌더는 bossDefeat로 확대 연출)
-      addScore(s, SCORE.BOSS_BONUS);
-      if (s.fullCombo) s.score = SCORE.CAP; // [정본] 2막 풀콤보 = 99,999,999 고정
-      s.events.push({ kind: 'bossDefeat' });
+      defeatBoss(s);
     }
     return true;
   }
@@ -331,11 +350,5 @@ export function specialHitBoss(s: GameState): void {
   b.hp -= 10;
   b.dmg += 10;
   s.events.push({ kind: 'bossHit', y: b.y, n: b.hp });
-  if (b.hp <= 0) {
-    setSt(b, 'defeated');
-    b.hittable = false;
-    addScore(s, SCORE.BOSS_BONUS);
-    if (s.fullCombo) s.score = SCORE.CAP;
-    s.events.push({ kind: 'bossDefeat' });
-  }
+  if (b.hp <= 0) defeatBoss(s);
 }

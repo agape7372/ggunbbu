@@ -1,13 +1,15 @@
-// 드로우 오케스트레이션 + 이벤트 소비(셰이크/플래시/사운드/진동/의성어).
-// core는 events만 발행 — 여기서 프레임마다 소비 후 클리어.
+// 드로우 오케스트레이션 + 이벤트 소비(셰이크/플래시/진동/의성어).
+// core는 events만 발행 — 오디오는 src/audio/consume.ts, 클리어는 씬.
 
 import type { GameState } from '../core/types';
 import { JUICE, JUICE_SYS, HAPTIC, PALETTE, VIEW } from '../config';
+import { onomatoFor, CAPTIONS } from '../content';
 import {
   initSprites, drawPlayer, drawStack, drawBoss, drawEntity,
   drawGroundRocks, drawStackShadow,
 } from './sprites';
-import { playSfx, type SfxNameOf } from '../audio/bridge';
+import { drawChapterBackdrop } from './background';
+import { drawEffects, resetEffects, spawnFromEvent, tickEffects } from './effects';
 
 let trauma = 0;
 let flashTicks = 0;
@@ -45,33 +47,10 @@ export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: bool
 
 export function initRenderer(): void {
   initSprites();
+  resetEffects();
 }
 
-function onomatopoeia(kind: string, combo: number): string | null {
-  switch (kind) {
-    case 'hit':
-      return combo >= 500 ? '빠샤아아!!!' : combo >= 100 ? '콰지지직!!' : combo >= 50 ? '콰지직!' : '콰직';
-    case 'floorCollapse': return '우르르';
-    case 'stackDestroy': return '쾅!!';
-    case 'butterCollapse': return '팟!';
-    case 'special': return '천지개벽!!!';
-    case 'bossDefeat': return '작전성공';
-    case 'guardAirBounce': return '탁!';
-    default: return null;
-  }
-}
-
-const SFX_MAP: Record<string, SfxNameOf> = {
-  slash: 'hit', hit: 'hit', floorCollapse: 'floorCollapse', stackDestroy: 'destroy',
-  butterCollapse: 'butterPop', special: 'special', hurt: 'pinned',
-  guardBounce: 'guardGround', guardAirBounce: 'guardAir', bossHit: 'bossHit', bossDefeat: 'bossDefeat',
-  boltCue: 'boltCue', boltStrike: 'boltStrike', gaugeFull: 'gaugeFull',
-  comboBreak: 'guardBreak', jump: 'jump', land: 'land',
-  guardDenied: 'gaugeWarn', lifeLost: 'lifeLost', bonusEnter: 'perfect',
-  bonusPerfect: 'perfect', phaseClear: 'gaugeFull', chapterUnlock: 'gaugeFull',
-};
-
-/** 이벤트 소비: 셰이크/플래시/의성어/사운드/진동. 소비 후 clear는 호출자가. */
+/** 이벤트 소비: 셰이크/플래시/의성어/진동. 사운드는 audio/consume. 소비 후 clear는 호출자가. */
 export function consumeEvents(s: GameState): void {
   for (const e of s.events) {
     const spec = JUICE[e.kind];
@@ -80,6 +59,7 @@ export function consumeEvents(s: GameState): void {
       if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#1A1A20'; }
       if (s.hitstop < spec.hitstop) s.hitstop = spec.hitstop;
     }
+    spawnFromEvent(s, e);
     // 콤보 숫자 팝업 (타격마다 1개, 상한까지 누적)
     if (e.kind === 'hit' || e.kind === 'bossHit') {
       const n = e.combo ?? s.combo;
@@ -98,24 +78,18 @@ export function consumeEvents(s: GameState): void {
       }
     }
     // 의성어 (동시 3개 상한)
-    const word = onomatopoeia(e.kind, e.combo ?? s.combo);
+    const combo = e.combo ?? s.combo;
+    let word = onomatoFor(e.kind, combo);
+    if (word && combo >= 999) word = CAPTIONS.combo999;
     if (word) {
       if (popups.length >= JUICE_SYS.ONOMATOPOEIA_MAX) popups.shift();
-      const esc = e.combo ?? s.combo;
       popups.push({
         text: word,
-        x: VIEW.LANE_X[0] + ((esc * 13) % 30) - 15,
+        x: VIEW.LANE_X[0] + ((combo * 13) % 30) - 15,
         y: VIEW.GROUND_Y - (e.y ?? 100) - 30,
         ticks: 24,
-        scale: e.kind === 'special' || e.kind === 'bossDefeat' ? 2 : 1 + Math.min(esc / 500, 0.8),
+        scale: e.kind === 'special' || e.kind === 'bossDefeat' ? 2 : 1 + Math.min(combo / 500, 0.8),
       });
-    }
-    // 사운드 (콤보 10단위 반음 상승)
-    const sfx = SFX_MAP[e.kind];
-    if (sfx) {
-      const semis = e.kind === 'hit' ? Math.floor(((e.combo ?? 0) / 10) % 12) : 0;
-      playSfx(sfx, semis);
-      if (e.kind === 'stackDestroy') playSfx('gorogoro');
     }
     // 진동 (연타 스로틀)
     if (vibrationOn && 'vibrate' in navigator) {
@@ -142,14 +116,16 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 감쇠
   trauma = Math.max(0, trauma - 0.693 / JUICE_SYS.SHAKE_HALF_LIFE_F * trauma);
   if (flashTicks > 0) flashTicks -= 1;
+  tickEffects();
 
   const [sx, sy] = shakeOffset();
   ctx.save();
   ctx.translate(sx, sy);
 
-  // 배경 (챕터/페이즈별 색 — 배경 아트는 위임 산출물로 교체 예정)
+  // 배경: 단색을 깐 뒤 챕터 PNG를 시도. 없으면(false) 단색만 남아 기존과 동일.
   ctx.fillStyle = bgColor(s);
   ctx.fillRect(-16, -16, VIEW.W + 32, VIEW.H + 32);
+  drawChapterBackdrop(ctx, s);
   // 지면
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
@@ -166,7 +142,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
   }
 
-  drawHud(ctx, s);
+  drawEffects(ctx);
   drawNumPopups(ctx);
   drawPopups(ctx);
   ctx.restore();
@@ -244,51 +220,5 @@ function drawPopups(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = PALETTE.YELLOW;
     ctx.fillText(p.text, 0, 0);
     ctx.restore();
-  }
-}
-
-function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
-  ctx.font = 'bold 14px monospace';
-  ctx.textAlign = 'left';
-  // 점수 (8자리)
-  ctx.fillStyle = PALETTE.INK;
-  ctx.fillText(String(s.score).padStart(8, '0'), 8, 20);
-  // 라이프
-  for (let i = 0; i < s.lives; i++) {
-    ctx.fillStyle = PALETTE.RED;
-    ctx.fillRect(8 + i * 14, 28, 10, 10);
-  }
-  // 콤보
-  if (s.combo > 0) {
-    const big = 16 + Math.min(s.combo / 50, 10);
-    ctx.font = `bold ${Math.round(big)}px monospace`;
-    ctx.fillStyle = s.combo >= 999 ? PALETTE.RED : PALETTE.YELLOW;
-    ctx.textAlign = 'right';
-    ctx.fillText(`${s.combo} COMBO`, VIEW.W - 8, 24);
-  }
-  // 게이지 2종 [원작] — 방어(핑크, 길다) / 기술(황색, 짧다)
-  const gw = 120;
-  ctx.fillStyle = '#D5D0C4';
-  ctx.fillRect(VIEW.W - gw - 8, 30, gw, 7);
-  ctx.fillStyle = '#FF6FA8';
-  ctx.fillRect(VIEW.W - gw - 8, 30, gw * (s.guardGauge / 100), 7);
-  const ww = 72;
-  ctx.fillStyle = '#D5D0C4';
-  ctx.fillRect(VIEW.W - ww - 8, 40, ww, 5);
-  ctx.fillStyle = s.wazaGauge >= 100 ? PALETTE.RED : PALETTE.YELLOW;
-  ctx.fillRect(VIEW.W - ww - 8, 40, ww * (s.wazaGauge / 100), 5);
-  // 보스 HP
-  if (s.boss && s.act2Phase === 'moon') {
-    ctx.fillStyle = '#D5D0C4';
-    ctx.fillRect(40, 48, VIEW.W - 80, 6);
-    ctx.fillStyle = PALETTE.RED;
-    ctx.fillRect(40, 48, (VIEW.W - 80) * (s.boss.hp / 230), 6);
-  }
-  // 보너스 타이머
-  if (s.mode === 'bonus' && s.bonus) {
-    ctx.font = 'bold 18px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = PALETTE.YELLOW;
-    ctx.fillText(`버터바 타임! ${Math.ceil(s.bonus.ticksLeft / 60)}s`, VIEW.W / 2, 70);
   }
 }

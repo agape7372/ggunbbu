@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "basePath": "./img/",
+  "images": {
+    "bg-europe": {
+      "src": "bg/europe.png",
+      "w": 360,
+      "h": 470,
+      "anchor": "topleft",
+      "align": "bottom"
+    },
+    "bg-asia": {
+      "src": "bg/asia.png",
+      "w": 360,
+      "h": 470,
+      "anchor": "topleft",
+      "align": "bottom"
+    },
+    "bg-eastasia": {
+      "src": "bg/eastasia.png",
+      "w": 360,
+      "h": 470,
+      "anchor": "topleft",
+      "align": "bottom"
+    },
+    "bg-modern": {
+      "src": "bg/modern.png",
+      "w": 360,
+      "h": 470,
+      "anchor": "topleft",
+      "align": "bottom"
+    },
+    "bg-act2": {
+      "src": "bg/act2.png",
+      "w": 360,
+      "h": 470,
+      "anchor": "topleft",
+      "align": "bottom"
+    },
+    "bg-moon": {
+      "src": "bg/moon.png",
+      "w": 360,
+      "h": 470,
+      "anchor": "topleft",
+      "align": "bottom"
+    },
+    "bg-bonus": {
+      "src": "bg/bonus.png",
+      "w": 360,
+      "h": 470,
+      "anchor": "topleft",
+      "align": "bottom"
+    },
+    "player": {
+      "src": "char/player.png",
+      "w": 46,
+      "h": 60,
+      "anchor": "foot",
+      "frames": 11,
+      "chroma": "#F4F1E8"
+    },
+    "boss": {
+      "src": "char/boss.png",
+      "w": 80,
+      "h": 64,
+      "anchor": "center",
+      "frames": 4,
+      "chroma": "#F4F1E8"
+    },
+    "ent-bolt": {
+      "src": "char/bolt.png",
+      "w": 12,
+      "h": 40,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    },
+    "ent-boltCue": {
+      "src": "char/bolt-cue.png",
+      "w": 12,
+      "h": 12,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    },
+    "ent-rock": {
+      "src": "char/rock.png",
+      "w": 24,
+      "h": 20,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    },
+    "ent-shotOk": {
+      "src": "char/shot-ok.png",
+      "w": 16,
+      "h": 10,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    },
+    "ent-shotNo": {
+      "src": "char/shot-no.png",
+      "w": 16,
+      "h": 10,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    },
+    "ent-rabbit": {
+      "src": "char/rabbit.png",
+      "w": 28,
+      "h": 20,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    },
+    "ent-cannon": {
+      "src": "char/cannon.png",
+      "w": 24,
+      "h": 28,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    },
+    "fx-hit": {
+      "src": "fx/hit.png",
+      "w": 24,
+      "h": 24,
+      "anchor": "center",
+      "frames": 3,
+      "chroma": "#F4F1E8"
+    },
+    "fx-slash": {
+      "src": "fx/slash.png",
+      "w": 48,
+      "h": 48,
+      "anchor": "center",
+      "chroma": "#F4F1E8"
+    }
+  }
+}
