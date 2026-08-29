@@ -41,6 +41,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     over: null,
     gimmick: 'none',
     waza: 'tenchi',
+    tokotonCycle: 0,
   };
 }
 
@@ -58,9 +59,14 @@ export function advance(s: GameState, input: InputFrame): void {
   const evStart = s.events.length;
 
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
-  if (input.special && s.wazaGauge >= WAZA_GAUGE.COST
-    && s.player.pose !== 'dead' && s.player.pose !== 'special') {
-    triggerSpecial(s);
+  if (input.special && s.player.pose !== 'dead' && s.player.pose !== 'special') {
+    if (s.wazaGauge < WAZA_GAUGE.COST || !hasSpecialTarget(s)) {
+      // 조용한 무반응 금지 (08-30, D-5·P1-4): 게이지 부족·허공 발동은 거부음으로 알린다.
+      // 허공(대상 0)에 게이지 100을 태우던 경로도 여기서 봉인 — 소모 없이 거부.
+      s.events.push({ kind: 'guardDenied' });
+    } else {
+      triggerSpecial(s);
+    }
   }
 
   // ── 깔림 상태 ──
@@ -154,6 +160,15 @@ function stepDebris(s: GameState): void {
   }
 }
 // ── 필살기 ──────────────────────────────────────────────────────
+/** 필살이 의미를 갖는 대상이 하나라도 있는가 — 없으면 발동 자체를 거부한다 (08-30, P1-4) */
+function hasSpecialTarget(s: GameState): boolean {
+  if (s.stack || s.boss || s.groundRocks > 0) return true;
+  for (const e of s.entities) {
+    if (e.kind === 'rock' || e.kind === 'bolt' || e.kind === 'shot') return true;
+  }
+  return false;
+}
+
 function triggerSpecial(s: GameState): void {
   const p = s.player;
   s.wazaGauge -= WAZA_GAUGE.COST;
@@ -161,7 +176,7 @@ function triggerSpecial(s: GameState): void {
   p.poseTick = 0;
   p.invulnTicks = SPECIAL.IFRAMES;
   p.pinTick = 0;
-  s.hitstop = SPECIAL.HITSTOP;
+  // 히트스톱은 'special' 이벤트를 advance 말미 JUICE 주입이 처리 — 이중 출처 금지 (08-30 검증)
   s.events.push({ kind: 'special', lane: p.lane });
 
   if (s.waza === 'tetsu') {
@@ -204,14 +219,19 @@ function applyAgeba(s: GameState): void {
   }
   const lo = p.y - 8;
   const hi = p.y + VIEW.FLOOR_H * SPECIAL.AGEBA_FLOORS;
-  let guard = 12;
-  while (guard-- > 0 && s.stack && s.stack.floors.length > 0) {
+  // ★08-30(P1-4): 기존 `if (res==='hit') break`는 HP2/3 층을 만나면 1대미지로 종료 —
+  // AGEBA_FLOORS(6)가 도달 불가라 80궤도 해금이 기본기(천지)보다 약했다.
+  // 올려베기 = 밴드 안 층을 최대 6층 붕괴할 때까지 연속 타격 + 강한 띄움(파밍 유지가 니치).
+  let destroyed = 0;
+  let iter = 24; // HP3×6층 안전 상한
+  while (iter-- > 0 && destroyed < SPECIAL.AGEBA_FLOORS && s.stack && s.stack.floors.length > 0) {
     const st = s.stack;
     const yHit = st.y;
     const mat = st.floors[0]?.mat;
     const res = damageStack(st, p.lane, lo, hi, 1);
     if (res === 'miss') break;
     if (res === 'collapse') {
+      destroyed += 1;
       s.events.push({ kind: 'floorCollapse', mat, y: yHit });
       addScore(s, SCORE.FLOOR_BONUS);
       if (st.floors.length === 0) {
@@ -219,9 +239,8 @@ function applyAgeba(s: GameState): void {
         break;
       }
     }
-    st.vy = Math.max(st.vy, STACK.HIT_LIFT_V);
+    st.vy = Math.max(st.vy, STACK.GUARD_GROUND_V);
     st.resting = false;
-    if (res === 'hit') break;
   }
 }
 
@@ -438,7 +457,11 @@ function stepTokoton(s: GameState): void {
   // p>1 은 현대 테마 고정. 그 전에는 2분 주기 챕터 순환 [설계]
   if (s.p > 1) s.chapter = ACT1.CHAPTER_THEMES.length - 1;
   else s.chapter = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS) % ACT1.CHAPTER_THEMES.length;
-  if (s.tick > 0 && s.tick % TOKOTON.CHAPTER_CYCLE_TICKS === 0) {
+  // ★08-30: `tick % CYCLE === 0` 정확 일치는 경계 틱이 히트스톱에 삼켜지면 그 사이클의
+  // 버터바가 통째로 소실됐다(검증 실측, 시드 18). 사이클 인덱스 비교로 스킵 내성 확보.
+  const cyc = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS);
+  if (cyc > s.tokotonCycle) {
+    s.tokotonCycle = cyc;
     enterBonusTokoton(s);
     return;
   }

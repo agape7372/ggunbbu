@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeState, advance } from '../src/core/sim';
 import { makeFloor, makeStack } from '../src/core/building';
 import { EMPTY_INPUT, type InputFrame } from '../src/core/types';
-import { WAZA_GAUGE } from '../src/config';
+import { SPECIAL, WAZA_GAUGE } from '../src/config';
 
 function inp(o: Partial<InputFrame> = {}): InputFrame {
   return { ...EMPTY_INPUT, ...o };
@@ -77,5 +77,41 @@ describe('필살 3종', () => {
     advance(s, inp({ special: true }));
     expect(s.stack).not.toBeNull();
     expect(s.stack!.floors.length).toBe(5);
+  });
+});
+
+// ★08-30 Wave 1: 필살 재설계 가드 (P1-4·D-5)
+describe('필살 재설계 (08-30)', () => {
+  it('올려베기는 HP 벽에서 멈추지 않고 최대 층수까지 접는다', () => {
+    const s = makeState();
+    s.waza = 'ageba';
+    s.wazaGauge = WAZA_GAUGE.MAX;
+    // hard(HP3) 8층 — 구코드는 첫 층 1대미지 후 종료(층 0 붕괴)
+    s.stack = makeStack({
+      variant: 'building',
+      theme: 'europe',
+      floors: Array.from({ length: 8 }, () => makeFloor('hard')),
+      y: 20,
+    });
+    advance(s, inp({ special: true }));
+    expect(s.stack!.floors.length).toBe(8 - SPECIAL.AGEBA_FLOORS);
+  });
+
+  it('허공 필살은 거부되고 게이지를 태우지 않는다', () => {
+    const s = makeState();
+    s.wazaGauge = WAZA_GAUGE.MAX;
+    advance(s, inp({ special: true })); // 스택·보스·투사체·더미 전무
+    expect(s.wazaGauge).toBe(WAZA_GAUGE.MAX);
+    expect(s.player.pose).not.toBe('special');
+    expect(s.events.some((e) => e.kind === 'guardDenied')).toBe(true);
+  });
+
+  it('게이지 부족 필살은 거부음 이벤트를 낸다 (조용한 무반응 금지)', () => {
+    const s = makeState();
+    s.wazaGauge = 10;
+    s.stack = tower();
+    advance(s, inp({ special: true }));
+    expect(s.player.pose).not.toBe('special');
+    expect(s.events.some((e) => e.kind === 'guardDenied')).toBe(true);
   });
 });

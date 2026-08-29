@@ -34,8 +34,12 @@ describe('1막 곡선/토코톤', () => {
     // eslint-disable-next-line no-console
     console.log(`[curve] 10min: score=${s.score.toLocaleString()} combo=${s.combo} p=${s.p.toFixed(2)} chapter=${s.chapter} mode=${s.mode} over=${s.over}`);
     expect(s.over).not.toBe('gameover');
-    // 자릿수 가드: 10분에 1M 미만(너무 느림)도, 시작 3분 내 해금(순삭)도 곡선 붕괴
-    expect(s.score).toBeGreaterThan(1_000_000);
+    // ★08-30 밴드 정직화: 봇은 콤보 유지를 못해(combo≈0~4) 점수가 층붕괴 보너스 위주 —
+    // 실측 1.03M에 하한 1.0M은 3% 마진짜리 플레이키 관목이었다(검증 발견).
+    // 봇 = 생존·자릿수 하한 가드일 뿐이고 인간 해금 체감은 콤보 산술이 지배
+    // (BASE_HIT 30 × 평균콤보 150 × 5타/s ≈ 22.5K/s → ≈7.4분). 최종 판정 = 실플레이.
+    expect(s.score).toBeGreaterThan(700_000);
+    expect(s.score).toBeLessThan(ACT1.UNLOCK_SCORE); // 봇이 해금하면 인간은 순삭 — 상한 가드
   }, 60_000);
 
   it('3분 시점에 순삭 해금되지 않는다 (최소 플레이 타임 보장)', () => {

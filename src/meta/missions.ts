@@ -232,10 +232,12 @@ export function defById(id: string): MissionDef | undefined {
 }
 
 /** dateKey 해시로 풀에서 중복 없이 DAILY_PICK개를 고른다. */
-export function pickDailyIds(dateKey: string): string[] {
-  const n = Math.min(DAILY_PICK, DAILY_POOL.length);
+export function pickDailyIds(dateKey: string, allowAd = true): string[] {
+  // 08-30: 광고 경로가 없는 환경(웹)에선 'ad' 트랙 미션이 영구 미달성이 된다 — 풀에서 제외
+  const pool = allowAd ? DAILY_POOL : DAILY_POOL.filter((d) => TRACK_BY_ID[d.id] !== 'ad');
+  const n = Math.min(DAILY_PICK, pool.length);
   if (n <= 0) return [];
-  const ids = DAILY_POOL.map((d) => d.id);
+  const ids = pool.map((d) => d.id);
   let seed = hash32(dateKey);
   for (let i = ids.length - 1; i > 0; i--) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -248,12 +250,12 @@ export function pickDailyIds(dateKey: string): string[] {
 }
 
 /** 날짜가 같으면 동일 참조. 다르거나 null이면 해시로 3개를 새로 뽑는다. */
-export function ensureDaily(state: DailyState | null, nowMs: number): DailyState {
+export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = true): DailyState {
   const dateKey = kstDateKey(nowMs);
   if (state && state.dateKey === dateKey) return state;
   return {
     dateKey,
-    items: pickDailyIds(dateKey).map(blankProgress),
+    items: pickDailyIds(dateKey, allowAd).map(blankProgress),
   };
 }
 

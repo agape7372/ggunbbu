@@ -6,7 +6,7 @@ import type { DailyState, MissionDef, MissionProgress } from '../meta/types';
 export function missionHtml(): string {
   return `<div class="ov-missions ui-card" style="max-height:520px;overflow-y:auto">
     <h2>미션</h2>
-    <p class="ov-manual-lead">광고를 보면 보상이 두 배.</p>
+    ${adBoostOn ? '<p class="ov-manual-lead">광고를 보면 보상이 두 배.</p>' : ''}
     <p class="ov-records-h" data-el="daily-h">오늘의 미션</p>
     <div data-el="daily" style="display:flex;flex-direction:column;gap:8px"></div>
     <p class="ov-records-h" style="margin-top:8px">달성 미션</p>
@@ -14,14 +14,18 @@ export function missionHtml(): string {
   </div>`;
 }
 
+let adBoostOn = true; // paintMissions가 매 렌더 갱신
+
 export function paintMissions(
   root: HTMLElement,
   daily: DailyState,
   defs: readonly MissionDef[],
   achieveProg: readonly MissionProgress[],
   achieveDefs: readonly MissionDef[],
+  adBoost: boolean, // 08-30: 광고 경로 실재 여부 — 웹은 false, 부스트 버튼 미렌더 (광고 위장 금지)
   onClaim: (id: string, boost: boolean) => void,
 ): void {
+  adBoostOn = adBoost;
   root.innerHTML = missionHtml();
   const dailyH = root.querySelector('[data-el="daily-h"]');
   if (dailyH) {
@@ -111,10 +115,10 @@ function missionRow(def: MissionDef, p: MissionProgress): HTMLElement {
 
   const row = document.createElement('div');
   row.style.display = 'grid';
-  row.style.gridTemplateColumns = '1fr 1fr';
+  row.style.gridTemplateColumns = adBoostOn ? '1fr 1fr' : '1fr';
   row.style.gap = '4px';
   row.appendChild(claimBtn(def.id, false, ready, '수령'));
-  row.appendChild(claimBtn(def.id, true, ready, '광고 받고 2배 수령'));
+  if (adBoostOn) row.appendChild(claimBtn(def.id, true, ready, '광고 받고 2배 수령'));
   wrap.appendChild(row);
   return wrap;
 }

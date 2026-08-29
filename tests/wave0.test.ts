@@ -100,3 +100,43 @@ describe('Wave 0: 히트스톱은 core가 주입한다 (P0-5)', () => {
     expect(sawHitstop).toBeGreaterThanOrEqual(JUICE.hit.hitstop);
   });
 });
+
+// ★08-30 검증 후속 가드
+describe('검증 후속 (08-30)', () => {
+  it('히트스톱 중에도 입력 버퍼가 수집되어 종료 후 해소된다 (불변식 가드)', () => {
+    const s = makeState();
+    s.hitstop = 4;
+    advance(s, inp({ jump: true })); // 히트스톱 틱 — 버퍼만 수집
+    expect(s.player.bufJump).toBeGreaterThan(0);
+    for (let i = 0; i < 5; i++) advance(s, inp());
+    expect(s.player.pose).toBe('jump'); // 버퍼가 살아남아 점프 발동
+  });
+
+  it('돌더미에 깔린 동안 후속 화산탄은 직격하지 않고 적재만 된다', () => {
+    const s = makeState();
+    s.stackSpawnCd = 100000;
+    s.groundRocks = 1;
+    advance(s, inp({ jump: true }));
+    for (let i = 0; i < 200 && s.player.y > 0; i++) advance(s, inp());
+    expect(s.player.pose).toBe('pinned');
+    const lives = s.lives;
+    s.entities.push({ kind: 'rock', lane: 0, y: 6, vy: -300, hp: 2 });
+    s.mode = 'act2';
+    s.act2Phase = 'rock';
+    // rock 착지는 act2 stepEntities 경로 — rocks<24로 두어 페이즈 전환(더미 초기화) 방지
+    s.act2c = { spawned: true, bolts: 0, rocks: 0, cd: 99999, t: 0 };
+    for (let i = 0; i < 10; i++) advance(s, inp());
+    expect(s.lives).toBe(lives); // 직격 없음
+    expect(s.groundRocks).toBe(2); // 적재만
+  });
+
+  it('토코톤 사이클 경계가 히트스톱에 삼켜져도 버터바가 소실되지 않는다', () => {
+    const s = makeState({ mode: 'tokoton' });
+    s.stackSpawnCd = 100000;
+    // 경계 직전 틱으로 점프시키고 경계 틱을 히트스톱으로 삼키게 한다
+    s.tick = 7199 - 2;
+    s.hitstop = 4; // 7198~7201 틱이 스킵 — 구코드는 % 일치 실패로 사이클 소실
+    for (let i = 0; i < 10; i++) advance(s, inp());
+    expect(s.mode).toBe('bonus');
+  });
+});

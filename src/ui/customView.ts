@@ -87,7 +87,7 @@ export function paintCustom(
         const mark = document.createElement('span');
         mark.setAttribute('aria-hidden', 'true');
         mark.textContent = '●';
-        btn.append(mark, document.createTextNode(' 잠김'));
+        btn.append(mark, document.createTextNode(' 잠김 · 상점')); // 해금 경로 안내 (08-30, D-3)
       } else {
         btn.textContent = item.name;
         if (current === item.id) btn.classList.add('selected');

@@ -292,7 +292,7 @@ function defeatBoss(s: GameState): void {
   if (!b || b.st === 'defeated') return;
   setSt(b, 'defeated');
   b.hittable = false;
-  s.hitstop = 30;
+  // 히트스톱 30f는 JUICE.bossDefeat이 단일 출처 — advance 말미 주입 (08-30 검증)
   addScore(s, SCORE.BOSS_BONUS);
   if (s.fullCombo) s.score = SCORE.CAP; // [정본] 2막 풀콤보 = 99,999,999 고정
   s.events.push({ kind: 'bossDefeat' });

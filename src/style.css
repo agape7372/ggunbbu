@@ -764,3 +764,16 @@ html, body {
     animation: none;
   }
 }
+
+/* 08-30(E-5): 시스템 스크롤바가 전단지 톤을 깨고 콘텐츠 위에 겹침 — 잉크색 얇은 바로 통일 */
+.ov-shop, .ui-card [style*="overflow-y"], .ov-screen [data-el="mission-list"] {
+  scrollbar-width: thin;
+  scrollbar-color: #1A1A20 transparent;
+}
+.ov-shop::-webkit-scrollbar { width: 4px; }
+.ov-shop::-webkit-scrollbar-thumb { background: #1A1A20; border-radius: 2px; }
+.ov-shop::-webkit-scrollbar-track { background: transparent; }
+
+/* 08-30(P1-2): 일시정지 경유 화면(취급설명서)에선 하단 탭바 차단 — pause 씬을 둔 채
+   메타 탭으로 새면 화면·씬이 어긋나고 진행 중 판이 소실되던 경로의 입구를 막는다. */
+#stage.paused .ov-tabs { display: none; }

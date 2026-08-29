@@ -17,7 +17,7 @@ export type Material =
 export interface FloorSeg { hp: number; maxHp: number; }
 
 export interface Floor {
-  /** 레인 0/1/2 독립 HP. 마천루(tower)는 층 공유 HP 특례 — sharedHp 사용 */
+  /** 단일 레인(M11) — 층당 세그 1개. HP 0이면 층 전체 붕괴 */
   segs: [FloorSeg];
   mat: Material;
   /** 층 높이 px (기본 FLOOR_H) */
@@ -48,8 +48,6 @@ export interface FallingStack {
   vy: number;
   /** 필살기 전파괴 면역 (2막 구조물) */
   specialImmune: boolean;
-  /** 층 공유 HP 특례 (마천루: 레인 무관 타격) */
-  sharedHp: boolean;
   /** 접지 후 정지 상태 (깔림) */
   resting: boolean;
   /** 스폰 시 총 층수 (완파 보너스 계산용) */
@@ -264,6 +262,8 @@ export interface GameState {
   gimmick: GimmickId;
   /** 이번 주행 장착 필살 */
   waza: WazaId;
+  /** 토코톤 버터바 사이클 진입 인덱스 — 히트스톱이 경계 틱을 삼켜도 소실 없게 (08-30 검증) */
+  tokotonCycle: number;
 }
 
 /** 프레임 입력 — input 레이어가 생성해 sim에 주입 */

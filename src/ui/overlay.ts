@@ -106,7 +106,7 @@ export interface OverlayApi {
   showGameOver(v: GameOverView): void;
   showEnding(v: EndingView): void;
   showOps(opts: { unlockedChapters: number; allOpen: boolean; act2Cleared: boolean }): void;
-  showMissions(daily: DailyState, achieves: MissionProgress[]): void;
+  showMissions(daily: DailyState, achieves: MissionProgress[], adBoost: boolean): void;
   showShop(inv: { dust: number; orbit: number }, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
   showCustom(loadout: Loadout, owned: ReadonlySet<string>): void;
   hide(): void;
@@ -142,7 +142,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <div class="ov-menu">
         <button type="button" class="flyer-btn primary selected" data-act="arcade">${SCREENS.menu.arcade}</button>
         <button type="button" class="flyer-btn" data-act="tokoton" data-el="tokoton">토코톤 — 잠김</button>
-        <button type="button" class="flyer-btn" data-act="butter" data-el="butter">버터바 챌린지 — 아직</button>
+        <button type="button" class="flyer-btn" data-act="butter" data-el="butter">버터바 챌린지 — 잠김</button>
         <button type="button" class="flyer-btn" data-act="ops">${SCREENS.menu.ops}</button>
       </div>
       <div class="ov-records">
@@ -435,13 +435,14 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       opsOpts = opts;
       showOpsPanel();
     },
-    showMissions(daily, achieves): void {
+    showMissions(daily, achieves, adBoost): void {
       paintMissions(
         $('mission-list'),
         daily,
         DAILY_POOL,
         achieves,
         ACHIEVES,
+        adBoost,
         (id, boost) => h.onClaimMission(id, boost),
       );
       show('missions');

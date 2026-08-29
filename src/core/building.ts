@@ -4,9 +4,10 @@
 import type { FallingStack, Floor, GameState, Lane, Material, Theme } from './types';
 import { MAT_HP, STACK, VIEW } from '../config';
 
-export function makeFloor(mat: Material, sharedHp = false): Floor {
+// M11 단일 레인 전환 후 "층 공유 HP 풀" 특례는 세그먼트 1개로 자동 성립 —
+// sharedHp 파라미터는 무효 사문이라 08-30 제거했다 (audit ③-8).
+export function makeFloor(mat: Material): Floor {
   const hp = MAT_HP[mat];
-  void sharedHp;
   return {
     segs: [{ hp, maxHp: hp }],
     mat,
@@ -19,7 +20,6 @@ export interface StackOpts {
   theme: Theme;
   floors: Floor[];
   specialImmune?: boolean;
-  sharedHp?: boolean;
   y?: number;
   vy?: number;
 }
@@ -33,7 +33,6 @@ export function makeStack(o: StackOpts): FallingStack {
     y: o.y ?? STACK.SPAWN_Y,
     vy: o.vy ?? 0,
     specialImmune: o.specialImmune ?? false,
-    sharedHp: o.sharedHp ?? false,
     resting: false,
     totalFloors: o.floors.length,
   };

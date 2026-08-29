@@ -136,7 +136,7 @@ export const WAZA_GAUGE = {
 // ── 필살기 ──────────────────────────────────────────────────────
 export const SPECIAL = {
   IFRAMES: 120,           // 발동 프레임부터 [정본: 무적]
-  HITSTOP: 10,
+  // (히트스톱은 JUICE.special.hitstop이 단일 출처 — 08-30 이중 정의 제거)
   IMMUNE_DMG: 10,         // 2막 면역 구조물엔 최하층 10대미지만
   MOON_DMG: 10,
   POSE_TICKS: 48,         // 연출만. 시뮬 파괴는 발동 틱에 끝난다
@@ -156,7 +156,10 @@ export const GIMMICK = {
 
 // ── 점수 [산술 검증: 1,500타 ≈ 7~9분에 9,999,999] ──────────────
 export const SCORE = {
-  BASE_HIT: 20,           // 타격 = 20 × min(combo, 999) (실측 튜닝: 10→20, DEVLOG 참조)
+  // ★08-30 재보정: 봇 실측 1.01M/10분(리치 68·HIT_LIFT 80·히트스톱 누적으로 저하).
+  // 인간 산술: 평균콤보 150·5타/s 기준 30×150×5=22.5K/s → 해금 ≈7.4분(목표 7~9분 밴드).
+  // 봇은 콤보 유지를 못해(combo≈4) 하한 가드일 뿐 인간 체감의 대리가 아니다 — 최종은 실플레이.
+  BASE_HIT: 30,           // 타격 = 30 × min(combo, 999) (10→20→30, DEVLOG 참조)
   FLOOR_BONUS: 1000,
   DESTROY_BONUS: 5000,
   BOLT_BONUS: 1000,
@@ -187,7 +190,7 @@ export const ACT2 = {
   ROCK_GAP_START: 120, ROCK_GAP_END: 60,
   ROCK_TIMEBOX_TICKS: 2400,                // 40s
   ROCK_STACK_MAX: 3,                       // 지면 적재 상한 (단일 레인)
-  ROCK_PILE_H: 40,                         // 더미 1단 높이(px) — 판정·렌더 공용
+  ROCK_PILE_H: 40,                         // 더미 1단 판정 높이(px). ⚠렌더(drawGroundRocks)는 12/16px 소형 — Wave 3 아트 패스에서 정렬
   // 2막 전 대상(번개·화산탄·전기탄·보스·더미) 타격 리치. 1막 ATTACK_REACH(68, 층 1개)와
   // 별개 — 계획서 원명세 128 유지. 08-30 act2.ts 하드코딩에서 config로 승격(수치 무변경).
   REACH: 128,

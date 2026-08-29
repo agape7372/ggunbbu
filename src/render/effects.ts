@@ -333,9 +333,22 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   spawnHitParticles(e.kind, x, y, JUICE[e.kind]?.particles ?? 0, e.mat);
 }
 
-/** drawGame용 1프레임 스텝. 히트스톱과 무관하게 매 드로우 호출할 것. */
+/**
+ * drawGame용 스텝. 히트스톱과 무관하게 매 드로우 호출할 것.
+ * ★08-30(P1-5): rAF마다 고정 TICK을 적분하면 120Hz 기기에서 파티클이 2배속,
+ * 프레임 드랍 시 슬로우가 된다 — 실경과 시간으로 적분한다.
+ */
+let fxLastNow = -1;
 export function tickEffects(): void {
-  updateEffects(TICK);
+  const now = typeof performance !== 'undefined' ? performance.now() : -1;
+  if (now < 0 || fxLastNow < 0) {
+    fxLastNow = now;
+    updateEffects(TICK);
+    return;
+  }
+  const dt = Math.min((now - fxLastNow) / 1000, 0.05);
+  fxLastNow = now;
+  updateEffects(dt > 0 ? dt : TICK);
 }
 
 /** shake transform이 적용된 ctx에 그린다. 월드(플레이어 다음) ~ HUD 전. */

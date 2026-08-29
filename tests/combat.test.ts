@@ -138,7 +138,7 @@ describe('깔림 3분기 [정본]', () => {
     const s = makeState();
     s.stack = makeStack({
       variant: 'skyscraper', theme: 'modern',
-      floors: [makeFloor('lobby'), makeFloor('penthouse')], sharedHp: true, y: 60,
+      floors: [makeFloor('lobby'), makeFloor('penthouse')], y: 60,
     });
     s.stack.vy = -600;
     while (s.player.pose !== 'pinned' && s.tick < 300) advance(s, EMPTY_INPUT);
@@ -259,7 +259,9 @@ describe('필살기', () => {
     const s = makeState();
     s.wazaGauge = 100;
     s.guardGauge = 100;
-    advance(s, inp({ special: true })); // 스택 없음 — 무적만
+    // 08-30: 허공 필살은 거부된다(P1-4) — 회피 대상(낙하 화산탄)을 두고 무적만 검증
+    s.entities.push({ kind: 'rock', lane: 0, y: 600, vy: 0, hp: 2 });
+    advance(s, inp({ special: true }));
     withStack(s, 30, 'hard');
     s.stack!.vy = -600;
     const lives = s.lives;

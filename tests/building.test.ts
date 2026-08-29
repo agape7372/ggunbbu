@@ -39,7 +39,7 @@ describe('세그먼트/붕괴 규칙 [정본 — 단일 레인]', () => {
   it('마천루 로비 HP10: 10타째에 붕괴', () => {
     const st = makeStack({
       variant: 'skyscraper', theme: 'modern',
-      floors: [makeFloor('lobby')], sharedHp: true, y: 0,
+      floors: [makeFloor('lobby')], y: 0,
     });
     for (let i = 0; i < 9; i++) expect(damageStack(st, 0, -1, 50, 1)).toBe('hit');
     expect(damageStack(st, 0, -1, 50, 1)).toBe('collapse'); // 10타째

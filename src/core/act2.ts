@@ -81,7 +81,7 @@ export function stepAct2(s: GameState): void {
           ...Array.from({ length: ACT2.TOWER_OFFICE_FLOORS }, () => makeFloor('office')),
           makeFloor('penthouse'),
         ];
-        s.stack = makeStack({ variant: 'skyscraper', theme: 'modern', floors, specialImmune: true, sharedHp: true });
+        s.stack = makeStack({ variant: 'skyscraper', theme: 'modern', floors, specialImmune: true });
         c.spawned = true;
       } else if (s.stack) {
         // 체크포인트 기록: 로비 격파(40) / 사무층 완료(148)
@@ -172,8 +172,11 @@ export function stepEntities(s: GameState): void {
         if (e.remnant) {
           remove.push(i); // 격파 잔해: 착지 무해, 적재 없음
         } else {
-          if (s.player.y <= 4 && !guardActive(s.player)) {
-            hurtPlayer(s); // 가드 중이거나 공중이면 무해하게 적재 [원작 공략 재현]
+          // 가드 중·공중·깔림 중이면 무해하게 적재 [원작 공략 재현]
+          // pinned 면제는 08-30 검증 발견: 깔림 진입이 무적 0이라 후속 돌이 직격해
+          // 방치 시 ~2초 전멸하던 신규 경로 봉인 — 깔린 몸 위 돌은 쌓이기만 한다.
+          if (s.player.y <= 4 && !guardActive(s.player) && s.player.pose !== 'pinned') {
+            hurtPlayer(s);
           }
           if (s.groundRocks < ACT2.ROCK_STACK_MAX) s.groundRocks += 1;
           s.events.push({ kind: 'land', lane: e.lane });
@@ -288,7 +291,7 @@ export function continueFromCheckpoint(s: GameState): void {
     enterAct2Phase(s, 'tower');
     s.combo = 148;
     const floors = [makeFloor('penthouse')];
-    s.stack = makeStack({ variant: 'skyscraper', theme: 'modern', floors, specialImmune: true, sharedHp: true });
+    s.stack = makeStack({ variant: 'skyscraper', theme: 'modern', floors, specialImmune: true });
     s.act2c!.spawned = true;
     s.checkpoint = 148;
   } else if (cp >= 40) {
@@ -298,7 +301,7 @@ export function continueFromCheckpoint(s: GameState): void {
       ...Array.from({ length: ACT2.TOWER_OFFICE_FLOORS }, () => makeFloor('office')),
       makeFloor('penthouse'),
     ];
-    s.stack = makeStack({ variant: 'skyscraper', theme: 'modern', floors, specialImmune: true, sharedHp: true });
+    s.stack = makeStack({ variant: 'skyscraper', theme: 'modern', floors, specialImmune: true });
     s.act2c!.spawned = true;
     s.checkpoint = 40;
   } else {

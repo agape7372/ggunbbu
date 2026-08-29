@@ -2,7 +2,7 @@
 // core는 events만 발행 — 오디오는 src/audio/consume.ts, 클리어는 씬.
 
 import type { GameState } from '../core/types';
-import { JUICE, JUICE_SYS, HAPTIC, PALETTE, VIEW } from '../config';
+import { JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, VIEW } from '../config';
 import { onomatoFor, CAPTIONS } from '../content';
 import {
   initSprites, drawPlayer, drawStack, drawBoss, drawEntity,
@@ -153,19 +153,26 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   }
   if (s.boss) drawBoss(ctx, s.boss, g);
 
-  if (s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
+  // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2)
+  const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES;
+  if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
     drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
   }
   ctx.restore();
 
-  // 화면 고정 예고 마커 — 필드 상단, 카메라 변환 밖 (공중에서도 절대 안 사라진다)
+  // 필드 클립 재적용 — 파티클·팝업·마커가 조작 존(하단 170px)을 침범하지 않게 (08-30, P1-5)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, VIEW.W, VIEW.FIELD_H);
+  ctx.clip();
+  // 화면 고정 예고 마커 — 카메라 변환 밖 (공중에서도 절대 안 사라진다)
   for (const e of s.entities) {
     if (e.kind === 'cannon' || (e.kind === 'bolt' && e.cueTicks > 0)) drawEntity(ctx, e, g);
   }
-
   drawEffects(ctx);
   drawNumPopups(ctx);
   drawPopups(ctx);
+  ctx.restore();
   ctx.restore();
 
   if (flashTicks > 0) {

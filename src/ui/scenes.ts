@@ -77,6 +77,10 @@ export function createApp(
   let overlay!: OverlayApi;
   let revivesUsed = 0;
   let reviving = false;
+  // 08-30(P1-1): 구역 작전·디버그 런은 영구 기록(bestArcade·unlockedChapters·maxCombo)을
+  // 오염시키지 않는다 — 재화(먼지·궤도) 지급만 유지. 부처버전 문법: 치트 런 = 기록 없음.
+  let runExempt = false;
+  let dustDirty = false; // 판 도중 재화 지급 발생 표시 — noteMissions 말미 저장 트리거
   const ads = createAdsPort();
   const iap = createIapPort();
 
@@ -112,7 +116,7 @@ export function createApp(
     s.waza = save.loadout.waza;
     s.gimmick = gimmick;
     revivesUsed = 0;
-    const daily = ensureDaily(save.daily, Date.now());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     applyMissionEvent(daily, save.achieves, { kind: 'runStart' });
@@ -142,6 +146,7 @@ export function createApp(
   }
 
   function startArcade(): void {
+    runExempt = debugOpen();
     save.buddhaMode = loadSave().buddhaMode;
     state = makeState({ seed: debugSeed(0x9e3779b9) });
     applyRunMeta(state);
@@ -168,10 +173,10 @@ export function createApp(
   }
 
   function openMissions(): void {
-    const daily = ensureDaily(save.daily, Date.now());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
-    overlay.showMissions(daily, save.achieves);
+    overlay.showMissions(daily, save.achieves, ads.ready());
   }
 
   function openShop(): void {
@@ -197,6 +202,7 @@ export function createApp(
       playSfx('uiDeny');
       return;
     }
+    runExempt = true; // 구역 작전 = 점수·챕터 주입 런 — 영구 기록 비반영 (P1-1)
     state = makeState({ seed: debugSeed(0xc0ffee) });
     applyRunMeta(state, op.gimmick);
     state.chapter = op.themeIndex;
@@ -227,12 +233,13 @@ export function createApp(
   async function claimMission(id: string, boost: boolean): Promise<void> {
     const def = defById(id) ?? DAILY_POOL.find((d) => d.id === id) ?? ACHIEVES.find((d) => d.id === id);
     if (!def) return;
-    const daily = ensureDaily(save.daily, Date.now());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     const prog = daily.items.find((p) => p.id === id) ?? save.achieves.find((p) => p.id === id);
     if (!prog) return;
     if (boost) {
+      if (!ads.ready()) { playSfx('uiDeny'); return; } // 웹: 광고 없음 — 버튼도 안 그리지만 백스톱 (08-30)
       const r = await ads.showRewarded('missionBoost');
       if (r !== 'ok') { playSfx('uiDeny'); return; }
       applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
@@ -259,7 +266,7 @@ export function createApp(
   async function adOrbit(): Promise<void> {
     const r = await ads.showRewarded('orbitPack');
     if (r !== 'ok') { playSfx('uiDeny'); return; }
-    const daily = ensureDaily(save.daily, Date.now());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grantOrbit(save, ORBIT_PER_AD);
@@ -287,6 +294,7 @@ export function createApp(
 
   function startTokoton(): void {
     if (!save.act2Cleared && !debugOpen()) return;
+    runExempt = debugOpen();
     state = makeState({ seed: debugSeed(0x51ed270b), mode: 'tokoton' });
     applyRunMeta(state);
     butterChallenge = false;
@@ -296,6 +304,7 @@ export function createApp(
   function startButterChallenge(round: number): void {
     const cap = debugOpen() ? 3 : save.butterTierReached;
     if (round < 1 || round > cap) return;
+    runExempt = debugOpen();
     state = makeState({ seed: debugSeed(0xabcdef) });
     applyRunMeta(state);
     state.wazaGauge = WAZA_GAUGE.MAX;
@@ -315,7 +324,7 @@ export function createApp(
     if (result !== 'ok') { playSfx('uiDeny'); return; }
     revivesUsed += 1;
     grantMercyLife(state);
-    const daily = ensureDaily(save.daily, Date.now());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'revive' });
     if (usedAd) applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
@@ -345,15 +354,17 @@ export function createApp(
 
   function persist(): void {
     if (!state) return;
-    const sc = state.score;
-    if (state.mode === 'tokoton') save.bestTokoton = Math.max(save.bestTokoton, sc);
-    else if (butterChallenge && state.bonus) {
-      const r = state.bonus.round;
-      save.butterBest[r] = Math.max(save.butterBest[r] ?? 0, sc);
-    } else save.bestArcade = Math.max(save.bestArcade, sc);
-    save.maxCombo = Math.max(save.maxCombo, state.combo);
-    save.unlockedChapters = Math.max(save.unlockedChapters, state.chapter);
-    if (state.bonus) save.butterTierReached = Math.max(save.butterTierReached, state.bonus.round);
+    if (!runExempt) {
+      const sc = state.score;
+      if (state.mode === 'tokoton') save.bestTokoton = Math.max(save.bestTokoton, sc);
+      else if (butterChallenge && state.bonus) {
+        const r = state.bonus.round;
+        save.butterBest[r] = Math.max(save.butterBest[r] ?? 0, sc);
+      } else save.bestArcade = Math.max(save.bestArcade, sc);
+      save.maxCombo = Math.max(save.maxCombo, state.combo);
+      save.unlockedChapters = Math.max(save.unlockedChapters, state.chapter);
+      if (state.bonus) save.butterTierReached = Math.max(save.butterTierReached, state.bonus.round);
+    }
     saveSave(save);
   }
 
@@ -508,10 +519,11 @@ export function createApp(
       case 'title': {
         bgm('title');
         touch?.setPinned(false);
-        if (overlay.getScreen() !== 'title') { prevTitleGuard = f.guard; break; }
+        if (overlay.getScreen() !== 'title') break;
         // guard는 홀드 레벨(엣지 아님) — 그대로 쓰면 메뉴가 60Hz로 돈다 (08-30, P0-6)
+        // prevTitleGuard는 update 말미에서 씬 무관하게 갱신 — boot를 가드로 넘긴 같은
+        // 홀드가 메뉴를 밀거나, 가드 쥔 채 타이틀 복귀 시 스테일 엣지가 생기지 않게 (08-30 검증)
         const guardEdge = f.guard && !prevTitleGuard;
-        prevTitleGuard = f.guard;
         if (f.special && f.guard) {
           // 디버그 해금 콤보(가드 홀드 + 필살) — 사운드 토글·메뉴 이동과 겹치지 않게 단독 처리
           debug = true;
@@ -595,6 +607,8 @@ export function createApp(
         break;
       }
     }
+    // 씬 무관 갱신 — boot·pause·gameover를 거쳐도 타이틀 가드 엣지가 스테일이 안 되게 (08-30 검증)
+    prevTitleGuard = f.guard;
   }
 
   function bgmFor(s: GameState): BgmTrack {
@@ -606,13 +620,13 @@ export function createApp(
   }
 
   function noteKind(kind: string, extra?: { n?: number; combo?: number; zone?: string }): void {
-    const daily = ensureDaily(save.daily, Date.now());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind, ...extra });
   }
 
   function noteMissions(s: GameState, extra?: { wasPinned?: boolean }): void {
-    const daily = ensureDaily(save.daily, Date.now());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     if (extra?.wasPinned && s.player.pose !== 'pinned' && s.player.pose !== 'dead') {
@@ -630,9 +644,12 @@ export function createApp(
       if (e.kind === 'chapterUnlock' && (e.n ?? 0) >= 2) {
         applyMissionEvent(daily, save.achieves, { kind: 'zoneSurvive', zone: 'eastasia' });
       }
-      if (e.kind === 'stackDestroy') grant(save, 2, 0);
-      if (e.kind === 'special') grant(save, 1, 0);
+      if (e.kind === 'stackDestroy') { grant(save, 2, 0); dustDirty = true; }
+      if (e.kind === 'special') { grant(save, 1, 0); dustDirty = true; }
     }
+    // 판 도중 이탈(탭 종료·데스크톱 강제 종료)에도 재화가 안 날아가게 — 틱마다가 아니라
+    // 지급 발생 프레임에만 저장 (08-30, P1-2 잔여)
+    if (dustDirty) { saveSave(save); dustDirty = false; }
   }
 
   function handleTransitions(s: GameState, wasMode: GameState['mode'], wasPhase: GameState['act2Phase']): void {

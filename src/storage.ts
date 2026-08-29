@@ -75,22 +75,18 @@ export function loadSave(): SaveData {
       return structuredClone(DEFAULT_SAVE);
     }
 
-    const data = parsed as Record<string, unknown>;
+    // ★08-30: 파싱 순서 = parse → migrate(raw) → validateAndClamp (levain persistence 문법).
+    // 구 코드는 `v !== 1 → 전체 초기화`였다 — 스키마를 올리는 순간, 그리고 미래 버전에서
+    // 롤백하는 순간 전 사용자 세이브가 전멸하는 지뢰. 이제 어떤 v라도 버리지 않고
+    // 마이그레이션 후 필드 검증이 살릴 수 있는 만큼 살린다(clamp — 버리지 않는다).
+    const data = migrate(parsed as Record<string, unknown>);
 
-    // v 필드 불일치 시 기본값
-    if (data.v !== 1) {
-      return structuredClone(DEFAULT_SAVE);
-    }
-
-    // 필드별 타입가드 및 보정
+    // 필드별 타입가드 및 clamp 보정
     const result: SaveData = {
       v: 1,
-      bestArcade:
-        typeof data.bestArcade === 'number' ? data.bestArcade : DEFAULT_SAVE.bestArcade,
-      bestTokoton:
-        typeof data.bestTokoton === 'number' ? data.bestTokoton : DEFAULT_SAVE.bestTokoton,
-      maxCombo:
-        typeof data.maxCombo === 'number' ? data.maxCombo : DEFAULT_SAVE.maxCombo,
+      bestArcade: num(data.bestArcade, DEFAULT_SAVE.bestArcade, 99_999_999),
+      bestTokoton: num(data.bestTokoton, DEFAULT_SAVE.bestTokoton, 99_999_999),
+      maxCombo: num(data.maxCombo, DEFAULT_SAVE.maxCombo, 999),
       act2Cleared:
         typeof data.act2Cleared === 'boolean'
           ? data.act2Cleared
@@ -99,20 +95,14 @@ export function loadSave(): SaveData {
         typeof data.buddhaMode === 'boolean'
           ? data.buddhaMode
           : DEFAULT_SAVE.buddhaMode,
-      unlockedChapters:
-        typeof data.unlockedChapters === 'number'
-          ? data.unlockedChapters
-          : DEFAULT_SAVE.unlockedChapters,
-      butterTierReached:
-        typeof data.butterTierReached === 'number'
-          ? data.butterTierReached
-          : DEFAULT_SAVE.butterTierReached,
+      unlockedChapters: num(data.unlockedChapters, DEFAULT_SAVE.unlockedChapters, 3),
+      butterTierReached: num(data.butterTierReached, DEFAULT_SAVE.butterTierReached, 3),
       butterBest: isRecordNumberNumber(data.butterBest)
         ? data.butterBest
         : DEFAULT_SAVE.butterBest,
       settings: validateSettings(data.settings),
-      dust: typeof data.dust === 'number' ? data.dust : 0,
-      orbit: typeof data.orbit === 'number' ? data.orbit : 0,
+      dust: num(data.dust, 0),
+      orbit: num(data.orbit, 0),
       owned: Array.isArray(data.owned)
         ? data.owned.filter((x): x is string => typeof x === 'string')
         : [...DEFAULT_SAVE.owned],
@@ -126,6 +116,24 @@ export function loadSave(): SaveData {
     // JSON 파싱 실패 또는 기타 예외
     return structuredClone(DEFAULT_SAVE);
   }
+}
+
+/**
+ * 버전 마이그레이션 사다리 — v1이 현행. 미래에 v2를 만들면 여기서 v1→v2 변환을 단계로 쌓는다.
+ * ★규칙(levain ARCHITECTURE §3 이식): 새 누적값·카운터는 버전을 올리지 말고 "무버전 추가 키"로
+ * 얹는다(필드 가드가 기본값으로 채움). 버전 상향은 "기존 필드의 의미·구조가 바뀌어 구버전이
+ * 오독하는 경우"로 한정 — 올리는 순간 그 버전을 모르는 과거 번들로의 OTA 롤백이 영구 금지된다.
+ * 알 수 없는 v(부재·미래)는 절대 초기화하지 않는다 — 그대로 통과시켜 필드 검증에 맡긴다.
+ */
+function migrate(data: Record<string, unknown>): Record<string, unknown> {
+  return data;
+}
+
+/** 유한 숫자면 [0, max]로 clamp, 아니면 기본값 — NaN·음수·문자열 오염에도 기록을 버리지 않는다 */
+function num(v: unknown, def: number, max = Number.MAX_SAFE_INTEGER): number {
+  return typeof v === 'number' && Number.isFinite(v)
+    ? Math.min(Math.max(0, Math.floor(v)), max)
+    : def;
 }
 
 function isProgress(v: unknown): v is MissionProgress {
