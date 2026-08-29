@@ -3,11 +3,11 @@
 // act2/보스 스테핑은 act2.ts/boss.ts (M4/M5)에서 이 파일에 연결된다.
 
 import type { GameState, InputFrame } from './types';
-import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, clingToFloors } from './player';
+import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
-import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, hurtPlayer } from './combat';
+import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { specialHitBoss } from './boss';
 
@@ -54,6 +54,8 @@ export function advance(s: GameState, input: InputFrame): void {
     s.hitstop -= 1;
     return;
   }
+  // 이번 틱에 발행되는 이벤트만 히트스톱 주입 대상 (advance 말미 참조)
+  const evStart = s.events.length;
 
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
   if (input.special && s.wazaGauge >= WAZA_GAUGE.COST
@@ -67,7 +69,6 @@ export function advance(s: GameState, input: InputFrame): void {
     stepPinned(s, input);
   } else {
     stepPlayer(s, input, TICK);
-    clingToFloors(s);
   }
 
   // [정본] 점프 무적의 이면: 지면에 놓인 스택 위/옆에 착지하면 그때 깔린다
@@ -77,12 +78,14 @@ export function advance(s: GameState, input: InputFrame): void {
     onPlayerCrushed(s);
   }
 
-  // 화산탄 더미 위 착지 깔림 — 공중이면 무해, 착지 순간에만 피격 (가드 적재와 구분)
+  // [정본] 화산탄 더미 위 착지 = 깔림 — 공중이면 무해, 착지 순간에만.
+  // ★08-30: hurtPlayer 직행(피어싱 연쇄 피격)이던 것을 깔림 상태기계로 라우팅 —
+  // 탈출 3분기(하/Z/X)가 그대로 적용된다. 더미 파밍(반복 타격 점수)은 불변.
   if (wasAirborne && s.player.y <= 0 && s.groundRocks > 0
     && s.player.pose !== 'pinned' && s.player.pose !== 'dead'
     && s.player.invulnTicks <= 0 && s.player.pose !== 'special'
     && s.mode !== 'bonus') {
-    hurtPlayer(s);
+    onPlayerCrushed(s);
   }
 
   // ── 방어 게이지 회복 (가드를 놓고 있을 때만) ──
@@ -102,7 +105,6 @@ export function advance(s: GameState, input: InputFrame): void {
     if (grounded && !tryGuardBounce(s, guardActive(s.player), s.player.y, prevStackY)) {
       onStackGrounded(s);
     }
-    clingToFloors(s);
   }
 
   // ── 가드 바운스 (비접지 프레임) ──
@@ -127,6 +129,14 @@ export function advance(s: GameState, input: InputFrame): void {
   else if (s.mode === 'tokoton') stepTokoton(s);
   else if (s.mode === 'bonus') stepBonus(s);
   else if (s.mode === 'act2') stepAct2(s);
+
+  // ── 히트스톱 주입 (JUICE 테이블) ──
+  // ★08-30: 렌더러가 s.hitstop을 쓰던 역방향 오염(P0-5)을 제거하고 core가 직접 주입한다.
+  // 헤드리스 테스트와 브라우저가 같은 시뮬을 돌게 하는 조건 — 렌더는 읽기 전용.
+  for (let i = evStart; i < s.events.length; i++) {
+    const spec = JUICE[s.events[i].kind];
+    if (spec && spec.hitstop > s.hitstop) s.hitstop = spec.hitstop;
+  }
 }
 
 function stepDebris(s: GameState): void {
@@ -246,8 +256,11 @@ function applyImmuneChip(s: GameState): void {
 function stepPinned(s: GameState, input: InputFrame): void {
   const p = s.player;
   const stack = s.stack;
-  if (!stack || !stack.resting) {
-    // 스택이 사라졌거나 떠올랐으면 자동 해방
+  const byStack = !!(stack && stack.resting);
+  // ★08-30: 화산탄 더미 깔림도 같은 상태기계를 탄다 (sim 착지 검사에서 진입)
+  const byRocks = !byStack && s.groundRocks > 0;
+  if (!byStack && !byRocks) {
+    // 깔림 원인이 사라졌으면 자동 해방
     p.pose = 'idle';
     p.poseTick = 0;
     return;
@@ -260,6 +273,12 @@ function stepPinned(s: GameState, input: InputFrame): void {
     loseLife(s);
     if (s.over) return;
   }
+
+  if (byRocks) {
+    stepPinnedByRocks(s, input);
+    return;
+  }
+  if (!stack) return; // byStack 보장 — 타입 내로잉용
 
   if (input.guard || p.bufGuard > 0) {
     // 하: 지면 가드로 띄우기 [정본] — 게이지 무관, 소모 없음
@@ -294,6 +313,28 @@ function stepPinned(s: GameState, input: InputFrame): void {
       p.invulnTicks = PLAYER.PIN_ESCAPE_IFRAMES_ATK;
     }
     p.poseTick = 0;
+  }
+}
+
+/** 화산탄 더미 깔림 — 하: 몸만 빼냄(무상) / Z: 최상단 돌 파괴 후 탈출 / X: 필살(전역 처리) */
+function stepPinnedByRocks(s: GameState, input: InputFrame): void {
+  const p = s.player;
+  if (input.guard || p.bufGuard > 0) {
+    p.bufGuard = 0;
+    p.pose = 'idle';
+    p.poseTick = 0;
+    p.invulnTicks = PLAYER.PIN_ESCAPE_IFRAMES_LIFT;
+    s.events.push({ kind: 'guardBounce', y: 0 });
+    return;
+  }
+  if (p.bufAttack > 0) {
+    p.bufAttack = 0;
+    s.groundRocks = Math.max(0, s.groundRocks - 1);
+    s.events.push({ kind: 'floorCollapse', y: 0 });
+    addScore(s, SCORE.FLOOR_BONUS);
+    p.pose = 'idle';
+    p.poseTick = 0;
+    p.invulnTicks = PLAYER.PIN_ESCAPE_IFRAMES_ATK;
   }
 }
 

@@ -36,23 +36,42 @@ export type IapResult = 'ok' | 'cancel' | 'fail';
 
 export interface IapPort {
   list(): readonly Sku[];
+  /** 결제 경로가 실재하는가 — 웹은 false(상점 IAP 섹션 숨김), ?debug=1만 시뮬레이션 */
+  available(): boolean;
   purchase(id: SkuId): Promise<IapResult>;
+}
+
+function urlHasDebug1(): boolean {
+  try {
+    if (typeof location === 'undefined') return false;
+    return new URLSearchParams(location.search).get('debug') === '1';
+  } catch {
+    return false;
+  }
 }
 
 /**
  * 웹 스텁 IapPort.
- * purchase는 항상 'ok' (네이티브 미배선). 테스트는 포트를 모킹한다.
- * 절대 throw 하지 않는다. P2 네이티브가 이 구현을 교체한다.
+ * ★08-30(P0-2): purchase 항상 'ok'(전 SKU 무료 지급)를 봉인 — 웹은 available()=false,
+ * purchase='fail'. ?debug=1만 성공 시뮬레이션. 절대 throw 하지 않는다.
+ * 네이티브(Wave 4+ — v1은 IAP 미출시, ROADMAP 참조)가 이 구현을 교체한다.
  */
 export function createIapPort(): IapPort {
+  const debugAutoOk = urlHasDebug1();
   return {
     list(): readonly Sku[] {
       return SKUS;
     },
 
+    available(): boolean {
+      if (typeof window === 'undefined') return true; // 헤드리스 테스트 결정론
+      return debugAutoOk;
+    },
+
     async purchase(_id: SkuId): Promise<IapResult> {
       try {
-        return 'ok';
+        if (typeof window === 'undefined') return 'ok';
+        return debugAutoOk ? 'ok' : 'fail';
       } catch {
         return 'fail';
       }

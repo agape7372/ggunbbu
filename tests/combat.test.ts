@@ -9,6 +9,11 @@ function inp(o: Partial<InputFrame>): InputFrame {
   return { ...EMPTY_INPUT, ...o };
 }
 
+/** 08-30: 히트스톱이 core로 이동 — 진입 연출 틱을 소진시킨 뒤 입력을 넣는다 */
+function flushHitstop(s: GameState): void {
+  while (s.hitstop > 0) advance(s, EMPTY_INPUT);
+}
+
 function withStack(s: GameState, y: number, mat: 'weak' | 'mid' | 'hard' = 'hard', floors = 3): void {
   s.stack = makeStack({
     variant: 'building', theme: 'europe',
@@ -61,17 +66,18 @@ describe('가드 2종 [정본]', () => {
     s.combo = 10;
     const jumpIn = inp({ jump: true });
     advance(s, jumpIn); // 점프 시작
-    // 상승 중 스택을 플레이어 머리 위에 배치
-    for (let t = 0; t < 30; t++) {
+    // 정점 부근(저속)에서 스택을 머리 위 존 안에 배치 — 08-30 cling 삭제로
+    // "상승 중 접착 → 존 고정" 우회가 사라졌다. 원작 문법 = 정점에서 공중가드.
+    for (let t = 0; t < 120; t++) {
       const p = s.player;
-      if (p.y > 60) {
-        withStack(s, p.y + PLAYER.H, 'hard');
+      if (p.y > 60 && p.vy < 60) {
+        withStack(s, p.y + PLAYER.H + 4, 'hard');
         s.stack!.vy = -50;
         break;
       }
       advance(s, EMPTY_INPUT);
     }
-    for (let i = 0; i < 6; i++) advance(s, inp({ guard: true }));
+    for (let i = 0; i < 8; i++) advance(s, inp({ guard: true }));
     expect(s.stack!.vy).toBeGreaterThan(STACK.GUARD_AIR_V * 0.6);
     expect(s.combo).toBe(10); // 유지
   });
@@ -110,6 +116,7 @@ describe('깔림 3분기 [정본]', () => {
 
   it('하: 띄우기 탈출 (라이프 무손실)', () => {
     const s = pinState();
+    flushHitstop(s); // 깔림 진입 hurt 히트스톱(4f) 소진
     const lives = s.lives;
     advance(s, inp({ guard: true }));
     expect(s.player.pose).toBe('idle');
@@ -119,6 +126,7 @@ describe('깔림 3분기 [정본]', () => {
 
   it('Z 성공: 최하층 5대미지로 붕괴 → 탈출', () => {
     const s = pinState(); // hard HP3 < 5 → 성공
+    flushHitstop(s);
     const lives = s.lives;
     advance(s, inp({ attack: true }));
     expect(s.player.pose).toBe('idle');
@@ -134,6 +142,7 @@ describe('깔림 3분기 [정본]', () => {
     });
     s.stack.vy = -600;
     while (s.player.pose !== 'pinned' && s.tick < 300) advance(s, EMPTY_INPUT);
+    flushHitstop(s);
     const lives = s.lives;
     advance(s, inp({ attack: true })); // lobby HP10, 5대미지로 못 부숨
     expect(s.lives).toBe(lives - 1);

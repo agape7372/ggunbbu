@@ -20,15 +20,22 @@ const ORBIT_ROWS: readonly OrbitRow[] = [
   { id: 'orbit', title: '글자 · 궤도', cost: COSMETIC_ORBIT_COST },
 ];
 
-export function shopHtml(): string {
+export function shopHtml(paths: { iap: boolean; ad: boolean }): string {
+  // 웹(결제·광고 미배선)에선 해당 섹션을 아예 안 그린다 — 무료 지급 위장 금지 (08-30, P0-2)
+  const skuBlock = paths.iap
+    ? `<p class="ov-manual-lead">부가세 포함. 모든 상품 ₩1,900 이하. 궤도조각으로도 연다.</p>
+    <div data-el="skus">${skuGroupsHtml()}</div>`
+    : `<p class="ov-manual-lead">궤도조각으로 연다. 결제 상품은 앱 출시 후.</p>`;
+  const adBtn = paths.ad
+    ? `<button type="button" class="flyer-btn" data-shop-ad="1">광고로 조각</button>`
+    : '';
   return `<div class="ov-shop" style="max-height:460px;overflow-y:auto">
     <h2>상점</h2>
-    <p class="ov-manual-lead">부가세 포함. 모든 상품 ₩1,900 이하. 궤도조각으로도 연다.</p>
+    ${skuBlock}
     <p class="ov-records-h" data-el="wallet">먼지 0 · 궤도조각 0</p>
-    <div data-el="skus">${skuGroupsHtml()}</div>
     <p class="ov-records-h" style="margin-top:8px">궤도조각 해금</p>
     <div data-el="orbit-rows"></div>
-    <button type="button" class="flyer-btn" data-shop-ad="1">광고로 조각</button>
+    ${adBtn}
   </div>`;
 }
 
@@ -36,11 +43,12 @@ export function paintShop(
   root: HTMLElement,
   inv: { dust: number; orbit: number },
   owned: ReadonlySet<string>,
+  paths: { iap: boolean; ad: boolean },
   onBuy: (skuId: string) => void,
   onAdPack: () => void,
   onOrbit: (id: string) => void,
 ): void {
-  root.innerHTML = shopHtml();
+  root.innerHTML = shopHtml(paths);
   const wallet = root.querySelector('[data-el="wallet"]');
   if (wallet) {
     wallet.textContent =
@@ -66,6 +74,11 @@ export function paintShop(
             <span>${escapeHtml(row.title)}</span>
             <span>궤도 ${fmtNum(row.cost)}</span>
           </span>`;
+        // 잔액 부족 = 조용한 무반응 금지 — 미션 탭과 같은 disabled 문법 (08-30, B-2)
+        if (inv.orbit < row.cost) {
+          b.disabled = true;
+          b.style.opacity = '0.42';
+        }
       }
       box.appendChild(b);
     }

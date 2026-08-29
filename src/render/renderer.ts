@@ -60,7 +60,7 @@ export function consumeEvents(s: GameState): void {
     if (spec) {
       trauma = Math.min(1, Math.max(trauma, spec.shake / JUICE_SYS.SHAKE_MAX_AMP));
       if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#1A1A20'; }
-      if (s.hitstop < spec.hitstop) s.hitstop = spec.hitstop;
+      // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
     }
     spawnFromEvent(s, e);
     // 콤보 숫자 팝업 (타격마다 1개, 상한까지 누적)
@@ -145,13 +145,23 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   if (s.stack) { drawStackShadow(ctx, s.stack, g); drawStack(ctx, s.stack, g); }
   drawDebris(ctx, s, g);
   drawGroundRocks(ctx, s.groundRocks, g);
-  for (const e of s.entities) if (e.kind !== 'stack') drawEntity(ctx, e, g);
+  for (const e of s.entities) {
+    if (e.kind === 'stack') continue;
+    // 예고 마커(대포·번개 큐)는 대응 신호 — 카메라와 무관하게 화면 고정으로 아래 별도 패스 (08-30, P0-4)
+    if (e.kind === 'cannon' || (e.kind === 'bolt' && e.cueTicks > 0)) continue;
+    drawEntity(ctx, e, g);
+  }
   if (s.boss) drawBoss(ctx, s.boss, g);
 
   if (s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
     drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
   }
   ctx.restore();
+
+  // 화면 고정 예고 마커 — 필드 상단, 카메라 변환 밖 (공중에서도 절대 안 사라진다)
+  for (const e of s.entities) {
+    if (e.kind === 'cannon' || (e.kind === 'bolt' && e.cueTicks > 0)) drawEntity(ctx, e, g);
+  }
 
   drawEffects(ctx);
   drawNumPopups(ctx);

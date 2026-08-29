@@ -65,6 +65,8 @@ export const SCREENS = {
     continue: '공격: 이어하기 / 필살: 타이틀',
     continueNamed: (place: string) => `${place} 격파 지점`,
     revive: (n: number, max: number) => `광고 보고 일어나기 (${n}/${max})`,
+    /** 웹(광고 미배선) — 광고를 위장하지 않는다 (08-30, P0-2) */
+    reviveFree: (n: number, max: number) => `일어나기 (${n}/${max})`,
     reviveGone: '부활 한도',
   },
 

@@ -45,6 +45,8 @@ export interface GameOverView {
   combo: number;
   canContinue: boolean;
   canRevive: boolean;
+  /** 광고 경로 실재 여부 — false(웹)면 광고 문구 없는 "일어나기" (08-30, P0-2) */
+  adRevive: boolean;
   reviveLeft: number;
   reviveMax: number;
   line: string;
@@ -105,7 +107,7 @@ export interface OverlayApi {
   showEnding(v: EndingView): void;
   showOps(opts: { unlockedChapters: number; allOpen: boolean; act2Cleared: boolean }): void;
   showMissions(daily: DailyState, achieves: MissionProgress[]): void;
-  showShop(inv: { dust: number; orbit: number }, owned: ReadonlySet<string>): void;
+  showShop(inv: { dust: number; orbit: number }, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
   showCustom(loadout: Loadout, owned: ReadonlySet<string>): void;
   hide(): void;
 }
@@ -425,7 +427,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       cont.hidden = !v.canContinue;
       const rev = $('go-revive') as HTMLButtonElement;
       rev.hidden = !v.canRevive;
-      rev.textContent = SCREENS.gameover.revive(v.reviveLeft, v.reviveMax);
+      rev.textContent = (v.adRevive ? SCREENS.gameover.revive : SCREENS.gameover.reviveFree)(v.reviveLeft, v.reviveMax);
       if (!v.canRevive) rev.textContent = SCREENS.gameover.reviveGone;
       show('gameover');
     },
@@ -444,11 +446,12 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       );
       show('missions');
     },
-    showShop(inv, owned): void {
+    showShop(inv, owned, paths): void {
       paintShop(
         $('shop-list'),
         inv,
         owned,
+        paths,
         (id) => h.onBuySku(id),
         () => h.onAdOrbit(),
         (id) => h.onUnlockOrbit(id),

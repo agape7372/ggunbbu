@@ -14,7 +14,6 @@ export type MissionTrack =
   | 'special'
   | 'survive'
   | 'ad'
-  | 'cling'
   | 'act2'
   | 'moon'
   | 'butter'
@@ -76,15 +75,6 @@ export const DAILY_POOL: readonly MissionDef[] = [
     goal: 1,
     rewardDust: 0,
     rewardOrbit: ORBIT_PER_AD,
-  },
-  {
-    id: 'cling_10',
-    kind: 'daily',
-    title: '점프 밀착 참격 10층',
-    desc: '붙어 올라가며 열 층을 벤다.',
-    goal: 10,
-    rewardDust: 20,
-    rewardOrbit: ORBIT_MISSION_BASE,
   },
   {
     id: 'destroy_8',
@@ -195,7 +185,6 @@ export const TRACK_BY_ID: Readonly<Record<string, MissionTrack>> = {
   special_1: 'special',
   survive_giwa: 'survive',
   watch_ad: 'ad',
-  cling_10: 'cling',
   first_act2: 'act2',
   moon_clear: 'moon',
   combo_100: 'combo',
@@ -285,7 +274,7 @@ export function applyJuiceToMissions(
  * 이벤트 종류 → 카운트 갱신(제자리 변이).
  * stackDestroy / special / hit·floorCollapse(combo) / adWatched
  * + moonClear / act2Enter / butterPerfect / pinEscape / revive
- * + clingSlash·jumpCling / survive·zoneSurvive / runStart(부활 런 리셋)
+ * + survive·zoneSurvive / runStart(부활 런 리셋)  (clingSlash는 08-30 cling 삭제와 함께 제거)
  */
 export function applyMissionEvent(
   daily: DailyState,
@@ -315,10 +304,6 @@ export function applyMissionEvent(
   }
   if (kind === 'adWatched') {
     addOnTrack(daily.items, 'ad', amt(event, 1));
-    return;
-  }
-  if (kind === 'clingSlash' || kind === 'jumpCling') {
-    addOnTrack(daily.items, 'cling', amt(event, 1));
     return;
   }
   if (kind === 'survive' || kind === 'zoneSurvive') {

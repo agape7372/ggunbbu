@@ -71,6 +71,7 @@ export function createApp(
   let debug = new URLSearchParams(location.search).has('debug');
   let titleTaps = 0;
   let menuIndex = 0;
+  let prevTitleGuard = false; // 타이틀 메뉴 가드 엣지 검출용 (P0-6)
   let lastBgm: BgmTrack | null = null;
   let settingsFrom: 'title' | 'pause' = 'title';
   let overlay!: OverlayApi;
@@ -174,7 +175,10 @@ export function createApp(
   }
 
   function openShop(): void {
-    overlay.showShop({ dust: save.dust, orbit: save.orbit }, ownedSet());
+    overlay.showShop({ dust: save.dust, orbit: save.orbit }, ownedSet(), {
+      iap: iap.available(),
+      ad: ads.ready(),
+    });
   }
 
   function openCustom(): void {
@@ -304,7 +308,9 @@ export function createApp(
     if (!state || scene !== 'gameover' || reviving) return;
     if (revivesUsed >= MAX_REVIVES_PER_RUN) { playSfx('uiDeny'); return; }
     reviving = true;
-    const result = await ads.showRewarded('revive');
+    // 웹(광고 미배선)은 광고 문구·대기 없이 그냥 일어난다 — 데모 정책 (08-30, P0-2)
+    const usedAd = ads.ready();
+    const result = usedAd ? await ads.showRewarded('revive') : 'ok';
     reviving = false;
     if (result !== 'ok') { playSfx('uiDeny'); return; }
     revivesUsed += 1;
@@ -312,7 +318,7 @@ export function createApp(
     const daily = ensureDaily(save.daily, Date.now());
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'revive' });
-    applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
+    if (usedAd) applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grant(save, 0, 0);
     saveSave(save);
     playSfx('uiBlip');
@@ -502,13 +508,22 @@ export function createApp(
       case 'title': {
         bgm('title');
         touch?.setPinned(false);
-        if (overlay.getScreen() !== 'title') break;
+        if (overlay.getScreen() !== 'title') { prevTitleGuard = f.guard; break; }
+        // guard는 홀드 레벨(엣지 아님) — 그대로 쓰면 메뉴가 60Hz로 돈다 (08-30, P0-6)
+        const guardEdge = f.guard && !prevTitleGuard;
+        prevTitleGuard = f.guard;
+        if (f.special && f.guard) {
+          // 디버그 해금 콤보(가드 홀드 + 필살) — 사운드 토글·메뉴 이동과 겹치지 않게 단독 처리
+          debug = true;
+          mountDebugMenu(() => state);
+          break;
+        }
         if (f.jump) {
           menuIndex = (menuIndex + MENU_LEN - 1) % MENU_LEN;
           overlay.setTitleSelected(menuIndex);
           playSfx('uiBlip');
         }
-        if (f.guard) {
+        if (guardEdge) {
           menuIndex = (menuIndex + 1) % MENU_LEN;
           overlay.setTitleSelected(menuIndex);
           playSfx('uiBlip');
@@ -521,10 +536,6 @@ export function createApp(
           playSfx('uiBlip');
         }
         if (f.attack) confirmTitle();
-        if (f.guard && f.special) {
-          debug = true;
-          mountDebugMenu(() => state);
-        }
         break;
       }
       case 'story': {
@@ -539,10 +550,9 @@ export function createApp(
         const wasMode = s.mode;
         const wasPhase = s.act2Phase;
         const wasPinned = s.player.pose === 'pinned';
-        const wasCling = s.player.cling;
         advance(s, f);
         if (debug) settleDebug(s);
-        noteMissions(s, { wasPinned, wasCling });
+        noteMissions(s, { wasPinned });
         consumeAudio(s);
         consumeEvents(s);
         handleTransitions(s, wasMode, wasPhase);
@@ -601,7 +611,7 @@ export function createApp(
     applyMissionEvent(daily, save.achieves, { kind, ...extra });
   }
 
-  function noteMissions(s: GameState, extra?: { wasPinned?: boolean; wasCling?: boolean }): void {
+  function noteMissions(s: GameState, extra?: { wasPinned?: boolean }): void {
     const daily = ensureDaily(save.daily, Date.now());
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
@@ -617,9 +627,6 @@ export function createApp(
         combo: e.combo ?? s.combo,
         zone: s.gimmick !== 'none' ? s.gimmick : undefined,
       });
-      if ((e.kind === 'hit' || e.kind === 'floorCollapse') && extra?.wasCling) {
-        applyMissionEvent(daily, save.achieves, { kind: 'clingSlash' });
-      }
       if (e.kind === 'chapterUnlock' && (e.n ?? 0) >= 2) {
         applyMissionEvent(daily, save.achieves, { kind: 'zoneSurvive', zone: 'eastasia' });
       }
@@ -690,6 +697,7 @@ export function createApp(
         combo: s.combo,
         canContinue: s.mode === 'act2' && s.checkpoint > 0,
         canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
+        adRevive: ads.ready(),
         reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
         reviveMax: MAX_REVIVES_PER_RUN,
         line: gameoverQuip(s.score + s.tick),

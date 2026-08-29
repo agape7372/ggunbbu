@@ -4,7 +4,6 @@
 
 import type { GameState, InputFrame, PlayerState } from './types';
 import { GUARD_GAUGE, PLAYER, SPECIAL } from '../config';
-import { floorSpan } from './building';
 
 export function makePlayer(): PlayerState {
   return {
@@ -14,7 +13,6 @@ export function makePlayer(): PlayerState {
     bufAttack: 0, bufJump: 0, bufGuard: 0,
     pinTick: 0,
     attackHit: false, attackFromAir: false,
-    cling: false,
   };
 }
 
@@ -120,7 +118,6 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     if (p.y <= 0) {
       p.y = 0;
       p.vy = 0;
-      p.cling = false;
       s.events.push({ kind: 'land' });
       if (p.pose === 'jump') { p.pose = 'idle'; p.poseTick = 0; }
       // [정본 재현] 공중 가드 유지 중 착지 → 지면 가드로 전이, 선딜 4f 재적용
@@ -135,51 +132,12 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
   p.poseTick = 0;
   p.attackHit = false;
   p.attackFromAir = fromAir;
-  p.cling = false;
 }
 
-/**
- * 비공격 공중 몸통 vs 층 AABB. 아래에서 겹치면 머리만 밑면에 붙이고 스택을 탄다.
- * 층 위 착지(플랫폼어)는 하지 않는다. y를 0 이하로 내리지 않는다(깔림 분기 가드).
- */
-export function clingToFloors(s: GameState): void {
-  const p = s.player;
-  if (p.pose === 'pinned' || p.pose === 'dead' || p.pose === 'special') {
-    p.cling = false;
-    return;
-  }
-  if (p.y <= 0) {
-    p.cling = false;
-    return;
-  }
-  if (attackActive(p)) {
-    p.cling = false;
-    return;
-  }
-  const stack = s.stack;
-  if (!stack || stack.floors.length === 0) {
-    p.cling = false;
-    return;
-  }
-
-  const head = p.y + PLAYER.H;
-  const slip = 10;
-  for (let i = 0; i < stack.floors.length; i++) {
-    const [bot, top] = floorSpan(stack, i);
-    if (head + slip < bot || p.y >= top) continue;
-    // 발은 층 밑보다 아래 — 위에서 내려앉아 착지하는 경로가 아님
-    if (p.y >= bot) continue;
-    const snapped = bot - PLAYER.H;
-    if (snapped <= 0) continue;
-    // 신규 밀착은 상대 상승(아래에서 들이받음)만. 라이드 중이면 중력으로 하향해 떨어져도 유지.
-    if (!p.cling && p.vy <= stack.vy) continue;
-    p.y = snapped;
-    p.vy = stack.vy;
-    p.cling = true;
-    return;
-  }
-  p.cling = false;
-}
+// ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면
+// 거의 항상 밑면에 접착돼 점프가 13px 홉으로 소멸하고(QA 실측), 같이 끌려 내려가 깔림에
+// 직행하는 구조적 자살 버튼이었다. 점프 = 제자리 회피 + 공중 무적(시각 관통 허용)이라는
+// 08-28 이전 검증 상태로 복원. 재도입하려면 docs/ROADMAP_2026-08-30.md Wave 0 근거를 먼저 뒤집을 것.
 
 function tryEnterGuard(s: GameState, airborne: boolean): void {
   const p = s.player;

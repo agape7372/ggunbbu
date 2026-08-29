@@ -216,7 +216,7 @@ export function stepEntities(s: GameState): void {
 export function tryHitAct2Targets(s: GameState): boolean {
   const p = s.player;
   const lo = p.y - 8;
-  const hi = p.y + 128;
+  const hi = p.y + ACT2.REACH; // 2막 리치 — config 승격(08-30), 수치 불변
   const px = VIEW.LANE_X[p.lane];
 
   // 1) 번개 (존 통과 중만 타격 가능)
@@ -256,7 +256,7 @@ export function tryHitAct2Targets(s: GameState): boolean {
   // 4) 보스 본체 / 드론 / 대포
   if (s.boss && tryHitBoss(s, lo, hi)) return true;
   // 5) 바닥 화산탄 더미 파밍 [정본: 반복 점수. 콤보는 플래그(기본 off)]
-  if (s.groundRocks > 0 && lo <= s.groundRocks * 40) {
+  if (s.groundRocks > 0 && lo <= s.groundRocks * ACT2.ROCK_PILE_H) {
     if (SCORE.GROUND_ROCK_COMBO) {
       registerHit(s);
     } else {

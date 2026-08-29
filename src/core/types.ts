@@ -135,8 +135,6 @@ export interface PlayerState {
   attackHit: boolean;
   /** attack 종료 후 복귀할 상태가 공중인가 */
   attackFromAir: boolean;
-  /** 층 밑면 라이드 중 — 위에서 낙하 관통과 구분 */
-  cling: boolean;
 }
 
 export type Act2Phase = 'cathedral' | 'tower' | 'bolt' | 'rock' | 'moon';
