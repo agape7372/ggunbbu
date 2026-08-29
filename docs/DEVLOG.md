@@ -357,3 +357,12 @@ null, 콘솔 에러 0, 캔버스 360×640 정상 렌더. 프로덕션(진짜 404
 - 빌드: `JAVA_HOME=D:/android-toolchain/jdk21 ./gradlew assembleDebug` → **BUILD SUCCESSFUL** (app-debug.apk 17.4MB).
 
 잔여(Wave 4): AdMob 리워드 웹측 배선(podoal ads.ts 구조), OTA 3종 이식+호스팅, keystore, 실기기 스모크, Play 콘솔.
+
+## 2026-08-30 — AdMob 리워드 배선 + 아트 프롬프트 매니페스트 정렬
+
+- `src/platform/ads.ts` 네이티브 분기: podoal 프로덕션 패턴 이식(런타임 조회·무throw·
+  show() await 금지 — 닫힘·타임아웃 경주·리스너 해제). 단위 ID는 테스트 값(짝값 표 = shell/README).
+- `docs/GROK_IMAGE_PROMPTS.md` +317줄: 매니페스트 슬롯 18키와 1:1 정렬된 JSON 프롬프트
+  (player 11프레임 시트는 frames.ts PLAYER_SHEET 순서 실검증 — 구 문서의 "필살 노랑 없음"
+  서술이 buildSpecial() 실코드와 어긋난 것도 정정). 크로마키·축소 절차·배경 상단 보강(E-1) 포함.
+- 위키·메모리 갱신: [[windows-node-fs-traps]] 신설(cpSync 무음 크래시), coding-portfolio 허브.
