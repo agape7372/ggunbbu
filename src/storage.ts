@@ -1,4 +1,6 @@
 import { SAVE_KEY } from './config';
+import { DEFAULT_LOADOUT, validateLoadout, type Loadout } from './meta/loadout';
+import { initAchieveProgress, type DailyState, type MissionProgress } from './meta/missions';
 
 export interface SaveSettings {
   sound: boolean;
@@ -18,6 +20,12 @@ export interface SaveData {
   butterTierReached: number; // 0~3 (경험한 버터바 회차)
   butterBest: Record<number, number>; // 회차별 최고점
   settings: SaveSettings;
+  dust: number;
+  orbit: number;
+  owned: string[];
+  loadout: Loadout;
+  daily: DailyState | null;
+  achieves: MissionProgress[];
 }
 
 export const DEFAULT_SAVE: SaveData = {
@@ -36,6 +44,12 @@ export const DEFAULT_SAVE: SaveData = {
     leftHanded: false,
     shakeLevel: 2,
   },
+  dust: 0,
+  orbit: 0,
+  owned: ['tenchi', 'ink', 'wire', 'flyer'],
+  loadout: { ...DEFAULT_LOADOUT },
+  daily: null,
+  achieves: initAchieveProgress(),
 };
 
 /**
@@ -97,6 +111,14 @@ export function loadSave(): SaveData {
         ? data.butterBest
         : DEFAULT_SAVE.butterBest,
       settings: validateSettings(data.settings),
+      dust: typeof data.dust === 'number' ? data.dust : 0,
+      orbit: typeof data.orbit === 'number' ? data.orbit : 0,
+      owned: Array.isArray(data.owned)
+        ? data.owned.filter((x): x is string => typeof x === 'string')
+        : [...DEFAULT_SAVE.owned],
+      loadout: validateLoadout(data.loadout),
+      daily: isDailyState(data.daily) ? data.daily : null,
+      achieves: Array.isArray(data.achieves) ? data.achieves.filter(isProgress) : initAchieveProgress(),
     };
 
     return result;
@@ -104,6 +126,18 @@ export function loadSave(): SaveData {
     // JSON 파싱 실패 또는 기타 예외
     return structuredClone(DEFAULT_SAVE);
   }
+}
+
+function isProgress(v: unknown): v is MissionProgress {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.id === 'string' && typeof o.count === 'number' && typeof o.claimed === 'boolean';
+}
+
+function isDailyState(v: unknown): v is DailyState {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.dateKey === 'string' && Array.isArray(o.items) && o.items.every(isProgress);
 }
 
 /**

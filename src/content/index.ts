@@ -13,12 +13,16 @@ import {
   BOSS_NAME,
   CHECKPOINT_LABEL,
   checkpointLabel,
+  GIMMICK_ZONES,
+  gimmickZoneOf,
   HERO,
+  OPERATIONS,
   REGIONS,
   regionOf,
   TAGLINE,
   TITLE,
   TITLE_EN,
+  WAZA_COPY,
 } from './world';
 import {
   butterChallengeEnd,
@@ -44,7 +48,10 @@ export {
   ENDING_LINES,
   GAMEOVER_QUIPS,
   gameoverQuip,
+  GIMMICK_ZONES,
+  gimmickZoneOf,
   HERO,
+  OPERATIONS,
   ONOMATO,
   onomatoFor,
   REGIONS,
@@ -53,6 +60,7 @@ export {
   TAGLINE,
   TITLE,
   TITLE_EN,
+  WAZA_COPY,
 };
 
 /** scenes.ts 가 쓰던 형태. 줄만 교체되고 키는 동일. */

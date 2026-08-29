@@ -5,6 +5,13 @@ import type { SaveData, SaveSettings } from '../storage';
 import { SCREENS, TAGLINE, TITLE, TITLE_EN } from '../content';
 import { fillGallery } from './gallery';
 import { SHAKE_LABEL } from './settings';
+import { isDevUnlocked } from '../platform/devUnlock';
+import { paintOps } from './opsView';
+import { paintMissions } from './missionView';
+import { paintShop } from './shopView';
+import { paintCustom } from './customView';
+import { ACHIEVES, DAILY_POOL } from '../meta';
+import type { DailyState, Loadout, MissionProgress } from '../meta/types';
 
 export type OverlayScreen =
   | 'none'
@@ -15,7 +22,11 @@ export type OverlayScreen =
   | 'settings'
   | 'butter'
   | 'gameover'
-  | 'ending';
+  | 'ending'
+  | 'ops'
+  | 'missions'
+  | 'shop'
+  | 'custom';
 
 export interface TitleView {
   selected: number;
@@ -33,6 +44,9 @@ export interface GameOverView {
   score: number;
   combo: number;
   canContinue: boolean;
+  canRevive: boolean;
+  reviveLeft: number;
+  reviveMax: number;
   line: string;
 }
 
@@ -62,8 +76,20 @@ export interface OverlayHandlers {
   onGameOverContinue(): void;
   onGameOverRetry(): void;
   onGameOverTitle(): void;
+  onGameOverRevive(): void;
   onEndingDone(): void;
   onLogoTap(): void;
+  onOpsPick(id: string): void;
+  onOpenOps(): void;
+  onOpenMissions(): void;
+  onOpenShop(): void;
+  onOpenCustom(): void;
+  onMetaBack(): void;
+  onClaimMission(id: string, boost: boolean): void;
+  onBuySku(id: string): void;
+  onAdOrbit(): void;
+  onUnlockOrbit(id: string): void;
+  onEquip(slot: string, id: string): void;
 }
 
 export interface OverlayApi {
@@ -77,8 +103,16 @@ export interface OverlayApi {
   showButterPick(tier: number): void;
   showGameOver(v: GameOverView): void;
   showEnding(v: EndingView): void;
+  showOps(opts: { unlockedChapters: number; allOpen: boolean; act2Cleared: boolean }): void;
+  showMissions(daily: DailyState, achieves: MissionProgress[]): void;
+  showShop(inv: { dust: number; orbit: number }, owned: ReadonlySet<string>): void;
+  showCustom(loadout: Loadout, owned: ReadonlySet<string>): void;
   hide(): void;
 }
+
+const TAB_SCREENS: ReadonlySet<OverlayScreen> = new Set([
+  'title', 'ops', 'missions', 'shop', 'custom', 'settings', 'butter',
+]);
 
 export function ensureOverlayLayer(): HTMLElement {
   let el = document.getElementById('overlay-layer');
@@ -99,7 +133,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <p class="ov-boot-cta blink">탭하여 시작</p>
     </div>
 
-    <div class="ov-screen ov-title" data-screen="title" hidden>
+    <div class="ov-screen ov-title ov-has-tabs" data-screen="title" hidden>
       <h1 class="ov-logo" data-act="logo">건뿌<span>!!</span></h1>
       <p class="ov-logo-en">${TITLE_EN}</p>
       <p class="ov-tag">${TAGLINE}</p>
@@ -107,7 +141,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         <button type="button" class="flyer-btn primary selected" data-act="arcade">${SCREENS.menu.arcade}</button>
         <button type="button" class="flyer-btn" data-act="tokoton" data-el="tokoton">토코톤 — 잠김</button>
         <button type="button" class="flyer-btn" data-act="butter" data-el="butter">버터바 챌린지 — 아직</button>
-        <button type="button" class="flyer-btn" data-act="settings">취급설명서</button>
+        <button type="button" class="flyer-btn" data-act="ops">${SCREENS.menu.ops}</button>
       </div>
       <div class="ov-records">
         <p class="ov-records-h">${SCREENS.title.records}</p>
@@ -133,7 +167,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       </div>
     </div>
 
-    <div class="ov-screen ov-dim ov-settings" data-screen="settings" hidden>
+    <div class="ov-screen ov-dim ov-settings ov-has-tabs" data-screen="settings" hidden>
       <div class="ui-card ui-card-manual">
         <h2>취급설명서</h2>
         <p class="ov-manual-lead">본 기기는 하늘에서 떨어지는 건물을 부수는 가정용 철거기입니다. 전원 투입 전 아래를 확인하십시오.</p>
@@ -146,7 +180,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       </div>
     </div>
 
-    <div class="ov-screen ov-dim ov-butter" data-screen="butter" hidden>
+    <div class="ov-screen ov-dim ov-butter ov-has-tabs" data-screen="butter" hidden>
       <div class="ui-card">
         <h2>버터바 챌린지</h2>
         <p class="ov-manual-lead">경험한 회차만 다시 부술 수 있습니다.</p>
@@ -160,9 +194,38 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         <h2>${SCREENS.gameover.title}</h2>
         <p class="ov-over-line" data-el="over-line"></p>
         <p class="ov-over-score" data-el="over-score"></p>
-        <button type="button" class="flyer-btn primary" data-act="go-continue" data-el="go-continue">이어하기</button>
+        <button type="button" class="flyer-btn primary" data-act="go-revive" data-el="go-revive">광고 보고 일어나기</button>
+        <button type="button" class="flyer-btn" data-act="go-continue" data-el="go-continue">이어하기</button>
         <button type="button" class="flyer-btn" data-act="go-retry">한 판 더</button>
         <button type="button" class="flyer-btn" data-act="go-title">타이틀로</button>
+      </div>
+    </div>
+
+    <div class="ov-screen ov-dim ov-has-tabs" data-screen="ops" hidden>
+      <div class="ui-card ui-card-manual">
+        <div data-el="ops-list"></div>
+        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
+      </div>
+    </div>
+
+    <div class="ov-screen ov-dim ov-has-tabs" data-screen="missions" hidden>
+      <div class="ui-card ui-card-manual">
+        <div data-el="mission-list"></div>
+        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
+      </div>
+    </div>
+
+    <div class="ov-screen ov-dim ov-has-tabs" data-screen="shop" hidden>
+      <div class="ui-card ui-card-manual">
+        <div data-el="shop-list"></div>
+        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
+      </div>
+    </div>
+
+    <div class="ov-screen ov-dim ov-has-tabs" data-screen="custom" hidden>
+      <div class="ui-card ui-card-manual">
+        <div data-el="custom-list"></div>
+        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
       </div>
     </div>
 
@@ -173,25 +236,46 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <p class="ov-end-note" data-el="end-note"></p>
       <p class="ov-hint blink">탭하면 타이틀로</p>
     </div>
+
+    <nav class="ov-tabs" data-el="tabs" hidden>
+      <button type="button" class="ov-tab" data-act="tab-play" data-tab="title">${SCREENS.tabs.play}</button>
+      <button type="button" class="ov-tab" data-act="tab-missions" data-tab="missions">${SCREENS.tabs.missions}</button>
+      <button type="button" class="ov-tab" data-act="tab-custom" data-tab="custom">${SCREENS.tabs.custom}</button>
+      <button type="button" class="ov-tab" data-act="tab-shop" data-tab="shop">${SCREENS.tabs.shop}</button>
+      <button type="button" class="ov-tab" data-act="tab-more" data-tab="settings">${SCREENS.tabs.more}</button>
+    </nav>
   `;
 
   let screen: OverlayScreen = 'none';
   let settings: SaveSettings | null = null;
   let titleView: TitleView | null = null;
+  let opsOpts = { unlockedChapters: 0, allOpen: false, act2Cleared: false };
 
   const $ = (name: string): HTMLElement => root.querySelector(`[data-el="${name}"]`) as HTMLElement;
+
+  function paintTabs(name: OverlayScreen): void {
+    const tabs = $('tabs');
+    const show = TAB_SCREENS.has(name);
+    tabs.hidden = !show;
+    const key = name === 'ops' || name === 'butter' ? 'title' : name;
+    tabs.querySelectorAll<HTMLButtonElement>('.ov-tab').forEach((btn) => {
+      btn.classList.toggle('on', btn.getAttribute('data-tab') === key);
+    });
+  }
 
   function show(name: OverlayScreen): void {
     screen = name;
     if (name === 'none') {
       root.classList.remove('is-open');
       root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => { el.hidden = true; });
+      paintTabs(name);
       return;
     }
     root.classList.add('is-open');
     root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => {
       el.hidden = el.getAttribute('data-screen') !== name;
     });
+    paintTabs(name);
   }
 
   function paintTitle(v: TitleView): void {
@@ -216,7 +300,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
   function setTitleSelected(index: number): void {
     if (titleView) titleView.selected = index;
-    const acts = ['arcade', 'tokoton', 'butter', 'settings'];
+    const acts = ['arcade', 'tokoton', 'butter', 'ops'];
     root.querySelectorAll('.ov-menu .flyer-btn').forEach((btn) => {
       btn.classList.toggle('selected', btn.getAttribute('data-act') === acts[index]);
     });
@@ -292,15 +376,32 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'butter-2': h.onButterRound(2); break;
       case 'butter-3': h.onButterRound(3); break;
       case 'butter-back': h.onButterBack(); break;
+      case 'ops': h.onOpenOps(); break;
+      case 'missions': h.onOpenMissions(); break;
+      case 'shop': h.onOpenShop(); break;
+      case 'custom': h.onOpenCustom(); break;
+      case 'meta-back': h.onMetaBack(); break;
+      case 'go-revive': h.onGameOverRevive(); break;
       case 'go-continue': h.onGameOverContinue(); break;
       case 'go-retry': h.onGameOverRetry(); break;
       case 'go-title': h.onGameOverTitle(); break;
       case 'ending': h.onEndingDone(); break;
-      default: break;
+      case 'tab-play': h.onMetaBack(); break;
+      case 'tab-missions': h.onOpenMissions(); break;
+      case 'tab-custom': h.onOpenCustom(); break;
+      case 'tab-shop': h.onOpenShop(); break;
+      case 'tab-more': h.onOpenSettings(); break;
+      default:
+        break;
     }
   });
 
-  return {
+  function showOpsPanel(): void {
+    paintOps($('ops-list'), opsOpts, (id) => h.onOpsPick(id));
+    show('ops');
+  }
+
+  const api: OverlayApi = {
     getScreen: () => screen,
     showBoot(): void { show('boot'); },
     showTitle(v: TitleView): void { paintTitle(v); show('title'); },
@@ -322,7 +423,41 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       $('over-score').textContent = SCREENS.result.overScore(v.score, v.combo);
       const cont = $('go-continue') as HTMLButtonElement;
       cont.hidden = !v.canContinue;
+      const rev = $('go-revive') as HTMLButtonElement;
+      rev.hidden = !v.canRevive;
+      rev.textContent = SCREENS.gameover.revive(v.reviveLeft, v.reviveMax);
+      if (!v.canRevive) rev.textContent = SCREENS.gameover.reviveGone;
       show('gameover');
+    },
+    showOps(opts): void {
+      opsOpts = opts;
+      showOpsPanel();
+    },
+    showMissions(daily, achieves): void {
+      paintMissions(
+        $('mission-list'),
+        daily,
+        DAILY_POOL,
+        achieves,
+        ACHIEVES,
+        (id, boost) => h.onClaimMission(id, boost),
+      );
+      show('missions');
+    },
+    showShop(inv, owned): void {
+      paintShop(
+        $('shop-list'),
+        inv,
+        owned,
+        (id) => h.onBuySku(id),
+        () => h.onAdOrbit(),
+        (id) => h.onUnlockOrbit(id),
+      );
+      show('shop');
+    },
+    showCustom(loadout, owned): void {
+      paintCustom($('custom-list'), loadout, owned, (slot, id) => h.onEquip(slot, id));
+      show('custom');
     },
     showEnding(v: EndingView): void {
       $('end-score').textContent = SCREENS.result.endScore(v.score, v.maxCombo);
@@ -333,6 +468,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     },
     hide(): void { show('none'); },
   };
+
+  return api;
 }
 
 function escapeHtml(s: string): string {
@@ -341,15 +478,16 @@ function escapeHtml(s: string): string {
   ));
 }
 
-export function titleViewFromSave(save: SaveData, selected: number): TitleView {
+export function titleViewFromSave(save: SaveData, selected: number, debugOpen = false): TitleView {
+  const unlocked = debugOpen || isDevUnlocked();
   return {
     selected,
-    tokotonOpen: save.act2Cleared,
-    butterTier: save.butterTierReached,
+    tokotonOpen: unlocked || save.act2Cleared,
+    butterTier: unlocked ? Math.max(3, save.butterTierReached) : save.butterTierReached,
     bestArcade: save.bestArcade,
     bestTokoton: save.bestTokoton,
     maxCombo: save.maxCombo,
-    unlockedChapters: save.unlockedChapters,
+    unlockedChapters: unlocked ? 3 : save.unlockedChapters,
     buddhaMode: save.buddhaMode,
     soundOn: save.settings.sound,
   };

@@ -44,6 +44,12 @@ const pool: Particle[] = Array.from({ length: POOL }, blank);
 let allocAt = 0;
 let live = 0;
 let fxSeed = 1;
+/** 렌더 카메라. spawnFromEvent가 월드 좌표를 화면으로 바꿀 때 더한다. */
+let fxCamY = 0;
+
+export function setFxCamY(y: number): void {
+  fxCamY = y;
+}
 
 function n01(): number {
   fxSeed = (Math.imul(fxSeed, 1103515245) + 12345) & 0x7fffffff;
@@ -204,10 +210,28 @@ function burst(kind: string, x: number, y: number, count: number, mat?: string):
     case 'butterCollapse':
       cream(x, y, count);
       return;
-    case 'special':
-      fill('ring', x, y, 0, 0, 0, 0.28, 14, PALETTE.YELLOW);
-      radial(x, y, Math.max(0, count - 1), PALETTE.INK);
+    case 'special': {
+      fill('ring', x, y, 0, 0, 90, 0.28, 36, PALETTE.YELLOW);
+      fill('ring', x, y, 0, 0, 160, 0.40, 72, PALETTE.YELLOW);
+      fill('ring', x, y, 0, 0, 240, 0.55, 110, PALETTE.YELLOW);
+      radial(x, y, count, PALETTE.INK);
+      sparks(x, y, Math.max(12, count >> 1), PALETTE.YELLOW, 280, 240);
+      const slashN = 8 + Math.min(4, (count / 12) | 0);
+      for (let i = 0; i < slashN; i++) {
+        const u = slashN <= 1 ? 0.5 : i / (slashN - 1);
+        fill(
+          'spark',
+          x - 40 + u * 90, y + 80 + u * -200,
+          720 + n01() * 80, -1600 - n01() * 120,
+          0,
+          0.16 + n01() * 0.10,
+          20 + n01() * 8,
+          PALETTE.YELLOW,
+        );
+      }
+      shards(x, y, 8 + (count / 8 | 0), mat, 1.9);
       return;
+    }
     case 'hurt':
       dust(x, y, count);
       return;
@@ -294,10 +318,16 @@ export function updateEffects(dt: number): void {
  */
 export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   const x = VIEW.LANE_X[e.lane ?? s.player.lane];
-  const y = VIEW.GROUND_Y - (e.y ?? s.player.y);
+  const y = VIEW.GROUND_Y - (e.y ?? s.player.y) + fxCamY;
   if (e.kind === 'slash') {
     fill('spark', x + 10, y - 28, 90, -50, 0, 0.14, 16, PALETTE.YELLOW);
     fill('spark', x + 4, y - 18, 40, -80, 0, 0.12, 12, PALETTE.YELLOW);
+    return;
+  }
+  if (e.kind === 'special') {
+    const n = JUICE.special?.particles ?? 0;
+    spawnHitParticles('special', x, y, n, e.mat);
+    spawnHitParticles('special', VIEW.W / 2, VIEW.FIELD_H / 2, n, e.mat);
     return;
   }
   spawnHitParticles(e.kind, x, y, JUICE[e.kind]?.particles ?? 0, e.mat);
@@ -324,8 +354,9 @@ export function drawEffects(ctx: CanvasRenderingContext2D): void {
     switch (p.style) {
       case 'spark': {
         const ang = Math.atan2(p.vy, p.vx);
-        const len = p.size + Math.hypot(p.vx, p.vy) * 0.018;
-        ctx.lineWidth = 1.4;
+        const slash = p.size > 16;
+        const len = p.size + Math.hypot(p.vx, p.vy) * (slash ? 0.06 : 0.018);
+        ctx.lineWidth = slash ? 2.6 : 1.4;
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(p.x - Math.cos(ang) * len, p.y - Math.sin(ang) * len);
@@ -358,7 +389,7 @@ export function drawEffects(ctx: CanvasRenderingContext2D): void {
         ctx.globalAlpha = t;
         ctx.lineWidth = 2.4 * t;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size + k * 52, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.size + k * (p.g > 0 ? p.g : 52), 0, Math.PI * 2);
         ctx.stroke();
         break;
       }

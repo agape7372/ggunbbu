@@ -10,7 +10,7 @@
 
 import type { GameState, Lane } from './types';
 import { damageStack } from './building';
-import { GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK } from '../config';
+import { GIMMICK, GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK } from '../config';
 import { VIEW } from '../config';
 import { rand } from './rng';
 
@@ -114,7 +114,9 @@ export function destroyStack(s: GameState): void {
     addScore(s, SCORE.DESTROY_BONUS);
   }
   s.stack = null;
-  s.stackSpawnCd = STACK.RESPAWN_TICKS;
+  s.stackSpawnCd = s.gimmick === 'night'
+    ? Math.max(12, Math.floor(STACK.RESPAWN_TICKS * GIMMICK.NIGHT_RESPAWN_MUL))
+    : STACK.RESPAWN_TICKS;
 }
 
 /**
@@ -131,7 +133,7 @@ export function tryGuardBounce(
   const prev = prevStackY ?? stack.y;
   if (guardActive === 'ground') {
     if (stack.y <= STACK.GUARD_ZONE_GROUND) {
-      stack.vy = STACK.GUARD_GROUND_V;
+      stack.vy = STACK.GUARD_GROUND_V * (s.gimmick === 'ice' ? GIMMICK.ICE_BOUNCE_GROUND : 1);
       stack.resting = false;
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_GROUND);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
@@ -143,7 +145,7 @@ export function tryGuardBounce(
     const plane = footY + PLAYER.H;
     const crossed = prev >= plane - STACK.GUARD_ZONE_AIR && stack.y <= plane + STACK.GUARD_ZONE_AIR;
     if (crossed || Math.abs(stack.y - plane) <= STACK.GUARD_ZONE_AIR) {
-      stack.vy = STACK.GUARD_AIR_V;
+      stack.vy = STACK.GUARD_AIR_V * (s.gimmick === 'ice' ? GIMMICK.ICE_BOUNCE_AIR : 1);
       stack.resting = false;
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_AIR);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;

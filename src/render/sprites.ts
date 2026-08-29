@@ -476,21 +476,27 @@ function buildGuardBreak(): PFrame {
 
 function buildSpecial(): PFrame {
   const { cv, c } = mkCanvas(WIDE_W, WIDE_H);
-  circle(c, WCX, HEAD_Y, HEAD_R);
-  stroke(c, [[WCX, HEAD_Y + HEAD_R], [WCX, HIP_Y]]);
-  stroke(c, [[WCX, HIP_Y], [WCX - 8, FOOT_Y]]);
-  stroke(c, [[WCX, HIP_Y], [WCX + 8, FOOT_Y]]);
-  stroke(c, [[WCX, SHOULDER_Y], [WCX - 6, 10]]);
-  stroke(c, [[WCX, SHOULDER_Y], [WCX + 6, 10]]);
-  weapon(c, WCX, 10, WCX, 0);                                // 두 손으로 칼을 머리 위에 세워 듦
-  const burstCx = WCX, burstCy = 28, r1 = 15, r2 = 20;        // 기 모으는 방사선 6개
-  for (const deg of [0, 60, 120, 180, 240, 300]) {
-    const rad = (deg * Math.PI) / 180;
-    stroke(c, [
-      [burstCx + Math.cos(rad) * r1, burstCy + Math.sin(rad) * r1],
-      [burstCx + Math.cos(rad) * r2, burstCy + Math.sin(rad) * r2],
-    ]);
-  }
+  // 화면을 가르는 대각 참격 — 양손 칼, 깊은 런지 팔로우스루
+  circle(c, WCX + 10, HEAD_Y + 5, HEAD_R);
+  stroke(c, [[WCX + 10, HEAD_Y + 5 + HEAD_R], [WCX + 2, HIP_Y + 4]]);
+  stroke(c, [[WCX + 2, HIP_Y + 4], [WCX + 14, 52], [WCX + 18, FOOT_Y]]); // 앞다리(굽힘)
+  stroke(c, [[WCX + 2, HIP_Y + 4], [WCX - 8, 50], [WCX - 18, FOOT_Y - 4]]); // 뒷다리(뻗음)
+  stroke(c, [[WCX + 6, SHOULDER_Y + 4], [WCX + 16, 38]]);               // 양손 칼자루
+  stroke(c, [[WCX + 6, SHOULDER_Y + 4], [WCX + 20, 42]]);
+  weapon(c, WCX + 20, 42, 58, 55);
+  c.strokeStyle = ARC;
+  c.lineWidth = 4;
+  c.lineCap = 'round';
+  c.globalAlpha = 0.35;
+  c.beginPath();
+  c.moveTo(6, 2);
+  c.quadraticCurveTo(42, 8, 60, 48);
+  c.stroke();
+  c.globalAlpha = 1;
+  c.beginPath();
+  c.moveTo(2, 8);
+  c.quadraticCurveTo(36, 18, 58, 55);
+  c.stroke();
   return { cv, ax: WCX, ay: FOOT_Y };
 }
 

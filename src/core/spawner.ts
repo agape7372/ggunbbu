@@ -3,7 +3,7 @@
 import type { Floor, GameState, Material, Theme } from './types';
 import { makeFloor, makeStack } from './building';
 import { rand } from './rng';
-import { ACT1 } from '../config';
+import { ACT1, GIMMICK } from '../config';
 
 /** p 구간 선형 보간으로 재질 분포 [weak, mid, hard] */
 export function matDist(p: number): [number, number, number] {
@@ -52,8 +52,14 @@ export function spawnAct1Building(s: GameState): void {
     }
     floors.push(f);
   }
-  // 접근 데드타임 절감: 스폰 시 초기 낙하속도 부여 (아키텍처 명세 반영)
-  s.stack = makeStack({ variant: 'building', theme, floors, vy: -70 });
+  if (s.gimmick === 'glass') {
+    for (let i = 0; i < floors.length; i += GIMMICK.GLASS_EVERY) {
+      floors[i].mat = 'weak';
+      floors[i].segs[0] = { hp: 1, maxHp: 1 };
+    }
+  }
+  const fall = s.gimmick === 'orbit' ? GIMMICK.ORBIT_SPAWN_VY : GIMMICK.DEFAULT_SPAWN_VY;
+  s.stack = makeStack({ variant: 'building', theme, floors, vy: fall });
 }
 
 function pickMat(s: GameState, dist: [number, number, number]): Material {

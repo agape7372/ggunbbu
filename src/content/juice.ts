@@ -8,6 +8,8 @@ export const ONOMATO = {
   stackDestroy: '쾅!!',
   butterCollapse: '팟!',
   special: '천지개벽!!!',
+  specialAgeba: '올려베기!!',
+  specialTetsu: '철벽!!',
   bossDefeat: '작전성공',
   guardAirBounce: '탁!',
 } as const;
@@ -30,6 +32,8 @@ export function onomatoFor(kind: string, combo: number): string | null {
     case 'stackDestroy': return ONOMATO.stackDestroy;
     case 'butterCollapse': return ONOMATO.butterCollapse;
     case 'special': return ONOMATO.special;
+    case 'specialAgeba': return ONOMATO.specialAgeba;
+    case 'specialTetsu': return ONOMATO.specialTetsu;
     case 'bossDefeat': return ONOMATO.bossDefeat;
     case 'guardAirBounce': return ONOMATO.guardAirBounce;
     default: return null;

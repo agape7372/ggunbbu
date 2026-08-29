@@ -155,6 +155,55 @@ export function mountDebugMenu(getState: () => GameState | null): void {
   mk('버터2', withState((s) => enterBonus(s, 2)));
   mk('버터3', withState((s) => enterBonus(s, 3)));
 
+  mk('전해금', () => {
+    const sv = loadSave();
+    sv.unlockedChapters = 3;
+    sv.act2Cleared = true;
+    sv.butterTierReached = 3;
+    sv.owned = ['tenchi', 'ageba', 'tetsu', 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit'];
+    sv.dust = Math.max(sv.dust, 999);
+    sv.orbit = Math.max(sv.orbit, 999);
+    saveSave(sv);
+    try { localStorage.setItem('gunbbu.devUnlock', '1'); } catch {}
+    paintStatus();
+  });
+
+  (
+    [
+      ['1구역', 0, 0, 0],
+      ['2구역', 1, 0.25, 2_500_000],
+      ['3구역', 2, 0.5, 5_000_000],
+      ['4구역', 3, 0.75, 7_500_000],
+    ] as const
+  ).forEach(([label, chapter, p, score]) => {
+    mk(label, withState((s) => {
+      s.mode = 'act1';
+      s.chapter = chapter;
+      s.p = p;
+      s.score = score;
+      s.act2Phase = null;
+      s.boss = null;
+      s.stack = null;
+      s.over = null;
+      s.player.pose = 'idle';
+      s.player.y = 0;
+    }));
+  });
+
+  (
+    [
+      ['유리', 'glass', 0],
+      ['빙결', 'ice', 1],
+      ['야간', 'night', 2],
+      ['궤도', 'orbit', 3],
+    ] as const
+  ).forEach(([label, gimmick, chapter]) => {
+    mk(label, withState((s) => {
+      s.chapter = chapter;
+      s.gimmick = gimmick;
+    }));
+  });
+
   const mulBtn = mk('점수×1', () => {
     cycleScoreMul();
     mulBtn.textContent = `점수×${runtime.scoreMul}`;
@@ -260,5 +309,5 @@ function paintStatus(): void {
   const seed = runtime.seedLock == null ? '자유' : String(runtime.seedLock);
   statusEl.textContent =
     `×${runtime.scoreMul}  무적${runtime.invincible ? 'ON' : 'OFF'}  낙하×${runtime.fallMul}  시드:${seed}`;
-  statusEl.textContent += '  (1-5페이즈 6버터 M배율 U무적 F낙하)';
+  statusEl.textContent += '  (1-5페이즈 6버터 M배율 U무적 F낙하 전해금 구역)';
 }
