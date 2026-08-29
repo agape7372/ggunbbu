@@ -46,10 +46,11 @@ describe('render pipeline', () => {
   });
 
   it('missing PNG assets fall back instead of throwing', () => {
-    expect(hasAsset('player')).toBe(false);
+    // ★08-30: 'player' 부재 단언 제거 — 실PNG를 넣는 순간(Wave 3) 테스트가 깨지던 함정.
+    // 폴백 계약은 "미등록/미로드 키는 false"이며 특정 키의 부재는 계약이 아니다.
     expect(hasAsset('no-such-key')).toBe(false);
     const ctx = { drawImage() { throw new Error('should not draw'); } } as unknown as CanvasRenderingContext2D;
-    expect(drawAsset(ctx, 'player', 0, 0)).toBe(false);
+    expect(drawAsset(ctx, 'no-such-key', 0, 0)).toBe(false);
     expect(drawAsset(ctx, 'bg-missing', 0, 0)).toBe(false);
   });
 });

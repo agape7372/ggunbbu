@@ -10,6 +10,7 @@ import {
 } from './sprites';
 import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
+import { vibrate } from '../platform/native';
 import { drawEffects, resetEffects, setFxCamY, setSlashColor, spawnFromEvent, tickEffects } from './effects';
 
 let trauma = 0;
@@ -110,14 +111,14 @@ export function consumeEvents(s: GameState): void {
       });
     }
     // 진동 (연타 스로틀)
-    if (vibrationOn && 'vibrate' in navigator) {
+    if (vibrationOn) {
       const pat = (HAPTIC as unknown as Record<string, number | readonly number[] | undefined>)[e.kind];
       if (pat !== undefined) {
         if (e.kind === 'hit') {
           hitHapticCount += 1;
           if (hitHapticCount % HAPTIC.HIT_THROTTLE !== 0) continue;
         }
-        try { navigator.vibrate(pat as number | number[]); } catch { /* 미지원 무시 */ }
+        vibrate(pat as number | readonly number[]); // 네이티브=Haptics, 웹=navigator.vibrate (throw 없음)
       }
     }
   }

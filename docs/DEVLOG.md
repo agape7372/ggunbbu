@@ -335,3 +335,25 @@ null, 콘솔 에러 0, 캔버스 360×640 정상 렌더. 프로덕션(진짜 404
 - **저장 전멸 지뢰 제거**: `v!==1 → 전체 초기화`를 levain 사다리(parse→migrate→validateAndClamp)로 교체. 미래 버전·v 부재도 필드 복구, 숫자는 clamp(버리지 않음). "무버전 추가 키" 규칙 주석 이식. storage.test 5종 신설(미래 v 생존 포함).
 
 검증: tsc 클린 / **107 테스트 green** / vite build 성공.
+
+## 2026-08-30 — Wave 3 착수 + Wave 4 셸 스캐폴드 (디버그 APK green)
+
+**Wave 3 (아트 파이프라인):**
+- 미참조 skyline 배경 4장 제거(dist 4.5MB 절감). act2.png(=europe-skyline 중복)·bonus.png(=modern 중복)는 참조 중이라 유지 — Wave 3 아트 재생성이 교체 예정.
+- `render-pipeline.test.ts`의 `hasAsset('player')===false` 단언 제거 — 실PNG 투입 시 깨지던 함정 해제.
+- GROK_IMAGE_PROMPTS.md 매니페스트 슬롯 정렬 섹션(위임 작성).
+
+**Wave 4 (앱 승격) — 셸 스캐폴드 완료, 디버그 APK 빌드 성공:**
+- `shell/` 별도 패키지(Capacitor 8) — 루트 런타임 의존성 0 불변. levain 정본 이식:
+  capacitor.config.ts(로컬 번들·Capgo 차단·notifyAppReady 타임아웃), build.gradle 서명 블록,
+  `android.overridePathCheck=true`(한글 경로), local.properties(D:/android-toolchain/sdk).
+- AdMob APPLICATION_ID meta-data 선삽입(★없으면 기동 크래시 — 현재 Google 테스트 ID, 제출 전 교체).
+- ★신규 함정 실측: **이 환경에서 `cpSync(recursive)`가 무음 크래시(exit 127, 메시지 0)** —
+  levain의 rmSync 함정과 같은 계열. copy-dist.mjs는 수동 재귀 복사 + 파일 수 검사로 작성.
+- `src/platform/native.ts` 신설 — `window.Capacitor.Plugins` 런타임 조회만(정적/동적 import 금지).
+  notifyAppReady(OTA 롤백 방지)·vibrate(Haptics 폴백)·onLifecycle(이중 발화 dedupe).
+  main.ts(visibilitychange 대체)·renderer(진동)에 배선.
+- docs/RELEASE.md — levain 절차서 각색 이식(OTA 호스팅 TBD).
+- 빌드: `JAVA_HOME=D:/android-toolchain/jdk21 ./gradlew assembleDebug` → **BUILD SUCCESSFUL** (app-debug.apk 17.4MB).
+
+잔여(Wave 4): AdMob 리워드 웹측 배선(podoal ads.ts 구조), OTA 3종 이식+호스팅, keystore, 실기기 스모크, Play 콘솔.

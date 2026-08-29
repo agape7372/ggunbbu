@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">건뿌</string>
+    <string name="title_activity_main">건뿌</string>
+    <string name="package_name">com.zaballgam.gunbbu</string>
+    <string name="custom_url_scheme">com.zaballgam.gunbbu</string>
+</resources>

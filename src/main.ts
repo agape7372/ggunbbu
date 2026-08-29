@@ -7,6 +7,7 @@ import { createApp, mountDebugPanel } from './ui/scenes';
 import { preloadAssets } from './render/assets';
 import { loadSave } from './storage';
 import { mountInstallPrompt } from './ui/installPrompt';
+import { notifyAppReady, onLifecycle } from './platform/native';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -62,9 +63,13 @@ function frame(now: number): void {
 }
 requestAnimationFrame(frame);
 
-document.addEventListener('visibilitychange', () => {
-  paused = document.hidden;
+// 전경/배경 — 웹 visibilitychange + 네이티브 appStateChange 통합 (이중 발화 1회 dedupe)
+onLifecycle((fg) => {
+  paused = !fg;
 });
+
+// 네이티브 셸: OTA 롤백 방지 신호 — 부팅 즉시 1회, 웹에선 무해 no-op
+notifyAppReady();
 
 // SW 등록 (프로덕션만)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
