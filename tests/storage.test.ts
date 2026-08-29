@@ -53,3 +53,21 @@ describe('저장 마이그레이션 사다리', () => {
     expect(loadSave().bestArcade).toBe(0);
   });
 });
+
+describe('butterBest 항목별 구제 (08-30 검증 후속)', () => {
+  it('항목 하나 손상돼도 나머지 회차 기록은 산다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, butterBest: { 1: 5000, 2: null, 3: 7000 } }));
+    const d = loadSave();
+    expect(d.butterBest[1]).toBe(5000);
+    expect(d.butterBest[3]).toBe(7000);
+    expect(d.butterBest[2]).toBeUndefined();
+  });
+
+  it('거대·음수 값은 clamp, 회차 밖 키는 버림', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, butterBest: { 1: -5, 2: 1e300, 9: 100 } }));
+    const d = loadSave();
+    expect(d.butterBest[1]).toBe(0);
+    expect(d.butterBest[2]).toBe(99_999_999);
+    expect(d.butterBest[9 as never]).toBeUndefined();
+  });
+});

@@ -12,6 +12,10 @@ import { notifyAppReady, onLifecycle } from './platform/native';
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
+// 네이티브 셸: OTA 롤백 방지 신호 — ★모듈 최상단에서 즉시(08-30 검증: preloadAssets 뒤에 두면
+// Wave 3 실PNG 투입 시 appReadyTimeout 10s를 잠식하고, 상류 throw에 신호가 유실돼 롤백 루프).
+notifyAppReady();
+
 // dpr ≤2 클램프 + 픽셀아트 설정
 function setupCanvas(): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -67,9 +71,6 @@ requestAnimationFrame(frame);
 onLifecycle((fg) => {
   paused = !fg;
 });
-
-// 네이티브 셸: OTA 롤백 방지 신호 — 부팅 즉시 1회, 웹에선 무해 no-op
-notifyAppReady();
 
 // SW 등록 (프로덕션만)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

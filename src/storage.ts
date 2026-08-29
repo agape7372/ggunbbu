@@ -97,9 +97,7 @@ export function loadSave(): SaveData {
           : DEFAULT_SAVE.buddhaMode,
       unlockedChapters: num(data.unlockedChapters, DEFAULT_SAVE.unlockedChapters, 3),
       butterTierReached: num(data.butterTierReached, DEFAULT_SAVE.butterTierReached, 3),
-      butterBest: isRecordNumberNumber(data.butterBest)
-        ? data.butterBest
-        : DEFAULT_SAVE.butterBest,
+      butterBest: clampButterBest(data.butterBest),
       settings: validateSettings(data.settings),
       dust: num(data.dust, 0),
       orbit: num(data.orbit, 0),
@@ -183,20 +181,21 @@ function isValidShakeLevel(value: unknown): value is 0 | 1 | 2 {
 }
 
 /**
- * Record<number, number>인지 검증한다.
+ * butterBest 항목별 구제 (08-30 검증: all-or-nothing 검증은 항목 하나 손상에 회차 전체
+ * 기록을 날렸고, 값 clamp도 없어 1e300·음수가 영구 보존됐다). 키는 회차 1~3만.
  */
-function isRecordNumberNumber(
-  value: unknown
-): value is Record<number, number> {
-  if (typeof value !== 'object' || value === null) {
-    return false;
+function clampButterBest(v: unknown): Record<number, number> {
+  if (typeof v !== 'object' || v === null) return {};
+  const out: Record<number, number> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    const round = Number(k);
+    if (!Number.isInteger(round) || round < 1 || round > 3) continue;
+    if (typeof val !== 'number' || !Number.isFinite(val)) continue;
+    out[round] = Math.min(Math.max(0, Math.floor(val)), 99_999_999);
   }
-
-  const obj = value as Record<string, unknown>;
-  return Object.entries(obj).every(
-    ([k, v]) => !isNaN(Number(k)) && typeof v === 'number'
-  );
+  return out;
 }
+
 
 /**
  * 저장 데이터를 localStorage에 저장한다.

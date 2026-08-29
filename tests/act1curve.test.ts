@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, advance } from '../src/core/sim';
 import { EMPTY_INPUT, type GameState, type InputFrame } from '../src/core/types';
-import { ACT1, TOKOTON } from '../src/config';
+import { ACT1, SCORE, TOKOTON } from '../src/config';
 
 /** 1막 생존 정책: 연타 + 비상 가드 (act2run 스택 정책의 경량판) */
 function act1Policy(s: GameState): InputFrame {
@@ -74,5 +74,14 @@ describe('1막 곡선/토코톤', () => {
     expect(s.chapter).toBe(ACT1.CHAPTER_THEMES.length - 1);
     for (let t = 0; t < 40 && !s.stack; t++) advance(s, EMPTY_INPUT);
     expect(s.stack?.theme).toBe('modern');
+  });
+});
+
+// 08-30 검증 후속: 봇 밴드는 BASE_HIT 계열에 불감(봇 콤보≈4) — 인간 산술을 직접 가드
+describe('인간 점수 산술 가드', () => {
+  it('평균콤보 150·5타/s 기준 초당 점수가 15K~45K 밴드 (해금 체감 4~11분)', () => {
+    const perSec = SCORE.BASE_HIT * 150 * 5;
+    expect(perSec).toBeGreaterThanOrEqual(15_000); // BASE_HIT 3급 실수 → 노잼
+    expect(perSec).toBeLessThanOrEqual(45_000);    // BASE_HIT 300급 실수 → 순삭
   });
 });

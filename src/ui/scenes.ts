@@ -326,8 +326,12 @@ export function createApp(
     reviving = true;
     // 웹(광고 미배선)은 광고 문구·대기 없이 그냥 일어난다 — 데모 정책 (08-30, P0-2)
     const usedAd = ads.ready();
-    const result = usedAd ? await ads.showRewarded('revive') : 'ok';
-    reviving = false;
+    let result: 'ok' | 'fail' | 'skip';
+    try {
+      result = usedAd ? await ads.showRewarded('revive') : 'ok';
+    } finally {
+      reviving = false; // 광고 경로가 어떤 이유로든 throw해도 부활 버튼이 세션 내내 안 죽게
+    }
     if (result !== 'ok') { playSfx('uiDeny'); return; }
     revivesUsed += 1;
     grantMercyLife(state);

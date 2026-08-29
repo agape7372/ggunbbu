@@ -366,3 +366,23 @@ null, 콘솔 에러 0, 캔버스 360×640 정상 렌더. 프로덕션(진짜 404
   (player 11프레임 시트는 frames.ts PLAYER_SHEET 순서 실검증 — 구 문서의 "필살 노랑 없음"
   서술이 buildSpecial() 실코드와 어긋난 것도 정정). 크로마키·축소 절차·배경 상단 보강(E-1) 포함.
 - 위키·메모리 갱신: [[windows-node-fs-traps]] 신설(cpSync 무음 크래시), coding-portfolio 허브.
+
+## 2026-08-30 — 델타 검증 패널 확정 8건 수리
+
+Wave 0 이후 6커밋(039b12d~cc9ed14)에 2차 적대적 패널(19에이전트) — 확정 8건(기각 0), 전부 수리:
+
+- [P1] **광고 동시 호출 무가드**: 리스너가 전역이라 더블탭 시 광고 1회로 N배 지급(플러그인 8.1.0
+  소스까지 파고 확정) → showNativeRewarded에 모듈 single-flight(진행 중 즉시 'fail').
+- [P1] **코스메틱×PNG 지뢰**: drawAsset('player')이 먼저라 Wave 3 PNG 투입 순간 팔리는
+  body/blade가 무음 사망 → 방침 확정: PNG 시트는 기본 룩 전용, 비기본 장착 시 프로시저럴이 이긴다
+  (틴트 패스는 Wave 3 후속 검토).
+- [P2] show 실패 시 180초 침묵: onRewardedVideoAdFailedToShow 구독 → 'fail' 즉시 settle.
+- [P2] prepare 림보 사각: PREPARE_TIMEOUT_MS 30s 경주 + tryRevive try/finally(reviving 영구 잠김 방지).
+- [P2] vibrate 평탄화: 웹 패턴 홀수 인덱스(휴지)를 합산에서 제외 — [100,50,200]이 350ms 연속
+  진동이 되던 것 수정.
+- [P2] notifyAppReady 전진: preloadAssets 뒤 → 모듈 최상단(Wave 3 실PNG가 10s 잠식 + 상류
+  throw 시 신호 유실 → OTA 롤백 루프 방지).
+- [P2] butterBest 사다리 미커버: all-or-nothing → 항목별 구제 + 키 1~3 + 값 clamp. 테스트 2종.
+- [P2] act1curve 상한 공허: 봇은 BASE_HIT에 불감 — 인간 산술 밴드(15K~45K/s) 직접 가드 테스트.
+
+검증: tsc 클린 / **110 테스트 green** / build 성공.

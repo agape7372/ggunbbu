@@ -21,6 +21,10 @@ const REWARDED_AD_UNIT_ID = TEST_REWARDED_AD_UNIT_ID;
 const REWARD_EVENT = 'onRewardedVideoAdReward';
 const DISMISS_EVENT = 'onRewardedVideoAdDismissed';
 const LOAD_FAILED_EVENT = 'onRewardedVideoAdFailedToLoad';
+// show 실패는 Dismissed가 안 오고 show() 콜도 영구 미결(플러그인 소스 실측) — 이 이벤트가 유일 공지
+const SHOW_FAILED_EVENT = 'onRewardedVideoAdFailedToShow';
+// prepare가 reject도 resolve도 없이 림보에 빠지는 경우의 상한 — settle 경주는 prepare 후에야 시작되므로 별도
+const PREPARE_TIMEOUT_MS = 30_000;
 // 닫힘 이벤트 미도달 상한 — 버튼이 영구히 물리는 것을 막는다 (podoal 실측 처방)
 const SETTLE_TIMEOUT_MS = 180_000;
 
@@ -85,14 +89,20 @@ function hasRewardAmount(value: unknown): boolean {
   return typeof amount === 'number' && Number.isFinite(amount) && amount > 0;
 }
 
+// ★동시 호출 가드(08-30 검증 P1): 리스너가 전역이라 더블탭 시 광고 1개의 보상 이벤트가
+// 두 호출 모두에 전달돼 N배 지급이 됐다. 진행 중이면 즉시 'fail' — 세 호출부를 한 번에 막는다.
+let adInFlight = false;
+
 /** 네이티브 리워드 광고 1회 — earned/dismissed/failed 를 AdResult로 접는다 */
 async function showNativeRewarded(): Promise<AdResult> {
   const admob = getAdMobPlugin();
   if (!admob) return 'fail';
+  if (adInFlight) return 'fail';
+  adInFlight = true;
   const handles: ListenerHandle[] = [];
   let earned = false;
-  let settle: ((o: 'ok' | 'skip') => void) | null = null;
-  const closed = new Promise<'ok' | 'skip'>((resolve) => { settle = resolve; });
+  let settle: ((o: AdResult) => void) | null = null;
+  const closed = new Promise<AdResult>((resolve) => { settle = resolve; });
   try {
     await ensureInitialized(admob);
     const rewardHandle = await addListenerSafe(admob, REWARD_EVENT, () => { earned = true; });
@@ -104,9 +114,20 @@ async function showNativeRewarded(): Promise<AdResult> {
       // 에러 코드(1=잘못된 요청·3=no fill)가 실패 원인 특정의 유일한 창구 — 로그로만
       console.warn('[ads] load failed', info);
     });
-    for (const h of [rewardHandle, dismissHandle, failHandle]) if (h) handles.push(h);
+    // ★show 실패(액티비티 전환 등)는 Dismissed도 show() resolve도 없다 — 이걸 안 들으면
+    // 경주 전 팔이 침묵해 180초를 꽉 채운다 (08-30 검증)
+    const showFailHandle = await addListenerSafe(admob, SHOW_FAILED_EVENT, (info) => {
+      console.warn('[ads] show failed', info);
+      settle?.('fail');
+      settle = null;
+    });
+    for (const h of [rewardHandle, dismissHandle, failHandle, showFailHandle]) if (h) handles.push(h);
 
-    await admob.prepareRewardVideoAd!({ adId: REWARDED_AD_UNIT_ID });
+    // ★prepare 림보 상한(08-30 검증): settle 경주는 prepare 이후에야 시작되므로 여기가 사각.
+    await Promise.race([
+      admob.prepareRewardVideoAd!({ adId: REWARDED_AD_UNIT_ID }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('prepare timeout')), PREPARE_TIMEOUT_MS)),
+    ]);
 
     // ★show()를 그대로 await 금지: 플러그인은 보상 획득 시에만 resolve한다 —
     // 중간에 닫으면 영영 대기라 닫힘·타임아웃과 경주시킨다 (podoal 실측).
@@ -118,7 +139,7 @@ async function showNativeRewarded(): Promise<AdResult> {
       () => 'fail' as const,
     );
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<'ok' | 'skip'>((resolve) => {
+    const timeout = new Promise<AdResult>((resolve) => {
       timer = setTimeout(() => resolve(earned ? 'ok' : 'skip'), SETTLE_TIMEOUT_MS);
     });
     try {
@@ -130,6 +151,7 @@ async function showNativeRewarded(): Promise<AdResult> {
     console.warn('[ads] rewarded failed', { err, adId: REWARDED_AD_UNIT_ID });
     return 'fail';
   } finally {
+    adInFlight = false;
     for (const h of handles) {
       try { h.remove?.(); } catch { /* 해제 실패 무해 */ }
     }

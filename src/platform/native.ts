@@ -45,9 +45,11 @@ export function notifyAppReady(): void {
 export function vibrate(pattern: number | readonly number[]): void {
   const h = plugin('Haptics');
   if (h?.vibrate) {
+    // 웹 Vibration 패턴의 홀수 인덱스는 휴지(pause) — 합산에서 제외해야 리듬 총량이 보존된다
+    // (08-30 검증: [100,50,200]이 350ms 연속 진동이 되던 평탄화 수정. 세그먼트 재생은 후속.)
     const total = typeof pattern === 'number'
       ? pattern
-      : pattern.reduce((a, b) => a + b, 0);
+      : pattern.reduce((a, b, i) => (i % 2 === 0 ? a + b : a), 0);
     void h.vibrate({ duration: Math.min(total, 400) }).catch(() => undefined);
     return;
   }
@@ -72,7 +74,9 @@ export function onLifecycle(cb: (fg: boolean) => void): void {
   }
   const app = plugin('App');
   if (app?.addListener) {
-    void app.addListener('appStateChange', ((st: { isActive: boolean }) => emit(st.isActive)) as unknown as never)
-      .catch(() => undefined);
+    try {
+      void app.addListener('appStateChange', ((st: { isActive: boolean }) => emit(st.isActive)) as unknown as never)
+        .catch(() => undefined);
+    } catch { /* 동기 throw도 삼킨다 — 라이프사이클 구독 실패가 부팅을 못 막게 */ }
   }
 }

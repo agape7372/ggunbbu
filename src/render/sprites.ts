@@ -344,11 +344,17 @@ let LINE = '#1A1A20';   // body 코스메틱
 const LINE_W = 2;
 let ARC = '#FFD200';    // blade 코스메틱 (참격 궤적)
 
+const DEFAULT_LINE = '#1A1A20';
+const DEFAULT_ARC = '#FFD200';
+/** 비기본 코스메틱 장착 여부 — true면 PNG 시트 대신 프로시저럴을 그린다(아래 drawPlayer) */
+let cosmeticsActive = false;
+
 /** 장착 코스메틱 적용 — 스틱맨 프레임 캐시를 무효화해 다음 드로우에 재빌드 */
 export function setPlayerCosmetics(bodyColor: string, bladeColor: string): void {
   if (LINE === bodyColor && ARC === bladeColor) return;
   LINE = bodyColor;
   ARC = bladeColor;
+  cosmeticsActive = bodyColor !== DEFAULT_LINE || bladeColor !== DEFAULT_ARC;
   playerFrames = null;
 }
 
@@ -859,14 +865,18 @@ export function drawPlayer(
   const bob = pose === 'idle' && Math.floor(animTick / 20) % 2 === 1 ? -1 : 0; // 2f 숨쉬기
   const footY = footCanvasY + bob;
   const sheet = playerSheetFrame(pose, animTick);
+  // ★코스메틱 방침(08-30 검증 P1): PNG 시트는 기본 룩 전용 — 비기본 body/blade 장착 시
+  // 프로시저럴이 이긴다. 안 그러면 Wave 3 PNG 투입 순간 팔리는 코스메틱이 무음 사망.
+  // (PNG 틴트 패스·색상별 시트는 ROADMAP Wave 3 후속 검토.)
+  const usePng = !cosmeticsActive;
   ctx.save();
   if (facing === -1) {
     ctx.translate(x, 0);
     ctx.scale(-1, 1);
-    if (!drawAsset(ctx, 'player', 0, footY, sheet)) {
+    if (!usePng || !drawAsset(ctx, 'player', 0, footY, sheet)) {
       ctx.drawImage(frame.cv, -frame.ax, footY - frame.ay);
     }
-  } else if (!drawAsset(ctx, 'player', x, footY, sheet)) {
+  } else if (!usePng || !drawAsset(ctx, 'player', x, footY, sheet)) {
     ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay);
   }
   ctx.restore();
