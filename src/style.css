@@ -777,3 +777,6 @@ html, body {
 /* 08-30(P1-2): 일시정지 경유 화면(취급설명서)에선 하단 탭바 차단 — pause 씬을 둔 채
    메타 탭으로 새면 화면·씬이 어긋나고 진행 중 판이 소실되던 경로의 입구를 막는다. */
 #stage.paused .ov-tabs { display: none; }
+
+/* 08-30 스윕: customView 잠금 칸 실루엣 — 클래스만 있고 규칙이 없던 사문 복구 */
+.flyer-btn.silhouette { filter: grayscale(1); opacity: 0.38; }

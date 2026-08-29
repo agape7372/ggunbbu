@@ -281,6 +281,14 @@ export const HAPTIC = {
   HIT_THROTTLE: 3,        // 연타 시 3회당 1회
 } as const;
 
+// ── 코스메틱 색 (P1-3 실구현 — 팔리는 물건은 실제로 바뀐다) ─────
+// body = 졸라맨 선 색 / blade = 참격 궤적·스파크 색 / letters = 콤보 팝업 기본 색.
+export const COSMETIC_COLORS = {
+  body: { ink: '#1A1A20', amber: '#B4690E', slate: '#3E5A82' } as Record<string, string>,
+  blade: { wire: '#FFD200', rebar: '#E5302E', crescent: '#4FD8E8' } as Record<string, string>,
+  letters: { flyer: '#1A1A20', stamp: '#C22A26', orbit: '#1E62D0' } as Record<string, string>,
+} as const;
+
 // ── 브랜드 팔레트 ───────────────────────────────────────────────
 export const PALETTE = {
   BG: '#F4F1E8',

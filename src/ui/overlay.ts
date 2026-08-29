@@ -379,9 +379,6 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'butter-3': h.onButterRound(3); break;
       case 'butter-back': h.onButterBack(); break;
       case 'ops': h.onOpenOps(); break;
-      case 'missions': h.onOpenMissions(); break;
-      case 'shop': h.onOpenShop(); break;
-      case 'custom': h.onOpenCustom(); break;
       case 'meta-back': h.onMetaBack(); break;
       case 'go-revive': h.onGameOverRevive(); break;
       case 'go-continue': h.onGameOverContinue(); break;

@@ -31,12 +31,6 @@ const BUTTON_SPECS: ButtonSpec[] = [
   { id: 'btn-special', action: 'special' },
 ];
 
-const LEFTOVER_IDS = [
-  'btn-attack-l', 'btn-attack-r',
-  'btn-guard-l', 'btn-guard-r',
-  'btn-special-l', 'btn-special-r',
-] as const;
-
 const BUTTON_LABELS: Record<TouchAction, string> = {
   jump: '점프',
   guard: '가드',
@@ -84,8 +78,6 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
 
   container.setAttribute('role', 'group');
   container.setAttribute('aria-label', '조작');
-
-  hideLeftoverButtons(container);
   for (const spec of BUTTON_SPECS) {
     const btn = ensureButton(container, spec.id, spec.action);
     buttonsByAction[spec.action].push(btn);
@@ -221,17 +213,6 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
       firstGestureCallback = cb;
     },
   };
-}
-
-function hideLeftoverButtons(container: HTMLElement): void {
-  for (const id of LEFTOVER_IDS) {
-    const el = container.querySelector<HTMLElement>(`#${id}`);
-    if (!el) continue;
-    el.hidden = true;
-    el.style.display = 'none';
-    el.style.pointerEvents = 'none';
-    el.classList.remove('tbtn');
-  }
 }
 
 function ensureButton(container: HTMLElement, id: string, action: TouchAction): HTMLButtonElement {

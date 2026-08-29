@@ -38,29 +38,17 @@ export const COSMETIC_ORBIT_COST = 40;
  * 기본 소유(tenchi / ink / wire / flyer)는 0.
  */
 export const ORBIT_COSTS: Readonly<Record<string, number>> = {
-  waza_ageba: WAZA_ORBIT_COST,
-  waza_tetsu: WAZA_ORBIT_COST,
   ageba: WAZA_ORBIT_COST,
   tetsu: WAZA_ORBIT_COST,
   tenchi: 0,
-  waza_tenchi: 0,
-  body_ink: 0,
   ink: 0,
-  body_amber: COSMETIC_ORBIT_COST,
   amber: COSMETIC_ORBIT_COST,
-  body_slate: COSMETIC_ORBIT_COST,
   slate: COSMETIC_ORBIT_COST,
-  blade_wire: 0,
   wire: 0,
-  blade_rebar: COSMETIC_ORBIT_COST,
   rebar: COSMETIC_ORBIT_COST,
-  blade_crescent: COSMETIC_ORBIT_COST,
   crescent: COSMETIC_ORBIT_COST,
-  letters_flyer: 0,
   flyer: 0,
-  letters_stamp: COSMETIC_ORBIT_COST,
   stamp: COSMETIC_ORBIT_COST,
-  letters_orbit: COSMETIC_ORBIT_COST,
   orbit: COSMETIC_ORBIT_COST,
 };
 

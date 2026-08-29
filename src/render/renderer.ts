@@ -2,15 +2,15 @@
 // core는 events만 발행 — 오디오는 src/audio/consume.ts, 클리어는 씬.
 
 import type { GameState } from '../core/types';
-import { JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, VIEW } from '../config';
+import { COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, VIEW } from '../config';
 import { onomatoFor, CAPTIONS } from '../content';
 import {
   initSprites, drawPlayer, drawStack, drawBoss, drawEntity,
-  drawGroundRocks, drawStackShadow,
+  drawGroundRocks, drawStackShadow, setPlayerCosmetics,
 } from './sprites';
 import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
-import { drawEffects, resetEffects, setFxCamY, spawnFromEvent, tickEffects } from './effects';
+import { drawEffects, resetEffects, setFxCamY, setSlashColor, spawnFromEvent, tickEffects } from './effects';
 
 let trauma = 0;
 let flashTicks = 0;
@@ -34,11 +34,14 @@ function scatter(): number {
   return ((popupSeed >>> 8) / 0x7fffff) * 2 - 1; // −1..1
 }
 
+// 08-30(P1-3): letters 코스메틱 — 저콤보(<50) 팝업 기본색. 에스컬레이션 색은 공통.
+let lettersColor: string = PALETTE.INK;
+
 function comboColor(n: number): string {
   if (n >= 500) return PALETTE.RED;
   if (n >= 100) return PALETTE.YELLOW;
   if (n >= 50) return PALETTE.BLUE;
-  return PALETTE.INK;
+  return lettersColor;
 }
 
 export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: boolean }): void {
@@ -49,6 +52,15 @@ export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: bool
 export function initRenderer(): void {
   initSprites();
   resetEffects();
+}
+
+/** 장착 코스메틱 일괄 적용 — 씬이 런 시작·장착 변경 시 호출 (08-30, P1-3) */
+export function applyCosmetics(loadout: { body: string; blade: string; letters: string }): void {
+  const body = COSMETIC_COLORS.body[loadout.body] ?? COSMETIC_COLORS.body.ink;
+  const blade = COSMETIC_COLORS.blade[loadout.blade] ?? COSMETIC_COLORS.blade.wire;
+  lettersColor = COSMETIC_COLORS.letters[loadout.letters] ?? COSMETIC_COLORS.letters.flyer;
+  setPlayerCosmetics(body, blade);
+  setSlashColor(blade);
 }
 
 /** 이벤트 소비: 셰이크/플래시/의성어/진동. 사운드는 audio/consume. 소비 후 clear는 호출자가. */

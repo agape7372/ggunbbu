@@ -43,18 +43,14 @@ export {
   ACHIEVE_DEFS,
   applyMissionEvent,
   applyMissionEvent as applyJuiceToMissions,
-  bump,
-  canClaim,
   claim,
   defById,
   DAILY_DEFS,
   DAILY_POOL,
   DAILY_POOL as MISSIONS,
-  emptyMissionState,
   ensureDaily,
   initAchieveProgress,
   kstDateKey,
-  rolloverIfNeeded,
 } from './missions';
 export type {
   DailyState,
@@ -62,6 +58,5 @@ export type {
   MissionEvent,
   MissionKind,
   MissionProgress,
-  MissionState,
 } from './missions';
 export type MissionId = string;

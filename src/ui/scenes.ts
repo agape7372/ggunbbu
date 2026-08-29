@@ -7,7 +7,7 @@ import type { GameState, GimmickId } from '../core/types';
 import { makeState, advance, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
 import { ACT1, PALETTE, VIEW, WAZA_GAUGE } from '../config';
-import { drawGame, consumeEvents, initRenderer, setFeedbackOptions } from '../render/renderer';
+import { drawGame, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { loadSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
 import type { TouchInput } from './touchLayer';
@@ -90,6 +90,7 @@ export function createApp(
     setLeftHanded: (on) => { touch?.setLeftHanded(on); },
   });
   initRenderer();
+  applyCosmetics(save.loadout); // 코스메틱 실반영 (08-30, P1-3)
   armAudioUnlock();
   input.onFirstGesture(() => { initAudio(); });
 
@@ -255,6 +256,11 @@ export function createApp(
   async function buySku(id: string): Promise<void> {
     const sku = SKUS.find((s) => s.id === id);
     if (!sku || sku.krw > 1900) return;
+    // 이미 전부 보유한 SKU는 결제 자체를 막는다 — 지급 0 실과금 사고 방지 (08-30, P1-4)
+    if (id === 'waza_unlock' && save.owned.includes('ageba') && save.owned.includes('tetsu')) {
+      playSfx('uiDeny');
+      return;
+    }
     const r = await iap.purchase(id as SkuId);
     if (r !== 'ok') { playSfx('uiDeny'); return; }
     applySku(id as SkuId);
@@ -287,6 +293,7 @@ export function createApp(
 
   function doEquip(slot: string, id: string): void {
     save.loadout = equip(save.loadout, slot, id, ownedSet());
+    applyCosmetics(save.loadout); // 즉시 반영 — 팔리는 물건은 실제로 바뀐다 (P1-3)
     saveSave(save);
     playSfx('uiBlip');
     openCustom();

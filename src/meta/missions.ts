@@ -352,50 +352,12 @@ export function claim(
   };
 }
 
-// ── index.ts 호환 (MissionState 묶음 API) ────────────────────────
 
-export interface MissionState {
-  dailyDateKey: string;
-  daily: MissionProgress[];
-  achieve: MissionProgress[];
-}
 
-export function emptyMissionState(nowMs: number = Date.now()): MissionState {
-  const daily = ensureDaily(null, nowMs);
-  return {
-    dailyDateKey: daily.dateKey,
-    daily: daily.items,
-    achieve: initAchieveProgress(),
-  };
-}
 
-export function rolloverIfNeeded(state: MissionState, nowMs: number = Date.now()): MissionState {
-  const next = ensureDaily({ dateKey: state.dailyDateKey, items: state.daily }, nowMs);
-  if (next.dateKey === state.dailyDateKey && next.items === state.daily) return state;
-  return { dailyDateKey: next.dateKey, daily: next.items, achieve: state.achieve };
-}
 
 /** id에 n을 더한다. 목표는 넘지 않는다. 새 객체. */
-export function bump(state: MissionState, id: string, n = 1): MissionState {
-  const add = Math.trunc(n);
-  if (add <= 0) return state;
-  const daily = bumpList(state.daily, id, add);
-  if (daily) {
-    return daily === state.daily ? state : { ...state, daily };
-  }
-  const achieve = bumpList(state.achieve, id, add);
-  if (achieve) {
-    return achieve === state.achieve ? state : { ...state, achieve };
-  }
-  return state;
-}
 
-export function canClaim(state: MissionState, id: string): boolean {
-  const def = DEFS_BY_ID.get(id);
-  if (!def) return false;
-  const p = state.daily.find((x) => x.id === id) ?? state.achieve.find((x) => x.id === id);
-  return p !== undefined && !p.claimed && p.count >= def.goal;
-}
 
 function blankProgress(id: string): MissionProgress {
   return { id, count: 0, claimed: false };
@@ -450,12 +412,3 @@ function resetUnclaimedTrack(list: MissionProgress[], track: MissionTrack): void
   }
 }
 
-function bumpList(list: MissionProgress[], id: string, add: number): MissionProgress[] | null {
-  const i = list.findIndex((p) => p.id === id);
-  if (i < 0) return null;
-  const count = Math.min(goalOf(id), list[i].count + add);
-  if (count === list[i].count) return list;
-  const copy = list.slice();
-  copy[i] = { ...list[i], count };
-  return copy;
-}

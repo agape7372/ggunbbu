@@ -51,6 +51,12 @@ export function setFxCamY(y: number): void {
   fxCamY = y;
 }
 
+// 08-30(P1-3): blade 코스메틱 — 참격 스파크 색
+let slashColor: string = PALETTE.YELLOW;
+export function setSlashColor(c: string): void {
+  slashColor = c;
+}
+
 function n01(): number {
   fxSeed = (Math.imul(fxSeed, 1103515245) + 12345) & 0x7fffffff;
   return (fxSeed >>> 8) / 0x7fffff;
@@ -320,8 +326,8 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   const x = VIEW.LANE_X[e.lane ?? s.player.lane];
   const y = VIEW.GROUND_Y - (e.y ?? s.player.y) + fxCamY;
   if (e.kind === 'slash') {
-    fill('spark', x + 10, y - 28, 90, -50, 0, 0.14, 16, PALETTE.YELLOW);
-    fill('spark', x + 4, y - 18, 40, -80, 0, 0.12, 12, PALETTE.YELLOW);
+    fill('spark', x + 10, y - 28, 90, -50, 0, 0.14, 16, slashColor);
+    fill('spark', x + 4, y - 18, 40, -80, 0, 0.12, 12, slashColor);
     return;
   }
   if (e.kind === 'special') {

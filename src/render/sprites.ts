@@ -339,9 +339,18 @@ const SHOULDER_Y = 23;   // 팔이 갈라지는 지점
 const HIP_Y = 38;        // 다리가 갈라지는 지점
 const FOOT_Y = 60;       // 바닥선 (= STAND_H = WIDE_H, 기존 프레임 발 높이와 동일)
 
-const LINE = '#1A1A20';
+// 08-30(P1-3): 코스메틱 실구현 — 상점이 파는 body(선 색)·blade(참격 색)가 실제 렌더를 바꾼다.
+let LINE = '#1A1A20';   // body 코스메틱
 const LINE_W = 2;
-const ARC = '#FFD200';
+let ARC = '#FFD200';    // blade 코스메틱 (참격 궤적)
+
+/** 장착 코스메틱 적용 — 스틱맨 프레임 캐시를 무효화해 다음 드로우에 재빌드 */
+export function setPlayerCosmetics(bodyColor: string, bladeColor: string): void {
+  if (LINE === bodyColor && ARC === bladeColor) return;
+  LINE = bodyColor;
+  ARC = bladeColor;
+  playerFrames = null;
+}
 
 /** pts를 순서대로 잇는 폴리라인 획. 관절 굽힘은 점 3개 이상으로 표현. */
 function stroke(c: CanvasRenderingContext2D, pts: [number, number][]): void {
@@ -525,7 +534,24 @@ function buildDead(): PFrame {
 
 let playerFrames: Record<PlayerFrameKey, PFrame> | null = null;
 
+function rebuildPlayerFrames(): void {
+  playerFrames = {
+    idle: buildIdle(),
+    jump: buildJump(),
+    attack0: buildAttack(0),
+    attack1: buildAttack(1),
+    attack2: buildAttack(2),
+    guardG: buildGuard(false),
+    guardA: buildGuard(true),
+    guardBreak: buildGuardBreak(),
+    special: buildSpecial(),
+    pinned: buildPinned(),
+    dead: buildDead(),
+  };
+}
+
 function pickPlayerFrame(pose: PlayerPose, animTick: number): PFrame {
+  if (!playerFrames) rebuildPlayerFrames(); // 코스메틱 변경 시 지연 재빌드
   const f = playerFrames!;
   switch (pose) {
     case 'idle': return f.idle;
@@ -798,19 +824,7 @@ export function initSprites(): void {
     tileCache.set(mat, cv);
   }
 
-  playerFrames = {
-    idle: buildIdle(),
-    jump: buildJump(),
-    attack0: buildAttack(0),
-    attack1: buildAttack(1),
-    attack2: buildAttack(2),
-    guardG: buildGuard(false),
-    guardA: buildGuard(true),
-    guardBreak: buildGuardBreak(),
-    special: buildSpecial(),
-    pinned: buildPinned(),
-    dead: buildDead(),
-  };
+  rebuildPlayerFrames();
 
   bossCache = new Map();
   (['idle', 'charging', 'stagger', 'defeated'] as const).forEach((kind) => {
