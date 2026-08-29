@@ -3,7 +3,8 @@
 // GUARD_AIR 유지 중 착지 → GUARD_GROUND로 자동 전이(선딜 재적용).
 
 import type { GameState, InputFrame, PlayerState } from './types';
-import { GUARD_GAUGE, PLAYER } from '../config';
+import { GUARD_GAUGE, PLAYER, SPECIAL } from '../config';
+import { floorSpan } from './building';
 
 export function makePlayer(): PlayerState {
   return {
@@ -13,6 +14,7 @@ export function makePlayer(): PlayerState {
     bufAttack: 0, bufJump: 0, bufGuard: 0,
     pinTick: 0,
     attackHit: false, attackFromAir: false,
+    cling: false,
   };
 }
 
@@ -31,7 +33,6 @@ export function attackActive(p: PlayerState): boolean {
 }
 
 const ATTACK_TOTAL = PLAYER.ATTACK_PRE + PLAYER.ATTACK_ACTIVE + PLAYER.ATTACK_POST;
-const SPECIAL_POSE_TICKS = 20;
 
 /** 입력 버퍼 수집 — 히트스톱 중에도 호출된다(버퍼 침범 금지 규칙) */
 export function collectBuffers(p: PlayerState, input: InputFrame): void {
@@ -104,7 +105,7 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     }
     case 'special': {
       p.poseTick += 1;
-      if (p.poseTick >= SPECIAL_POSE_TICKS) {
+      if (p.poseTick >= SPECIAL.POSE_TICKS) {
         p.pose = p.y > 0 ? 'jump' : 'idle';
         p.poseTick = 0;
       }
@@ -119,6 +120,7 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     if (p.y <= 0) {
       p.y = 0;
       p.vy = 0;
+      p.cling = false;
       s.events.push({ kind: 'land' });
       if (p.pose === 'jump') { p.pose = 'idle'; p.poseTick = 0; }
       // [정본 재현] 공중 가드 유지 중 착지 → 지면 가드로 전이, 선딜 4f 재적용
@@ -133,6 +135,50 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
   p.poseTick = 0;
   p.attackHit = false;
   p.attackFromAir = fromAir;
+  p.cling = false;
+}
+
+/**
+ * 비공격 공중 몸통 vs 층 AABB. 아래에서 겹치면 머리만 밑면에 붙이고 스택을 탄다.
+ * 층 위 착지(플랫폼어)는 하지 않는다. y를 0 이하로 내리지 않는다(깔림 분기 가드).
+ */
+export function clingToFloors(s: GameState): void {
+  const p = s.player;
+  if (p.pose === 'pinned' || p.pose === 'dead' || p.pose === 'special') {
+    p.cling = false;
+    return;
+  }
+  if (p.y <= 0) {
+    p.cling = false;
+    return;
+  }
+  if (attackActive(p)) {
+    p.cling = false;
+    return;
+  }
+  const stack = s.stack;
+  if (!stack || stack.floors.length === 0) {
+    p.cling = false;
+    return;
+  }
+
+  const head = p.y + PLAYER.H;
+  const slip = 10;
+  for (let i = 0; i < stack.floors.length; i++) {
+    const [bot, top] = floorSpan(stack, i);
+    if (head + slip < bot || p.y >= top) continue;
+    // 발은 층 밑보다 아래 — 위에서 내려앉아 착지하는 경로가 아님
+    if (p.y >= bot) continue;
+    const snapped = bot - PLAYER.H;
+    if (snapped <= 0) continue;
+    // 신규 밀착은 상대 상승(아래에서 들이받음)만. 라이드 중이면 중력으로 하향해 떨어져도 유지.
+    if (!p.cling && p.vy <= stack.vy) continue;
+    p.y = snapped;
+    p.vy = stack.vy;
+    p.cling = true;
+    return;
+  }
+  p.cling = false;
 }
 
 function tryEnterGuard(s: GameState, airborne: boolean): void {

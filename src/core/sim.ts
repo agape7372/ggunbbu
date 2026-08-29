@@ -3,11 +3,11 @@
 // act2/보스 스테핑은 act2.ts/boss.ts (M4/M5)에서 이 파일에 연결된다.
 
 import type { GameState, InputFrame } from './types';
-import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive } from './player';
+import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, clingToFloors } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, hurtPlayer } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, WAZA_GAUGE } from '../config';
+import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { specialHitBoss } from './boss';
 
@@ -39,6 +39,8 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     fullCombo: true,
     events: [],
     over: null,
+    gimmick: 'none',
+    waza: 'tenchi',
   };
 }
 
@@ -65,6 +67,7 @@ export function advance(s: GameState, input: InputFrame): void {
     stepPinned(s, input);
   } else {
     stepPlayer(s, input, TICK);
+    clingToFloors(s);
   }
 
   // [정본] 점프 무적의 이면: 지면에 놓인 스택 위/옆에 착지하면 그때 깔린다
@@ -99,6 +102,7 @@ export function advance(s: GameState, input: InputFrame): void {
     if (grounded && !tryGuardBounce(s, guardActive(s.player), s.player.y, prevStackY)) {
       onStackGrounded(s);
     }
+    clingToFloors(s);
   }
 
   // ── 가드 바운스 (비접지 프레임) ──
@@ -150,37 +154,92 @@ function triggerSpecial(s: GameState): void {
   s.hitstop = SPECIAL.HITSTOP;
   s.events.push({ kind: 'special', lane: p.lane });
 
-  const stack = s.stack;
-  if (stack) {
-    if (stack.specialImmune) {
-      // [정본: 2막 일부 무효] 최하층에 10대미지만
-      const res = damageStack(stack, p.lane, stack.y - 1, stack.y + 1, SPECIAL.IMMUNE_DMG);
-      if (res === 'collapse') {
-        s.events.push({ kind: 'floorCollapse', mat: 'cathedral', y: stack.y });
-        addScore(s, SCORE.FLOOR_BONUS);
-        if (stack.floors.length === 0) destroyStack(s);
-        else stack.vy = Math.max(stack.vy, STACK.PIN_ESCAPE_V);
-      } else {
-        stack.vy = Math.max(stack.vy, STACK.PIN_ESCAPE_V);
-      }
-      stack.resting = false;
-    } else {
-      // 전체 파괴 — 고정 보너스만 (콤보/게이지 변동 없음 [설계])
-      addScore(s, stack.floors.length * SCORE.FLOOR_BONUS);
-      destroyStack(s);
-    }
+  if (s.waza === 'tetsu') {
+    applyTetsu(s);
+  } else if (s.waza === 'ageba') {
+    applyAgeba(s);
+  } else {
+    applyTenchi(s);
   }
-  // 화산탄 전체 소거 (공중 + 바닥) — 2막 P4
-  let cleared = 0;
-  s.entities = s.entities.filter((e) => {
-    if (e.kind === 'rock') { cleared += 1; return false; }
-    return true;
-  });
-  cleared += s.groundRocks;
-  s.groundRocks = 0;
-  if (cleared > 0) addScore(s, cleared * SCORE.FLOOR_BONUS);
-  // 보스: 소량 대미지 + 무적 (주 용도는 회피 [정본])
+
+  // 철벽은 방패만 — 건물·화산탄을 지우지 않는다.
+  if (s.waza !== 'tetsu') {
+    let cleared = 0;
+    s.entities = s.entities.filter((e) => {
+      if (e.kind === 'rock') { cleared += 1; return false; }
+      return true;
+    });
+    cleared += s.groundRocks;
+    s.groundRocks = 0;
+    if (cleared > 0) addScore(s, cleared * SCORE.FLOOR_BONUS);
+  }
   if (s.boss) specialHitBoss(s);
+}
+
+function applyTetsu(s: GameState): void {
+  const stack = s.stack;
+  if (!stack) return;
+  stack.resting = false;
+  stack.vy = Math.max(stack.vy, SPECIAL.TETSU_V);
+  stack.y = Math.max(stack.y, 0.001);
+}
+
+function applyAgeba(s: GameState): void {
+  const stack = s.stack;
+  const p = s.player;
+  if (!stack) return;
+  if (stack.specialImmune) {
+    applyImmuneChip(s);
+    return;
+  }
+  const lo = p.y - 8;
+  const hi = p.y + VIEW.FLOOR_H * SPECIAL.AGEBA_FLOORS;
+  let guard = 12;
+  while (guard-- > 0 && s.stack && s.stack.floors.length > 0) {
+    const st = s.stack;
+    const yHit = st.y;
+    const mat = st.floors[0]?.mat;
+    const res = damageStack(st, p.lane, lo, hi, 1);
+    if (res === 'miss') break;
+    if (res === 'collapse') {
+      s.events.push({ kind: 'floorCollapse', mat, y: yHit });
+      addScore(s, SCORE.FLOOR_BONUS);
+      if (st.floors.length === 0) {
+        destroyStack(s);
+        break;
+      }
+    }
+    st.vy = Math.max(st.vy, STACK.HIT_LIFT_V);
+    st.resting = false;
+    if (res === 'hit') break;
+  }
+}
+
+function applyTenchi(s: GameState): void {
+  const stack = s.stack;
+  if (!stack) return;
+  if (stack.specialImmune) {
+    applyImmuneChip(s);
+    return;
+  }
+  addScore(s, stack.floors.length * SCORE.FLOOR_BONUS);
+  destroyStack(s);
+}
+
+function applyImmuneChip(s: GameState): void {
+  const stack = s.stack;
+  const p = s.player;
+  if (!stack) return;
+  const res = damageStack(stack, p.lane, stack.y - 1, stack.y + 1, SPECIAL.IMMUNE_DMG);
+  if (res === 'collapse') {
+    s.events.push({ kind: 'floorCollapse', mat: 'cathedral', y: stack.y });
+    addScore(s, SCORE.FLOOR_BONUS);
+    if (stack.floors.length === 0) destroyStack(s);
+    else stack.vy = Math.max(stack.vy, STACK.PIN_ESCAPE_V);
+  } else {
+    stack.vy = Math.max(stack.vy, STACK.PIN_ESCAPE_V);
+  }
+  stack.resting = false;
 }
 
 // ── 깔림 ────────────────────────────────────────────────────────
@@ -281,6 +340,25 @@ function onPlayerCrushed(s: GameState): void {
   s.player.poseTick = 0;
   s.player.pinTick = 0;
   s.events.push({ kind: 'hurt' });
+}
+
+/** 광고 부활 등 — 콤보·점수 유지, 라이프 1, 짧은 무적. 씬이 over===gameover 일 때 호출. */
+export function grantMercyLife(s: GameState): void {
+  s.over = null;
+  s.lives = 1;
+  const p = s.player;
+  p.pose = 'idle';
+  p.poseTick = 0;
+  p.y = Math.max(p.y, 0.001);
+  p.vy = 0;
+  p.invulnTicks = PLAYER.HIT_IFRAMES;
+  p.pinTick = 0;
+  const stack = s.stack;
+  if (stack?.resting) {
+    stack.resting = false;
+    stack.vy = Math.max(stack.vy, STACK.PIN_ESCAPE_V);
+    stack.y = Math.max(stack.y, 0.001);
+  }
 }
 
 // ── 1막 ─────────────────────────────────────────────────────────

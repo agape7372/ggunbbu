@@ -20,10 +20,16 @@ export const VIEW = {
   GROUND_Y: 470,         // 캔버스 픽셀상 지면 라인 (렌더 변환용)
 } as const;
 
+// ── 카메라 (렌더 전용. 시뮬 y는 그대로) ─────────────────────────
+export const CAMERA = {
+  KEEP_PX: 140,          // 플레이어 발을 필드 하단에서 이만큼 위에 유지
+  STACK_MARGIN: 72,      // (예비) 스택 프레이밍. 점프 추종을 깎지 않는다.
+} as const;
+
 // ── 플레이어 물리 ───────────────────────────────────────────────
 export const PLAYER = {
   GRAVITY: 1780,          // px/s²
-  JUMP_V0: 800,           // 정점 ≈180px, 체공 ≈0.9s — "매우 높은 점프" [정본 느낌]
+  JUMP_V0: 1600,          // 정점 ≈719px ≈ 10.6층(FLOOR_H 68). 카메라가 발을 따라가 지면이 필드 밖으로 나간다.
   W: 46, H: 55,          // 원작 82×98 × 0.5625
   // 원작은 한 번의 참격이 "한 층"에 닿는다(참격 스프라이트 67px vs 층 120px).
   // 기존 128px는 40px 층 기준 3.2개 층을 동시에 때려 위치 선정을 무의미하게 만들었다.
@@ -125,6 +131,19 @@ export const SPECIAL = {
   HITSTOP: 10,
   IMMUNE_DMG: 10,         // 2막 면역 구조물엔 최하층 10대미지만
   MOON_DMG: 10,
+  POSE_TICKS: 48,         // 연출만. 시뮬 파괴는 발동 틱에 끝난다
+  AGEBA_FLOORS: 6,        // 올려베기: 발끝에서 위로 최대 층수
+  TETSU_V: 1190,          // 철벽: 지면 가드와 같은 띄움. 파괴 없음
+} as const;
+
+// ── 구역 작전 기믹 (아케이드 gimmick='none' 이면 미적용) ────────
+export const GIMMICK = {
+  ICE_BOUNCE_GROUND: 0.7,
+  ICE_BOUNCE_AIR: 0.55,
+  NIGHT_RESPAWN_MUL: 0.45,
+  ORBIT_SPAWN_VY: -120,
+  DEFAULT_SPAWN_VY: -70,
+  GLASS_EVERY: 2,         // 짝수 층 HP1
 } as const;
 
 // ── 점수 [산술 검증: 1,500타 ≈ 7~9분에 9,999,999] ──────────────
@@ -221,7 +240,7 @@ export const JUICE: Record<string, JuiceSpec> = {
   floorCollapse:  { hitstop: 3, shake: 3, flash: 2, particles: 10 },
   stackDestroy:   { hitstop: 6, shake: 6, flash: 0, particles: 24 },
   butterCollapse: { hitstop: 2, shake: 2, flash: 2, particles: 8 },
-  special:        { hitstop: 10, shake: 10, flash: 2, particles: 24 },
+  special:        { hitstop: 10, shake: 14, flash: 4, particles: 32 },
   hurt:           { hitstop: 4, shake: 8, flash: 3, particles: 4 },
   guardBounce:    { hitstop: 1, shake: 2, flash: 2, particles: 3 },
   guardAirBounce: { hitstop: 2, shake: 3, flash: 3, particles: 5 },

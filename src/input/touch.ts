@@ -1,5 +1,6 @@
 // Pointer Events 가상 버튼. 제스처(스와이프) 없음 — 홀드+연타+동시 입력 지연을 피한다.
 // 버튼 DOM은 #touch-layer 안에 두고, 히트 영역은 CSS가 FIELD_H 아래로 클립한다.
+// 왼쪽 점프, 오른쪽 공격/가드/필살. 왼손잡이는 .mirror 로 좌우 스왑.
 
 export type TouchAction = 'jump' | 'guard' | 'attack' | 'special';
 
@@ -18,12 +19,23 @@ export interface TouchInput {
   onFirstGesture(cb: () => void): void;
 }
 
-const BUTTON_IDS: Record<TouchAction, string> = {
-  jump: 'btn-jump',
-  guard: 'btn-guard',
-  attack: 'btn-attack',
-  special: 'btn-special',
-};
+interface ButtonSpec {
+  id: string;
+  action: TouchAction;
+}
+
+const BUTTON_SPECS: ButtonSpec[] = [
+  { id: 'btn-jump', action: 'jump' },
+  { id: 'btn-attack', action: 'attack' },
+  { id: 'btn-guard', action: 'guard' },
+  { id: 'btn-special', action: 'special' },
+];
+
+const LEFTOVER_IDS = [
+  'btn-attack-l', 'btn-attack-r',
+  'btn-guard-l', 'btn-guard-r',
+  'btn-special-l', 'btn-special-r',
+] as const;
 
 const BUTTON_LABELS: Record<TouchAction, string> = {
   jump: '점프',
@@ -32,12 +44,18 @@ const BUTTON_LABELS: Record<TouchAction, string> = {
   special: '필살',
 };
 
-const ACTIONS = Object.keys(BUTTON_IDS) as TouchAction[];
+const ACTIONS = Object.keys(BUTTON_LABELS) as TouchAction[];
+const ACTION_SET = new Set<string>(ACTIONS);
 const BUTTON_PINNED_LABEL = '⬆탈출';
 
 /** 같은 탭이 pointer + 호환 mouse로 두 번 들어오는 기기용 */
 const GHOST_MOUSE_MS = 650;
 const DUP_DOWN_MS = 32;
+
+interface PointerBind {
+  action: TouchAction;
+  btn: HTMLElement;
+}
 
 export function initTouchLayer(container: HTMLElement): TouchInput {
   const held: Record<TouchAction, boolean> = {
@@ -47,11 +65,17 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     jump: false, guard: false, attack: false, special: false,
   };
 
-  const pointerMap = new Map<number, TouchAction>();
-  const buttonElements = new Map<TouchAction, HTMLButtonElement>();
-  const lastDownAt: Record<TouchAction, number> = {
-    jump: 0, guard: 0, attack: 0, special: 0,
+  const pointerMap = new Map<number, PointerBind>();
+  const actionPointers: Record<TouchAction, Set<number>> = {
+    jump: new Set(),
+    guard: new Set(),
+    attack: new Set(),
+    special: new Set(),
   };
+  const buttonsByAction: Record<TouchAction, HTMLButtonElement[]> = {
+    jump: [], guard: [], attack: [], special: [],
+  };
+  const lastDownAt = new Map<string, number>();
 
   let firstGestureCallback: (() => void) | null = null;
   let firstGestureFired = false;
@@ -61,8 +85,10 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   container.setAttribute('role', 'group');
   container.setAttribute('aria-label', '조작');
 
-  for (const action of ACTIONS) {
-    buttonElements.set(action, ensureButton(container, action));
+  hideLeftoverButtons(container);
+  for (const spec of BUTTON_SPECS) {
+    const btn = ensureButton(container, spec.id, spec.action);
+    buttonsByAction[spec.action].push(btn);
   }
 
   const fireFirst = (): void => {
@@ -71,17 +97,32 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     firstGestureCallback();
   };
 
-  const setActive = (action: TouchAction, on: boolean): void => {
-    buttonElements.get(action)?.classList.toggle('active', on);
+  const setBtnActive = (btn: HTMLElement, on: boolean): void => {
+    btn.classList.toggle('active', on);
   };
 
-  const releaseAction = (action: TouchAction): void => {
-    held[action] = false;
-    setActive(action, false);
+  const btnStillHeld = (btn: HTMLElement): boolean => {
+    for (const bind of pointerMap.values()) {
+      if (bind.btn === btn) return true;
+    }
+    return false;
+  };
+
+  const releasePointer = (pointerId: number): void => {
+    const bind = pointerMap.get(pointerId);
+    if (!bind) return;
+    pointerMap.delete(pointerId);
+    actionPointers[bind.action].delete(pointerId);
+    if (!btnStillHeld(bind.btn)) setBtnActive(bind.btn, false);
+    held[bind.action] = actionPointers[bind.action].size > 0;
   };
 
   const releaseAll = (): void => {
-    for (const action of ACTIONS) releaseAction(action);
+    for (const action of ACTIONS) {
+      actionPointers[action].clear();
+      held[action] = false;
+      for (const btn of buttonsByAction[action]) setBtnActive(btn, false);
+    }
     pointerMap.clear();
   };
 
@@ -89,17 +130,20 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     const btn = (event.target as HTMLElement | null)?.closest?.('.tbtn');
     if (!btn || !container.contains(btn)) return;
 
-    const action = btn.getAttribute('data-action') as TouchAction | null;
-    if (!action || !(action in BUTTON_IDS)) return;
+    const action = btn.getAttribute('data-action');
+    if (!action || !ACTION_SET.has(action)) return;
+    const touchAction = action as TouchAction;
 
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
     const now = performance.now();
     if (event.pointerType === 'mouse' && now - lastTouchStamp < GHOST_MOUSE_MS) return;
-    if (now - lastDownAt[action] < DUP_DOWN_MS) return;
 
-    // 이미 다른 포인터가 홀드 중이면 무시 (두 엄지가 같은 버튼을 밟는 경우)
-    if (held[action]) return;
+    const downKey = btn.id || touchAction;
+    const prevDown = lastDownAt.get(downKey) ?? 0;
+    if (now - prevDown < DUP_DOWN_MS) return;
+
+    if (pointerMap.has(event.pointerId)) return;
 
     fireFirst();
     event.preventDefault();
@@ -113,19 +157,18 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     if (event.pointerType === 'touch' || event.pointerType === 'pen') {
       lastTouchStamp = now;
     }
-    lastDownAt[action] = now;
+    lastDownAt.set(downKey, now);
 
-    pointerMap.set(event.pointerId, action);
-    held[action] = true;
-    pressed[action] = true;
-    setActive(action, true);
+    pointerMap.set(event.pointerId, { action: touchAction, btn: btn as HTMLElement });
+    actionPointers[touchAction].add(event.pointerId);
+    held[touchAction] = true;
+    pressed[touchAction] = true;
+    setBtnActive(btn as HTMLElement, true);
   };
 
   const onPointerEnd = (event: PointerEvent): void => {
-    const action = pointerMap.get(event.pointerId);
-    if (!action) return;
-    pointerMap.delete(event.pointerId);
-    releaseAction(action);
+    if (!pointerMap.has(event.pointerId)) return;
+    releasePointer(event.pointerId);
     event.preventDefault();
   };
 
@@ -163,8 +206,11 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     setPinned(next: boolean) {
       if (pinned === next) return;
       pinned = next;
-      const btn = buttonElements.get('guard');
-      if (btn) btn.textContent = pinned ? BUTTON_PINNED_LABEL : BUTTON_LABELS.guard;
+      const label = pinned ? BUTTON_PINNED_LABEL : BUTTON_LABELS.guard;
+      for (const btn of buttonsByAction.guard) {
+        btn.textContent = label;
+        btn.setAttribute('aria-label', label);
+      }
     },
 
     setLeftHanded(mirror: boolean) {
@@ -177,17 +223,27 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   };
 }
 
-function ensureButton(container: HTMLElement, action: TouchAction): HTMLButtonElement {
-  const id = BUTTON_IDS[action];
+function hideLeftoverButtons(container: HTMLElement): void {
+  for (const id of LEFTOVER_IDS) {
+    const el = container.querySelector<HTMLElement>(`#${id}`);
+    if (!el) continue;
+    el.hidden = true;
+    el.style.display = 'none';
+    el.style.pointerEvents = 'none';
+    el.classList.remove('tbtn');
+  }
+}
+
+function ensureButton(container: HTMLElement, id: string, action: TouchAction): HTMLButtonElement {
   const existing = container.querySelector<HTMLButtonElement>(`#${id}`);
   const btn = existing ?? document.createElement('button');
   btn.id = id;
   btn.type = 'button';
-  btn.classList.add('tbtn');
+  btn.className = 'tbtn';
   btn.tabIndex = -1;
   btn.setAttribute('data-action', action);
   btn.setAttribute('aria-label', BUTTON_LABELS[action]);
-  if (!btn.textContent) btn.textContent = BUTTON_LABELS[action];
+  btn.textContent = BUTTON_LABELS[action];
   if (btn.parentElement !== container) container.appendChild(btn);
   return btn;
 }

@@ -135,6 +135,8 @@ export interface PlayerState {
   attackHit: boolean;
   /** attack 종료 후 복귀할 상태가 공중인가 */
   attackFromAir: boolean;
+  /** 층 밑면 라이드 중 — 위에서 낙하 관통과 구분 */
+  cling: boolean;
 }
 
 export type Act2Phase = 'cathedral' | 'tower' | 'bolt' | 'rock' | 'moon';
@@ -168,6 +170,12 @@ export interface BossState {
 }
 
 export type Mode = 'act1' | 'act2' | 'tokoton' | 'bonus';
+
+/** 구역 작전 기믹. none = 아케이드 기본. 수치 테이블 MAT_HP 구조는 유지. */
+export type GimmickId = 'none' | 'glass' | 'ice' | 'night' | 'orbit';
+
+/** 장착 필살. 체크포인트 타격 수에 영향을 주면 안 된다. */
+export type WazaId = 'tenchi' | 'ageba' | 'tetsu';
 
 /** 타격감 이벤트 — core가 발행, 렌더/오디오/햅틱이 소비 (JUICE 매트릭스 키) */
 export type JuiceKind =
@@ -254,6 +262,10 @@ export interface GameState {
   events: JuiceEvent[];
   /** 게임 종료 플래그 */
   over: 'gameover' | 'cleared' | null;
+  /** 구역 작전 기믹 (아케이드는 none) */
+  gimmick: GimmickId;
+  /** 이번 주행 장착 필살 */
+  waza: WazaId;
 }
 
 /** 프레임 입력 — input 레이어가 생성해 sim에 주입 */

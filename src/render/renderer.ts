@@ -9,7 +9,8 @@ import {
   drawGroundRocks, drawStackShadow,
 } from './sprites';
 import { drawChapterBackdrop } from './background';
-import { drawEffects, resetEffects, spawnFromEvent, tickEffects } from './effects';
+import { cameraFollowY } from './camera';
+import { drawEffects, resetEffects, setFxCamY, spawnFromEvent, tickEffects } from './effects';
 
 let trauma = 0;
 let flashTicks = 0;
@@ -52,6 +53,8 @@ export function initRenderer(): void {
 
 /** 이벤트 소비: 셰이크/플래시/의성어/진동. 사운드는 audio/consume. 소비 후 clear는 호출자가. */
 export function consumeEvents(s: GameState): void {
+  const cam = cameraFollowY(s);
+  setFxCamY(cam);
   for (const e of s.events) {
     const spec = JUICE[e.kind];
     if (spec) {
@@ -68,7 +71,7 @@ export function consumeEvents(s: GameState): void {
         numPopups.push({
           n,
           x: VIEW.LANE_X[0] + scatter() * 22,
-          y: VIEW.GROUND_Y - (e.y ?? 100) - 12 + scatter() * 10,
+          y: VIEW.GROUND_Y - (e.y ?? 100) - 12 + scatter() * 10 + cam,
           vx: scatter() * 0.9,
           vy: -1.4 - Math.abs(scatter()) * 0.8,
           ticks: JUICE_SYS.COMBO_POPUP_LIFE_F,
@@ -80,15 +83,18 @@ export function consumeEvents(s: GameState): void {
     // 의성어 (동시 3개 상한)
     const combo = e.combo ?? s.combo;
     let word = onomatoFor(e.kind, combo);
+    if (e.kind === 'special') {
+      word = onomatoFor(s.waza === 'ageba' ? 'specialAgeba' : s.waza === 'tetsu' ? 'specialTetsu' : 'special', combo);
+    }
     if (word && combo >= 999) word = CAPTIONS.combo999;
     if (word) {
       if (popups.length >= JUICE_SYS.ONOMATOPOEIA_MAX) popups.shift();
       popups.push({
         text: word,
         x: VIEW.LANE_X[0] + ((combo * 13) % 30) - 15,
-        y: VIEW.GROUND_Y - (e.y ?? 100) - 30,
-        ticks: 24,
-        scale: e.kind === 'special' || e.kind === 'bossDefeat' ? 2 : 1 + Math.min(combo / 500, 0.8),
+        y: VIEW.GROUND_Y - (e.y ?? 100) - 30 + cam,
+        ticks: e.kind === 'special' ? 40 : 24,
+        scale: e.kind === 'special' || e.kind === 'bossDefeat' ? 2.4 : 1 + Math.min(combo / 500, 0.8),
       });
     }
     // 진동 (연타 스로틀)
@@ -113,20 +119,25 @@ function shakeOffset(): [number, number] {
 }
 
 export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
-  // 감쇠
   trauma = Math.max(0, trauma - 0.693 / JUICE_SYS.SHAKE_HALF_LIFE_F * trauma);
   if (flashTicks > 0) flashTicks -= 1;
   tickEffects();
 
+  const cam = cameraFollowY(s);
+  setFxCamY(cam);
   const [sx, sy] = shakeOffset();
   ctx.save();
   ctx.translate(sx, sy);
 
-  // 배경: 단색을 깐 뒤 챕터 PNG를 시도. 없으면(false) 단색만 남아 기존과 동일.
   ctx.fillStyle = bgColor(s);
   ctx.fillRect(-16, -16, VIEW.W + 32, VIEW.H + 32);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, VIEW.W, VIEW.FIELD_H);
+  ctx.clip();
+  ctx.translate(0, cam);
   drawChapterBackdrop(ctx, s);
-  // 지면
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
 
@@ -137,17 +148,16 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   for (const e of s.entities) if (e.kind !== 'stack') drawEntity(ctx, e, g);
   if (s.boss) drawBoss(ctx, s.boss, g);
 
-  // 플레이어 (피격 무적 점멸)
   if (s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
     drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
   }
+  ctx.restore();
 
   drawEffects(ctx);
   drawNumPopups(ctx);
   drawPopups(ctx);
   ctx.restore();
 
-  // 전화면 플래시
   if (flashTicks > 0) {
     ctx.globalAlpha = 0.35 * (flashTicks / 4);
     ctx.fillStyle = flashColor;

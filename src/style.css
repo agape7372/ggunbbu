@@ -45,7 +45,8 @@ html, body {
 }
 
 /* 터치 조작 존 — VIEW.FIELD_H(470) 아래만. 필드를 가리지 않는다.
-   --field-h 는 main이 config.VIEW.FIELD_H 로 주입. */
+   --field-h 는 main이 config.VIEW.FIELD_H 로 주입.
+   레이어 360×170. 왼쪽 점프, 오른쪽 공격/가드/필살. */
 #touch-layer {
   position: absolute;
   top: var(--field-h, 470px);
@@ -67,16 +68,20 @@ html, body {
   z-index: 0;
 }
 
-/* 터치 버튼 공통 스타일 */
+/* 철거 공구 실루엣 — 캔디 원 금지. 잉크/아이보리 플레이트, 히트는 사각 ::before. */
 .tbtn {
   position: absolute;
-  border-radius: 50%;
-  border: 2px solid rgba(26, 26, 32, 0.22);
-  background: rgba(26, 26, 32, 0.16);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
   color: #1A1A20;
   font-family: system-ui, sans-serif;
-  font-weight: bold;
-  font-size: 12px;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,79 +94,125 @@ html, body {
   z-index: 1;
 }
 
-/* 히트 영역 확장 (-8px) */
+/* 히트 영역 확장 (-8px). 시각 클립과 분리해 overflow clip에 안 잘리게 둔다. */
 .tbtn::before {
   content: '';
   position: absolute;
   inset: -8px;
-  border-radius: 50%;
+  border-radius: 10px;
   pointer-events: auto;
   z-index: -1;
 }
 
-/* 버튼 활성화 상태 */
-.tbtn.active {
-  background: rgba(26, 26, 32, 0.32);
-  border-color: rgba(26, 26, 32, 0.5);
-  transform: scale(0.92);
+/* 시각 플레이트 (::after). 라벨/히트(::before)는 클립하지 않는다. */
+.tbtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #F4F1E8;
+  border: 2.5px solid #1A1A20;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: -1;
+  box-shadow: 2px 3px 0 #1A1A20;
 }
 
-/* 버튼 배치 — 좌표는 #touch-layer(필드 아래 170px) 기준.
-   왼손: 점프(탭) + 가드(홀드) — 공중가드 후 오른손 연타가 가능해야 한다.
-   오른손: 공격(엄지 홈) + 필살(원거리, 오발 방지). */
+.tbtn.active {
+  transform: scale(0.94);
+}
+
+.tbtn.active::after {
+  background: #C4C0B4;
+  box-shadow: 1px 1px 0 #1A1A20;
+}
+
+.tbtn[data-action="special"]::after {
+  border-color: #FFD200;
+  border-width: 3px;
+  box-shadow: 2px 3px 0 #1A1A20, inset 0 0 0 1px #1A1A20;
+}
+
+.tbtn[data-action="special"].active::after {
+  background: #E6C400;
+  box-shadow: 1px 1px 0 #1A1A20, inset 0 0 0 1px #1A1A20;
+}
+
+/* 점프: 철판 라운드렉트. 공격: 해머 페이스. 가드: 헬멧. 필살: 경고 플레이트.
+   clip-path는 테두리를 대각으로 잘라 실루엣이 끊기므로 쓰지 않는다. */
+#btn-jump::after {
+  border-radius: 20px;
+}
+
+#btn-attack::after {
+  border-radius: 8px;
+}
+
+#btn-guard::after {
+  border-radius: 10px 10px 16px 16px;
+}
+
+#btn-special::after {
+  border-radius: 6px;
+}
+
+/* 버튼 배치 — #touch-layer(필드 아래 170px) 기준.
+   왼쪽 점프(엄지 홈). 오른쪽: 공격 위, 가드 아래, 필살 안쪽. */
 
 #btn-jump {
-  left: 12px;
-  top: 8px;
-  width: 96px;
-  height: 96px;
-  font-size: 14px;
-}
-
-#btn-guard {
-  left: 16px;
-  top: 112px;
-  width: 76px;
-  height: 50px;
-  border-radius: 18px;
-  font-size: 12px;
+  left: 10px;
+  top: 22px;
+  width: 128px;
+  height: 128px;
+  font-size: 18px;
 }
 
 #btn-attack {
-  left: 248px;
-  top: 66px;
-  width: 96px;
-  height: 96px;
+  left: 228px;
+  top: 10px;
+  width: 122px;
+  height: 78px;
+  font-size: 16px;
+}
+
+#btn-guard {
+  left: 228px;
+  top: 96px;
+  width: 122px;
+  height: 58px;
   font-size: 14px;
 }
 
 #btn-special {
-  left: 152px;
-  top: 8px;
+  left: 168px;
+  top: 10px;
   width: 52px;
   height: 52px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
-/* 왼손잡이: 점프·가드는 오른쪽, 공격·필살은 왼쪽 */
+/* 왼손잡이: 점프↔클러스터 통째 스왑 */
 #touch-layer.mirror #btn-jump {
-  left: auto;
-  right: 12px;
+  left: 222px;
 }
 
+#touch-layer.mirror #btn-attack,
 #touch-layer.mirror #btn-guard {
-  left: auto;
-  right: 16px;
-}
-
-#touch-layer.mirror #btn-attack {
-  left: auto;
-  right: 248px;
+  left: 10px;
 }
 
 #touch-layer.mirror #btn-special {
-  left: auto;
-  right: 152px;
+  left: 140px;
+}
+
+/* HMR로 남은 양측 복제 버튼은 숨긴다 */
+#btn-attack-l,
+#btn-attack-r,
+#btn-guard-l,
+#btn-guard-r,
+#btn-special-l,
+#btn-special-r {
+  display: none !important;
+  pointer-events: none;
 }
 
 /* Safe-area inset 미적용 사유: #stage가 transform scale 기반이므로
@@ -405,6 +456,51 @@ html, body {
   touch-action: manipulation;
 }
 
+.ov-has-tabs {
+  padding-bottom: 64px;
+}
+
+.ov-tabs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 52px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 2px solid #1A1A20;
+  background: #F4F1E8;
+  z-index: 12;
+  pointer-events: auto;
+}
+
+.ov-tabs[hidden] {
+  display: none !important;
+}
+
+.ov-tab {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-right: 1px solid #1A1A20;
+  background: transparent;
+  color: #1A1A20;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ov-tab:last-child {
+  border-right: none;
+}
+
+.ov-tab.on {
+  background: #FFD200;
+}
+
 .ov-screen[hidden] { display: none !important; }
 
 .ov-boot {
@@ -433,6 +529,7 @@ html, body {
 .ov-title {
   background: #F4F1E8;
   justify-content: flex-start;
+  overflow-y: auto;
 }
 
 .ov-logo {
@@ -464,7 +561,7 @@ html, body {
 .ov-menu {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 280px;
 }
 
