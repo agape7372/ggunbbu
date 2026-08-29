@@ -252,7 +252,13 @@ export function pickDailyIds(dateKey: string, allowAd = true): string[] {
 /** 날짜가 같으면 동일 참조. 다르거나 null이면 해시로 3개를 새로 뽑는다. */
 export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = true): DailyState {
   const dateKey = kstDateKey(nowMs);
-  if (state && state.dateKey === dateKey) return state;
+  if (state && state.dateKey === dateKey) {
+    // 광고 경로가 사라진 환경에서 이미 뽑힌 광고 미션은 그날 안에 영구 미달성 — 그 항목만 걷어낸다
+    if (!allowAd && state.items.some((p) => TRACK_BY_ID[p.id] === 'ad')) {
+      return { dateKey, items: state.items.filter((p) => TRACK_BY_ID[p.id] !== 'ad') };
+    }
+    return state;
+  }
   return {
     dateKey,
     items: pickDailyIds(dateKey, allowAd).map(blankProgress),
