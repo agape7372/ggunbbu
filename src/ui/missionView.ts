@@ -44,13 +44,30 @@ export function paintMissions(
   }
   if (achieveBox) {
     const list = achieveDefs.length ? achieveDefs : ACHIEVES;
-    for (const def of list) {
-      const p = achieveProg.find((x) => x.id === def.id) ?? {
-        id: def.id,
-        count: 0,
-        claimed: false,
-      };
-      achieveBox.appendChild(missionRow(def, p));
+    const paired = list.map((def) => ({
+      def,
+      p: achieveProg.find((x) => x.id === def.id) ?? { id: def.id, count: 0, claimed: false },
+    }));
+    // ★11개를 같은 크기로 쌓아 3배 스크롤이 났다(08-30 실측) — 지금 할 수 있는 것부터 올리고,
+    // 끝난 것은 한 줄로 접는다. 정보량은 그대로, 훑는 거리는 줄어든다.
+    const rank = (x: { def: MissionDef; p: MissionProgress }): number => {
+      if (x.p.claimed) return 2;
+      return x.p.count >= goalOf(x.def) ? 0 : 1;
+    };
+    paired.sort((a2, b2) => rank(a2) - rank(b2));
+    const done: string[] = [];
+    for (const x of paired) {
+      if (x.p.claimed) {
+        done.push(x.def.title);
+        continue;
+      }
+      achieveBox.appendChild(missionRow(x.def, x.p));
+    }
+    if (done.length > 0) {
+      const line = document.createElement('p');
+      line.className = 'mission-done';
+      line.textContent = `수령 완료 ${done.length}개 · ${done.join(' · ')}`;
+      achieveBox.appendChild(line);
     }
   }
 
