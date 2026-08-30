@@ -18,6 +18,7 @@
   --sp-4: 8px; /* 여유 간격 */
   --sp-5: 12px; /* 섹션 간격 */
   --sp-6: 16px; /* 넓은 간격 */
+  --sp-7: 24px; /* 화면 여백 */
 
   /* 타이포 (font-size 상위 빈도 6개) */
   --fs-1: 10px; /* 캡션 */
@@ -314,9 +315,13 @@ html, body {
   right: 0;
   top: 0;
   padding: var(--sp-3) var(--sp-4) var(--sp-4);
-  /* ★판때기 제거(08-30). 불투명 스트립 + 하단 2px 보더가 FIELD_H 상단을 덮어 건물이 들어오는
-     구간을 먹고 있었다. 글자 가독성만 남기는 얕은 페이드로 바꾼다 — 경계선은 긋지 않는다. */
-  background: linear-gradient(to bottom, rgba(244, 241, 232, 0.92) 55%, rgba(244, 241, 232, 0));
+  /* ★판때기 제거(08-30). 처음엔 얕은 페이드로 남겼는데, 실측하니 건물이 화면에 들어오는
+     첫 250ms 동안 상단 48px이 그 띠 밑을 지난다(진입 순간 = 반응이 가장 필요한 구간).
+     배경을 아예 없애고 글자에 아이보리 헤일로만 준다 — 필드는 한 픽셀도 안 먹는다. */
+  background: none;
+  text-shadow:
+    0 1px 0 var(--ivory), 0 -1px 0 var(--ivory),
+    1px 0 0 var(--ivory), -1px 0 0 var(--ivory);
   /* ★ui-monospace는 디지털시계 질감이라 손그림 톤과 충돌했다(08-30 감식).
      자릿수 정렬은 폰트가 아니라 tabular-nums로 잡는다(.hud-score). */
   font-family: var(--font-ui);
@@ -530,7 +535,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 28px 18px 20px;
+  padding: var(--sp-7) var(--sp-6) var(--sp-6);
   box-sizing: border-box;
   font-family: var(--font-ui);
   color: var(--ink);
@@ -644,7 +649,7 @@ html, body {
 .ov-tag {
   font-size: var(--fs-3);
   font-weight: 700;
-  margin: 10px 0 var(--sp-6);
+  margin: var(--sp-4) 0 var(--sp-6);
   text-align: center;
 }
 
@@ -699,7 +704,7 @@ html, body {
 .ov-records {
   width: 300px;
   margin-top: var(--sp-6);
-  padding: var(--sp-4) 10px;
+  padding: var(--sp-4) var(--sp-5);
   border: 2px solid var(--ink);
   font-size: var(--fs-2);
   text-align: center;
@@ -774,7 +779,7 @@ html, body {
 
 .ui-card {
   width: 300px;
-  padding: 18px var(--sp-6) var(--sp-6);
+  padding: var(--sp-6);
   border: 1.5px solid var(--ink);
   background: var(--ivory);
   display: flex;
@@ -806,7 +811,7 @@ html, body {
 }
 
 .mission-desc {
-  margin: 2px 0 var(--sp-2);
+  margin: var(--sp-1) 0 var(--sp-2);
 }
 
 /* 수령 완료분은 한 줄로 접는다 — 목록이 아니라 영수증처럼 */
