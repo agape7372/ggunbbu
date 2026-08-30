@@ -127,7 +127,7 @@ function claimBtn(id: string, boost: boolean, ready: boolean, label: string): HT
   const b = document.createElement('button');
   b.type = 'button';
   b.className = boost ? 'flyer-btn primary' : 'flyer-btn';
-  b.style.minHeight = '36px';
+  b.style.minHeight = '44px';
   b.style.padding = '6px 6px';
   b.style.fontSize = '11px';
   b.textContent = label;

@@ -133,7 +133,7 @@ function skuById(id: string): Sku | undefined {
 function groupHtml(title: string, skus: readonly Sku[]): string {
   const rows = skus.map((sku) => {
     const extra = sku.orbit != null ? `궤도조각 ${fmtNum(sku.orbit)}` : '';
-    return `<button type="button" class="flyer-btn" data-shop-sku="${escapeHtml(sku.id)}" style="text-align:left;min-height:40px;padding:6px 10px">
+    return `<button type="button" class="flyer-btn" data-shop-sku="${escapeHtml(sku.id)}" style="text-align:left;min-height:44px;padding:6px 10px">
       <span style="display:flex;justify-content:space-between;gap:8px;font-size:13px">
         <span>${escapeHtml(sku.title)}</span>
         <span>₩${fmtNum(sku.krw)}</span>

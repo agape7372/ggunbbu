@@ -1,15 +1,50 @@
 /* 건뿌 스타일 — 반응형 레터박스 + 터치 UI 레이어 */
 
+:root {
+  /* 색 */
+  --ink: #1A1A20; /* 잉크 — 기본 텍스트/테두리 */
+  --ivory: #F4F1E8; /* 아이보리 — 카드/버튼 배경 */
+  --paper: #E8E4D8; /* 종이 — 배경 바탕 */
+  --yellow: #FFD200; /* 옐로 — 강조/필살/CTA */
+  --red: #E5302E; /* 레드 — 경고/보스/실패 */
+  --dust: #6E695F; /* 더스트 — 보조 텍스트 */
+  --dust-2: #8A857A; /* 더스트2 — 흐린 보조 텍스트 */
+  --pink: #FF6FA8; /* 핑크 — 가드 게이지 */
+
+  /* 간격 (margin/padding/gap 상위 빈도 6개) */
+  --sp-1: 3px; /* 최소 간격 */
+  --sp-2: 4px; /* 촘촘한 간격 */
+  --sp-3: 6px; /* 기본 간격 */
+  --sp-4: 8px; /* 여유 간격 */
+  --sp-5: 12px; /* 섹션 간격 */
+  --sp-6: 16px; /* 넓은 간격 */
+
+  /* 타이포 (font-size 상위 빈도 6개) */
+  --fs-1: 10px; /* 캡션 */
+  --fs-2: 11px; /* 보조 라벨 */
+  --fs-3: 12px; /* 본문 소 */
+  --fs-4: 13px; /* 본문 */
+  --fs-5: 14px; /* 강조 본문 */
+  --fs-6: 16px; /* 버튼 라벨 */
+
+  --font-ui: system-ui, 'Malgun Gothic', sans-serif; /* UI 기본 폰트 */
+  --font-display: Batang, Gungsuh, serif; /* 로고/타이틀 세리프 */
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* ★띠가 죽어 보이던 이유는 남는 공간이 아니라 스테이지 안팎 색이 달랐다는 것이다.
+   360×640 스테이지 밖이 --paper(#E8E4D8)라 게임이 액자에 갇혀 보였고, index.html의
+   theme-color(#F4F1E8)와도 어긋나 상태바→띠→필드로 톤이 두 번 꺾였다. 같은 아이보리로
+   맞추면 띠가 곧 인쇄 여백이 된다(08-30). */
 html, body {
   width: 100%;
   height: 100%;
-  background: #E8E4D8;
+  background: var(--ivory);
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: none;
@@ -58,12 +93,13 @@ html, body {
   z-index: 3;
 }
 
+/* ★그라데이션 워시 제거(08-30) — 필드와 조작존을 색으로 갈라놓아 화면 하단 26%가
+   통짜 크롬처럼 보였다. 경계는 얇은 규칙선 하나면 충분하다("선 하나를 뺄 수 있으면 뺀다"). */
 #touch-layer::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(244, 241, 232, 0.45), rgba(244, 241, 232, 0.12));
-  border-top: 1px solid rgba(26, 26, 32, 0.18);
+  border-top: 1px solid rgba(26, 26, 32, 0.16);
   pointer-events: none;
   z-index: 0;
 }
@@ -75,10 +111,10 @@ html, body {
   padding: 0;
   border: none;
   background: transparent;
-  color: #1A1A20;
+  color: var(--ink);
   font-family: system-ui, sans-serif;
   font-weight: 800;
-  font-size: 11px;
+  font-size: var(--fs-2);
   letter-spacing: -0.04em;
   line-height: 1.1;
   white-space: nowrap;
@@ -94,11 +130,13 @@ html, body {
   z-index: 1;
 }
 
-/* 히트 영역 확장 (-8px). 시각 클립과 분리해 overflow clip에 안 잘리게 둔다. */
+/* 히트 영역 확장. 시각 클립과 분리해 overflow clip에 안 잘리게 둔다.
+   ★08-30 실측: -8px 확장이 버튼 간 8px 갭을 먹어 공격↔가드 8.4px·필살↔공격 8.3px 겹쳤다
+   (경계를 누르면 위에 있는 쪽이 먹는다 = 오조작). 이웃이 있는 버튼은 -3px로 좁혀 겹침 0. */
 .tbtn::before {
   content: '';
   position: absolute;
-  inset: -8px;
+  inset: -3px;
   border-radius: 10px;
   pointer-events: auto;
   z-index: -1;
@@ -109,12 +147,12 @@ html, body {
   content: '';
   position: absolute;
   inset: 0;
-  background: #F4F1E8;
-  border: 2.5px solid #1A1A20;
+  background: var(--ivory);
+  border: 1.5px solid var(--ink);
   box-sizing: border-box;
   pointer-events: none;
   z-index: -1;
-  box-shadow: 2px 3px 0 #1A1A20;
+  box-shadow: 1px 2px 0 var(--ink);
 }
 
 .tbtn.active {
@@ -123,18 +161,18 @@ html, body {
 
 .tbtn.active::after {
   background: #C4C0B4;
-  box-shadow: 1px 1px 0 #1A1A20;
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
 .tbtn[data-action="special"]::after {
-  border-color: #FFD200;
+  border-color: var(--yellow);
   border-width: 3px;
-  box-shadow: 2px 3px 0 #1A1A20, inset 0 0 0 1px #1A1A20;
+  box-shadow: 2px 3px 0 var(--ink), inset 0 0 0 1px var(--ink);
 }
 
 .tbtn[data-action="special"].active::after {
   background: #E6C400;
-  box-shadow: 1px 1px 0 #1A1A20, inset 0 0 0 1px #1A1A20;
+  box-shadow: 1px 1px 0 var(--ink), inset 0 0 0 1px var(--ink);
 }
 
 /* 점프: 철판 라운드렉트. 공격: 해머 페이스. 가드: 헬멧. 필살: 경고 플레이트.
@@ -158,6 +196,9 @@ html, body {
 /* 버튼 배치 — #touch-layer(필드 아래 170px) 기준.
    왼쪽 점프(엄지 홈). 오른쪽: 공격 위, 가드 아래, 필살 안쪽. */
 
+/* 점프는 왼쪽에 홀로 있어 넓게 확장해도 이웃과 안 겹친다 */
+#btn-jump::before { inset: -8px; }
+
 #btn-jump {
   left: 10px;
   top: 22px;
@@ -171,7 +212,7 @@ html, body {
   top: 10px;
   width: 122px;
   height: 78px;
-  font-size: 16px;
+  font-size: var(--fs-6);
 }
 
 #btn-guard {
@@ -179,7 +220,7 @@ html, body {
   top: 96px;
   width: 122px;
   height: 58px;
-  font-size: 14px;
+  font-size: var(--fs-5);
 }
 
 #btn-special {
@@ -187,7 +228,7 @@ html, body {
   top: 10px;
   width: 52px;
   height: 52px;
-  font-size: 11px;
+  font-size: var(--fs-2);
 }
 
 /* 왼손잡이: 점프↔클러스터 통째 스왑 */
@@ -264,14 +305,17 @@ html, body {
   left: 0;
   right: 0;
   top: 0;
-  padding: 6px 8px 8px;
-  background: rgba(244, 241, 232, 0.94);
-  border-bottom: 2px solid #1A1A20;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  /* ★판때기 제거(08-30). 불투명 스트립 + 하단 2px 보더가 FIELD_H 상단을 덮어 건물이 들어오는
+     구간을 먹고 있었다. 글자 가독성만 남기는 얕은 페이드로 바꾼다 — 경계선은 긋지 않는다. */
+  background: linear-gradient(to bottom, rgba(244, 241, 232, 0.92) 55%, rgba(244, 241, 232, 0));
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  color: #1A1A20;
+  color: var(--ink);
   pointer-events: none;
 }
 
+/* 시각 크기는 유지하되(필드를 덜 먹는다) 히트 영역만 44×44로 넓힌다 — ::before 참조.
+   ★08-30 실측: 세로 22.9px로 플레이 중 유일한 상시 버튼이 기준의 절반이었다. */
 .hud-pause {
   position: absolute;
   top: 6px;
@@ -279,10 +323,10 @@ html, body {
   width: 44px;
   height: 22px;
   padding: 0;
-  border: 2px solid #1A1A20;
-  background: #F4F1E8;
-  color: #1A1A20;
-  font-size: 10px;
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  font-size: var(--fs-1);
   font-weight: 800;
   letter-spacing: -0.04em;
   pointer-events: auto;
@@ -290,16 +334,23 @@ html, body {
   z-index: 1;
 }
 
+.hud-pause::before {
+  content: '';
+  position: absolute;
+  inset: -11px -0px;
+  pointer-events: auto;
+}
+
 .hud-pause:active {
-  background: #1A1A20;
-  color: #F4F1E8;
+  background: var(--ink);
+  color: var(--ivory);
 }
 
 .hud-row-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 6px;
+  gap: var(--sp-3);
   padding-left: 52px;
   min-height: 36px;
 }
@@ -309,40 +360,41 @@ html, body {
 .hud-col-right { flex: 0 0 124px; text-align: right; }
 
 .hud-score {
-  font-size: 13px;
+  font-size: var(--fs-4);
   font-weight: 800;
   letter-spacing: 0.04em;
   line-height: 1.2;
+  font-variant-numeric: tabular-nums; /* 8자리 점수가 타격마다 폭이 흔들리지 않게 */
 }
 
 .hud-lives {
   display: flex;
-  gap: 3px;
-  margin-top: 3px;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
 }
 
 .life {
   display: block;
   width: 10px;
   height: 10px;
-  border: 1.5px solid #1A1A20;
+  border: 1.5px solid var(--ink);
   background: transparent;
 }
 
 .life.on {
-  background: #E5302E;
+  background: var(--red);
 }
 
 .hud-mode {
-  font-size: 10px;
+  font-size: var(--fs-1);
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: none;
 }
 
 .hud-floor {
-  font-size: 10px;
-  color: #6E695F;
+  font-size: var(--fs-1);
+  color: var(--dust);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -350,37 +402,39 @@ html, body {
 }
 
 .hud-combo {
-  font-size: 12px;
+  font-size: var(--fs-3);
   font-weight: 800;
   height: 16px;
   line-height: 16px;
-  color: #1A1A20;
+  color: var(--ink);
 }
 
-.hud-combo.hi { color: #1A1A20; }
+.hud-combo.hi { color: var(--ink); }
 .hud-combo.mid {
   display: inline-block;
-  background: #FFD200;
-  padding: 0 4px;
+  background: var(--yellow);
+  padding: 0 var(--sp-2);
 }
-.hud-combo.hot { color: #E5302E; }
+.hud-combo.hot { color: var(--red); }
 .hud-combo.cap {
   animation: hud-rainbow 0.6s linear infinite;
 }
-.hud-combo.punch {
+/* punch/punch-b는 같은 키프레임 — 강제 리플로우(void offsetWidth) 없이 재시작하려고 번갈아 단다(hud.ts) */
+.hud-combo.punch,
+.hud-combo.punch-b {
   animation: hud-punch 80ms cubic-bezier(0.27, 1.64, 0.42, 0.64);
 }
 .hud-combo.broke {
-  color: #8A857A;
+  color: var(--dust-2);
   transform: translateY(6px);
   opacity: 0.7;
 }
 
 .hud-gauges {
-  margin-top: 4px;
+  margin-top: var(--sp-2);
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--sp-1);
   align-items: flex-end;
 }
 
@@ -390,11 +444,11 @@ html, body {
   width: 110px;
   background: #D5D0C4;
   overflow: hidden;
-  border: 1px solid #1A1A20;
+  border: 1px solid var(--ink);
 }
 
 .bar-waza { width: 72px; height: 5px; }
-.bar-boss { width: 100%; height: 6px; margin-top: 3px; }
+.bar-boss { width: 100%; height: 6px; margin-top: var(--sp-1); }
 
 .bar .ghost,
 .bar .fill {
@@ -405,42 +459,43 @@ html, body {
   width: 0;
 }
 
+/* ★고스트 추격은 JS가 감쇠값을 굴린다(hud.ts chaseGhost) — CSS 트랜지션을 쓰면 매 프레임
+   목표값이 다시 쓰여 트랜지션이 계속 재시작되고, 설계한 "지연 추격"이 화면에 아예 안 나온다. */
 .bar .ghost {
   background: rgba(26, 26, 32, 0.18);
-  transition: width 180ms linear 80ms;
 }
 
 .bar .fill { transition: none; }
-.bar-guard .fill { background: #FF6FA8; }
-.bar-waza .fill { background: #FFD200; }
-.bar-waza.full .fill { background: #E5302E; }
-.bar-boss .fill { background: #E5302E; }
+.bar-guard .fill { background: var(--pink); }
+.bar-waza .fill { background: var(--yellow); }
+.bar-waza.full .fill { background: var(--red); }
+.bar-boss .fill { background: var(--red); }
 
 .hud-boss,
 .hud-bonus,
 .hud-cap,
 .hud-pin,
 .hud-waza-ready {
-  margin-top: 4px;
-  font-size: 10px;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-1);
   font-weight: 700;
   text-align: center;
 }
 
-.hud-bonus { color: #1A1A20; font-size: 12px; }
-.hud-cap { color: #E5302E; }
+.hud-bonus { color: var(--ink); font-size: var(--fs-3); }
+.hud-cap { color: var(--red); }
 .hud-pin {
   position: absolute;
   left: 50%;
   top: 418px;
   transform: translateX(-50%);
   width: 240px;
-  padding: 4px 8px;
-  border: 2px solid #1A1A20;
-  background: #F4F1E8;
-  font-size: 11px;
+  padding: var(--sp-2) var(--sp-4);
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  font-size: var(--fs-2);
 }
-.hud-waza-ready { color: #1A1A20; }
+.hud-waza-ready { color: var(--ink); }
 
 /* 오버레이 스크린 */
 .ov-screen {
@@ -451,8 +506,8 @@ html, body {
   align-items: center;
   padding: 28px 18px 20px;
   box-sizing: border-box;
-  font-family: system-ui, 'Malgun Gothic', sans-serif;
-  color: #1A1A20;
+  font-family: var(--font-ui);
+  color: var(--ink);
   touch-action: manipulation;
 }
 
@@ -468,8 +523,8 @@ html, body {
   height: 52px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  border-top: 2px solid #1A1A20;
-  background: #F4F1E8;
+  border-top: 2px solid var(--ink);
+  background: var(--ivory);
   z-index: 12;
   pointer-events: auto;
 }
@@ -482,11 +537,11 @@ html, body {
   margin: 0;
   padding: 0;
   border: none;
-  border-right: 1px solid #1A1A20;
+  border-right: 1px solid var(--ink);
   background: transparent;
-  color: #1A1A20;
+  color: var(--ink);
   font-family: inherit;
-  font-size: 10px;
+  font-size: var(--fs-1);
   font-weight: 800;
   letter-spacing: -0.04em;
   cursor: pointer;
@@ -498,23 +553,23 @@ html, body {
 }
 
 .ov-tab.on {
-  background: #FFD200;
+  background: var(--yellow);
 }
 
 .ov-screen[hidden] { display: none !important; }
 
 .ov-boot {
   justify-content: center;
-  background: #F4F1E8;
+  background: var(--ivory);
 }
 
 .ov-boot-mark {
   font-size: 28px;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-4);
 }
 
 .ov-boot-title {
-  font-family: Batang, Gungsuh, serif;
+  font-family: var(--font-display);
   font-size: 48px;
   font-weight: 900;
   letter-spacing: -0.04em;
@@ -522,46 +577,46 @@ html, body {
 
 .ov-boot-cta {
   margin-top: 18px;
-  font-size: 14px;
+  font-size: var(--fs-5);
   font-weight: 700;
 }
 
 .ov-title {
-  background: #F4F1E8;
+  background: var(--ivory);
   justify-content: flex-start;
   overflow-y: auto;
 }
 
 .ov-logo {
-  font-family: Batang, Gungsuh, serif;
+  font-family: var(--font-display);
   font-size: 52px;
   font-weight: 900;
   letter-spacing: -0.06em;
   line-height: 1;
-  margin-top: 12px;
+  margin-top: var(--sp-5);
   pointer-events: auto;
 }
 
-.ov-logo span { color: #FFD200; -webkit-text-stroke: 1px #1A1A20; }
+.ov-logo span { color: var(--yellow); -webkit-text-stroke: 1px var(--ink); }
 
 .ov-logo-en {
-  font-size: 11px;
+  font-size: var(--fs-2);
   letter-spacing: 0.28em;
-  color: #6E695F;
-  margin-top: 4px;
+  color: var(--dust);
+  margin-top: var(--sp-2);
 }
 
 .ov-tag {
-  font-size: 12px;
+  font-size: var(--fs-3);
   font-weight: 700;
-  margin: 10px 0 16px;
+  margin: 10px 0 var(--sp-6);
   text-align: center;
 }
 
 .ov-menu {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-3);
   width: 280px;
 }
 
@@ -569,13 +624,13 @@ html, body {
   display: block;
   width: 100%;
   min-height: 44px;
-  padding: 8px 12px;
-  border: 2px solid #1A1A20;
-  background: #F4F1E8;
-  color: #1A1A20;
-  box-shadow: 3px 3px 0 #1A1A20;
+  padding: var(--sp-4) var(--sp-5);
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--fs-5);
   font-weight: 800;
   cursor: pointer;
   touch-action: manipulation;
@@ -583,8 +638,8 @@ html, body {
 }
 
 .flyer-btn[hidden] { display: none !important; }
-.flyer-btn.primary { background: #FFD200; }
-.flyer-btn.selected { outline: 2px solid #1A1A20; outline-offset: 2px; }
+.flyer-btn.primary { background: var(--yellow); }
+.flyer-btn.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
 .flyer-btn.locked,
 .flyer-btn:disabled {
   opacity: 0.42;
@@ -594,21 +649,21 @@ html, body {
 
 .flyer-btn:not(:disabled):active {
   transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 #1A1A20;
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
 .ov-records {
   width: 280px;
-  margin-top: 16px;
-  padding: 8px 10px;
-  border: 2px solid #1A1A20;
-  font-size: 11px;
+  margin-top: var(--sp-6);
+  padding: var(--sp-4) 10px;
+  border: 2px solid var(--ink);
+  font-size: var(--fs-2);
   text-align: center;
 }
 
 .ov-records-h {
   font-weight: 800;
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-2);
   letter-spacing: 0.08em;
 }
 
@@ -616,36 +671,36 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
+  gap: var(--sp-3);
   width: 280px;
-  margin-top: 12px;
+  margin-top: var(--sp-5);
 }
 
 .ov-stamp {
-  font-size: 10px;
+  font-size: var(--fs-1);
   font-weight: 700;
-  padding: 4px 6px;
-  border: 1.5px dashed #8A857A;
-  color: #8A857A;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1.5px dashed var(--dust-2);
+  color: var(--dust-2);
 }
 
 .ov-stamp.open {
   border-style: solid;
-  border-color: #1A1A20;
-  color: #1A1A20;
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
 .ov-hint {
   margin-top: auto;
-  padding-top: 12px;
-  font-size: 10px;
-  color: #6E695F;
+  padding-top: var(--sp-5);
+  font-size: var(--fs-1);
+  color: var(--dust);
   text-align: center;
 }
 
 .ov-buddha {
-  font-size: 11px;
-  margin-top: 6px;
+  font-size: var(--fs-2);
+  margin-top: var(--sp-3);
 }
 
 .ov-dim {
@@ -659,7 +714,7 @@ html, body {
 .ov-story-lines {
   width: 300px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--fs-4);
   line-height: 1.7;
 }
 
@@ -667,45 +722,45 @@ html, body {
 
 .ui-card {
   width: 300px;
-  padding: 18px 16px 16px;
-  border: 3px solid #1A1A20;
-  background: #F4F1E8;
-  box-shadow: 5px 5px 0 #1A1A20;
+  padding: 18px var(--sp-6) var(--sp-6);
+  border: 3px solid var(--ink);
+  background: var(--ivory);
+  box-shadow: 5px 5px 0 var(--ink);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-4);
   text-align: center;
 }
 
 .ui-card h2 {
-  font-family: Batang, Gungsuh, serif;
+  font-family: var(--font-display);
   font-size: 26px;
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-2);
 }
 
-.ui-card-fail h2 { color: #E5302E; }
+.ui-card-fail h2 { color: var(--red); }
 
 .ui-card-manual {
   text-align: left;
 }
 
 .ov-manual-lead {
-  font-size: 11px;
+  font-size: var(--fs-2);
   line-height: 1.5;
-  color: #6E695F;
-  margin-bottom: 4px;
+  color: var(--dust);
+  margin-bottom: var(--sp-2);
 }
 
 .ov-manual-keys {
-  font-size: 10px;
-  color: #6E695F;
+  font-size: var(--fs-1);
+  color: var(--dust);
   line-height: 1.4;
 }
 
 .ov-pause-stats,
 .ov-over-score,
 .ov-over-line {
-  font-size: 12px;
+  font-size: var(--fs-3);
 }
 
 .ov-ending {
@@ -714,26 +769,26 @@ html, body {
 }
 
 .ov-end-stamp {
-  font-family: Batang, Gungsuh, serif;
+  font-family: var(--font-display);
   font-size: 36px;
   font-weight: 900;
 }
 
 .ov-end-sub {
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--fs-4);
 }
 
 .ov-end-score {
   margin-top: 18px;
-  font-size: 13px;
+  font-size: var(--fs-4);
   font-weight: 700;
 }
 
 .ov-end-note {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #6E695F;
+  margin-top: var(--sp-4);
+  font-size: var(--fs-3);
+  color: var(--dust);
   text-align: center;
 }
 
@@ -747,10 +802,10 @@ html, body {
 }
 
 @keyframes hud-rainbow {
-  0% { color: #E5302E; }
+  0% { color: var(--red); }
   33% { color: #1E62D0; }
-  66% { color: #1A1A20; }
-  100% { color: #E5302E; }
+  66% { color: var(--ink); }
+  100% { color: var(--red); }
 }
 
 @keyframes hud-blink {
@@ -759,6 +814,7 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .hud-combo.punch,
+  .hud-combo.punch-b,
   .hud-combo.cap,
   .blink {
     animation: none;
@@ -766,12 +822,18 @@ html, body {
 }
 
 /* 08-30(E-5): 시스템 스크롤바가 전단지 톤을 깨고 콘텐츠 위에 겹침 — 잉크색 얇은 바로 통일 */
-.ov-shop, .ui-card [style*="overflow-y"], .ov-screen [data-el="mission-list"] {
+/* ★08-30 실측 정정: `.ui-card [style*=…]`는 후손 셀렉터라 인라인 overflow-y를 자기 자신이
+   가진 .ov-missions·.ov-custom엔 안 걸렸다(5탭 중 3탭이 시스템 스크롤바). 자기 자신도 잡는다. */
+.ov-shop,
+.ov-ops,
+.ui-card[style*="overflow-y"],
+.ui-card [style*="overflow-y"],
+.ov-screen [data-el="mission-list"] {
   scrollbar-width: thin;
-  scrollbar-color: #1A1A20 transparent;
+  scrollbar-color: var(--ink) transparent;
 }
 .ov-shop::-webkit-scrollbar { width: 4px; }
-.ov-shop::-webkit-scrollbar-thumb { background: #1A1A20; border-radius: 2px; }
+.ov-shop::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 2px; }
 .ov-shop::-webkit-scrollbar-track { background: transparent; }
 
 /* 08-30(P1-2): 일시정지 경유 화면(취급설명서)에선 하단 탭바 차단 — pause 씬을 둔 채

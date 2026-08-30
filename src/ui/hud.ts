@@ -93,6 +93,26 @@ export function mountHud(
   let lastBonus = '';
   let lastBoss = '';
   let comboPunchTimer = 0;
+  // 게이지: 매 프레임 style.width를 다시 쓰면 레이아웃이 매 프레임 무효화된다(08-30 실측).
+  // 정수 %가 바뀔 때만 쓴다.
+  let lastG = -1;
+  let lastW = -1;
+  // 고스트(지연 추격)는 CSS transition으로 하면 매 프레임 목표값이 다시 쓰여 트랜지션이
+  // 계속 재시작돼 화면에 아무것도 안 나온다 — JS에서 감쇠값을 직접 굴린다.
+  let ghostG = 0;
+  let ghostW = 0;
+  let lastGhostG = -1;
+  let lastGhostW = -1;
+  // punch 애니메이션 재시작에 쓰던 void offsetWidth(강제 동기 리플로우)를 없애고
+  // 같은 키프레임을 가리키는 클래스 2개를 번갈아 단다.
+  let punchAlt = false;
+
+  /** 값이 오르면 즉시 따라가고, 내려갈 때만 프레임당 GHOST_DECAY_PCT 씩 천천히 내려온다. */
+  const GHOST_DECAY_PCT = 1.6;
+  function chaseGhost(prev: number, v: number): number {
+    if (v >= prev) return v;
+    return Math.max(v, prev - GHOST_DECAY_PCT);
+  }
 
   function livesHtml(n: number): string {
     let s = '';
@@ -154,21 +174,43 @@ export function mountHud(
         comboEl.classList.toggle('cap', s.combo >= 999);
         comboEl.classList.toggle('broke', broke);
         if (rose) {
-          comboEl.classList.remove('punch');
-          void comboEl.offsetWidth;
-          comboEl.classList.add('punch');
+          // 클래스 2개를 번갈아 달아 애니메이션을 재시작한다 — 강제 리플로우 없이 같은 효과.
+          punchAlt = !punchAlt;
+          comboEl.classList.toggle('punch', punchAlt);
+          comboEl.classList.toggle('punch-b', !punchAlt);
           window.clearTimeout(comboPunchTimer);
-          comboPunchTimer = window.setTimeout(() => comboEl.classList.remove('punch'), 90);
+          comboPunchTimer = window.setTimeout(() => {
+            comboEl.classList.remove('punch');
+            comboEl.classList.remove('punch-b');
+          }, 90);
         }
         capEl.hidden = s.combo < 999;
       }
 
       const g = Math.max(0, Math.min(100, s.guardGauge));
       const w = Math.max(0, Math.min(100, s.wazaGauge));
-      guardFill.style.width = `${g}%`;
-      guardGhost.style.width = `${g}%`;
-      wazaFill.style.width = `${w}%`;
-      wazaGhost.style.width = `${w}%`;
+      const gi = Math.round(g);
+      const wi = Math.round(w);
+      if (gi !== lastG) {
+        lastG = gi;
+        guardFill.style.width = `${gi}%`;
+      }
+      if (wi !== lastW) {
+        lastW = wi;
+        wazaFill.style.width = `${wi}%`;
+      }
+      ghostG = chaseGhost(ghostG, g);
+      ghostW = chaseGhost(ghostW, w);
+      const ggi = Math.round(ghostG);
+      const gwi = Math.round(ghostW);
+      if (ggi !== lastGhostG) {
+        lastGhostG = ggi;
+        guardGhost.style.width = `${ggi}%`;
+      }
+      if (gwi !== lastGhostW) {
+        lastGhostW = gwi;
+        wazaGhost.style.width = `${gwi}%`;
+      }
       wazaBar.classList.toggle('full', w >= 100);
       readyEl.hidden = w < 100;
 

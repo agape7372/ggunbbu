@@ -75,7 +75,7 @@ export function paintCustom(
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'flyer-btn';
-      btn.style.minHeight = '40px';
+      btn.style.minHeight = '44px';
       btn.style.padding = '6px 4px';
       btn.style.fontSize = '11px';
       btn.setAttribute('data-equip-slot', sec.slot);
