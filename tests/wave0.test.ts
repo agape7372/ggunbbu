@@ -44,7 +44,28 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
     expect(maxY).toBeGreaterThan(70);
   });
 
-  it('★접착 금지 — 부딪힌 뒤 내려오는 스택을 따라가지 않는다', () => {
+  it('내려오는 밑면은 플레이어를 눌러 내린다 (계획 정본: 못 부수면 깔린다)', () => {
+    const s = makeState();
+    s.stack = makeStack({
+      variant: 'building',
+      theme: 'europe',
+      floors: [makeFloor('hard'), makeFloor('hard')],
+      y: 300,
+    });
+    s.stack.vy = -400;
+    advance(s, inp({ jump: true }));
+    let pressed = false;
+    for (let i = 0; i < 120; i++) {
+      advance(s, inp());
+      // 밑면 바로 아래에 붙어 같이 내려오는 구간이 있어야 한다(눌림)
+      if (s.player.y > 0 && Math.abs(s.player.y - (s.stack!.y - 55)) < 1.5) pressed = true;
+      if (s.player.pose === 'pinned') break;
+    }
+    expect(pressed).toBe(true);
+    expect(s.player.pose).toBe('pinned'); // 지면까지 눌리면 깔림
+  });
+
+  it('★그래도 접착은 아니다 — 밑면이 위로 도망가면 따라 올라가지 않는다', () => {
     const s = makeState();
     s.stack = makeStack({
       variant: 'building',
@@ -52,21 +73,16 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
       floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard')],
       y: 140,
     });
-    s.stack.vy = -100; // 내려오는 중
+    s.stack.vy = 0;
     advance(s, inp({ jump: true }));
-    let bonked = false;
-    let ticks = 0;
-    for (let i = 0; i < 120; i++) {
-      advance(s, inp());
-      if (s.player.vy === 0 && s.player.y > 0) bonked = true;
-      if (s.player.y <= 0) { ticks = i; break; }
-    }
-    expect(bonked).toBe(true);
-    // 구코드(cling): 스택 밑면에 붙어 같이 내려오느라 지면 도달이 스택 속도에 묶였다.
-    // 신코드: 막히기만 하고 곧바로 자유낙하 — 스택보다 훨씬 빨리 지면에 닿는다.
-    expect(s.player.y).toBe(0);
-    expect(ticks).toBeLessThan(60);
-    expect(s.stack!.y).toBeGreaterThan(0); // 스택은 아직 공중 — 끌려 내려간 게 아니다
+    for (let i = 0; i < 6; i++) advance(s, inp());
+    // 밑면(140)에서 막힌 상태에서, 스택을 위로 밀어낸다(공격의 HIT_LIFT와 같은 방향)
+    s.stack.y = 400;
+    s.stack.vy = 300;
+    const before = s.player.y;
+    for (let i = 0; i < 10; i++) advance(s, inp());
+    // 접착이면 밑면을 따라 400 근처로 끌려 올라갔을 것. 막힘은 붙지 않는다 — 그대로 낙하.
+    expect(s.player.y).toBeLessThanOrEqual(before + 0.01);
   });
 
   it('정지 스택 아래에서도 점프는 즉시 발동한다 (13px 홉 소멸 방지)', () => {

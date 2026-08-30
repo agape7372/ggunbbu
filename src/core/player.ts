@@ -115,7 +115,7 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   if (p.y > 0 || p.vy > 0) {
     p.vy -= PLAYER.GRAVITY * dt;
     p.y += p.vy * dt;
-    blockUnderStack(s, p);
+    contactWithStack(s, p);
     if (p.y <= 0) {
       p.y = 0;
       p.vy = 0;
@@ -136,30 +136,48 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
 }
 
 /**
- * ★08-30(사용자 지시 "통과 안 하고 막히는 거"): 낙하 건물 밑면은 **막힌다**.
- * 통과도 아니고 윗면 착지도 아니다 — 머리가 밑면에 닿으면 거기서 멈춘다.
+ * 낙하 건물 밑면과의 접촉 — **막고, 누른다.**
  *
- * ★08-29 cling(접착)과 다른 점이 이 함수의 존재 이유다:
- *   ① **상승 중에만** 검사한다. 하강 중에도 막으면 스택이 플레이어를 밀어 내리는 옛 경로가
- *      되살아난다(끌려 내려가 깔림 직행 = 자살 버튼, ROADMAP Wave 0의 삭제 사유).
- *   ② 부딪히면 `vy = 0`으로 **멈출 뿐** 스택 속도(`stack.vy`)를 따라가지 않는다. 접착 없음.
- *   ③ 밑면 아래에 사람이 설 자리가 없으면(headroom ≤ 0) 검사하지 않는다 — 그건 깔림 판정
- *      영역이고 여기서 건드리면 y가 음수로 튄다.
- * 필살 중에는 막지 않는다(전파괴 연출이 벽에 걸리면 안 된다).
+ * ★계획 정본(원작 대조)이 정한 루프가 이것이다:
+ *   - "공격: 건물을 약간 위로 밀어냄" · "정석: 최하층 HP1 남기고 점프가드 → 공중에서 아래층 제거 → 반복"
+ *   - "건물 완전 접지 = 라이프 1 손실 + 깔림"
+ *   즉 **계속 부수며 건물을 띄워 버티는 게 공격이고, 못 부수면 눌려 내려가 죽는 게 리스크**다.
+ *   관통은 그 리스크를 지워 게임을 무르게 만든다(08-30 사용자 지적).
+ *
+ * 두 방향 모두 접촉으로 처리한다:
+ *   ① 상승 중 머리가 밑면에 닿으면 거기서 멈춘다(통과 금지).
+ *   ② 밑면이 내려와 머리를 덮으면 **같이 눌려 내려간다**. 지면까지 눌리면 sim의 접지 검사가
+ *      깔림([정본] 라이프 1 손실)으로 받는다.
+ *
+ * ★08-29 cling과 다른 점: cling은 **접촉하지 않았는데도** `p.vy <= stack.vy`만으로 밑면에 스냅해
+ * 점프가 13px 홉으로 소멸했다. 여기서는 **실제로 겹칠 때만** 개입하고, 밑면 아래에 설 자리가
+ * 없으면(headroom ≤ 0) 좌표를 건드리지 않는다(그 구간은 깔림 판정 영역이다).
+ * 필살 중에는 무적·전파괴라 개입하지 않는다.
  */
-function blockUnderStack(s: GameState, p: PlayerState): void {
+function contactWithStack(s: GameState, p: PlayerState): void {
   const st = s.stack;
   if (!st || s.mode === 'bonus') return;
-  if (p.vy <= 0 || p.pose === 'special') return;
+  if (p.pose === 'special' || p.pose === 'pinned' || p.pose === 'dead') return;
+
   const headroom = st.y - PLAYER.H;
-  if (headroom <= 0) return;
-  if (p.y + PLAYER.H <= st.y) return;
-  p.y = headroom;
-  p.vy = 0;
-  s.events.push({ kind: 'headBonk' });
+  if (p.y + PLAYER.H <= st.y) return; // 아직 안 닿았다
+
+  // ① 올라가다 부딪힘 — 그 높이에서 멈춘다
+  if (p.vy > 0 && headroom > 0) {
+    p.y = headroom;
+    p.vy = 0;
+    s.events.push({ kind: 'headBonk' });
+    return;
+  }
+
+  // ② 밑면이 내려와 덮음 — 같이 눌려 내려간다(스택보다 느리게 못 내려간다)
+  if (st.vy < 0 || st.resting) {
+    p.y = Math.max(0, headroom);
+    if (st.vy < 0) p.vy = Math.min(p.vy, st.vy);
+  }
 }
 
-// ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면
+// ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다.// ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면
 // 거의 항상 밑면에 접착돼 점프가 13px 홉으로 소멸하고(QA 실측), 같이 끌려 내려가 깔림에
 // 직행하는 구조적 자살 버튼이었다. 점프 = 제자리 회피 + 공중 무적(시각 관통 허용)이라는
 // 08-28 이전 검증 상태로 복원. 재도입하려면 docs/ROADMAP_2026-08-30.md Wave 0 근거를 먼저 뒤집을 것.

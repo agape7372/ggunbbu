@@ -151,8 +151,12 @@ describe('깔림 3분기 [정본]', () => {
   });
 });
 
-describe('점프 무적 [정본: 공중에서는 짓눌리지 않음]', () => {
-  it('공중에 있으면 스택이 접지해도 라이프 무손실', () => {
+// ★08-30 계약 개정(사용자 확정, 계획 정본 대조): "공중 무적"은 원작이 아니다.
+// 계획서 정본 = "공격은 건물을 위로 밀어냄 / 최하층 부수며 버팀 / 건물 완전 접지 = 라이프 1 손실".
+// 즉 **부수며 띄워 버티는 게 방어고, 못 부수면 눌려 내려가 죽는 게 리스크**다.
+// 공중에 있다고 건물이 통과해 주면 그 리스크가 통째로 사라진다.
+describe('밑면 접촉 [08-30 개정: 공중이어도 눌린다]', () => {
+  it('내려오는 밑면이 덮으면 공중이어도 눌려 내려가 깔린다', () => {
     const s = makeState();
     advance(s, inp({ jump: true }));
     for (let t = 0; t < 12; t++) advance(s, EMPTY_INPUT); // 충분히 상승
@@ -160,10 +164,10 @@ describe('점프 무적 [정본: 공중에서는 짓눌리지 않음]', () => {
     withStack(s, 20, 'hard');
     s.stack!.vy = -600;
     const lives = s.lives;
-    for (let t = 0; t < 20 && !s.stack!.resting; t++) advance(s, EMPTY_INPUT);
-    expect(s.stack!.resting).toBe(true);   // 스택은 지면에 놓임
-    expect(s.lives).toBe(lives);           // 그러나 공중이라 무사
-    expect(s.player.pose).not.toBe('pinned');
+    for (let t = 0; t < 40 && s.player.pose !== 'pinned'; t++) advance(s, EMPTY_INPUT);
+    expect(s.stack!.resting).toBe(true);
+    expect(s.player.pose).toBe('pinned');  // 눌려 내려가 깔림
+    expect(s.lives).toBe(lives - 1);       // [정본] 접지 = 라이프 1 손실
   });
 
   it('놓인 스택 위로 착지하면 그때 깔린다', () => {

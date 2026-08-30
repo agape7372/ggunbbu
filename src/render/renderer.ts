@@ -166,35 +166,13 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   }
   if (s.boss) drawBoss(ctx, s.boss, g);
 
-  // ★08-30(A안, 사용자 확정): 점프 관통은 [정본]이다(sim.ts "점프 무적의 이면 = 착지 시 깔림").
-  // 규칙을 바꾸지 않고 **화면에 드러낸다** — 관통이 버그로 보이던 건 "지금 무적"이 안 보여서였다.
-  //   ① 공중 = 반투명 실루엣(통과 중이라는 신호)
-  //   ② 지면에 스택이 놓여 있는데 공중이면 = 착지 예정 지점에 위험 표시(무적의 이면을 예고)
-  const airborne = s.player.y > 0;
-  const landingDanger = airborne && !!s.stack?.resting
-    && s.player.pose !== 'dead' && s.player.pose !== 'pinned' && s.mode !== 'bonus';
-  if (landingDanger) drawLandingDanger(ctx, g, s.player.invulnTicks);
-
-  // ③ 겹치는 프레임 = 스침. ★08-30 갱신: 이제 **상승 중엔 밑면에서 막히므로**(core blockUnderStack)
-  //    겹침은 "내려오는 스택이 나를 지나칠 때"만 남는다. 그 순간에만 획을 긋고 몸을 반투명으로 —
-  //    맞은 게 아니라 지나간 것이라는 신호. 점프 내내 흐릿하게 두지 않는다(캐릭터가 약해 보인다).
-  let overlapping = false;
-  if (airborne && s.stack) {
-    const stackTop = s.stack.y + s.stack.floors.reduce((a2, f) => a2 + f.h, 0);
-    const pTop = s.player.y + PLAYER.H;
-    if (pTop > s.stack.y && s.player.y < stackTop) {
-      overlapping = true;
-      drawGraze(ctx, g - s.player.y - PLAYER.H / 2);
-    }
-  }
-
+  // ★08-30 계약 개정: 관통 시각화(반투명·스침 획·착지 위험 표시)는 전부 제거했다.
+  // 밑면이 막고 누르는 세계에서는 "통과 중"이라는 상태 자체가 없다 — 없는 것을 그리면 거짓말이다.
+  // 접촉 피드백은 core가 발행하는 headBonk 이벤트(먼지·소리·진동)가 진다.
   // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2)
   const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES;
   if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
-    const ghost = overlapping && s.player.pose !== 'special';
-    if (ghost) ctx.globalAlpha = 0.62;
     drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
-    if (ghost) ctx.globalAlpha = 1;
   }
   ctx.restore();
 
@@ -224,49 +202,6 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     ctx.fillRect(0, 0, VIEW.W, VIEW.H);
     ctx.globalAlpha = 1;
   }
-}
-
-/** 관통 스침 — 캐릭터 양옆으로 짧은 먼지 획 2개. 획이 얇아 필드 판독성을 안 먹는다. */
-function drawGraze(ctx: CanvasRenderingContext2D, cy: number): void {
-  const cx = VIEW.LANE_X[0];
-  ctx.save();
-  ctx.globalAlpha = 0.5;
-  ctx.strokeStyle = '#6E695F';
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx - 30, cy - 6);
-  ctx.lineTo(cx - 16, cy - 2);
-  ctx.moveTo(cx + 16, cy + 2);
-  ctx.lineTo(cx + 30, cy + 6);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/**
- * 착지 예정 지점 위험 표시 — 지면에 스택이 놓인 채 공중에 있으면 내려오는 순간 깔린다([정본]).
- * 점선 사각 + 화살표 하나. 필드를 덜 먹게 지면 바로 위에만 그린다.
- */
-function drawLandingDanger(ctx: CanvasRenderingContext2D, groundY: number, invulnTicks: number): void {
-  const w = 44;
-  const x = VIEW.LANE_X[0] - w / 2;
-  const y = groundY - 14;
-  const blink = Math.floor(invulnTicks / 6) % 2 === 0 ? 1 : 0.55;
-  ctx.save();
-  ctx.globalAlpha = 0.85 * blink;
-  ctx.strokeStyle = PALETTE.RED;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 3]);
-  ctx.strokeRect(x, y, w, 12);
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(VIEW.LANE_X[0], y - 12);
-  ctx.lineTo(VIEW.LANE_X[0], y - 3);
-  ctx.moveTo(VIEW.LANE_X[0] - 4, y - 7);
-  ctx.lineTo(VIEW.LANE_X[0], y - 3);
-  ctx.lineTo(VIEW.LANE_X[0] + 4, y - 7);
-  ctx.stroke();
-  ctx.restore();
 }
 
 function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number): void {
