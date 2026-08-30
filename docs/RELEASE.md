@@ -42,6 +42,9 @@ JAVA_HOME="D:/android-toolchain/jdk21" ./gradlew assembleDebug
 # 산출물: android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+- 버전 올리기: 루트에서 `npm run version:native -- <versionName> [versionCode]` —
+  gradle 두 값을 같이 올리고 다음에 발행할 OTA 버전까지 알려준다(내려가는 값은 거부).
+- 스토어 등록정보·Data Safety·콘텐츠 등급 답변 원고: [STORE_LISTING.md](STORE_LISTING.md).
 - `android/local.properties`(sdk.dir)는 기기별 — 커밋 금지. 새 PC에선 `sdk.dir=D:\\android-toolchain\\sdk` 직접 생성.
 - 릴리스: `./gradlew bundleRelease` → 서명 AAB.
 

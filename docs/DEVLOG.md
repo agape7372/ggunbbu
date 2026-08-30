@@ -429,3 +429,15 @@ Wave 0 이후 6커밋(039b12d~cc9ed14)에 2차 적대적 패널(19에이전트) 
 
 잔여(Wave 4): `cd ota && npx vercel --prod` 첫 배포(사용자 승인) · keystore 생성 · 실 AdMob ID ·
 실기기 스모크 · Play 콘솔 제출물. 잔여(Wave 3): 아트 PNG 11키 생성(그록 프롬프트는 정렬 완료).
+
+**같은 날 후속 — 제출 원고와 버전 스크립트:**
+
+- `docs/STORE_LISTING.md` 신설 — 앱 이름·짧은 설명·자세한 설명(병맛 톤 유지, 게임 안 문구와 같은
+  세계관 용어), 그래픽 자산 체크리스트, **Data Safety 답변표**, 콘텐츠 등급 설문 답변, 배포 국가.
+  ★AdMob을 켠 채 "데이터 수집 없음"으로 답하면 안 된다(광고 ID 항목 필수) — 표에 못 박아 뒀다.
+  ★1차 배포는 한국만 — EEA·영국은 UMP 붙인 뒤에.
+- `scripts/version-native.mjs` (`npm run version:native`) — gradle versionCode·versionName을 같이
+  올리고 다음 OTA 버전을 안내한다. **내려가는 값은 거부** — versionName이 내려가면 매니페스트에
+  떠 있는 옛 번들이 다시 "새 버전"이 되어 새 APK를 덮는다(§1-1 다운그레이드 경로 재현).
+- 아이콘 실측: `public/icons/icon-512.png` = 512×512 RGBA — Play 아이콘 규격 충족. 피처 그래픽
+  1024×500과 스크린샷은 미제작(Wave 3 아트와 같이).
