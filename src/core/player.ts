@@ -159,6 +159,14 @@ function contactWithStack(s: GameState, p: PlayerState): void {
   if (!st || s.mode === 'bonus') return;
   if (p.pose === 'special' || p.pose === 'pinned' || p.pose === 'dead') return;
 
+  // [원작 이식] 포즈4 비대칭 (2026-08-30 사용자 확정): **공중 공격 중에는 밑면에 막히지 않는다 —
+  // 뚫으며 부순다.** 원작 `FUN_00405140` switch: 평범한 점프(3/0xe)=정지, 공중 공격(4)=파괴.
+  // 이 비대칭이 원작 게임감의 핵심 — 그냥 뛰면 머리를 박고, 뛰면서 베야 위로 길이 뚫린다.
+  // 파괴 자체는 기존 타격 파이프라인이 수행한다(ATTACK_REACH 68 = 층 1개, 접촉 시 밑층이 창 안).
+  // 원작의 6프레임 선행 스윕은 터널링 방지용 — 리메이크는 틱당 상승 ≤8px < 층 68px라 불필요.
+  // 층이 살아남으면(고HP) 공격 종료 후 점프 포즈로 복귀하며 다시 막힘/눌림 — 원작과 동일 구조.
+  if (p.pose === 'attack' && p.attackFromAir) return;
+
   const headroom = st.y - PLAYER.H;
   if (p.y + PLAYER.H <= st.y) return; // 아직 안 닿았다
 

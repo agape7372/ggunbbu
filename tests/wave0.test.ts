@@ -17,11 +17,12 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
     s.stackSpawnCd = 100000;
     advance(s, inp({ jump: true }));
     let maxY = 0;
-    for (let i = 0; i < 35; i++) {
+    // ★원작 물리 도입(08-30): 정점 555px(8.2층)·체공 280f — 전 비행을 돌려 정점을 본다
+    for (let i = 0; i < 320; i++) {
       advance(s, inp());
       maxY = Math.max(maxY, s.player.y);
     }
-    expect(maxY).toBeGreaterThan(250);
+    expect(maxY).toBeGreaterThan(500);
   });
 
   it('낙하 건물 밑면에 부딪히면 거기서 멈춘다 (통과 금지)', () => {
@@ -32,7 +33,9 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
       floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard')],
       y: 140,
     });
-    s.stack.vy = 0; // 정지시켜 밑면 높이를 고정 — 막힘 높이만 본다
+    s.stack.vy = 0;
+    s.stack.resting = true; // 진짜로 고정 — vy=0만으로는 중력이 계속 떨어뜨린다
+    // (구 물리에선 플레이어가 빨라 이 전제 오류가 가려졌었다 — 원작 물리 도입이 드러냄)
     advance(s, inp({ jump: true }));
     let maxY = 0;
     for (let i = 0; i < 20; i++) {
@@ -74,8 +77,9 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
       y: 140,
     });
     s.stack.vy = 0;
+    s.stack.resting = true; // 밑면 고정(위와 동일 이유)
     advance(s, inp({ jump: true }));
-    for (let i = 0; i < 6; i++) advance(s, inp());
+    for (let i = 0; i < 15; i++) advance(s, inp()); // 원작 물리로는 막힘 도달에 ~11틱
     // 밑면(140)에서 막힌 상태에서, 스택을 위로 밀어낸다(공격의 HIT_LIFT와 같은 방향)
     s.stack.y = 400;
     s.stack.vy = 300;
@@ -83,6 +87,33 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
     for (let i = 0; i < 10; i++) advance(s, inp());
     // 접착이면 밑면을 따라 400 근처로 끌려 올라갔을 것. 막힘은 붙지 않는다 — 그대로 낙하.
     expect(s.player.y).toBeLessThanOrEqual(before + 0.01);
+  });
+
+  it('[원작 이식] 공중 공격은 밑면에 막히지 않는다 — 뚫으며 부순다 (포즈4 비대칭)', () => {
+    const s = makeState();
+    s.stackSpawnCd = 100000;
+    s.stack = makeStack({
+      variant: 'building',
+      theme: 'europe',
+      floors: [makeFloor('weak'), makeFloor('weak'), makeFloor('weak')],
+      y: 140,
+    });
+    s.stack.resting = true;
+    s.stack.vy = 0;
+    const floorsBefore = s.stack.floors.length;
+    advance(s, inp({ jump: true }));
+    // 막힘 직전(y≈70)까지 상승 후 공중 공격 개시
+    for (let i = 0; i < 60 && s.player.y < 70; i++) advance(s, inp());
+    advance(s, inp({ attack: true }));
+    let maxY = 0;
+    for (let i = 0; i < 25; i++) {
+      advance(s, inp());
+      maxY = Math.max(maxY, s.player.y);
+    }
+    // 평범한 점프의 막힘 상한(밑면140−키55=85)을 넘어 올라간다 = 관통
+    expect(maxY).toBeGreaterThan(85 + 1);
+    // 뚫기만 하는 게 아니라 부순다 — 밑층이 줄었다
+    expect(s.stack!.floors.length).toBeLessThan(floorsBefore);
   });
 
   it('정지 스택 아래에서도 점프는 즉시 발동한다 (13px 홉 소멸 방지)', () => {
@@ -117,7 +148,7 @@ describe('Wave 0: 화산탄 더미 착지 = 깔림 (연쇄 피격 아님)', () =
     s.groundRocks = 2;
     s.lives = 3;
     advance(s, inp({ jump: true }));
-    for (let i = 0; i < 200 && s.player.y > 0; i++) advance(s, inp());
+    for (let i = 0; i < 400 && s.player.y > 0; i++) advance(s, inp()); // 체공 280f(원작 물리)
     return s;
   }
 
@@ -179,7 +210,7 @@ describe('검증 후속 (08-30)', () => {
     s.stackSpawnCd = 100000;
     s.groundRocks = 1;
     advance(s, inp({ jump: true }));
-    for (let i = 0; i < 200 && s.player.y > 0; i++) advance(s, inp());
+    for (let i = 0; i < 400 && s.player.y > 0; i++) advance(s, inp()); // 체공 280f(원작 물리)
     expect(s.player.pose).toBe('pinned');
     const lives = s.lives;
     s.entities.push({ kind: 'rock', lane: 0, y: 6, vy: -300, hp: 2 });

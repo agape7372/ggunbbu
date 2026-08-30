@@ -68,7 +68,9 @@ describe('가드 2종 [정본]', () => {
     advance(s, jumpIn); // 점프 시작
     // 정점 부근(저속)에서 스택을 머리 위 존 안에 배치 — 08-30 cling 삭제로
     // "상승 중 접착 → 존 고정" 우회가 사라졌다. 원작 문법 = 정점에서 공중가드.
-    for (let t = 0; t < 120; t++) {
+    // ★원작 물리(중력 204) 도입으로 정점 도달이 느려졌다 — 루프 상한 120→200
+    // (구 상한은 vy<60 도달 전에 끝나 자연 스폰 스택에 기대는 우연 통과 구조였다).
+    for (let t = 0; t < 200; t++) {
       const p = s.player;
       if (p.y > 60 && p.vy < 60) {
         withStack(s, p.y + PLAYER.H + 4, 'hard');
@@ -77,8 +79,11 @@ describe('가드 2종 [정본]', () => {
       }
       advance(s, EMPTY_INPUT);
     }
+    expect(s.stack).not.toBeNull(); // 배치 실패(루프 소진)를 우연 통과로 가리지 않는다
     for (let i = 0; i < 8; i++) advance(s, inp({ guard: true }));
     expect(s.stack!.vy).toBeGreaterThan(STACK.GUARD_AIR_V * 0.6);
+    // [원작 이식] 공중가드 바운스 = 플레이어 하향 반동(원작 vy=8.0px/f 아래로 × 68/120)
+    expect(s.player.vy).toBeLessThanOrEqual(-STACK.GUARD_AIR_RECOIL_V + 1);
     expect(s.combo).toBe(10); // 유지
   });
 
