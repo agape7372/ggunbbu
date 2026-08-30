@@ -5,7 +5,7 @@ import { makeFloor, makeStack } from '../src/core/building';
 import { EMPTY_INPUT, type GameState, type InputFrame } from '../src/core/types';
 import { GUARD_GAUGE, PLAYER, STACK } from '../src/config';
 
-function inp(o: Partial<InputFrame>): InputFrame {
+function inp(o: Partial<InputFrame> = {}): InputFrame {
   return { ...EMPTY_INPUT, ...o };
 }
 
@@ -77,7 +77,7 @@ describe('가드 2종 [정본]', () => {
         s.stack!.vy = -50;
         break;
       }
-      advance(s, EMPTY_INPUT);
+      advance(s, inp());
     }
     expect(s.stack).not.toBeNull(); // 배치 실패(루프 소진)를 우연 통과로 가리지 않는다
     for (let i = 0; i < 8; i++) advance(s, inp({ guard: true }));
@@ -164,7 +164,7 @@ describe('밑면 접촉 [08-30 개정: 공중이어도 눌린다]', () => {
   it('내려오는 밑면이 덮으면 공중이어도 눌려 내려가 깔린다', () => {
     const s = makeState();
     advance(s, inp({ jump: true }));
-    for (let t = 0; t < 12; t++) advance(s, EMPTY_INPUT); // 충분히 상승
+    for (let t = 0; t < 12; t++) advance(s, inp()); // 충분히 상승 (홀드 유지 = 최대 점프)
     expect(s.player.y).toBeGreaterThan(50);
     withStack(s, 20, 'hard');
     s.stack!.vy = -600;
@@ -178,7 +178,7 @@ describe('밑면 접촉 [08-30 개정: 공중이어도 눌린다]', () => {
   it('놓인 스택 위로 착지하면 그때 깔린다', () => {
     const s = makeState();
     advance(s, inp({ jump: true }));
-    for (let t = 0; t < 12; t++) advance(s, EMPTY_INPUT);
+    for (let t = 0; t < 12; t++) advance(s, inp());
     withStack(s, 20, 'hard');
     s.stack!.vy = -600;
     const lives = s.lives;

@@ -5,7 +5,7 @@ import { continueFromCheckpoint, enterAct2Phase } from '../src/core/act2';
 import { EMPTY_INPUT, type InputFrame } from '../src/core/types';
 import { ACT2, GUARD_GAUGE, PLAYER } from '../src/config';
 
-function inp(o: Partial<InputFrame>): InputFrame {
+function inp(o: Partial<InputFrame> = {}): InputFrame {
   return { ...EMPTY_INPUT, ...o };
 }
 
@@ -65,12 +65,12 @@ describe('화산탄 더미 착지 [정본: 공중 무적, 착지 시 깔림]', (
     enterAct2Phase(s, 'rock');
     s.stackSpawnCd = 9999;
     advance(s, inp({ jump: true }));
-    for (let t = 0; t < 16; t++) advance(s, EMPTY_INPUT);
+    for (let t = 0; t < 16; t++) advance(s, inp());
     expect(s.player.y).toBeGreaterThan(50);
     s.groundRocks = 2;
     s.combo = 12;
     const lives = s.lives;
-    while (s.player.y > 0 && s.tick < 300) advance(s, EMPTY_INPUT);
+    while (s.player.y > 0 && s.tick < 300) advance(s, inp());
     expect(s.lives).toBe(lives - 1);
     expect(s.combo).toBe(0);
   });

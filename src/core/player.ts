@@ -113,6 +113,8 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
 
   // ── 수직 물리 (전 상태 공통, 지상 고정 상태 제외) ──
   if (p.y > 0 || p.vy > 0) {
+    // ★08-30 5차: 상승·하강 같은 중력. 4차의 FALL_MUL(하강 가속)은 가변 점프와 한 세트였고
+    // 둘 다 철거했다 — 체공이 1.60초면 하강을 따로 재촉할 이유가 없다.
     p.vy -= PLAYER.GRAVITY * dt;
     p.y += p.vy * dt;
     contactWithStack(s, p);

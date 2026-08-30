@@ -102,8 +102,9 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
     s.stack.vy = 0;
     const floorsBefore = s.stack.floors.length;
     advance(s, inp({ jump: true }));
-    // 막힘 직전(y≈70)까지 상승 후 공중 공격 개시
-    for (let i = 0; i < 60 && s.player.y < 70; i++) advance(s, inp());
+    // 상승 중에 공중 공격 개시. ★08-30 5차: 점프가 23px/틱으로 빨라져 y≥70을 기다리면
+    // 같은 틱에 밑면(140−55=85)에 막혀 vy가 0이 된 뒤 공격이 시작된다 — 관통할 상승분이 없다.
+    for (let i = 0; i < 60 && s.player.y < 40; i++) advance(s, inp());
     advance(s, inp({ attack: true }));
     let maxY = 0;
     for (let i = 0; i < 25; i++) {

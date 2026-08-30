@@ -2,7 +2,7 @@
 // core는 events만 발행 — 오디오는 src/audio/consume.ts, 클리어는 씬.
 
 import type { GameState } from '../core/types';
-import { COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, VIEW } from '../config';
+import { CAMERA, COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, VIEW } from '../config';
 import { onomatoFor, CAPTIONS } from '../content';
 import {
   initSprites, drawPlayer, drawStack, drawBoss, drawEntity,
@@ -14,6 +14,11 @@ import { vibrate } from '../platform/native';
 import { drawEffects, resetEffects, setFxCamY, setSlashColor, spawnFromEvent, tickEffects } from './effects';
 
 let trauma = 0;
+/**
+ * 카메라 보간 상태 (08-30 4차). cameraFollowY는 순수 목표값만 내고, 프레임간 추격은 여기서 한다 —
+ * 목표값을 그대로 쓰면 데드존 진입 순간 화면이 툭 튄다. drawGame이 매 프레임 한 번 전진시킨다.
+ */
+let smoothCam = 0;
 let flashTicks = 0;
 let flashColor = '#1A1A20';
 let shakeSeed = 0;
@@ -53,6 +58,7 @@ export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: bool
 export function initRenderer(): void {
   initSprites();
   resetEffects();
+  smoothCam = 0;
 }
 
 /** 장착 코스메틱 일괄 적용 — 씬이 런 시작·장착 변경 시 호출 (08-30, P1-3) */
@@ -66,7 +72,8 @@ export function applyCosmetics(loadout: { body: string; blade: string; letters: 
 
 /** 이벤트 소비: 셰이크/플래시/의성어/진동. 사운드는 audio/consume. 소비 후 clear는 호출자가. */
 export function consumeEvents(s: GameState): void {
-  const cam = cameraFollowY(s);
+  // 이펙트 좌표는 drawGame과 같은 카메라를 봐야 한다 — 목표값이 아니라 보간된 현재값.
+  const cam = smoothCam;
   setFxCamY(cam);
   for (const e of s.events) {
     const spec = JUICE[e.kind];
@@ -136,7 +143,10 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   if (flashTicks > 0) flashTicks -= 1;
   tickEffects();
 
-  const cam = cameraFollowY(s);
+  const camTarget = cameraFollowY(s);
+  smoothCam += (camTarget - smoothCam) * CAMERA.LERP;
+  if (Math.abs(camTarget - smoothCam) < 0.5) smoothCam = camTarget;
+  const cam = smoothCam;
   setFxCamY(cam);
   const [sx, sy] = shakeOffset();
   ctx.save();
@@ -149,8 +159,13 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.beginPath();
   ctx.rect(0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
   ctx.clip();
-  ctx.translate(0, cam);
+  // 배경은 얕게만 따라온다 — 하늘이 통째로 딸려 오르면 카메라가 움직인 게 아니라
+  // 화면이 흔들린 것처럼 읽힌다(깊이 단서 상실).
+  ctx.save();
+  ctx.translate(0, cam * CAMERA.BG_PARALLAX);
   drawChapterBackdrop(ctx, s);
+  ctx.restore();
+  ctx.translate(0, cam);
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
 
@@ -195,6 +210,20 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 읽히게 한다. 조작 존 상단(#touch-layer::after)과 같은 굵기·같은 농도로 맞춘 액자 두 변.
   ctx.fillStyle = 'rgba(26, 26, 32, 0.16)';
   ctx.fillRect(0, VIEW.FIELD_TOP, VIEW.W, 1);
+
+  // 지면 인디케이터 (08-30 4차) — 카메라가 올라가 지면선이 화면 아래로 빠진 동안에만 뜬다.
+  // 추종 카메라를 폐기했던 근거가 "지면이 화면 밖"이었다. 카메라는 되살리되 그 정보만은
+  // 화면에 붙박아 둔다: 바닥변의 지면선 + 플레이어 레인의 착지 눈금.
+  if (cam > 0.5) {
+    const a = Math.min(1, cam / CAMERA.MAX);
+    ctx.save();
+    ctx.globalAlpha = 0.14 + 0.30 * a;
+    ctx.fillStyle = PALETTE.INK;
+    ctx.fillRect(0, VIEW.FIELD_H - 2, VIEW.W, 2);
+    const px = VIEW.LANE_X[s.player.lane];
+    ctx.fillRect(px - 15, VIEW.FIELD_H - 8, 30, 2);
+    ctx.restore();
+  }
 
   if (flashTicks > 0) {
     ctx.globalAlpha = 0.35 * (flashTicks / 4);

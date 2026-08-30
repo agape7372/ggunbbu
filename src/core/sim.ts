@@ -285,12 +285,40 @@ function stepPinned(s: GameState, input: InputFrame): void {
     return;
   }
 
-  // 방치 페널티: 120f마다 라이프 반복 손실
+  // 방치 페널티: 120f마다 라이프 반복 손실 + **자비 바운스**
+  //
+  // ★08-30 4차 [사용자 증언] — 원작은 깔린 채로 정지해 있지 않다:
+  //   "라이프 깎이면서 바닥에 퉁 하고 살짝 떴다가, 못 막거나 못 부수면 다시 쿵 하고 또 깔리면서
+  //    라이프 깎이는데 여기선 없네."
+  // 실측(사용자 영상 10fps 계측): 2차 깔림 구간 2.0초 동안 건물 상단 y가 337에 고정 — 1px도 안
+  // 움직이고 그대로 사망했다. 그 2.0초 = PIN_REPEAT_TICKS 120f. **손실은 돌고 있는데 화면에
+  // 아무 일도 안 일어났다.** 빠진 건 라이프 로직이 아니라 그 손실이 만들어야 할 물리·연출이다.
+  //
+  // 계획 정본 §깔림도 "이후 120f 경과마다 lives−1 반복"을 규정하고, ROADMAP Wave 1의
+  // "방치 사망 템포 재검(PIN_REPEAT 120f)"이 미완으로 남아 있었다 — 새 설계가 아니라 그 이행이다.
+  // ⚠ 단 ORIGINAL_BENCHMARK에는 깔림 라이프·튕김의 원작 실측이 **없다**. 근거는 사용자 증언과
+  // 계획서(나무위키 유래)뿐이라 [정본] 딱지를 붙이지 않는다.
+  //
+  // 값은 Z 실패 분기와 같은 PIN_MERCY_V를 쓴다 — 결과가 같으면("라이프 깎고 튕김") 값도 같아야 한다.
+  // "쿵"(재깔림)은 새 코드가 없다: 튕긴 스택이 다시 내려앉으면 sim 루프의 매 틱 착지 검사가
+  // onPlayerCrushed로 받는다. 사이클이 기존 물리에서 저절로 닫힌다.
   p.pinTick += 1;
   if (p.pinTick >= PLAYER.PIN_REPEAT_TICKS) {
     p.pinTick = 0;
     loseLife(s);
     if (s.over) return;
+    s.events.push({ kind: 'hurt', y: 0 }); // 화면·진동·둔탁음 — lifeLost 단독은 JUICE 항목이 없다
+    if (byStack && stack) {
+      // 돌더미 깔림(byRocks)은 튕길 대상이 없다 — 이벤트만 내고 깔린 채로 둔다.
+      stack.vy = STACK.PIN_MERCY_V;
+      stack.resting = false;
+      stack.y = Math.max(stack.y, 0.001);
+      p.pose = 'idle';
+      p.poseTick = 0;
+      // ★탈출 무적(60/90f)을 쓰면 안 된다 — 스택 왕복(≈47f)보다 길어서 "쿵"이 영영 안 온다.
+      p.invulnTicks = PLAYER.PIN_TIMEOUT_IFRAMES;
+      return; // 방금 풀려났다 — 이번 틱은 탈출 입력을 먹지 않는다
+    }
   }
 
   if (byRocks) {

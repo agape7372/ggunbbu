@@ -268,6 +268,8 @@ export interface GameState {
 
 /** 프레임 입력 — input 레이어가 생성해 sim에 주입 */
 export interface InputFrame {
+  // ★08-30 5차: 점프는 **단발 엣지**다(원작 문법). 4차에 넣었던 jumpHold(가변 점프)는 사용자
+  // 지시("한번 누르면 슝 솟아야하는데 왜 누르고있게만들었어?")로 철거했다. 홀드는 guard만.
   jump: boolean;    // 엣지
   guard: boolean;   // 홀드 (레벨)
   attack: boolean;  // 엣지
