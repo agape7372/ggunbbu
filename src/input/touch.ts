@@ -13,6 +13,8 @@ export interface TouchInput {
   clearPressed(): void;
   /** 가드 상태 → 라벨 '가드' ↔ '⬆탈출' 스왑 */
   setPinned(pinned: boolean): void;
+  /** 필살 게이지 충전 완료 → 필살 버튼만 노랑(노랑 = "지금 쓸 수 있다") */
+  setSpecialReady(ready: boolean): void;
   /** 왼손잡이 모드 → #touch-layer.mirror 토글 */
   setLeftHanded(mirror: boolean): void;
   /** 첫 pointerdown 1회 콜백 (오디오 언락용) */
@@ -75,6 +77,7 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   let firstGestureFired = false;
   let lastTouchStamp = 0;
   let pinned = false;
+  let specialReady = false;
 
   container.setAttribute('role', 'group');
   container.setAttribute('aria-label', '조작');
@@ -203,6 +206,12 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
         btn.textContent = label;
         btn.setAttribute('aria-label', label);
       }
+    },
+
+    setSpecialReady(next: boolean) {
+      if (specialReady === next) return;
+      specialReady = next;
+      for (const btn of buttonsByAction.special) btn.classList.toggle('ready', next);
     },
 
     setLeftHanded(mirror: boolean) {

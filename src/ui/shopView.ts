@@ -29,7 +29,7 @@ export function shopHtml(paths: { iap: boolean; ad: boolean }): string {
   const adBtn = paths.ad
     ? `<button type="button" class="flyer-btn" data-shop-ad="1">광고로 조각</button>`
     : '';
-  return `<div class="ov-shop" style="max-height:460px;overflow-y:auto">
+  return `<div class="ov-shop ov-panel">
     <h2>상점</h2>
     ${skuBlock}
     <p class="ov-records-h" data-el="wallet">먼지 0 · 궤도조각 0</p>

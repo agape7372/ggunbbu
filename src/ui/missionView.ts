@@ -4,7 +4,7 @@ import { ACHIEVES, DAILY_POOL } from '../meta/missions';
 import type { DailyState, MissionDef, MissionProgress } from '../meta/types';
 
 export function missionHtml(): string {
-  return `<div class="ov-missions ui-card" style="max-height:520px;overflow-y:auto">
+  return `<div class="ov-missions ov-panel">
     <h2>미션</h2>
     ${adBoostOn ? '<p class="ov-manual-lead">광고를 보면 보상이 두 배.</p>' : ''}
     <p class="ov-records-h" data-el="daily-h">오늘의 미션</p>

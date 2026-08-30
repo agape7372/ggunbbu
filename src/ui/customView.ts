@@ -52,7 +52,7 @@ export function customHtml(): string {
     `<p class="ov-records-h">${escapeHtml(sec.title)}</p>
      <div data-el="${sec.slot}" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px"></div>`,
   ).join('');
-  return `<div class="ov-custom ui-card" style="max-height:520px;overflow-y:auto">
+  return `<div class="ov-custom ov-panel">
     <h2>커스텀</h2>
     <p class="ov-manual-lead">색과 글자만 바뀝니다. 세기는 그대로.</p>
     ${blocks}

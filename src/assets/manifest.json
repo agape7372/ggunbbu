@@ -5,49 +5,49 @@
     "bg-europe": {
       "src": "bg/europe.png",
       "w": 360,
-      "h": 470,
+      "h": 610,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-asia": {
       "src": "bg/asia.png",
       "w": 360,
-      "h": 470,
+      "h": 610,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-eastasia": {
       "src": "bg/eastasia.png",
       "w": 360,
-      "h": 470,
+      "h": 610,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-modern": {
       "src": "bg/modern.png",
       "w": 360,
-      "h": 470,
+      "h": 610,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-act2": {
       "src": "bg/act2.png",
       "w": 360,
-      "h": 470,
+      "h": 610,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-moon": {
       "src": "bg/moon.png",
       "w": 360,
-      "h": 470,
+      "h": 610,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-bonus": {
       "src": "bg/modern.png",
       "w": 360,
-      "h": 470,
+      "h": 610,
       "anchor": "topleft",
       "align": "bottom"
     },

@@ -581,6 +581,7 @@ export function createApp(
         handleTransitions(s, wasMode, wasPhase);
         s.events.length = 0;
         touch?.setPinned(s.player.pose === 'pinned');
+        touch?.setSpecialReady(s.wazaGauge >= 100);
         bgm(bgmFor(s));
         break;
       }

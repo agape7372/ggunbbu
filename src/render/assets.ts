@@ -151,8 +151,8 @@ export function drawAsset(
 
 /**
  * 필드(dest)를 덮되 소스의 하단(스카이라인)을 맞춘다.
- * 360×640 원본도 360×470 필드에 넣으면 위가 잘리고 지평선이 지면에 붙는다.
- * 이미 470 높이인 시트는 그대로 들어간다.
+ * 소스가 필드보다 크면 위가 잘리고 지평선이 지면에 붙는다(cover + 하단 고정).
+ * 필드 높이는 VIEW.FIELD_H가 정한다 — 08-30에 470 → 610으로 늘었다.
  */
 export function drawBackdrop(
   ctx: CanvasRenderingContext2D,
