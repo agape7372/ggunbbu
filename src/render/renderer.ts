@@ -2,7 +2,7 @@
 // core는 events만 발행 — 오디오는 src/audio/consume.ts, 클리어는 씬.
 
 import type { GameState } from '../core/types';
-import { CAMERA, COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, VIEW } from '../config';
+import { CAMERA, COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, STACK, VIEW } from '../config';
 import { onomatoFor, CAPTIONS } from '../content';
 import {
   initSprites, drawPlayer, drawStack, drawBoss, drawEntity,
@@ -200,6 +200,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   for (const e of s.entities) {
     if (e.kind === 'cannon' || (e.kind === 'bolt' && e.cueTicks > 0)) drawEntity(ctx, e, g);
   }
+  drawSpawnCue(ctx, s);
   drawEffects(ctx);
   drawNumPopups(ctx);
   drawPopups(ctx);
@@ -238,9 +239,11 @@ function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number
     const a = Math.min(1, d.life / 18);
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.fillStyle = '#3A3A42';
+    // ★08-30 7차: 구 채움 '#3A3A42' 는 캐릭터 잉크(#1A1A20)와 명도가 붙어 있었다 —
+    // 졸라맨은 선만 있는 형상이라 잔해 더미 위에 올라서면 통째로 삼켜졌다. PALETTE 명도 위계 참조.
+    ctx.fillStyle = PALETTE.RUBBLE;
     ctx.fillRect(d.x - d.w / 2, groundY - d.y - d.h, d.w, d.h);
-    ctx.strokeStyle = '#1A1A20';
+    ctx.strokeStyle = PALETTE.INK;
     ctx.lineWidth = 2;
     ctx.strokeRect(d.x - d.w / 2, groundY - d.y - d.h, d.w, d.h);
     ctx.restore();
@@ -253,6 +256,46 @@ function bgColor(s: GameState): string {
   if (s.mode === 'act2') return '#EAE6DA';
   const by = ['#F4F1E8', '#F0EEE4', '#F2EDE2', '#EFEDE6'];
   return by[s.chapter % 4];
+}
+
+/**
+ * 다음 건물 예고. 완파 후 스폰까지의 공백이 아무 신호 없는 빈 화면이었다(08-30 7차).
+ * 번개·대포 큐와 같은 규칙을 따른다 — 카메라 변환 **밖**, 필드 상단 고정, 잉크 실루엣.
+ * 렌더 전용이라 시뮬은 안 건드린다: 읽는 값은 `stackSpawnCd` 하나뿐이다.
+ */
+function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
+  if (s.stack || s.over) return;
+  const cd = s.stackSpawnCd;
+  if (cd <= 0 || cd > STACK.SPAWN_CUE_TICKS) return;
+
+  const x = VIEW.LANE_X[s.player.lane] ?? VIEW.LANE_X[0];
+  const y = VIEW.FIELD_TOP + 16;
+  const t = 1 - cd / STACK.SPAWN_CUE_TICKS;   // 0 → 1 로 다가온다
+  ctx.save();
+  ctx.globalAlpha = 0.35 + 0.45 * t;
+  // 낙하 경로 안내선 — 어디로 떨어지는지가 정보다
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath();
+  ctx.moveTo(x, y + 12);
+  ctx.lineTo(x, y + 12 + 26 * t);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // ▼ 마커 — 아이보리 헤일로 위에 잉크 삼각형(밝은 배경·어두운 배경 양쪽에서 산다)
+  const r = 9 + 2 * Math.sin(t * Math.PI * 4);
+  ctx.beginPath();
+  ctx.moveTo(x - r, y - r * 0.7);
+  ctx.lineTo(x + r, y - r * 0.7);
+  ctx.lineTo(x, y + r * 0.8);
+  ctx.closePath();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = PALETTE.WHITE;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = PALETTE.INK;
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawNumPopups(ctx: CanvasRenderingContext2D): void {
@@ -270,8 +313,15 @@ function drawNumPopups(ctx: CanvasRenderingContext2D): void {
     ctx.translate(p.x, p.y);
     ctx.font = `bold ${Math.round(13 * p.scale * pop)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#F4F1E8';
+    // ★08-30 7차 이중 외곽선: 아이보리 헤일로 하나만 두면 **배경색과 같은 색**이라
+    // 밝은 건물 면 위에서 통째로 사라진다(사용자 영상 판정). 잉크 링을 바깥에 하나 더 둘러
+    // 밝은 곳/어두운 곳 양쪽에서 최소 한 겹은 살아남게 한다.
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 4.5;
+    ctx.strokeStyle = PALETTE.INK;
+    ctx.strokeText(String(p.n), 0, 0);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = PALETTE.WHITE;
     ctx.strokeText(String(p.n), 0, 0);
     ctx.fillStyle = p.color;
     ctx.fillText(String(p.n), 0, 0);
@@ -291,8 +341,12 @@ function drawPopups(ctx: CanvasRenderingContext2D): void {
     ctx.rotate(-0.08);
     ctx.font = `bold ${Math.round(14 * p.scale)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#F4F1E8';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = PALETTE.INK;      // 노랑 채움은 아이보리 배경에서 제일 약하다 — 잉크 링 필수
+    ctx.strokeText(p.text, 0, 0);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = PALETTE.WHITE;
     ctx.strokeText(p.text, 0, 0);
     ctx.fillStyle = PALETTE.YELLOW;
     ctx.fillText(p.text, 0, 0);

@@ -372,7 +372,7 @@ export function createApp(
         const r = state.bonus.round;
         save.butterBest[r] = Math.max(save.butterBest[r] ?? 0, sc);
       } else save.bestArcade = Math.max(save.bestArcade, sc);
-      save.maxCombo = Math.max(save.maxCombo, state.combo);
+      save.maxCombo = Math.max(save.maxCombo, state.peakCombo);
       save.unlockedChapters = Math.max(save.unlockedChapters, state.chapter);
       if (state.bonus) save.butterTierReached = Math.max(save.butterTierReached, state.bonus.round);
     }
@@ -723,7 +723,8 @@ export function createApp(
       setChrome('gameover');
       overlay.showGameOver({
         score: s.score,
-        combo: s.combo,
+        combo: s.peakCombo,   // 현재 콤보는 죽는 히트가 이미 끊었다 — 결과화면은 이번 판 최고치를 쓴다
+
         canContinue: s.mode === 'act2' && s.checkpoint > 0,
         canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
         adRevive: ads.ready(),

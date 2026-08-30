@@ -238,6 +238,12 @@ export interface GameState {
   /** 2막 페이즈 진행 카운터 (act2.ts 전용) */
   act2c: { spawned: boolean; bolts: number; rocks: number; cd: number; t: number } | null;
   combo: number;
+  /**
+   * 이번 판 최고 콤보. 결과화면·저장 기록이 읽는 값이다.
+   * ★08-30 7차: 결과화면이 `combo`(현재 카운터)를 읽어 **항상 0**이었다 — 죽는 히트가
+   * `hurtPlayer` 안에서 `breakCombo()` 를 먼저 부르고 그 다음에 over 플래그를 세우기 때문.
+   */
+  peakCombo: number;
   score: number;
   /** 방어 게이지 0~100 (원작 핑크 bougyobar) — 가드 전용. 0이면 가드 불가 */
   guardGauge: number;

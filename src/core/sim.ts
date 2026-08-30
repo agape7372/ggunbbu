@@ -28,6 +28,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     bonus: null,
     act2c: null,
     combo: 0,
+    peakCombo: 0,
     score: 0,
     guardGauge: GUARD_GAUGE.MAX,
     wazaGauge: 0,
@@ -143,6 +144,10 @@ export function advance(s: GameState, input: InputFrame): void {
     const spec = JUICE[s.events[i].kind];
     if (spec && spec.hitstop > s.hitstop) s.hitstop = spec.hitstop;
   }
+
+  // 최고 콤보 갱신. breakCombo 쪽에도 같은 캡처가 있다 — 한 틱 안에서 올랐다가 끊기는
+  // 경우(타격 직후 피격)는 여기까지 못 오기 때문이다. 두 지점이 함께 있어야 빠짐이 없다.
+  if (s.combo > s.peakCombo) s.peakCombo = s.combo;
 }
 
 function stepDebris(s: GameState): void {

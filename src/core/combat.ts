@@ -25,6 +25,7 @@ export function addCombo(s: GameState): void {
 
 export function breakCombo(s: GameState): void {
   if (s.combo > 0) s.events.push({ kind: 'comboBreak', combo: s.combo });
+  if (s.combo > s.peakCombo) s.peakCombo = s.combo;   // 0으로 만들기 전에 봉인
   s.combo = 0;
   if (s.mode === 'act2') s.fullCombo = false;
 }

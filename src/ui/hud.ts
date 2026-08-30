@@ -30,13 +30,19 @@ export function mountHud(
         <div class="hud-col hud-col-right">
           <div class="hud-combo" data-el="combo"></div>
           <div class="hud-gauges">
-            <div class="bar bar-guard" title="방어 게이지">
-              <span class="ghost" data-el="guard-ghost"></span>
-              <span class="fill" data-el="guard-fill"></span>
+            <div class="gauge-row">
+              <span class="gauge-label">방어</span>
+              <div class="bar bar-guard">
+                <span class="ghost" data-el="guard-ghost"></span>
+                <span class="fill" data-el="guard-fill"></span>
+              </div>
             </div>
-            <div class="bar bar-waza" data-el="waza-bar" title="필살 게이지">
-              <span class="ghost" data-el="waza-ghost"></span>
-              <span class="fill" data-el="waza-fill"></span>
+            <div class="gauge-row">
+              <span class="gauge-label">필살</span>
+              <div class="bar bar-waza" data-el="waza-bar">
+                <span class="ghost" data-el="waza-ghost"></span>
+                <span class="fill" data-el="waza-fill"></span>
+              </div>
             </div>
           </div>
         </div>

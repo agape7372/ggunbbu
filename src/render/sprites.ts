@@ -13,6 +13,10 @@ import { bossSheetFrame, entityAssetKey, playerSheetFrame } from './frames';
 
 // ── 공통 색상 ────────────────────────────────────────────────────
 const OUTLINE = '#0A0A14';
+// ★08-30 7차 — 건물 층 외곽선. ART_DIRECTION §B 가 "outlined in thin black line" 을 명시하는데
+// 렌더는 색 차이로만 경계를 흉내 내고 있었다(fillBase). 다만 캐릭터 잉크(#1A1A20)보다 **밝게** 잡는다
+// — 순수 검정으로 두르면 층 경계가 화면에서 제일 어두워져 졸라맨이 다시 묻힌다(PALETTE 명도 위계).
+const TILE_EDGE = '#4A4740';
 const ROCK_BASE = '#5A5A5F';
 const ROCK_CRACK = '#D9782E';
 
@@ -126,12 +130,16 @@ const SPECIAL_COLORS: Record<Exclude<Material, Tier>, TierColors> = {
 };
 
 function fillBase(c: CanvasRenderingContext2D, w: number, h: number, t: TierColors): void {
-  c.fillStyle = t.dark;
-  c.fillRect(0, 0, w, h);
   c.fillStyle = t.base;
-  c.fillRect(1, 1, w - 2, h - 2);
+  c.fillRect(0, 0, w, h);
   c.fillStyle = t.dark;
-  c.fillRect(0, h - 2, w, 2);
+  c.fillRect(0, h - 3, w, 3);          // 바닥 그림자 — 층이 쌓인 깊이 단서
+  // 얇은 외곽선 1px. stroke 대신 fillRect 4변 — 타일은 오프스크린 캔버스라 반픽셀 번짐을 피한다.
+  c.fillStyle = TILE_EDGE;
+  c.fillRect(0, 0, w, 1);
+  c.fillRect(0, h - 1, w, 1);
+  c.fillRect(0, 0, 1, h);
+  c.fillRect(w - 1, 0, 1, h);
 }
 
 function drawThemeDetail(c: CanvasRenderingContext2D, w: number, h: number, mat: Tier, theme: Theme, t: TierColors): void {

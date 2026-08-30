@@ -212,11 +212,15 @@ html, body {
 /* 점프는 왼쪽에 홀로 있어 넓게 확장해도 이웃과 안 겹친다 */
 #btn-jump::before { inset: -8px; }
 
+/* ★08-30 7차 — 크기 위계 정정. 이 게임의 컨셉은 "베면 된다"인데 점프(128²=16384)가 공격
+   (122×78=9516)보다 1.7배 컸다. 제일 큰 버튼이 제일 중요한 행동이어야 한다.
+   현행 면적 위계: 공격 10736 > 점프 10000 > 가드 6832 > 필살 3600.
+   ⚠ 이웃 간 겹침 0 계약 유지(::before inset -3px 기준): 필살 우변 220+3=223 < 공격 좌변 228-3=225. */
 #btn-jump {
   left: 10px;
-  top: 22px;
-  width: 128px;
-  height: 128px;
+  top: 44px;
+  width: 100px;
+  height: 100px;
   font-size: 18px;
 }
 
@@ -224,29 +228,29 @@ html, body {
   left: 228px;
   top: 10px;
   width: 122px;
-  height: 78px;
+  height: 88px;
   font-size: var(--fs-6);
 }
 
 #btn-guard {
   left: 228px;
-  top: 96px;
+  top: 106px;
   width: 122px;
-  height: 58px;
+  height: 56px;
   font-size: var(--fs-5);
 }
 
 #btn-special {
-  left: 168px;
+  left: 160px;
   top: 10px;
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   font-size: var(--fs-2);
 }
 
 /* 왼손잡이: 점프↔클러스터 통째 스왑 */
 #touch-layer.mirror #btn-jump {
-  left: 222px;
+  left: 250px;   /* 폭 100 기준 우측 정렬 (구 222 는 폭 128 시절 값) */
 }
 
 #touch-layer.mirror #btn-attack,
@@ -472,10 +476,29 @@ html, body {
   align-items: flex-end;
 }
 
+/* ★08-30 7차: 두 게이지의 이름이 `title` 속성에만 있었다 — 네이티브 툴팁은 마우스 hover 전용이라
+   모바일에서는 영영 안 뜬다. 화면에 안 그려지는 라벨은 없는 라벨이다. 실제 텍스트로 세운다.
+   컬럼 폭 124px 안에 들어가야 해서 방어 바를 110 → 88px 로 줄였다(라벨 22 + 갭 4 + 바 88 = 114). */
+.gauge-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.gauge-label {
+  font-size: var(--fs-1);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
 .bar {
   position: relative;
   height: 7px;
-  width: 110px;
+  width: 88px;
   background: #D5D0C4;
   overflow: hidden;
   border: 1px solid var(--ink);
@@ -532,9 +555,14 @@ html, body {
   padding: var(--sp-2) var(--sp-4);
   font-size: var(--fs-2);
   font-weight: 800;
+  /* ★08-30 7차: 1px 직교 4방 헤일로는 밝은 배경에서만 통했다 — 어두운 건물 텍스처 위에 깔리면
+     잉크 글자와 배경이 둘 다 어두워 링이 끊긴다. 대각까지 채운 2px 링으로 글자를 완전히 감싼다. */
   text-shadow:
-    0 1px 0 var(--ivory), 0 -1px 0 var(--ivory),
-    1px 0 0 var(--ivory), -1px 0 0 var(--ivory);
+    0 2px 0 var(--ivory), 0 -2px 0 var(--ivory),
+    2px 0 0 var(--ivory), -2px 0 0 var(--ivory),
+    1px 1px 0 var(--ivory), -1px 1px 0 var(--ivory),
+    1px -1px 0 var(--ivory), -1px -1px 0 var(--ivory),
+    0 0 4px var(--ivory);
 }
 .hud-waza-ready { color: var(--ink); }
 
