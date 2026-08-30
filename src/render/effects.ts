@@ -241,6 +241,10 @@ function burst(kind: string, x: number, y: number, count: number, mat?: string):
     case 'hurt':
       dust(x, y, count);
       return;
+    // 밑면에 머리를 부딪힘 — 위로 튀는 먼지 몇 알. 가드 바운스와 같은 톤(먼지색)이되 더 작게.
+    case 'headBonk':
+      sparks(x, y, Math.max(3, count >> 1), '#6E695F', 60, 120);
+      return;
     case 'guardBounce':
       sparks(x, y, count, '#6E695F', 70, 180);
       return;

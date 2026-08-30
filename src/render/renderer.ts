@@ -175,12 +175,15 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     && s.player.pose !== 'dead' && s.player.pose !== 'pinned' && s.mode !== 'bonus';
   if (landingDanger) drawLandingDanger(ctx, g, s.player.invulnTicks);
 
-  // ③ 관통하는 순간 = 스침. 몸을 지나가는 층의 위아래 모서리에 짧은 획을 그어
-  //    "맞은 게 아니라 통과했다"를 눈으로 말한다. 상태 없음 — 겹치는 프레임에만 그린다.
-  if (airborne && s.stack && !s.stack.resting) {
+  // ③ 겹치는 프레임 = 스침. ★08-30 갱신: 이제 **상승 중엔 밑면에서 막히므로**(core blockUnderStack)
+  //    겹침은 "내려오는 스택이 나를 지나칠 때"만 남는다. 그 순간에만 획을 긋고 몸을 반투명으로 —
+  //    맞은 게 아니라 지나간 것이라는 신호. 점프 내내 흐릿하게 두지 않는다(캐릭터가 약해 보인다).
+  let overlapping = false;
+  if (airborne && s.stack) {
     const stackTop = s.stack.y + s.stack.floors.reduce((a2, f) => a2 + f.h, 0);
     const pTop = s.player.y + PLAYER.H;
     if (pTop > s.stack.y && s.player.y < stackTop) {
+      overlapping = true;
       drawGraze(ctx, g - s.player.y - PLAYER.H / 2);
     }
   }
@@ -188,7 +191,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2)
   const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES;
   if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
-    const ghost = airborne && s.player.pose !== 'special';
+    const ghost = overlapping && s.player.pose !== 'special';
     if (ghost) ctx.globalAlpha = 0.62;
     drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
     if (ghost) ctx.globalAlpha = 1;

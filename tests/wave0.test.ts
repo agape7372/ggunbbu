@@ -8,9 +8,23 @@ function inp(o: Partial<InputFrame> = {}): InputFrame {
   return { ...EMPTY_INPUT, ...o };
 }
 
-// ★08-30 Wave 0 회귀 가드 — 셋 다 구코드(8a9da28 cling·피어싱 착지·렌더 히트스톱)에서 빨갛다.
-describe('Wave 0: 점프 부활 (cling 삭제)', () => {
-  it('낙하 건물 아래서 점프해도 잡아먹히지 않는다 — 정점 250px 이상', () => {
+// ★08-30 Wave 0 회귀 가드 — 구코드(8a9da28 cling·피어싱 착지·렌더 히트스톱)에서 빨갛다.
+// ★08-30 개정(사용자 지시 "통과 안 하고 막히는 거"): 밑면은 **막힌다**로 계약이 바뀌었다.
+// 바뀌지 않은 것 = cling이 죽인 것들: 접착·끌려 내려감·머리 위가 빈데도 점프가 소멸하는 것.
+describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
+  it('머리 위가 비면 점프는 그대로다 — 정점 250px 이상', () => {
+    const s = makeState();
+    s.stackSpawnCd = 100000;
+    advance(s, inp({ jump: true }));
+    let maxY = 0;
+    for (let i = 0; i < 35; i++) {
+      advance(s, inp());
+      maxY = Math.max(maxY, s.player.y);
+    }
+    expect(maxY).toBeGreaterThan(250);
+  });
+
+  it('낙하 건물 밑면에 부딪히면 거기서 멈춘다 (통과 금지)', () => {
     const s = makeState();
     s.stack = makeStack({
       variant: 'building',
@@ -18,18 +32,44 @@ describe('Wave 0: 점프 부활 (cling 삭제)', () => {
       floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard')],
       y: 140,
     });
-    s.stack.vy = -100;
+    s.stack.vy = 0; // 정지시켜 밑면 높이를 고정 — 막힘 높이만 본다
     advance(s, inp({ jump: true }));
     let maxY = 0;
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < 20; i++) {
       advance(s, inp());
       maxY = Math.max(maxY, s.player.y);
     }
-    // 구코드: 밑면 접착으로 y≈85(140−55)에 고정. 신코드: 관통해 정상 탄도.
-    expect(maxY).toBeGreaterThan(250);
+    // 밑면(140) − 키(55) = 85가 상한. 그 위로는 한 픽셀도 못 올라간다.
+    expect(maxY).toBeLessThanOrEqual(85 + 0.01);
+    expect(maxY).toBeGreaterThan(70);
   });
 
-  it('정지 스택 옆에서도 점프가 즉시 발동한다 (13px 홉 소멸 방지)', () => {
+  it('★접착 금지 — 부딪힌 뒤 내려오는 스택을 따라가지 않는다', () => {
+    const s = makeState();
+    s.stack = makeStack({
+      variant: 'building',
+      theme: 'europe',
+      floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard')],
+      y: 140,
+    });
+    s.stack.vy = -100; // 내려오는 중
+    advance(s, inp({ jump: true }));
+    let bonked = false;
+    let ticks = 0;
+    for (let i = 0; i < 120; i++) {
+      advance(s, inp());
+      if (s.player.vy === 0 && s.player.y > 0) bonked = true;
+      if (s.player.y <= 0) { ticks = i; break; }
+    }
+    expect(bonked).toBe(true);
+    // 구코드(cling): 스택 밑면에 붙어 같이 내려오느라 지면 도달이 스택 속도에 묶였다.
+    // 신코드: 막히기만 하고 곧바로 자유낙하 — 스택보다 훨씬 빨리 지면에 닿는다.
+    expect(s.player.y).toBe(0);
+    expect(ticks).toBeLessThan(60);
+    expect(s.stack!.y).toBeGreaterThan(0); // 스택은 아직 공중 — 끌려 내려간 게 아니다
+  });
+
+  it('정지 스택 아래에서도 점프는 즉시 발동한다 (13px 홉 소멸 방지)', () => {
     const s = makeState();
     s.stack = makeStack({
       variant: 'building',
@@ -40,9 +80,15 @@ describe('Wave 0: 점프 부활 (cling 삭제)', () => {
     s.stack.resting = true;
     s.stack.vy = 0;
     advance(s, inp({ jump: true }));
-    for (let i = 0; i < 20; i++) advance(s, inp());
-    // 구코드: cling이 y=145(200−55)에 스냅해 vy=0. 신코드: 20틱이면 상승 중(y>200도 가능).
-    expect(s.player.y).toBeGreaterThan(150);
+    let maxY = 0;
+    for (let i = 0; i < 20; i++) {
+      advance(s, inp());
+      maxY = Math.max(maxY, s.player.y);
+    }
+    // 밑면 200 − 키 55 = 145까지는 오른다(막힌 뒤엔 곧장 내려오므로 순간값이 아니라 정점을 본다).
+    // 13px 홉으로 죽지 않는다.
+    expect(maxY).toBeGreaterThan(120);
+    expect(maxY).toBeLessThanOrEqual(145 + 0.01);
     expect(s.player.pose).toBe('jump');
   });
 });

@@ -115,6 +115,7 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   if (p.y > 0 || p.vy > 0) {
     p.vy -= PLAYER.GRAVITY * dt;
     p.y += p.vy * dt;
+    blockUnderStack(s, p);
     if (p.y <= 0) {
       p.y = 0;
       p.vy = 0;
@@ -132,6 +133,30 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
   p.poseTick = 0;
   p.attackHit = false;
   p.attackFromAir = fromAir;
+}
+
+/**
+ * ★08-30(사용자 지시 "통과 안 하고 막히는 거"): 낙하 건물 밑면은 **막힌다**.
+ * 통과도 아니고 윗면 착지도 아니다 — 머리가 밑면에 닿으면 거기서 멈춘다.
+ *
+ * ★08-29 cling(접착)과 다른 점이 이 함수의 존재 이유다:
+ *   ① **상승 중에만** 검사한다. 하강 중에도 막으면 스택이 플레이어를 밀어 내리는 옛 경로가
+ *      되살아난다(끌려 내려가 깔림 직행 = 자살 버튼, ROADMAP Wave 0의 삭제 사유).
+ *   ② 부딪히면 `vy = 0`으로 **멈출 뿐** 스택 속도(`stack.vy`)를 따라가지 않는다. 접착 없음.
+ *   ③ 밑면 아래에 사람이 설 자리가 없으면(headroom ≤ 0) 검사하지 않는다 — 그건 깔림 판정
+ *      영역이고 여기서 건드리면 y가 음수로 튄다.
+ * 필살 중에는 막지 않는다(전파괴 연출이 벽에 걸리면 안 된다).
+ */
+function blockUnderStack(s: GameState, p: PlayerState): void {
+  const st = s.stack;
+  if (!st || s.mode === 'bonus') return;
+  if (p.vy <= 0 || p.pose === 'special') return;
+  const headroom = st.y - PLAYER.H;
+  if (headroom <= 0) return;
+  if (p.y + PLAYER.H <= st.y) return;
+  p.y = headroom;
+  p.vy = 0;
+  s.events.push({ kind: 'headBonk' });
 }
 
 // ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면

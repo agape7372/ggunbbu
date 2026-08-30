@@ -61,6 +61,9 @@ function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[]
       return ['jump'];
     case 'land':
       return [e.lane !== undefined ? 'rockLand' : 'land'];
+    // 밑면에 부딪힘 — 착지음을 재사용한다(둔탁한 한 방). 새 신스 없이 신호만 준다.
+    case 'headBonk':
+      return ['land'];
     case 'guardDenied':
       return [s.player.pose === 'guardBreak' ? 'guardBreak' : 'gaugeWarn'];
     case 'lifeLost':

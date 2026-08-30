@@ -266,6 +266,8 @@ export const JUICE: Record<string, JuiceSpec> = {
   butterCollapse: { hitstop: 2, shake: 2, flash: 2, particles: 8 },
   special:        { hitstop: 10, shake: 14, flash: 4, particles: 32 },
   hurt:           { hitstop: 4, shake: 8, flash: 3, particles: 4 },
+  // 밑면 충돌 — 막혔다는 걸 손에 알리되 타격보다 약하게(적을 친 게 아니다)
+  headBonk:       { hitstop: 1, shake: 2, flash: 0, particles: 4 },
   guardBounce:    { hitstop: 1, shake: 2, flash: 2, particles: 3 },
   guardAirBounce: { hitstop: 2, shake: 3, flash: 3, particles: 5 },
   bossHit:        { hitstop: 2, shake: 1, flash: 2, particles: 4 },
@@ -286,7 +288,7 @@ export const JUICE_SYS = {
 export const HAPTIC = {
   hit: 8, floorCollapse: 20, stackDestroy: [30, 20, 30],
   butterCollapse: 10, special: [100, 50, 200], hurt: 60,
-  guardBounce: 15, bossDefeat: [100, 50, 100, 50, 200],
+  guardBounce: 15, headBonk: 12, bossDefeat: [100, 50, 100, 50, 200],
   HIT_THROTTLE: 3,        // 연타 시 3회당 1회
 } as const;
 
