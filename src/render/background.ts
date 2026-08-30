@@ -19,5 +19,5 @@ export function backdropKey(s: BackdropInput): string {
 
 /** 필드(지면 위)에 챕터 배경 PNG를 그린다. 실패 시 false — 단색 폴백이 그대로 보인다. */
 export function drawChapterBackdrop(ctx: CanvasRenderingContext2D, s: BackdropInput): boolean {
-  return drawBackdrop(ctx, backdropKey(s), 0, 0, VIEW.W, VIEW.FIELD_H);
+  return drawBackdrop(ctx, backdropKey(s), 0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
 }

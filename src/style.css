@@ -172,9 +172,13 @@ html, body {
    기본은 잉크, 게이지가 차면(.ready) 그때 노랑(08-30 2차 감식). */
 .tbtn[data-action="special"]::after {
   border-width: 2px;
+  /* 미충전 = 점선 먼지색. 실선 잉크면 다른 버튼과 톤이 같아 "지금 못 쓴다"가 안 읽힌다. */
+  border-style: dashed;
+  border-color: var(--dust);
 }
 
 .tbtn[data-action="special"].ready::after {
+  border-style: solid;
   border-color: var(--yellow);
   background: var(--yellow);
 }
@@ -314,7 +318,11 @@ html, body {
   left: 0;
   right: 0;
   top: 0;
-  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  /* = VIEW.FIELD_TOP. 상시 정보(점수·목숨·모드·게이지)는 이 띠 안에 들어가고 필드는 그 아래서
+     시작한다. 보스·보너스·깔림 같은 단발 배너는 이 높이를 넘어 필드 위에 겹칠 수 있다(의도) —
+     상시가 아니라 그 순간에만 뜨는 줄이라 필드를 상시로 먹지 않는다. */
+  min-height: 50px;
+  padding: var(--sp-3) var(--sp-4) 0;
   /* ★판때기 제거(08-30). 처음엔 얕은 페이드로 남겼는데, 실측하니 건물이 화면에 들어오는
      첫 250ms 동안 상단 48px이 그 띠 밑을 지난다(진입 순간 = 반응이 가장 필요한 구간).
      배경을 아예 없애고 글자에 아이보리 헤일로만 준다 — 필드는 한 픽셀도 안 먹는다. */
@@ -398,6 +406,8 @@ html, body {
   border: 1.5px solid var(--ink);
   border-radius: 50%;
   background: transparent;
+  /* 글자엔 text-shadow 헤일로가 있는데 점에는 없어 건물 위에서 사라졌다(08-30 3차 감식) */
+  box-shadow: 0 0 0 1.5px var(--ivory);
 }
 
 .life.on {

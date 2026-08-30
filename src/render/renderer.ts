@@ -147,7 +147,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, VIEW.W, VIEW.FIELD_H);
+  ctx.rect(0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
   ctx.clip();
   ctx.translate(0, cam);
   drawChapterBackdrop(ctx, s);
@@ -176,7 +176,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 필드 클립 재적용 — 파티클·팝업·마커가 조작 존(하단 170px)을 침범하지 않게 (08-30, P1-5)
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, VIEW.W, VIEW.FIELD_H);
+  ctx.rect(0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
   ctx.clip();
   // 화면 고정 예고 마커 — 카메라 변환 밖 (공중에서도 절대 안 사라진다)
   for (const e of s.entities) {
