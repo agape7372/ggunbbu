@@ -188,6 +188,11 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.restore();
   ctx.restore();
 
+  // 필드 상단 규칙선 — 건물이 클립 경계에서 '툭' 나타나는 걸 프레임 안으로 들어오는 것으로
+  // 읽히게 한다. 조작 존 상단(#touch-layer::after)과 같은 굵기·같은 농도로 맞춘 액자 두 변.
+  ctx.fillStyle = 'rgba(26, 26, 32, 0.16)';
+  ctx.fillRect(0, VIEW.FIELD_TOP, VIEW.W, 1);
+
   if (flashTicks > 0) {
     ctx.globalAlpha = 0.35 * (flashTicks / 4);
     ctx.fillStyle = flashColor;
