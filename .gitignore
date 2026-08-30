@@ -3,3 +3,4 @@ dist/
 *.local
 .DS_Store
 ota/bundles/
+dist-feel.zip
