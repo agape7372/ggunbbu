@@ -50,7 +50,7 @@ const SECTIONS: readonly CatalogSection[] = [
 export function customHtml(): string {
   const blocks = SECTIONS.map((sec) =>
     `<p class="ov-records-h">${escapeHtml(sec.title)}</p>
-     <div data-el="${sec.slot}" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px"></div>`,
+     <div data-el="${sec.slot}" class="ov-custom-grid"></div>`,
   ).join('');
   return `<div class="ov-custom ov-panel">
     <h2>커스텀</h2>
@@ -74,10 +74,7 @@ export function paintCustom(
       const open = isOwned(owned, sec.slot, item.id);
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'flyer-btn';
-      btn.style.minHeight = '44px';
-      btn.style.padding = '6px 4px';
-      btn.style.fontSize = '11px';
+      btn.className = 'flyer-btn ov-custom-btn';
       btn.setAttribute('data-equip-slot', sec.slot);
       btn.setAttribute('data-equip-id', item.id);
       if (!open) {

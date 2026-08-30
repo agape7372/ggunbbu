@@ -4,12 +4,12 @@ import { OPERATIONS, type OperationCopy } from '../content/world';
 
 export function opsHtml(): string {
   const stamps = OPERATIONS.map((op) =>
-    `<button type="button" class="flyer-btn ov-stamp open" data-op="${escapeHtml(op.id)}" style="min-height:44px;font-size:12px;padding:6px 6px">${escapeHtml(op.name)}</button>`,
+    `<button type="button" class="flyer-btn ov-stamp open ov-op-stamp" data-op="${escapeHtml(op.id)}">${escapeHtml(op.name)}</button>`,
   ).join('');
   return `<div class="ov-ops ov-panel">
     <h2>구역 작전</h2>
     <p class="ov-manual-lead">하늘이 던진 구역을 고른다. 기믹은 클리어 후.</p>
-    <div data-el="ops" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${stamps}</div>
+    <div data-el="ops" class="ov-ops-grid">${stamps}</div>
   </div>`;
 }
 

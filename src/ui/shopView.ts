@@ -33,7 +33,7 @@ export function shopHtml(paths: { iap: boolean; ad: boolean }): string {
     <h2>상점</h2>
     ${skuBlock}
     <p class="ov-records-h" data-el="wallet">먼지 0 · 궤도조각 0</p>
-    <p class="ov-records-h" style="margin-top:8px">궤도조각 해금</p>
+    <p class="ov-records-h ov-orbit-h">궤도조각 해금</p>
     <div data-el="orbit-rows"></div>
     ${adBtn}
   </div>`;
@@ -60,9 +60,7 @@ export function paintShop(
       const has = hasItem(owned, row.id);
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'flyer-btn';
-      b.style.textAlign = 'left';
-      b.style.minHeight = '44px';
+      b.className = 'flyer-btn ov-row-btn';
       b.setAttribute('data-orbit-id', row.id);
       if (has) {
         b.disabled = true;
@@ -70,7 +68,7 @@ export function paintShop(
         b.textContent = `${row.title} — 보유`;
       } else {
         b.innerHTML =
-          `<span style="display:flex;justify-content:space-between;gap:8px;font-size:13px">
+          `<span class="ov-row-line">
             <span>${escapeHtml(row.title)}</span>
             <span>궤도 ${fmtNum(row.cost)}</span>
           </span>`;
@@ -133,16 +131,16 @@ function skuById(id: string): Sku | undefined {
 function groupHtml(title: string, skus: readonly Sku[]): string {
   const rows = skus.map((sku) => {
     const extra = sku.orbit != null ? `궤도조각 ${fmtNum(sku.orbit)}` : '';
-    return `<button type="button" class="flyer-btn" data-shop-sku="${escapeHtml(sku.id)}" style="text-align:left;min-height:44px;padding:6px 10px">
-      <span style="display:flex;justify-content:space-between;gap:8px;font-size:13px">
+    return `<button type="button" class="flyer-btn ov-row-btn" data-shop-sku="${escapeHtml(sku.id)}" style="padding:6px 10px">
+      <span class="ov-row-line">
         <span>${escapeHtml(sku.title)}</span>
         <span>₩${fmtNum(sku.krw)}</span>
       </span>
-      ${extra ? `<span style="display:block;font-size:10px;font-weight:600;color:#6E695F;margin-top:2px">${escapeHtml(extra)}</span>` : ''}
+      ${extra ? `<span class="ov-row-extra" style="margin-top:2px">${escapeHtml(extra)}</span>` : ''}
     </button>`;
   }).join('');
-  return `<p class="ov-records-h" style="margin-top:6px">${escapeHtml(title)}</p>
-    <div style="display:flex;flex-direction:column;gap:6px">${rows}</div>`;
+  return `<p class="ov-records-h ov-sku-group-h">${escapeHtml(title)}</p>
+    <div class="ov-sku-rows">${rows}</div>`;
 }
 
 function fmtNum(n: number): string {

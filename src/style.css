@@ -836,6 +836,31 @@ html, body {
 .mission-row .bar .fill.is-ready { background: var(--yellow); }
 .mission-row .bar .fill.is-done { background: var(--dust-2); }
 
+/* 08-30: shopView/customView/opsView 인라인 스타일 클래스화 — 값은 그대로, 토큰으로만 이동 */
+.ov-orbit-h { margin-top: var(--sp-4); }
+.ov-sku-group-h { margin-top: var(--sp-3); }
+.ov-sku-rows { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+.ov-row-btn { text-align: left; }
+.ov-row-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  font-size: var(--fs-4);
+}
+.ov-row-extra {
+  display: block;
+  font-size: var(--fs-1);
+  font-weight: 600;
+  color: var(--dust);
+}
+
+.ov-custom-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-2); }
+.ov-custom-btn { padding: var(--sp-3) var(--sp-2); font-size: var(--fs-2); }
+
+.ov-ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.ov-op-stamp { font-size: var(--fs-3); padding: var(--sp-3); }
+
 .ov-panel {
   display: flex;
   flex-direction: column;
