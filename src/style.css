@@ -610,9 +610,13 @@ html, body {
   font-weight: 700;
 }
 
+/* ★세로가 640 → 780으로 늘어난 뒤 남는 140px이 안내문구 위에 통째로 고여 244px 구멍이
+   됐다(08-30 실측). 위로 붙이지 말고 세로 가운데로 — 남는 공간이 위아래로 갈라져
+   "여백"으로 읽힌다. 짧은 기기에서 넘치면 overflow-y가 받는다. */
 .ov-title {
   background: var(--ivory);
-  justify-content: flex-start;
+  justify-content: center;
+  gap: var(--sp-2);
   overflow-y: auto;
 }
 
@@ -789,6 +793,35 @@ html, body {
 
 /* ★탭 화면은 셸(.ui-card) 안에 뷰가 자기 카드를 또 넣어 테두리가 두 겹으로 보였다(08-30 2차 감식).
    안쪽은 테두리 없는 패널로 — 획은 바깥 카드 하나만 긋는다. */
+/* 미션 행 — 뷰가 인라인으로 찍던 값들을 여기로. 조판은 CSS 한 곳에서만 정한다. */
+.mission-row {
+  border: 1.5px solid var(--ink);
+  padding: var(--sp-3) var(--sp-4);
+  text-align: left;
+}
+
+.mission-title {
+  font-size: var(--fs-3);
+  font-weight: 800;
+}
+
+.mission-desc {
+  margin: 2px 0 var(--sp-2);
+}
+
+.mission-meta {
+  font-size: var(--fs-1);
+  margin: var(--sp-2) 0 var(--sp-3);
+  color: var(--dust);
+}
+
+/* 진행 중 = 잉크, 수령 가능 = 노랑, 수령 완료 = 흐린 먼지.
+   ★순서 주의: 특정도가 같으므로(둘 다 클래스 3개) 상태 규칙이 뒤에 와야 이긴다. */
+.mission-row .bar { width: 100%; height: 6px; }
+.mission-row .bar .fill { background: var(--ink); }
+.mission-row .bar .fill.is-ready { background: var(--yellow); }
+.mission-row .bar .fill.is-done { background: var(--dust-2); }
+
 .ov-panel {
   display: flex;
   flex-direction: column;

@@ -72,40 +72,34 @@ function missionRow(def: MissionDef, p: MissionProgress): HTMLElement {
   const ratio = Math.max(0, Math.min(1, count / goal));
 
   const wrap = document.createElement('div');
-  wrap.style.border = '2px solid #1A1A20';
-  wrap.style.padding = '6px 8px';
-  wrap.style.textAlign = 'left';
+  wrap.className = 'mission-row';
 
   const title = document.createElement('p');
-  title.style.fontSize = '12px';
-  title.style.fontWeight = '800';
+  title.className = 'mission-title';
   title.textContent = def.title;
   wrap.appendChild(title);
 
   const desc = descOf(def);
   if (desc) {
     const sub = document.createElement('p');
-    sub.className = 'ov-manual-lead';
-    sub.style.margin = '2px 0 4px';
+    sub.className = 'ov-manual-lead mission-desc';
     sub.textContent = desc;
     wrap.appendChild(sub);
   }
 
   const bar = document.createElement('div');
   bar.className = 'bar';
-  bar.style.width = '100%';
-  bar.style.height = '6px';
   const fill = document.createElement('span');
   fill.className = 'fill';
   fill.style.width = `${Math.round(ratio * 100)}%`;
-  fill.style.background = p.claimed ? '#948E82' : '#FFD200';
+  // ★노랑 = "지금 할 수 있다" 하나로 통일(08-30 2차 감식). 진행 중은 잉크, 수령 가능일 때만 노랑.
+  fill.className = ready ? 'fill is-ready' : 'fill';
+  if (p.claimed) fill.classList.add('is-done');
   bar.appendChild(fill);
   wrap.appendChild(bar);
 
   const meta = document.createElement('p');
-  meta.style.fontSize = '10px';
-  meta.style.margin = '4px 0 6px';
-  meta.style.color = '#6E695F';
+  meta.className = 'mission-meta';
   meta.textContent = p.claimed
     ? '수령 완료'
     : `${count.toLocaleString('ko-KR')} / ${goal.toLocaleString('ko-KR')}  ·  먼지 ${dustOf(def)} · 궤도조각 ${orbitOf(def)}`;
