@@ -87,6 +87,25 @@ if (existsSync(manifestPath)) {
     if (missing.length > 0) {
       notes.push(`  미충족: ${missing.map(([k]) => k).join(', ')}`);
     }
+
+    // 소비자 없는 슬롯 — 키 문자열이 src/ 어디에도 안 나오면 그림을 넣어도 아무도 안 그린다.
+    // (2026-08-30 실측: fx-hit·fx-slash가 그 상태였다. 아트 발주 전에 잡으라고 여기서 센다.)
+    const srcFiles = walk(path.join(root, 'src')).filter((f) => /\.(ts|js|json)$/.test(f.path));
+    const codeText = srcFiles
+      .filter((f) => !f.path.endsWith(path.join('assets', 'manifest.json')))
+      .map((f) => readFileSync(f.path, 'utf8'))
+      .join('\n');
+    // 키가 템플릿으로 조립되는 경우도 있다(`bg-${theme}`·`ent-${kind}`) — 그 접두사는 소비된 것으로 본다.
+    const dynamicPrefixes = new Set(
+      [...codeText.matchAll(/`([a-z0-9]+)-\$\{/g)].map((m) => `${m[1]}-`),
+    );
+    const orphans = keys.filter(([k]) =>
+      !codeText.includes(`'${k}'`) &&
+      !codeText.includes(`"${k}"`) &&
+      ![...dynamicPrefixes].some((p) => k.startsWith(p)));
+    if (orphans.length > 0) {
+      notes.push(`  ★소비자 없음(코드가 안 그림): ${orphans.map(([k]) => k).join(', ')}`);
+    }
   } catch {
     problems.push('src/assets/manifest.json 파싱 실패');
   }

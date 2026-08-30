@@ -52,8 +52,12 @@
 | `ent-shotNo` | 64x40→16x10 | 회피 전용 탄(속 찬 원+가시, manifest `ent-shotNo`) |
 | `ent-rabbit` | 112x80→28x20 | 정찰 드론(토끼 아님, manifest `ent-rabbit`) |
 | `ent-cannon` | 96x112→24x28 | 고정 포탑 (manifest `ent-cannon`) |
-| `fx-hit` | 288x96→72x24 | 타격 스파크 3프레임 (manifest `fx-hit`) |
-| `fx-slash` | 192x192→48x48 | 참격 궤적 단독 VFX (manifest `fx-slash`) |
+| `fx-hit` | 288x96→72x24 | 타격 스파크 3프레임 (manifest `fx-hit`) — ★**소비자 없음** |
+| `fx-slash` | 192x192→48x48 | 참격 궤적 단독 VFX (manifest `fx-slash`) — ★**소비자 없음** |
+
+★**fx 2종은 매니페스트에만 있고 코드가 안 그린다**(2026-08-30 실측, `npm run check:budget`가 매번 센다).
+지금 이펙트는 `src/render/effects.ts`의 파티클이 전부라 PNG를 넣어도 화면에 안 나온다. **생성 전에**
+① 렌더러에 그릴 자리를 먼저 만들지, ② 매니페스트에서 두 키를 뺄지 정할 것 — 안 정하면 안 쓰는 그림이 나온다.
 | `bg-europe` | 360x470 | 1막 유럽 회랑 배경 (manifest `bg-europe`) |
 | `bg-asia` | 360x470 | 1막 시장 배경 (manifest `bg-asia`) |
 | `bg-eastasia` | 360x470 | 1막 기와능선 배경 (manifest `bg-eastasia`) |
