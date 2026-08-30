@@ -871,13 +871,45 @@ html, body {
 .ov-ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .ov-op-stamp { font-size: var(--fs-3); padding: var(--sp-3); }
 
+/* ★탭 화면은 카드에 가두지 않는다(08-30 사용자 지시: "미션을 왜 굳이 칸에 가둬놨냐, 팝업처럼 펼쳐").
+   테두리 있는 300px 상자 안에서 스크롤하면 목록이 창문 너머로 보이는 꼴이 된다.
+   시트 = 화면을 그대로 쓰는 한 장. 획은 제목 밑줄 하나로 충분하다. */
+.ov-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 328px;
+  flex: 1 1 auto;
+  min-height: 0;
+  text-align: left;
+}
+
+/* 제목은 시트 직계일 수도(취급설명서), 뷰 패널 안쪽일 수도(미션·상점·꾸미기) 있다 */
+.ov-sheet h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.2;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1.5px solid var(--ink);
+}
+
+/* 시트 안에서는 목록이 남는 높이를 전부 먹고, 뒤로 버튼은 바닥에 붙는다 */
+.ov-sheet > [data-el] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ov-sheet > .flyer-btn {
+  flex: 0 0 auto;
+}
+
 .ov-panel {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
   text-align: left;
-  max-height: 520px;
-  overflow-y: auto;
 }
 
 .ui-card-manual {

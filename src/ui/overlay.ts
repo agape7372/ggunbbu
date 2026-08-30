@@ -171,7 +171,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     </div>
 
     <div class="ov-screen ov-dim ov-settings ov-has-tabs" data-screen="settings" hidden>
-      <div class="ui-card ui-card-manual">
+      <div class="ov-sheet">
         <h2>취급설명서</h2>
         <p class="ov-manual-lead">본 기기는 하늘에서 떨어지는 건물을 부수는 가정용 철거기입니다. 전원 투입 전 아래를 확인하십시오.</p>
         <button type="button" class="flyer-btn" data-act="set-sound" data-el="set-sound">소리 켜짐</button>
@@ -206,28 +206,28 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     </div>
 
     <div class="ov-screen ov-dim ov-has-tabs" data-screen="ops" hidden>
-      <div class="ui-card ui-card-manual">
+      <div class="ov-sheet">
         <div data-el="ops-list"></div>
         <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
       </div>
     </div>
 
     <div class="ov-screen ov-dim ov-has-tabs" data-screen="missions" hidden>
-      <div class="ui-card ui-card-manual">
+      <div class="ov-sheet">
         <div data-el="mission-list"></div>
         <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
       </div>
     </div>
 
     <div class="ov-screen ov-dim ov-has-tabs" data-screen="shop" hidden>
-      <div class="ui-card ui-card-manual">
+      <div class="ov-sheet">
         <div data-el="shop-list"></div>
         <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
       </div>
     </div>
 
     <div class="ov-screen ov-dim ov-has-tabs" data-screen="custom" hidden>
-      <div class="ui-card ui-card-manual">
+      <div class="ov-sheet">
         <div data-el="custom-list"></div>
         <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
       </div>
