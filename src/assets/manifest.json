@@ -45,7 +45,7 @@
       "align": "bottom"
     },
     "bg-bonus": {
-      "src": "bg/bonus.png",
+      "src": "bg/modern.png",
       "w": 360,
       "h": 470,
       "anchor": "topleft",

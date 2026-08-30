@@ -386,3 +386,46 @@ Wave 0 이후 6커밋(039b12d~cc9ed14)에 2차 적대적 패널(19에이전트) 
 - [P2] act1curve 상한 공허: 봇은 BASE_HIT에 불감 — 인간 산술 밴드(15K~45K/s) 직접 가드 테스트.
 
 검증: tsc 클린 / **110 테스트 green** / build 성공.
+
+## 2026-08-30 — Wave 4 OTA 배선 + 에셋 예산 게이트 (Wave 3 코드측)
+
+**OTA 3종 이식 완료** (levain 정본 → 건뿌 각색, ROADMAP Wave 4):
+
+- `src/platform/ota.ts` — 부팅 3초 뒤 매니페스트 확인 → 다운로드 → `next()` 예약.
+  ★levain과 다른 점: `@capgo/capacitor-updater`를 **import 하지 않는다**. 루트 런타임 의존성 0이
+  이 레포 불변 규칙이라 `window.Capacitor.Plugins.CapacitorUpdater` 런타임 조회로만 접근한다
+  (`native.ts`의 `nativePlugin` export 신설 — 조회 경로를 한 군데로 묶어 import가 새로 안 생기게).
+- `scripts/ota-release.mjs` + `scripts/lib/zip.mjs`(결정론 zip, 외부 의존 0) — 건뿌 보강 3가지:
+  ① **`src/version.ts`를 스크립트가 갱신**(levain은 수동이라 번들 안 버전과 매니페스트가 어긋날 수
+  있었다) ② **셸 `versionName`과 비교해 죽은 발행 차단**(OTA는 네이티브보다 높은 버전만 적용된다 —
+  현재 셸 1.0이므로 첫 OTA는 1.0.1 이상) ③ 워킹트리 더러우면 경고(zip은 워킹트리를 싣는다).
+- `ota/` 정적 배포처 — `index.html`·`privacy.html`·`vercel.json`(manifest 무캐시 / bundles 1년 immutable).
+  ★**개인정보처리방침 URL 게이트가 여기서 같이 풀린다** — Play 제출용 페이지를 같은 호스팅에 얹었다.
+  `ota/bundles/`는 gitignore.
+- ★**서비스 워커 함정 선차단**: 셸도 `http://localhost` 오리진이라 SW가 살아 있으면 OTA로 갈아끼운
+  새 번들 위에 **옛 캐시를 계속 서빙**한다(무선 갱신이 조용히 무효). `main.ts`가 네이티브에서는
+  등록하지 않고 기존 등록을 해제한다. 웹은 그대로(오프라인 PWA 유지).
+- 설정(취급설명서)에 `모델 GUNBBU · 버전 v<APP_VERSION>` 표시 — 폰에 뜬 번들이 어느 것인지 눈으로 확인.
+- 검증: dry-run 실행(`1.0.1`) — 15파일 1.84MB zip·sha256 산출, tsc 클린, **118 테스트 green**(+8).
+
+**에셋 예산 게이트**(ROADMAP Wave 3 코드측):
+
+- `scripts/check-budget.mjs` 신설 + `npm run build`에 연결(= Pages CI에서도 돈다).
+  dist 총량 12MB / 이미지 한 장 1.5MB / `public/img` 합계 8MB 상한, **바이트 동일 중복 검출**,
+  매니페스트 슬롯 충족률 출력(현재 18개 중 7개 충족, 11개 미충족 = Wave 3 아트 몫).
+- 중복 제거: `bonus.png`가 `modern.png`와 **바이트 동일**이라 삭제하고 매니페스트 `bg-bonus.src`를
+  `bg/modern.png`로 돌렸다(로드맵 지적사항). 보너스 배경이 따로 생기면 그때 다시 파일을 넣으면 된다.
+- 실측: dist 2.24MB(직전 8MB는 **지난 빌드 누적분** — 빌드가 dist를 안 비운다. ota-release가 먼저 비운다).
+- `render-pipeline.test.ts:49` 항목은 08-30에 이미 수리돼 있었다(로드맵 기재가 낡음).
+
+**문서 정정 — RELEASE.md가 levain 문장을 사실로 들고 있었다:**
+
+- §5 "서명·키스토어 (2026-08-23 완료)" → **거짓**. `D:\keys\gunbbu\`는 없다(levain 것만 실재).
+  "미생성 — 사용자 작업" + keytool 절차로 교체. 이대로 뒀으면 릴리스 날 막혔다.
+- §8 전체 재작성 — 르방 저장 v2·보관 통·재료 30종 롤백 서술(전부 levain 도메인) 제거, 건뿌
+  storage 사다리 기준으로 다시 씀. §1 "CI 없음"도 거짓(Pages 워크플로가 push마다 test·build) — 정정.
+- §7 체크리스트: 개인정보처리방침 URL을 실제 경로로, **UMP(EEA 광고 동의) 미구현** 항목 추가.
+- CLAUDE.md: 네이티브 접근 규칙(런타임 조회만)·버전 단일 출처·예산 게이트 반영, 위임 규칙 Haiku 금지.
+
+잔여(Wave 4): `cd ota && npx vercel --prod` 첫 배포(사용자 승인) · keystore 생성 · 실 AdMob ID ·
+실기기 스모크 · Play 콘솔 제출물. 잔여(Wave 3): 아트 PNG 11키 생성(그록 프롬프트는 정렬 완료).

@@ -7,7 +7,8 @@ import { createApp, mountDebugPanel } from './ui/scenes';
 import { preloadAssets } from './render/assets';
 import { loadSave } from './storage';
 import { mountInstallPrompt } from './ui/installPrompt';
-import { notifyAppReady, onLifecycle } from './platform/native';
+import { notifyAppReady, onLifecycle, isNative } from './platform/native';
+import { initOta } from './platform/ota';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -72,9 +73,21 @@ onLifecycle((fg) => {
   paused = !fg;
 });
 
-// SW 등록 (프로덕션만)
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
+// OTA 확인 — 네이티브 셸에서만, 부팅 3초 뒤 조용히. 받아 두기만 하고 적용은 다음 복귀 때.
+initOta();
+
+// SW 등록 (웹 프로덕션만)
+// ★네이티브 셸에서는 등록하지 않는다: 셸도 http://localhost 오리진이라 SW가 그대로 살아
+// OTA로 갈아끼운 새 번들 위에 **옛 캐시를 계속 서빙**한다(무선 갱신이 조용히 무효가 되는 경로).
+// 이미 등록된 기기를 위해 해제도 같이 건다 — 앱 자산은 어차피 기기 안에 있어 오프라인은 무손실.
+if ('serviceWorker' in navigator) {
+  if (isNative()) {
+    void navigator.serviceWorker.getRegistrations()
+      .then((rs) => Promise.all(rs.map((r) => r.unregister())))
+      .catch(() => undefined);
+  } else if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 }

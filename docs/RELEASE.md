@@ -1,7 +1,7 @@
 <!-- ★08-30: levain(르방이) 셸 릴리스 절차서를 건뿌용으로 각색 이식(ROADMAP Wave 4).
      루트≠셸 구조 차이: 건뿌는 웹 게임이 루트, 셸은 shell/ 하위 별도 패키지다.
      아래 본문에서 android/ 는 shell/android/, 프로젝트 루트 명령은 shell/ 기준으로 읽는다.
-     OTA 호스팅 URL·버전 4곳 동기는 아직 미확정(TBD) — 배선 시 이 문서를 갱신할 것. -->
+     ★08-30 갱신: OTA는 배선 완료(§8) — 호스팅 gunbbu-ota.vercel.app, 버전 출처는 src/version.ts 하나. -->
 
 # 건뿌 — 빌드·릴리스 절차
 
@@ -9,7 +9,7 @@
 > `server.url` 라이브 리로드·FCM·Firebase·AdMob·딥링크 관련 절차는 전부 해당 없음.
 > (OTA 정적 배포처는 별개 — §8.)
 
-## 1. 로컬 검증 (CI 없음 — GitHub Actions 비활성, 전부 로컬)
+## 1. 로컬 검증 (+ GitHub Actions는 Pages 배포에 살아 있다 — push마다 test·build)
 
 ```bash
 npm test              # vitest — sim 코어 전 suite
@@ -17,13 +17,13 @@ npm run build         # vite build → dist/
 npm run dev           # 웹 확인 (Chrome 모바일 뷰포트)
 ```
 
-## 1-1. ★APK/AAB를 새로 구우면 OTA도 같이 발행한다 (2026-08-24 실사고)
+## 1-1. ★APK/AAB를 새로 구우면 OTA도 같이 발행한다 (levain 2026-08-24 실사고)
 
 **증상**: 새로 설치한 APK가 홈으로 나갔다 오면 옛날 화면으로 되돌아간다. 브라우저(dev)는 최신인데 폰만 구버전 — "폰이랑 브라우저 버전이 다른" 상태.
 
 **원인**: 내장 번들의 버전은 `versionName`(예 `1.0`)이다. 매니페스트에 그보다 높은 옛 OTA(예 `1.0.1`)가 떠 있으면 `ota.ts`의 비교가 `1.0.1 > 1.0`으로 판정해 **옛 번들을 받아 예약**하고, 백그라운드 복귀 시 새 APK의 웹 자산을 옛것으로 덮어쓴다. 즉 OTA가 다운그레이드로 작동한다.
 
-**규칙**: 웹 자산(dist/에 들어가는 전부 — JS·CSS·GLB·폰트·문구·상수)을 고쳐 APK/AAB를 재빌드했으면, **같은 코드로 OTA를 한 번 더 발행**해 매니페스트를 그 이상으로 올린다.
+**규칙**: 웹 자산(dist/에 들어가는 전부 — JS·CSS·이미지·문구·상수)을 고쳐 APK/AAB를 재빌드했으면, **같은 코드로 OTA를 한 번 더 발행**해 매니페스트를 그 이상으로 올린다.
 
 ```bash
 npm run ota:release -- <versionName보다 높은 버전>   # 예: 네이티브 1.0 → 1.0.2
@@ -82,15 +82,24 @@ npx @capacitor/assets generate --android \
 (아이콘 mipmap은 유지, `drawable-{land,port}*`·`drawable-night`만 제거 — podoal과 같은 정리).
 아이콘 원본은 `assets/icon/`에 버전관리.
 
-## 5. 서명·키스토어 (2026-08-23 완료)
+## 5. 서명·키스토어 (★미생성 — 사용자 작업)
 
-- keystore: `D:\keys\gunbbu\gunbbu.keystore` (alias `gunbbu`), 자격증명 = `D:\keys\gunbbu\credentials.txt`.
-- gradle 서명: `android/key.properties`(gitignore) — 분실 시 credentials.txt 값으로 재작성.
+★2026-08-30 확인: `D:\keys\gunbbu\`는 **없다**. 이 절은 levain 절차서를 이식하며 "완료"로 잘못
+따라온 문장이었다(levain은 `D:\keys\levain\`에 실재). 릴리스 AAB를 굽기 전에 새로 만들어야 한다.
+
+```bash
+# 예시 — 비밀번호는 사용자가 정하고 credentials.txt에 같이 남긴다
+keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
+  -alias gunbbu -keyalg RSA -keysize 2048 -validity 10000
+```
+
+- 생성 후: `shell/android/key.properties`(gitignore) 작성 — storeFile·storePassword·keyAlias·keyPassword.
+- **키 분실 = Play 업데이트 영구 불가.** 생성 즉시 keystore와 credentials.txt를 별도 백업.
 - 릴리스: `cd android && JAVA_HOME="D:/android-toolchain/jdk21" ./gradlew bundleRelease`
   → `android/app/build/outputs/bundle/release/app-release.aab`
-- Play App Signing 사용(업로드 키 분리) 권장. **키 분실 = Play 업데이트 불가.**
+- Play App Signing 사용(업로드 키 분리) 권장.
 
-## 6. appId (확정: 2026-08-23)
+## 6. appId (확정: 2026-08-30)
 
 `com.zaballgam.gunbbu` — 사용자 확정. **Play 등록 후 변경 불가.**
 
@@ -106,8 +115,10 @@ npx @capacitor/assets generate --android \
 ## 7. Play Console 내부테스트 제출물 체크리스트
 
 - [ ] 서명 AAB (`bundleRelease` + keystore)
-- [ ] **개인정보처리방침 URL** — 수집 데이터 0·완전 로컬이라 최단 코스. 정적 페이지 1장
-      (기존 Vercel 계정에 정적 호스팅 또는 GitHub Pages)
+- [ ] **개인정보처리방침 URL** — 페이지는 작성됨(`ota/privacy.html`). OTA 배포처를 한 번
+      올리면 `https://gunbbu-ota.vercel.app/privacy.html`이 그대로 제출 URL이 된다(§8)
+- [ ] **광고 동의(UMP)** — AdMob 초기화만 있고 유럽(EEA·영국) 동의 절차는 **미구현**.
+      배포 국가를 한국 등으로 좁히거나, EEA를 포함하려면 UMP를 붙인 뒤 제출할 것
 - [ ] **Data Safety 폼** — "수집하는 데이터 없음, 제3자 공유 없음, 모든 데이터 기기 내 저장"
 - [ ] 콘텐츠 등급 설문 — 전체이용가(폭력·도박·공포 요소 0)
 - [ ] 스토어 등록정보: 앱 이름 "건뿌", 짧은 설명, 자세한 설명
@@ -117,84 +128,85 @@ npx @capacitor/assets generate --android \
 - [ ] 내부테스트 트랙 테스터 이메일 등록
 - [ ] targetSdk — 현재 `android/variables.gradle`이 **36**(Android 16). 정본은 그 파일이지 이 줄이 아니다
 
-## 8. OTA(웹 번들 갱신)
+## 8. OTA(웹 번들 갱신) — 2026-08-30 배선 완료
 
-`@capgo/capacitor-updater` — 정적 호스팅(`https://gunbbu-ota.vercel.app`, `manifest.json` + `bundles/*.zip`
-두 파일뿐, 서버 로직 없음). 앱이 부팅 시 매니페스트를 읽어 새 버전이면 백그라운드로 받아 두고,
-**앱을 백그라운드로 보냈다 다시 열 때** 적용한다(세션 중 화면이 갈아끼워지지 않는다).
-실측 주의: 완전 종료 후 재시작만으로는 적용되지 않는다 — 홈으로 나갔다 돌아오는 전환이 트리거다. 계약·구현은
-[ARCHITECTURE.md §6](ARCHITECTURE.md)·`src/platform/ota.ts` 참조.
+`@capgo/capacitor-updater`(shell/ 의존성) + 정적 호스팅 `https://gunbbu-ota.vercel.app`
+(`manifest.json` + `bundles/*.zip` 두 파일뿐, 서버 로직 없음). 앱이 부팅 3초 뒤 매니페스트를 읽고
+새 버전이면 백그라운드로 받아 두었다가, **앱을 백그라운드로 보냈다 다시 열 때** 적용한다
+(세션 중에는 화면이 갈아끼워지지 않는다). 완전 종료 후 재시작만으로는 적용되지 않는다 —
+홈으로 나갔다 돌아오는 전환이 트리거다(levain 에뮬 실측).
+
+구현: `src/platform/ota.ts`(웹측, 플러그인 접근은 `window.Capacitor.Plugins` 런타임 조회만 —
+루트 런타임 의존성 0 불변) · `shell/capacitor.config.ts`의 `CapacitorUpdater` 블록(autoUpdate off,
+Capgo 클라우드 URL 3종 공백으로 차단) · `scripts/ota-release.mjs`(패키저).
 
 **OTA로 되는 것 / 안 되는 것**
 
 | 되는 것 (웹 자산, `dist/`에 들어가는 전부) | 안 되는 것 (APK/AAB 재배포 필요) |
 |---|---|
 | JS/CSS 번들 | 네이티브 플러그인 추가·변경 |
-| 이미지·폰트·GLB 등 정적 자산 | Android 권한 |
-| three.js 셰이더(.glsl) | `capacitor.config.ts`의 appId |
-| UI 문구(`ui/copy.ts`) | 아이콘·스플래시 등 네이티브 리소스 |
-| 게임 밸런스 상수(`sim/constants.ts`) | versionCode·versionName, AndroidManifest.xml |
+| 이미지(`public/img/`)·아이콘·매니페스트 | Android 권한 |
+| 게임 밸런스 상수(`src/config.ts`) | `capacitor.config.ts`의 appId |
+| UI 문구(`src/content/`) | 아이콘·스플래시 등 네이티브 리소스 |
+| 에셋 매니페스트(`src/assets/manifest.json`) | versionCode·versionName, AndroidManifest.xml |
 
 **릴리스 절차**
 
 ```bash
-# 0) src/version.ts의 APP_VERSION을 <version>으로 먼저 갱신 (설정 하단 표시·개발자 모드 앵커)
-npm run ota:release -- <version>          # 예: 1.1.0 — build → zip → sha256 체크섬 → ota/ 산출물
-# 신규 네이티브 플러그인을 전제로 한 번들이면 최소 네이티브 버전을 명시:
-npm run ota:release -- <version> --min-native=<x.y>
+npm run ota:release -- <version>             # 예: 1.0.1 — 빌드 → zip → sha256 → ota/ 산출물
 npm run ota:release -- <version> --dry-run   # 파일 쓰기 없이 빌드·zip·체크섬만 확인
+npm run ota:release -- <version> --min-native=<x.y>   # 새 네이티브 플러그인을 전제한 번들이면
 
 cd ota && npx vercel --prod --scope jirings-projects   # 실제 배포는 이 한 줄
+curl -s https://gunbbu-ota.vercel.app/manifest.json   # version 확인
 ```
 
-`scripts/ota-release.mjs`가 `ota/manifest.json`(현재 배포 버전)과 `ota/history.json`(발행 이력 누적)을
-같이 갱신하고, `ota/bundles/`에는 최근 4개 버전만 남기고 자동 정리한다.
+스크립트가 하는 일(levain 정본 + 건뿌 보강 3가지):
 
-**롤백**: `ota/history.json`에서 되돌릴 버전의 항목(version/url/checksum)을 찾아 그대로
-`ota/manifest.json`에 덮어쓰고 다시 `cd ota && npx vercel --prod --scope jirings-projects`로 배포한다.
-앱은 다음 확인 때 그 버전을 받는다. **주의**: `bundles/*.zip`은 1년 immutable 캐시로 서빙되므로
-같은 파일명을 새로 쓰지 않는다 — 롤백은 기존 zip을 다시 가리키기만 할 뿐 파일을 교체하지 않는다.
-4개보다 오래된 버전은 zip 자체가 정리되어 없을 수 있으니 history.json으로 존재를 먼저 확인.
-**⚠️ 저장 스키마 하위호환(2026-08-24 추가)**: 저장 v2(멀티 르방) 이후 번들이 한 번이라도
-사용자 기기에 저장을 쓰면, **v2를 모르는 옛 번들로 롤백 금지** — 옛 코드가 schemaVersion 2를
-읽지 못해 조용히 새 게임으로 덮어쓴다(미러까지). 롤백 후보는 반드시 v2 인지 버전 중에서 고른다.
+- **`src/version.ts`를 직접 갱신한다** — 번들 안 버전(설정 화면 표시)과 매니페스트 버전이
+  어긋날 수 없게. levain은 이게 수동이라 그 파일에 "⚠ 수동 갱신" 경고가 붙어 있었다.
+  발행 후 이 변경분을 **커밋할 것**.
+- **셸 `versionName`과 비교해 죽은 발행을 막는다** — OTA는 네이티브보다 높은 버전만 적용된다.
+  현재 셸은 `versionName "1.0"`이므로 첫 OTA는 `1.0.1` 이상.
+- **워킹트리가 더러우면 경고한다** — zip은 지금 작업 중인 파일을 그대로 싣는다(옆 세션 동승 사고 방지).
+- 그리고 `dist/`를 파일 단위로 먼저 비운다 — ★디렉터리째 `rmSync(recursive)`는 이 환경에서
+  **에러 없이 실패한다**(DEVLOG 08-30 `cpSync` 무음 크래시와 같은 계열). 안 비우면 지난 빌드
+  누적분이 번들에 통째로 실린다(levain 실측: 440개 42.6MB가 네 번의 릴리스에 섞여 나갔다).
 
-**보관 통(pantry) 경제 — 1.3.0**: 빵 굽기 원가를 mass에서 보관 통으로 옮긴 개편(GDD §6-2)은
-스키마 버전을 올리지 않았다 — v2 그대로, `shared.pantry`는 무버전 추가 키다(ARCHITECTURE.md §3).
-그래서 위 v1 금지와 달리 **1.2.x로 롤백해도 저장은 안전**하다 — 옛 코드가 `pantry` 키를 모를 뿐
-나머지(르방·도감·경제 카운터)는 그대로 읽는다. 잃는 건 보관 통 잔량이다(떼어 둔 g이
-사라짐 — 병 속 mass·산미·성장 단계는 무손실). 굽기 자체는 1.2.x 코드가 원래의 mass 게이트로
-되돌아가므로 계속 가능하다.
+`ota/manifest.json`(현재 배포 버전)과 `ota/history.json`(발행 이력)을 같이 갱신하고,
+`ota/bundles/`에는 최근 4개만 남기고 자동 정리한다.
 
-**★"무버전 추가 키라 안전"은 키 추가에만 성립한다 — 기존 키가 담는 값의 집합이 커진 경우는 다르다**
-(2026-08-26, 재료 30종 발행에서 확인). 1.3.3은 스키마 버전을 안 올렸지만 재료를 12 → 30종으로 늘렸다.
-1.3.2 이하로 내려가면:
+**롤백**: `ota/history.json`에서 되돌릴 버전의 항목(version/url/checksum)을 그대로
+`ota/manifest.json`에 덮어쓰고 다시 `cd ota && npx vercel --prod --scope jirings-projects`. 앱은 다음 확인 때 그 버전을 받는다.
+`bundles/*.zip`은 1년 immutable 캐시라 같은 파일명을 새로 쓰지 않는다 — 롤백은 기존 zip을 다시
+가리킬 뿐이다. 4개보다 오래된 버전은 zip이 정리돼 없을 수 있으니 history.json으로 먼저 확인.
 
-| 대상 | 결과 |
-|---|---|
-| 도감 발견(변형 키 포함) | **무손실** — 열거가 카탈로그를 안 보고 저장된 키를 그대로 훑는다. 롤포워드하면 되살아난다 |
-| 가루·경제 카운터 | **무손실** — 베이스 레시피만 세고 상수도 그대로 |
-| 르방 물리·성장·산미 | **무손실** |
-| 화면 | **안 깨진다** — 교환소·굽기 모달·도감-빵이 전부 옛 카탈로그로 돌아 미지의 id를 만나지 않는다 |
-| **`shared.inventory`의 신규 18종 수량** | ★**소실.** 옛 코드가 모르는 재료라 조용히 버려지고, 옛 클라이언트가 처음 저장하는 순간 **영구히** 지워진다 |
+**★저장 하위호환**: 건뿌 세이브는 `src/storage.ts`의 사다리(`parse → migrate → clamp`)로 읽는다.
+버전 키가 낮거나 손상돼도 항목별로 구제되므로 **옛 번들로 롤백해도 기록이 전멸하지 않는다**
+(08-30 Wave 2에서 전멸 경로 제거, `tests/storage.test.ts`가 가드). 다만 새 번들에서 추가된
+필드(새 코스메틱·새 기록 항목)는 옛 코드가 모르므로 옛 클라이언트가 저장하는 순간 **버려질 수 있다**.
+일반화: 키를 늘린 변경은 롤백해도 안전하고, **값 집합(카탈로그)이 커진 변경은 롤백 비대칭을 만든다**.
 
-즉 롤백해도 진척은 남지만 **재료함에 쌓아둔 신규 재료는 못 돌아온다.** 발행을 막을 사유는 아니고,
-롤백을 실제로 결정할 때 이걸 알고 하면 된다. 일반화: **카탈로그가 커지는 변경은 스키마 버전이
-그대로여도 롤백 비대칭을 만든다** — "키를 안 늘렸으니 안전"으로 넘기지 말고 값 집합을 따로 따져라.
+**zip은 커밋하지 않는다**(`.gitignore`의 `ota/bundles/`). 과거 번들의 실체는 ① 배포돼 있는 Vercel
+프로젝트와 ② 릴리스를 돌린 이 PC의 `ota/bundles/` 두 곳뿐이다 — 다른 PC에서 `vercel --prod`를
+돌리면 로컬에 없는 과거 zip이 배포본에서 사라져 롤백 URL이 404가 된다.
 
-**zip은 커밋하지 않는다**(`.gitignore`의 `ota/bundles/` — 개당 5MB대). 따라서 과거 번들의 실체는
-① 지금 배포돼 있는 Vercel 프로젝트와 ② 릴리스를 돌린 이 PC의 `ota/bundles/` 두 곳에만 있다.
-다른 PC에서 `vercel --prod`를 돌리면 로컬에 없는 과거 zip이 배포본에서 사라져 롤백 URL이 404가 된다 —
-새 PC에서 배포하기 전에 `ota/bundles/`를 함께 옮길 것.
+**안전장치**: 앱은 부팅 즉시 `notifyAppReady()`를 호출한다(`src/main.ts` 최상단 → `platform/native.ts`).
+못 받으면 플러그인이 "깨진 번들"로 판단해 다음 실행에 이전 번들로 자동 복귀한다(`appReadyTimeout` 10초).
 
-**안전장치**: 앱은 부팅 즉시 `notifyAppReady()`를 호출한다(`src/platform/ota.ts`). 이걸 받지 못하면
-(크래시 등으로 부팅이 안 끝나면) 플러그인이 "깨진 번들"로 판단해 다음 실행에 자동으로 이전 번들로
-되돌아간다 — 별도 조치 불필요. 번들 적용은 백그라운드 전환 후 복귀에만 일어난다(세션 중 무적용).
+**★서비스 워커**: 네이티브 셸에서는 SW를 등록하지 않고 기존 등록을 해제한다(`src/main.ts`).
+셸도 `http://localhost` 오리진이라 SW가 살아 있으면 OTA로 갈아끼운 새 번들 위에 옛 캐시를
+계속 서빙해 무선 갱신이 조용히 무효가 된다. 웹(브라우저)에서는 그대로 등록한다 — 오프라인 PWA 경로.
 
-**★새 APK/AAB를 구웠다면 OTA도 같이 발행할 것** — 매니페스트가 `versionName`보다 높은 옛 번들을 가리키고 있으면 새 APK가 백그라운드 복귀 때 옛 웹 자산으로 덮인다(다운그레이드). 절차·근거는 §1-1.
+**★새 APK/AAB를 구웠다면 OTA도 같이 발행할 것** — 매니페스트가 `versionName`보다 높은 옛 번들을
+가리키고 있으면 새 APK가 백그라운드 복귀 때 옛 웹 자산으로 덮인다(다운그레이드). 근거는 §1-1.
 
-**Play 정책**: 웹 자산(JS/HTML/CSS 등) 무선 갱신은 허용 범위. 네이티브 코드·권한 교체는 금지 —
+**Play 정책**: 웹 자산(JS/HTML/CSS·이미지) 무선 갱신은 허용 범위. 네이티브 코드·권한 교체는 금지 —
 이 구조는 전자만 다루므로 해당 없음. 위 표의 "안 되는 것"이 필요해지면 통상 절차(§2~§6)로 AAB 재배포.
+
+**개인정보처리방침 호스팅**: 같은 정적 배포처가 `privacy.html`도 서빙한다 —
+`https://gunbbu-ota.vercel.app/privacy.html` (Play 콘솔 §7 체크리스트의 URL 항목).
+
 
 ## 9. 릴리스 게이트
 

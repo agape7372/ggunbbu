@@ -31,6 +31,12 @@ function plugin(name: string): Record<string, (...a: unknown[]) => Promise<unkno
 }
 
 /**
+ * 같은 런타임 조회를 platform 층의 다른 포트(ota.ts 등)도 쓴다 — 조회 경로를 한 군데로 묶어
+ * 정적/동적 import가 새로 생기지 않게 한다. 부재 시 null, throw 없음.
+ */
+export const nativePlugin = plugin;
+
+/**
  * 부팅 즉시 1회 호출 — CapacitorUpdater가 이 신호를 못 받으면 OTA 번들을
  * 부팅 실패로 판단해 롤백한다(levain 실측). 웹·플러그인 부재에선 무해 no-op.
  */

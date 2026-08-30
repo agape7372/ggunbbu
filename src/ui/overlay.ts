@@ -11,6 +11,7 @@ import { paintMissions } from './missionView';
 import { paintShop } from './shopView';
 import { paintCustom } from './customView';
 import { ACHIEVES, DAILY_POOL } from '../meta';
+import { APP_VERSION } from '../version';
 import type { DailyState, Loadout, MissionProgress } from '../meta/types';
 
 export type OverlayScreen =
@@ -178,6 +179,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         <button type="button" class="flyer-btn" data-act="set-hand" data-el="set-hand">왼손잡이 꺼짐</button>
         <button type="button" class="flyer-btn" data-act="set-shake" data-el="set-shake">흔들림 기본</button>
         <p class="ov-manual-keys">키보드: 점프 ↑/W · 가드 ↓/S · 공격 Z · 필살 X · 일시정지 Esc</p>
+        <p class="ov-manual-keys">모델 GUNBBU · 버전 v${APP_VERSION}</p>
         <button type="button" class="flyer-btn primary" data-act="set-back">뒤로</button>
       </div>
     </div>
