@@ -149,6 +149,8 @@ export function mountHud(
       if (s.lives !== lastLives) {
         lastLives = s.lives;
         livesEl.innerHTML = livesHtml(s.lives);
+        // 마지막 하나만 빨강 — 빨강을 아껴야 위험 신호로 읽힌다(ART_DIRECTION).
+        livesEl.dataset.last = s.lives === 1 ? '1' : '';
       }
 
       const mt = modeText(s);

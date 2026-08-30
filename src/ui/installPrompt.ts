@@ -67,21 +67,26 @@ function ensureStyle(): void {
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
+    /* ★08-30: 이 층은 style.css와 분리돼 있어 개편에서 빠지기 쉽다 — 같은 규칙을 손으로 맞춘다.
+       획 1.5px · 드롭섀도우 없음 · 터치 44px · 안내는 중앙 팝업(바닥 시트 금지). */
     #install-prompt{position:fixed;bottom:8px;left:8px;right:8px;z-index:200;pointer-events:none}
-    #install-prompt .ip-card{pointer-events:auto;max-width:360px;margin:0 auto;display:flex;align-items:center;gap:8px;padding:8px 10px;border:2px solid #1A1A20;background:#F4F1E8;box-shadow:3px 3px 0 #1A1A20;font-family:system-ui,sans-serif;color:#1A1A20}
+    #install-prompt .ip-card{pointer-events:auto;max-width:360px;margin:0 auto;display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid #1A1A20;background:#F4F1E8;font-family:system-ui,sans-serif;color:#1A1A20}
     #install-prompt .ip-copy{flex:1;min-width:0}
     #install-prompt .ip-title{font-size:13px;font-weight:800;line-height:1.2}
     #install-prompt .ip-sub{font-size:11px;color:#6E695F;margin-top:2px}
-    #install-prompt button{border:2px solid #1A1A20;background:#FFD200;color:#1A1A20;font-size:12px;font-weight:800;padding:6px 10px;min-height:32px;cursor:pointer}
-    #install-prompt .ip-x{background:#F4F1E8;min-width:32px;padding:0}
-    #install-guide{position:fixed;inset:0;z-index:210;background:rgba(26,26,32,.45);display:flex;align-items:flex-end;justify-content:center}
-    #install-guide .ip-sheet{width:100%;max-width:360px;background:#F4F1E8;border:3px solid #1A1A20;border-bottom:none;padding:18px 16px 24px;font-family:system-ui,sans-serif;color:#1A1A20}
+    #install-prompt button{border:1.5px solid #1A1A20;background:#FFD200;color:#1A1A20;font-size:12px;font-weight:800;padding:6px 10px;min-height:44px;min-width:44px;cursor:pointer}
+    #install-prompt button:active{background:#1A1A20;color:#FFD200}
+    #install-prompt .ip-x{background:#F4F1E8;min-width:44px;padding:0}
+    #install-prompt .ip-x:active{background:#1A1A20;color:#F4F1E8}
+    #install-guide{position:fixed;inset:0;z-index:210;background:rgba(26,26,32,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+    #install-guide .ip-sheet{width:100%;max-width:320px;background:#F4F1E8;border:1.5px solid #1A1A20;padding:18px 16px}
     #install-guide h2{font-size:18px;text-align:center;margin:0 0 12px}
     #install-guide ol{margin:0 0 12px;padding:0;list-style:none}
     #install-guide li{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.4;margin:0 0 8px}
-    #install-guide .ip-num{flex:0 0 22px;height:22px;border:2px solid #1A1A20;text-align:center;font-weight:800;font-size:12px;line-height:18px}
+    #install-guide .ip-num{flex:0 0 22px;height:22px;border:1.5px solid #1A1A20;border-radius:50%;text-align:center;font-weight:800;font-size:12px;line-height:19px}
     #install-guide .ip-note{font-size:11px;color:#6E695F;text-align:center;margin:0 0 12px}
-    #install-guide button{display:block;width:100%;border:2px solid #1A1A20;background:#FFD200;font-weight:800;padding:10px;cursor:pointer}
+    #install-guide button{display:block;width:100%;min-height:44px;border:1.5px solid #1A1A20;background:#FFD200;font-weight:800;padding:10px;cursor:pointer}
+    #install-guide button:active{background:#1A1A20;color:#FFD200}
   `;
   document.head.appendChild(style);
 }

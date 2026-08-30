@@ -309,7 +309,9 @@ html, body {
   /* ★판때기 제거(08-30). 불투명 스트립 + 하단 2px 보더가 FIELD_H 상단을 덮어 건물이 들어오는
      구간을 먹고 있었다. 글자 가독성만 남기는 얕은 페이드로 바꾼다 — 경계선은 긋지 않는다. */
   background: linear-gradient(to bottom, rgba(244, 241, 232, 0.92) 55%, rgba(244, 241, 232, 0));
-  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  /* ★ui-monospace는 디지털시계 질감이라 손그림 톤과 충돌했다(08-30 감식).
+     자릿수 정렬은 폰트가 아니라 tabular-nums로 잡는다(.hud-score). */
+  font-family: var(--font-ui);
   color: var(--ink);
   pointer-events: none;
 }
@@ -373,16 +375,24 @@ html, body {
   margin-top: var(--sp-1);
 }
 
+/* ★목숨은 빨간 사각형 3개였다 — 아이콘이 아니라 placeholder처럼 읽혔다(08-30 감식).
+   원 = 졸라맨 머리와 같은 도형, 채움/빈칸으로 남은 수를 말한다. 빨강은 마지막 하나에만. */
 .life {
   display: block;
   width: 10px;
   height: 10px;
   border: 1.5px solid var(--ink);
+  border-radius: 50%;
   background: transparent;
 }
 
 .life.on {
+  background: var(--ink);
+}
+
+.hud-lives[data-last="1"] .life.on {
   background: var(--red);
+  border-color: var(--red);
 }
 
 .hud-mode {
@@ -466,7 +476,9 @@ html, body {
 }
 
 .bar .fill { transition: none; }
-.bar-guard .fill { background: var(--pink); }
+/* ★핑크 #FF6FA8은 원작 bougyobar 유래였지만 건뿌 팔레트에 없는 유일한 색이었다.
+   방어=먼지톤, 필살=노랑, 보스=빨강으로 역할을 색으로 가른다(08-30 감식·사용자 지시 개편). */
+.bar-guard .fill { background: var(--dust); }
 .bar-waza .fill { background: var(--yellow); }
 .bar-waza.full .fill { background: var(--red); }
 .bar-boss .fill { background: var(--red); }
@@ -484,16 +496,21 @@ html, body {
 
 .hud-bonus { color: var(--ink); font-size: var(--fs-3); }
 .hud-cap { color: var(--red); }
+/* ★깔림 안내가 흰 알약 말풍선(2px 테두리 + 불투명 판)이라 그림 한복판에 시스템 알림창이
+   뜬 것처럼 보였다(08-30 감식). 판을 없애고 잉크 글자만 남긴다 — 배경은 필드가 그대로 비친다.
+   가독성은 아이보리 헤일로(text-shadow)로 잡는다. */
 .hud-pin {
   position: absolute;
   left: 50%;
   top: 418px;
   transform: translateX(-50%);
-  width: 240px;
+  width: 260px;
   padding: var(--sp-2) var(--sp-4);
-  border: 2px solid var(--ink);
-  background: var(--ivory);
   font-size: var(--fs-2);
+  font-weight: 800;
+  text-shadow:
+    0 1px 0 var(--ivory), 0 -1px 0 var(--ivory),
+    1px 0 0 var(--ivory), -1px 0 0 var(--ivory);
 }
 .hud-waza-ready { color: var(--ink); }
 
@@ -552,8 +569,11 @@ html, body {
   border-right: none;
 }
 
+/* ★노랑은 화면당 한 곳(ART_DIRECTION §5-6). 그 한 곳은 "지금 할 일"인 CTA다 —
+   탭 선택은 색이 아니라 굵기와 밑줄로 말한다(08-30 감식: 타이틀에 노랑이 3곳이었다). */
 .ov-tab.on {
-  background: var(--yellow);
+  background: var(--ivory);
+  box-shadow: inset 0 -3px 0 var(--ink);
 }
 
 .ov-screen[hidden] { display: none !important; }
@@ -597,7 +617,9 @@ html, body {
   pointer-events: auto;
 }
 
-.ov-logo span { color: var(--yellow); -webkit-text-stroke: 1px var(--ink); }
+/* 노랑 한 곳 규칙: 타이틀에서 그 한 곳은 "지금 할 일"인 아케이드 시작 버튼이다.
+   로고는 크기로 이미 이긴다 — 색까지 쓰면 강조가 둘로 갈린다(08-30 감식). */
+.ov-logo span { color: var(--ink); }
 
 .ov-logo-en {
   font-size: var(--fs-2);
@@ -617,7 +639,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-  width: 280px;
+  width: 300px;
 }
 
 .flyer-btn {
@@ -625,10 +647,9 @@ html, body {
   width: 100%;
   min-height: 44px;
   padding: var(--sp-4) var(--sp-5);
-  border: 2px solid var(--ink);
+  border: 1.5px solid var(--ink);
   background: var(--ivory);
   color: var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
   font-family: inherit;
   font-size: var(--fs-5);
   font-weight: 800;
@@ -642,18 +663,28 @@ html, body {
 .flyer-btn.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
 .flyer-btn.locked,
 .flyer-btn:disabled {
-  opacity: 0.42;
-  box-shadow: none;
+  /* 잠김은 흐리게 지우는 게 아니라 점선으로 "아직 안 열림"을 말한다(옅은 회색은
+     비활성 placeholder처럼 보여 상태를 못 읽는다 — 08-30 감식). */
+  opacity: 1;
+  border-style: dashed;
+  border-color: var(--dust);
+  color: var(--dust);
   cursor: default;
 }
 
+/* 눌림 = 잉크 반전(도장). 오프셋 그림자는 ART_DIRECTION이 금지한 드롭섀도우라 안 쓴다. */
 .flyer-btn:not(:disabled):active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--ink);
+  background: var(--ink);
+  color: var(--ivory);
+}
+
+.flyer-btn.primary:not(:disabled):active {
+  background: var(--ink);
+  color: var(--yellow);
 }
 
 .ov-records {
-  width: 280px;
+  width: 300px;
   margin-top: var(--sp-6);
   padding: var(--sp-4) 10px;
   border: 2px solid var(--ink);
@@ -672,7 +703,7 @@ html, body {
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--sp-3);
-  width: 280px;
+  width: 300px;
   margin-top: var(--sp-5);
 }
 
@@ -688,6 +719,12 @@ html, body {
   border-style: solid;
   border-color: var(--ink);
   color: var(--ink);
+}
+
+/* 타이틀에선 auto 밀기를 쓰지 않는다 — 스탬프와 안내 사이에 200px짜리 구멍이 생겨
+   "여백"이 아니라 "콘텐츠가 없어서 빈 곳"으로 읽혔다(08-30 감식). 남는 공간은 아래로 모은다. */
+.ov-title .ov-hint {
+  margin-top: var(--sp-6);
 }
 
 .ov-hint {
@@ -709,7 +746,9 @@ html, body {
 }
 
 .ov-pause { background: rgba(244, 241, 232, 0.72); }
-.ov-over { background: rgba(250, 236, 232, 0.92); }
+/* ★로즈 워시(rgba(250,236,232))는 ART_DIRECTION 팔레트에 없는 색이었다 — 실패의 빨강은
+   제목 한 곳으로 충분하다(08-30 감식). */
+.ov-over { background: rgba(244, 241, 232, 0.94); }
 
 .ov-story-lines {
   width: 300px;
@@ -723,9 +762,8 @@ html, body {
 .ui-card {
   width: 300px;
   padding: 18px var(--sp-6) var(--sp-6);
-  border: 3px solid var(--ink);
+  border: 1.5px solid var(--ink);
   background: var(--ivory);
-  box-shadow: 5px 5px 0 var(--ink);
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);

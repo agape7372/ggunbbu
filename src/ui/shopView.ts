@@ -62,7 +62,7 @@ export function paintShop(
       b.type = 'button';
       b.className = 'flyer-btn';
       b.style.textAlign = 'left';
-      b.style.minHeight = '40px';
+      b.style.minHeight = '44px';
       b.setAttribute('data-orbit-id', row.id);
       if (has) {
         b.disabled = true;
