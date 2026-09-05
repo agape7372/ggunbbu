@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, advance } from '../src/core/sim';
 import { makeFloor, makeStack } from '../src/core/building';
-import { EMPTY_INPUT, type InputFrame } from '../src/core/types';
-import { JUICE } from '../src/config';
+import { EMPTY_INPUT, type GameState, type InputFrame } from '../src/core/types';
+import { GUARD_GAUGE, JUICE, PLAYER } from '../src/config';
 
 function inp(o: Partial<InputFrame> = {}): InputFrame {
   return { ...EMPTY_INPUT, ...o };
@@ -138,6 +138,72 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
     expect(maxY).toBeGreaterThan(120);
     expect(maxY).toBeLessThanOrEqual(145 + 0.01);
     expect(s.player.pose).toBe('jump');
+  });
+});
+
+// ★09-05(P2-1): 가드 브레이크가 공중에서 'idle'로 복귀하던 결함.
+// 'idle'은 지면 상태다 — 그 위에서 공격하면 attackFromAir가 죽어 밑면 관통이 무효가 되고,
+// 가드를 누르면 허공인데도 지면가드(guardG)가 성립한다.
+describe('공중 가드 브레이크는 점프 상태로 복귀한다 (09-05 P2-1)', () => {
+  /** 공중에서 게이지를 터뜨려 guardBreak 스턴이 끝난 직후 상태를 만든다. */
+  function airGuardBreakDone(): GameState {
+    const s = makeState();
+    s.stackSpawnCd = 100000;
+    advance(s, inp({ jump: true }));
+    advance(s, inp({ guard: true }));
+    expect(s.player.pose).toBe('guardA'); // 공중 가드 진입 확인
+    s.guardGauge = 0.2; // 다음 틱에 터지도록 — 홀드 소모(22/s)를 100틱 기다리지 않는다
+    advance(s, inp({ guard: true }));
+    expect(s.player.pose).toBe('guardBreak');
+    // 스턴(20f) 종료까지 방치. 이 동안에도 계속 상승 중이다(체공 96f).
+    for (let i = 0; i < 60 && s.player.pose === 'guardBreak'; i++) advance(s, EMPTY_INPUT);
+    expect(s.player.pose).not.toBe('guardBreak');
+    expect(s.player.y).toBeGreaterThan(0); // 아직 공중 — 전제가 깨지면 테스트 자체가 무의미
+    return s;
+  }
+
+  it('스턴이 끝나도 공중이면 pose는 jump다 (구코드는 idle)', () => {
+    const s = airGuardBreakDone();
+    expect(s.player.pose).toBe('jump');
+  });
+
+  it('이어지는 공격은 attackFromAir=true — 밑면을 관통하며 층을 깎는다', () => {
+    const s = airGuardBreakDone();
+    // 머리 위 24px에 밑면이 오도록 정지 스택을 놓는다. 평범한 점프의 상한 = ceil.
+    const ceil = s.player.y + 24;
+    const stackY = ceil + PLAYER.H;
+    s.stack = makeStack({
+      variant: 'building',
+      theme: 'europe',
+      floors: [makeFloor('weak'), makeFloor('weak'), makeFloor('weak')],
+      y: stackY,
+    });
+    s.stack.resting = true;
+    s.stack.vy = 0;
+    const floorsBefore = s.stack.floors.length;
+
+    advance(s, inp({ attack: true }));
+    expect(s.player.attackFromAir).toBe(true); // ★핵심: idle 복귀면 false가 된다
+
+    let maxY = 0;
+    for (let i = 0; i < 20; i++) {
+      // 타격은 스택을 밀어올린다(HIT_LIFT_V) — 밑면이 도망가면 "관통했다"와 "천장이 비켰다"를
+      // 구분할 수 없다. 매 틱 제자리에 못 박아 ceil을 상수로 만든다.
+      s.stack!.y = stackY;
+      s.stack!.vy = 0;
+      s.stack!.resting = true;
+      advance(s, EMPTY_INPUT);
+      maxY = Math.max(maxY, s.player.y);
+    }
+    expect(maxY).toBeGreaterThan(ceil + 1); // 막힘 상한을 넘었다 = 관통
+    expect(s.stack!.floors.length).toBeLessThan(floorsBefore);
+  });
+
+  it('이어지는 가드는 공중가드(guardA)다 — 허공에서 지면가드가 서지 않는다', () => {
+    const s = airGuardBreakDone();
+    s.guardGauge = GUARD_GAUGE.MAX; // 터뜨린 게이지를 되돌려 진입 문턱을 통과시킨다
+    advance(s, inp({ guard: true }));
+    expect(s.player.pose).toBe('guardA');
   });
 });
 

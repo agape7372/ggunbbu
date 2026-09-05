@@ -1,5 +1,8 @@
 // 키보드 + 터치 → InputFrame. 엣지(점프/공격/필살)와 홀드(가드)를 구분한다.
-// 원작에 좌우 이동이 없어 ←→(A/D) 매핑은 폐기. ↑/W/Space 점프, ↓/S/Shift 가드, Z/J 공격, X/K 필살.
+// ←→(A/D) 매핑은 폐기. ↑/W/Space 점프, ↓/S/Shift 가드, Z/J 공격, X/K 필살.
+// ★09-05 정정: 폐기 근거는 "원작에 좌우 이동이 없다"가 아니다 — 원작은 3레인 + 좌우 대시가
+// 있다(docs/ORIGINAL_BENCHMARK_2026-08-30.md §5-B). 단일 레인은 세로 360폭 모바일 조작성
+// 선택이다(사용자 확정, 불변).
 
 import type { InputFrame } from '../core/types';
 import type { TouchInput } from './touch';

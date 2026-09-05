@@ -1,5 +1,8 @@
 // FallingStack 생성·물리·타격·붕괴 규칙.
-// 원작에 좌우 이동이 없으므로 층은 세그먼트 1개다(레인 분할 폐기) — HP 0이면 층 전체 붕괴.
+// 층은 세그먼트 1개다(레인 분할 폐기) — HP 0이면 층 전체 붕괴.
+// ★09-05 정정: 근거는 "원작에 좌우 이동이 없다"가 아니었다. 단일 레인은 세로 360폭에서
+// 모바일 조작성을 위해 고른 것이다(사용자 확정, 불변). 원작은 3레인 + 좌우 대시가 있다 —
+// docs/ORIGINAL_BENCHMARK_2026-08-30.md §5-B.
 
 import type { FallingStack, Floor, GameState, Lane, Material, Theme } from './types';
 import { MAT_HP, STACK, VIEW } from '../config';

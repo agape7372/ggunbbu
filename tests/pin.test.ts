@@ -91,6 +91,84 @@ describe('깔림 방치 사이클 (08-30 4차)', () => {
     expect(s.events.some((e) => e.kind === 'lifeLost')).toBe(true);
   });
 
+  // ★09-05: 깔림 진입 시 입력 버퍼 클리어. 깔리기 직전에 눌렀다 뗀 Z가 첫 pinned 틱에
+  // 탈출 시도로 소비되던 결함 — 고HP층이면 실패 분기로 라이프를 한 장 더 먹는다.
+  // 버퍼는 pinned/히트스톱 동안 감쇠하지 않아(stepPlayer 미실행) 한 번 남으면 살아 있다.
+  describe('깔림 진입 버퍼 클리어 (09-05)', () => {
+    /**
+     * 가드 브레이크 스턴(20f) 중에 건물이 접지해 깔리는 상황을 만든다.
+     * guardBreak는 버퍼를 소비하지 않는 유일한 지상 포즈라, 진입 직전의 Z를 **소비 없이**
+     * 남길 수 있다 — 그래야 "첫 pinned 틱이 그걸 먹는가"를 물을 수 있다.
+     * 스턴 중에는 가드 판정도 없어(guardActive=null) 접지가 바운스로 새지 않는다.
+     */
+    function stunnedUnderStack(): GameState {
+      const s = makeState();
+      s.lives = 9;
+      // 낙하 종단속도(ACT1_VTERM[0] 238 = 3.97px/틱)를 감안해 스턴 20f 안에 접지할 높이로 둔다.
+      s.stack = makeStack({
+        variant: 'building', theme: 'europe',
+        floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard')],
+        y: 50,
+      });
+      s.stack.vy = -238;
+      advance(s, inp({ guard: true }));      // 지면 가드 진입
+      expect(s.player.pose).toBe('guardG');  // poseTick 0 = 선딜 중이라 가드 판정은 아직 없다
+      s.guardGauge = 0.2;                    // 다음 틱에 게이지가 터진다
+      advance(s, inp({ guard: true }));
+      expect(s.player.pose).toBe('guardBreak');
+      return s;
+    }
+
+    function crushedDuringStun(attackAt: 'none' | 'lastTickBeforePin', pinTick = 0): GameState {
+      const s = stunnedUnderStack();
+      for (let i = 0; s.player.pose !== 'pinned' && i < 200; i++) {
+        // 진입 직전 1틱 = 깔림을 일으키는 틱(pinTick)의 바로 앞
+        const isEdge = attackAt === 'lastTickBeforePin' && i === pinTick - 2;
+        if (isEdge) expect(s.player.pose).toBe('guardBreak'); // 스턴 중 = Z가 소비되지 않는 창
+        advance(s, isEdge ? inp({ attack: true }) : EMPTY_INPUT);
+      }
+      expect(s.player.pose).toBe('pinned');
+      expect(s.player.poseTick).toBe(0);
+      return s;
+    }
+
+    it('진입 직전 1틱의 Z는 첫 pinned 틱에 소비되지 않는다 — 자동 탈출 없음', () => {
+      // 1패스: 아무것도 안 눌러 깔림까지 걸리는 틱 수를 잰다(결정론 시뮬).
+      const probe = stunnedUnderStack();
+      let pinTick = 0;
+      while (probe.player.pose !== 'pinned' && pinTick < 200) { advance(probe, EMPTY_INPUT); pinTick += 1; }
+      expect(pinTick).toBeGreaterThan(1);                              // Z를 끼워 넣을 틱이 있다
+      expect(pinTick).toBeLessThan(PLAYER.GUARD_BREAK_STUN);           // 그 틱이 스턴 안에 있다
+
+      // 2패스: 같은 시나리오에서 진입 직전 1틱에만 Z 엣지. 스턴 중이라 물리는 동일하다.
+      const s = crushedDuringStun('lastTickBeforePin', pinTick);
+      expect(s.player.bufAttack).toBe(0); // 진입이 버퍼를 비웠다
+      const lives = s.lives;
+      const floors = s.stack!.floors.length;
+      s.events.length = 0;
+
+      // 이후 방치 — 첫 pinned 틱이 Z를 먹었다면 층이 붕괴하며 즉시 풀려난다.
+      const ticks = neglectUntil(s, (x) => x.player.pose === 'idle');
+      expect(s.events.some((e) => e.kind === 'floorCollapse')).toBe(false); // Z 탈출 시도 없음
+      expect(s.stack!.floors.length).toBe(floors);
+      expect(s.lives).toBe(lives - 1); // 방치 손실 1회뿐 — Z 실패로 인한 추가 손실 없음
+
+      // 퉁→쿵 사이클은 그대로 살아 있다(즉시 풀림이 아니라 방치 주기에 맞춰 온다)
+      expect(ticks).toBeGreaterThan(PLAYER.PIN_REPEAT_TICKS * 0.8);
+      expect(ticks).toBeLessThan(PLAYER.PIN_REPEAT_TICKS * 1.5);
+      expect(s.stack!.vy).toBeGreaterThan(STACK.PIN_MERCY_V * 0.9);
+    });
+
+    it('깔린 뒤 새로 누른 Z는 그대로 탈출 시도가 된다 (과잉 차단 아님)', () => {
+      const s = crushedDuringStun('none');
+      while (s.hitstop > 0) advance(s, EMPTY_INPUT); // 진입 히트스톱 소진
+      const floors = s.stack!.floors.length;
+      advance(s, inp({ attack: true }));
+      expect(s.player.pose).not.toBe('pinned');       // 5대미지 → hard(HP3) 붕괴로 탈출
+      expect(s.stack!.floors.length).toBe(floors - 1);
+    });
+  });
+
   it('돌더미 깔림은 튕기지 않는다 — 라이프만 깎이고 깔린 채로 (회귀 가드)', () => {
     const s = makeState();
     s.lives = 9;

@@ -70,16 +70,36 @@ function sourceSize(image: LoadedImage): { w: number; h: number } {
   return { w: image.naturalWidth, h: image.naturalHeight };
 }
 
+/**
+ * 이미지 1건 로드 상한. ★09-05(P1-3): onerror만 있으면 **응답이 멈춘** 서버(끊긴 게 아니라
+ * 열어둔 채 안 보내는 경우)에서 onload도 onerror도 영영 안 와 `main.ts`의 preload await가
+ * 무한 대기하고 스플래시가 그대로 굳는다. 타임아웃은 실패와 동일하게 취급한다 —
+ * 이 키만 미로드로 남고 호출부가 프로시저럴 스프라이트로 폴백한다.
+ */
+const LOAD_TIMEOUT_MS = 8000;
+
 function loadOne(key: string, entry: AssetEntry): Promise<void> {
   return new Promise((resolve) => {
-    const image = new Image();
-    image.onload = () => {
-      loaded.set(key, entry.chroma ? applyChroma(image, entry.chroma) : image);
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // 성공/실패/타임아웃 어느 쪽이든 정확히 1회만 resolve — reject하지 않는다.
+    const settle = (image?: HTMLImageElement): void => {
+      if (settled) return;
+      settled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      if (image) loaded.set(key, entry.chroma ? applyChroma(image, entry.chroma) : image);
       resolve();
     };
-    image.onerror = () => {
-      resolve(); // 실패해도 reject하지 않음 — 이 키만 null로 남고 나머지는 계속 진행
-    };
+
+    const image = new Image();
+    image.onload = () => settle(image);
+    image.onerror = () => settle(); // 실패해도 reject하지 않음 — 이 키만 null로 남고 나머지는 계속 진행
+    timer = setTimeout(() => {
+      // 뒤늦게 onload가 오더라도 settled 가드가 막는다(src를 비우면 브라우저에 따라
+      // 현재 문서 URL로 재요청이 나가므로 건드리지 않는다).
+      console.warn(`[assets] "${key}" 로드가 ${LOAD_TIMEOUT_MS}ms를 넘겨 폴백 처리`);
+      settle();
+    }, LOAD_TIMEOUT_MS);
     image.src = manifest.basePath + entry.src;
   });
 }

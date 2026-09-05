@@ -90,7 +90,12 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     }
     case 'guardBreak': {
       p.poseTick += 1;
-      if (p.poseTick >= PLAYER.GUARD_BREAK_STUN) { p.pose = 'idle'; p.poseTick = 0; }
+      // ★09-05: 공중에서 게이지가 터졌으면 스턴이 끝나도 여전히 공중이다 — 'jump'로 복귀한다.
+      // 'idle' 고정이면 ① 이어지는 공격이 startAttack(p,false)로 들어가 attackFromAir가 죽고
+      // (밑면 관통이 무효화) ② 가드 입력이 공중인데도 지면가드(guardG)로 성립해
+      // combat.tryGuardBounce의 'ground' 분기(콤보 단절·게이지 소모)가 허공에서 발동했다.
+      // attack/special 종료 분기와 같은 규칙으로 통일한다.
+      if (p.poseTick >= PLAYER.GUARD_BREAK_STUN) { p.pose = p.y > 0 ? 'jump' : 'idle'; p.poseTick = 0; }
       break;
     }
     case 'attack': {
@@ -187,7 +192,7 @@ function contactWithStack(s: GameState, p: PlayerState): void {
   }
 }
 
-// ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다.// ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면
+// ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면
 // 거의 항상 밑면에 접착돼 점프가 13px 홉으로 소멸하고(QA 실측), 같이 끌려 내려가 깔림에
 // 직행하는 구조적 자살 버튼이었다. 점프 = 제자리 회피 + 공중 무적(시각 관통 허용)이라는
 // 08-28 이전 검증 상태로 복원. 재도입하려면 docs/ROADMAP_2026-08-30.md Wave 0 근거를 먼저 뒤집을 것.

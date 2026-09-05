@@ -78,7 +78,11 @@ export function advance(s: GameState, input: InputFrame): void {
     stepPlayer(s, input, TICK);
   }
 
-  // [정본] 점프 무적의 이면: 지면에 놓인 스택 위/옆에 착지하면 그때 깔린다
+  // 착지 순간의 깔림 검사. ★09-05 정정: 여기 있던 "점프 무적의 이면"은 사실이 아니다 —
+  // **점프 무적 같은 건 없다**(08-30에 관통·공중무적 계약이 폐기됐다). 공중이 안전한 건
+  // 무적이라서가 아니라 밑면 접촉·접지 판정이 지면에서만 성립하기 때문이다.
+  // 실제 계약: 지면에 놓인(resting) 스택 위/옆에 착지하면 그때 깔린다. 단 무적(invulnTicks)
+  // 중에는 이 검사를 통과한다 — 무적이 끝난 뒤 착지·재착지에서 다시 걸린다.
   if (s.player.y <= 0 && s.player.pose !== 'pinned' && s.player.pose !== 'dead'
     && s.stack?.resting && s.player.invulnTicks <= 0 && s.player.pose !== 'special'
     && s.mode !== 'bonus') {
@@ -408,8 +412,10 @@ function onStackGrounded(s: GameState): void {
 
   if (s.player.invulnTicks > 0 || s.player.pose === 'special') return; // 무적 중 접지 무시
 
-  // [정본] "점프 중에는 짓눌리지 않음" — 공중이면 피해 없음.
-  // 착지 시점에 스택이 아직 지면에 있으면 그때 깔린다(sim 루프의 착지 검사).
+  // ★09-05 정정: 여기 붙어 있던 정본 딱지("점프 중에는 짓눌리지 않음")를 뗀다 —
+  // 08-30에 **밑면이 덮으면 같이 눌린다**로 뒤집힌 계약이다(docs/ROADMAP_2026-08-30.md §밑면 접촉,
+  // player.ts contactWithStack ②분기). 접지 틱에 공중이면 이 경로가 안 받을 뿐, 그 전에
+  // 밑면에 눌려 지면까지 내려와 있으면 여기서 깔린다.
   if (s.player.y > 0) return;
 
   if (s.mode === 'bonus') {
@@ -432,6 +438,15 @@ function onPlayerCrushed(s: GameState): void {
   s.player.pose = 'pinned';
   s.player.poseTick = 0;
   s.player.pinTick = 0;
+  // ★09-05: 진입 시 입력 버퍼를 비운다 — **깔림은 새 입력으로만 탈출한다.**
+  // 깔리기 직전에 눌렀다 뗀 Z가 첫 pinned 틱에 탈출 시도로 소비되고, 고HP층이면 라이프를
+  // 한 장 더 먹었다(stepPinned의 Z 실패 분기). 버퍼는 pinned/히트스톱 동안 감쇠하지 않아
+  // (stepPlayer가 안 돌므로) 한 번 남으면 그대로 살아 있다.
+  // ⚠ "버퍼 감쇠"로는 못 고친다 — advance 초입 collectBuffers가 pinned 분기보다 앞이라
+  // 홀드·연타 중이면 매 틱 재장전된다. 진입 시 1회 클리어가 유일하게 유효한 지점이다.
+  s.player.bufAttack = 0;
+  s.player.bufJump = 0;
+  s.player.bufGuard = 0;
   s.events.push({ kind: 'hurt' });
 }
 
