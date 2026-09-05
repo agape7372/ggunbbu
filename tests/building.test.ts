@@ -1,7 +1,9 @@
 // 건물 데이터 모델 규칙: 레인 세그먼트 독립 HP, 층 전체 붕괴, 밀어올림.
 import { describe, it, expect } from 'vitest';
 import { makeFloor, makeStack, damageStack, stepStack, floorSpan } from '../src/core/building';
-import { VIEW } from '../src/config';
+import { makeState } from '../src/core/sim';
+import { spawnAct1Building } from '../src/core/spawner';
+import { MAT_HP, VIEW } from '../src/config';
 
 function stack3() {
   return makeStack({
@@ -61,5 +63,33 @@ describe('세그먼트/붕괴 규칙 [정본 — 단일 레인]', () => {
     const H = VIEW.FLOOR_H;
     expect(floorSpan(st, 0)).toEqual([10, 10 + H]);
     expect(floorSpan(st, 2)).toEqual([10 + 2 * H, 10 + 3 * H]);
+  });
+});
+
+// ★09-05: 30% 재추첨이 HP만 바꾸고 mat은 base로 남겨 두던 결함의 회귀 가드.
+// 렌더는 mat으로 타일을 고른다 — 등급과 HP가 어긋나면 화면이 거짓말을 한다.
+describe('1막 스폰: 보이는 등급 = 실제 HP (09-05)', () => {
+  it('시드·진행도를 갈아도 모든 층에서 MAT_HP[mat] === segs[0].maxHp', () => {
+    const seen = new Set<string>();
+    let floorCount = 0;
+    for (const seed of [1, 7, 12345, 90210, 424242]) {
+      for (const p of [0, 0.25, 0.5, 0.75, 1]) {
+        const s = makeState({ seed });
+        s.p = p;
+        for (let n = 0; n < 40; n++) {
+          spawnAct1Building(s);
+          for (const f of s.stack!.floors) {
+            expect(MAT_HP[f.mat]).toBe(f.segs[0].maxHp);
+            expect(f.segs[0].hp).toBe(f.segs[0].maxHp); // 갓 스폰한 층은 온전하다
+            seen.add(f.mat);
+            floorCount += 1;
+          }
+          s.stack = null;
+        }
+      }
+    }
+    // 표본이 비어 있거나 한 등급뿐이면 위 단언은 아무것도 못 지킨다
+    expect(floorCount).toBeGreaterThan(1000);
+    expect(seen.size).toBe(3); // weak/mid/hard 셋 다 나왔다
   });
 });

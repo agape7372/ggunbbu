@@ -43,13 +43,13 @@ export function spawnAct1Building(s: GameState): void {
   const floors: Floor[] = [];
   for (let i = 0; i < floorCount; i++) {
     // 층 재질 추첨 후 30% 확률로 재추첨(±1 단계 변형) — 세그먼트 분할이 없어진 뒤의 층 단위 변형
+    // ★09-05 정합: 재추첨이 segs[0].hp만 갈아끼우고 f.mat은 base로 남겨 뒀다. 렌더는 mat으로
+    // 타일을 고르므로(render/sprites.ts drawThemeDetail) 1막 층의 약 20%가 **보이는 등급 ≠ 실제 HP**
+    // 였다 — 약해 보이는 층이 3대를 먹는다. makeFloor로 통째로 교체해 등급과 HP를 한 출처
+    // (config MAT_HP)에서 함께 세운다. rand 호출 순서·횟수는 그대로라 시뮬 산술은 불변이다.
     const base = pickMat(s, dist);
-    const f = makeFloor(base);
-    if (rand(s) < 0.3) {
-      const alt = pickMat(s, dist);
-      const hp = alt === 'weak' ? 1 : alt === 'mid' ? 2 : 3;
-      f.segs[0] = { hp, maxHp: hp };
-    }
+    let f = makeFloor(base);
+    if (rand(s) < 0.3) f = makeFloor(pickMat(s, dist));
     floors.push(f);
   }
   if (s.gimmick === 'glass') {
