@@ -53,153 +53,18 @@
 
 ---
 
-## 3. 이미지 프롬프트 세트
+## 3. 이미지 프롬프트 → `docs/IMAGE_PROMPTS.md`
 
-> 사용법: `[공통]` 블록을 매 프롬프트 앞에 그대로 붙인다.
-
-### [공통] — 매번 복붙
-```
-Minimal line art. Thin, even-weight black ink strokes (#1A1A20) with rounded caps,
-drawn with a slight hand-drawn wobble but never rough or sketchy.
-Flat warm ivory background #F4F1E8, completely untextured.
-Only one accent color allowed: yellow #FFD200.
-No shading, no gradients, no drop shadows, no outlines thicker than the stroke itself,
-no texture, no pixel art, no photographic elements.
-Generous empty space — the drawing occupies a small part of the frame.
-Deadpan and quiet. No text, no logo, no watermark, no UI.
-```
-
----
-
-### A. 졸라맨 포즈 시트 (최우선 — 이게 나와야 나머지가 정해진다)
-
-```
-[공통]
-
-Subject: A stick figure. Plain circle for a head with NO face at all — no eyes,
-no mouth, nothing. Single-line torso, single-line limbs with simple joint bends.
-He carries a thin blade drawn as one straight line with a tiny circle for the grip.
-
-Layout: character sheet, 6 poses in one horizontal row, side view facing right,
-ALL AT IDENTICAL SCALE ON ONE SHARED GROUND LINE, evenly spaced:
-1. IDLE — standing upright, blade lowered at his side, relaxed
-2. ATTACK — deep forward lunge, blade swung down and through, trailing a single
-   sweeping yellow #FFD200 arc behind the blade
-3. GUARD — blade raised horizontally above the head with both arms, knees bent, bracing
-4. JUMP — airborne, both knees tucked up, blade trailing behind
-5. PINNED — flattened flat on the ground, limbs splayed out sideways
-6. DEAD — collapsed on his back, limbs limp
-
-The yellow arc appears ONLY in the ATTACK pose. Every other pose is pure black line.
-Each figure must be small within its cell with clear empty space around it.
-Silhouette must stay readable when shrunk to 50 pixels tall.
-```
-
-**왜 이렇게 쓰나**: 게임이 필요한 건 46×55px 프레임 10종이다. `IDENTICAL SCALE ON ONE
-SHARED GROUND LINE`을 대문자로 강제하지 않으면 포즈마다 크기·발높이가 달라져 잘라도 못 쓴다.
-`geonppu-stickman.png`는 이 조건 없이 1포즈만 나온 상태다.
-
----
-
-### B. 건물 층 — 먼지 톤 라인 (원색 폐기 후 재작업)
-
-```
-[공통]
-
-Subject: A single floor of a building, drawn straight-on with no perspective —
-a wide flat rectangle outlined in thin black line, filled with a muted dusty
-grey-brown (nearly desaturated). Windows drawn as simple thin-line rectangles.
-
-Three variants stacked vertically in one image, same width, same line weight:
-TOP    — plain face, two square windows, no other detail
-MIDDLE — same face with evenly spaced horizontal joint lines, four arched-top windows
-BOTTOM — same face with a dense grid of joint lines, six narrow vertical slit windows
-
-The three must be distinguishable in pure greyscale by window shape and line density
-alone — NOT by color. Fills stay dull and close in value; nothing saturated,
-nothing bright. Wide short proportions. Each tiles seamlessly left to right.
-```
-
----
-
-### C. 배경 — 밝은 원경
-
-```
-[공통]
-
-Subject: Vertical game background. A distant city skyline along the very bottom edge,
-drawn as thin black outlines only with no fill — just the contour of rooftops,
-water tanks, and antennas, like a single continuous pen line across the horizon.
-Everything above the skyline is empty ivory.
-
-Composition: skyline occupies only the bottom 15% of the frame. The upper 85%
-is completely empty ivory — no clouds, no sun, no stars, no gradient.
-Tall vertical aspect ratio.
-
-This is a background that must disappear behind gameplay. If it draws attention,
-it is wrong.
-```
-
-**왜 이렇게 쓰나**: 이전 시도들이 전부 배경을 주인공으로 만들어서 폐기됐다.
-(밤하늘 별, 파스텔 아파트, 실사 구름) 이 스타일에서 배경의 정답은 **거의 아무것도 없음**이다.
-
----
-
-### D. 달 보스 "보름호"
-
-```
-[공통]
-
-Subject: A perfect circle drawn in thin black line — the moon. A few small
-circles inside it for craters, also thin line only, no fill. One of those circles
-is different: it is a mechanical lens iris, and it is filled solid yellow #FFD200.
-A few short straight antenna lines project from the circle's rim.
-
-Centered, square aspect, large in frame but with clear empty margin.
-Absurd rather than menacing — it is a moon that happens to be watching you.
-No face, no expression.
-```
-
----
-
-### E. 버터바
-
-```
-[공통]
-
-Subject: A single rectangular slab of butter, drawn straight-on as a thin-line
-rectangle with slightly rounded corners, filled flat yellow #FFD200.
-A thin line near the top edge suggests a peeled wrapper. Nothing else.
-
-Wide short proportions, single object, centered, lots of empty ivory around it.
-It must read as SOFT while every building block in this game reads as HARD —
-achieve that only through the corner rounding, not through shading.
-```
-
----
-
-### F. 타이틀 키 비주얼
-
-```
-[공통]
-
-Subject: Vertical title art. A tiny stick figure stands at the bottom center,
-seen from behind, blade in hand, head tilted up. Far above him, a towering stack
-of building floors recedes upward and out of the top of the frame, drawn in thin
-line with muted dusty fills, getting smaller and fainter toward the top.
-A single thin-line circle — the moon, with one small solid yellow dot inside it —
-sits near the very top.
-
-Tall vertical aspect. The figure is almost comically small against the stack.
-Keep the upper quarter sparse; a title will be placed there.
-No heroic posing. He is just a guy looking up at a very tall problem.
-```
+프롬프트 정본은 `docs/IMAGE_PROMPTS.md` 하나다(2026-09-05). 이 절에 있던 A~F 프롬프트는 그리로 흡수됐다.
+이 문서는 스타일 정본(§1·§2)만 유지한다 — 프롬프트를 여기에 다시 쓰지 말 것.
 
 ---
 
 ## 4. 이 방향으로 갈 때 코드에서 바뀌어야 하는 것
 
 이건 아트만의 문제가 아니다. **밝은 테마 반전은 게임 코드 변경을 요구한다.**
+
+> ★2026-09-05: 아래 표는 전부 이행 완료(배경 아이보리·먼지톤 3단·졸라맨 선·HUD 반전·플래시). 역사 기록으로만 둔다.
 
 | 항목 | 현재 | 필요 | 위치 |
 |---|---|---|---|

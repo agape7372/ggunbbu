@@ -110,8 +110,12 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 
 - **한글 경로**: AGP가 거부 → `android/gradle.properties`의 `android.overridePathCheck=true` (적용됨).
 - **aapt/adb는 한글 경로 못 읽음** → APK를 ASCII 경로로 복사 후 조작.
-- **Capacitor 플러그인은 정적 import 필수** — `import('@capacitor/x')` 동적 bare-import는
-  WebView가 해석 못 해 조용히 null (알림·햅틱 전부 무음 실패). `src/platform/native.ts` 주석 참조.
+- **Capacitor 플러그인은 `window.Capacitor.Plugins` 런타임 조회만** — 정적 bare import
+  (`import '@capacitor/x'`)도 동적 bare import(`import('@capacitor/x')`)도 금지다. 플러그인 패키지는
+  `shell/`에만 있고 루트 런타임 의존성은 0을 유지하므로, 루트 번들이 bare 지정자를 참조하는 순간
+  웹 번들이 오염되거나 WebView가 해석 못 해 조용히 null이 된다(알림·햅틱 전부 무음 실패).
+  접근은 `src/platform/`에서만. 정본은 `CLAUDE.md` 참고 절.
+  **← 09-05 정정(AUDIT F-4)** — 기존 "정적 import 필수" 문장이 `CLAUDE.md`와 정면 모순이었다.
 - key.properties의 storePassword/keyPassword 둘 다 채울 것 — 하나라도 비면
   "Given final block not properly padded".
 
