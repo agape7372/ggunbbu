@@ -1078,3 +1078,4 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - **버전 표기**: 설정 맨 아래는 앱이면 셸 `versionName`(1.0), 웹이면 번들 버전. `src/version.ts`(0.1.0)는 OTA가 꺼진 동안 쓰이지 않아 손대지 않았다.
 - 검증: 25개 파일 163 테스트, tsc 클린, `npm run build` 예산 OK(dist 2.93MB). 헤드리스 캡처 23장(390×844·360×640) pageerror 0. 검수에서 고친 것: `[hidden]`이 display 지정 버튼에 지던 문제(전역 규칙), 흔들림 값 중복 문구, HUD 층 표시 잘림, 게임오버 제목·도장 중복, 광고 뒤 토스트 잔류.
 - 남은 것(사용자 몫): keystore 생성·백업, AdMob 실 ID(앱 ID·리워드 단위), Pages 배포로 방침 URL 활성, Play 비공개 테스트, 실기기 확인.
+- 후속: vite `emptyOutDir`가 이 환경에서 오류 없이 실패해 dist에 9월 빌드 번들까지 쌓여 APK에 실리고 있었다(서비스 워커 사전 캐시엔 안 들어감). `scripts/clean-dist.mjs`(파일 단위 unlink + 잔존 검사)를 `npm run build` 맨 앞에 붙였다 → dist 39 → 36개, 2.93 → 2.77MB. 일일 미션 「궤도 광고」 → 「궤도조각 광고」.

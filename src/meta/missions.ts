@@ -71,7 +71,7 @@ export const DAILY_POOL: readonly MissionDef[] = [
     id: 'watch_ad',
     kind: 'daily',
     title: '광고 한 편',
-    desc: '궤도 광고. 선택은 본인.',
+    desc: '궤도조각 광고. 선택은 본인.',
     goal: 1,
     rewardDust: 0,
     rewardOrbit: ORBIT_PER_AD,
