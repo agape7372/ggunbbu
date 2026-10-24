@@ -71,3 +71,14 @@ describe('butterBest 항목별 구제 (08-30 검증 후속)', () => {
     expect(d.butterBest[9 as never]).toBeUndefined();
   });
 });
+
+describe('howtoSeen 무버전 키', () => {
+  it('없거나 이상한 값이면 false, true는 보존', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
+    expect(loadSave().howtoSeen).toBe(false);
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: 'yes' }));
+    expect(loadSave().howtoSeen).toBe(false);
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true }));
+    expect(loadSave().howtoSeen).toBe(true);
+  });
+});

@@ -4,12 +4,13 @@
 import type { GameState } from '../core/types';
 import { ACT2, BOSS } from '../config';
 import { ACT2_PHASES, BOSS_NAME, CAPTIONS, hudModeLabel, SCREENS } from '../content';
+import { ICON } from './icons';
 
 export interface HudApi {
   sync(s: GameState): void;
 }
 
-const pinHint = `${CAPTIONS.pinned} — 가드:탈출 · 공격:밑층`;
+const pinHint = `${CAPTIONS.pinned}<small>가드: 빠져나오기 · 공격: 아래층 베기</small>`;
 
 export function mountHud(
   root: HTMLElement,
@@ -17,7 +18,7 @@ export function mountHud(
 ): HudApi {
   root.innerHTML = `
     <div class="hud">
-      <button type="button" class="hud-pause" aria-label="일시정지">잠깐</button>
+      <button type="button" class="hud-pause" aria-label="일시정지">${ICON.pause}</button>
       <div class="hud-row hud-row-top">
         <div class="hud-col hud-col-left">
           <div class="hud-score" data-el="score">00000000</div>
@@ -31,7 +32,7 @@ export function mountHud(
           <div class="hud-combo" data-el="combo"></div>
           <div class="hud-gauges">
             <div class="gauge-row">
-              <span class="gauge-label">방어</span>
+              <span class="gauge-label">가드</span>
               <div class="bar bar-guard">
                 <span class="ghost" data-el="guard-ghost"></span>
                 <span class="fill" data-el="guard-fill"></span>
@@ -80,7 +81,6 @@ export function mountHud(
   const readyEl = el('ready');
 
   capEl.textContent = CAPTIONS.combo999;
-  pinEl.textContent = `${CAPTIONS.pinned} — 가드:탈출 · 공격:밑층`;
   readyEl.textContent = CAPTIONS.specialReady;
 
   const pauseBtn = root.querySelector('.hud-pause') as HTMLButtonElement;
@@ -136,21 +136,24 @@ export function mountHud(
     }
     if (s.mode === 'act2' && s.act2Phase === 'rock' && s.act2c) {
       const sec = Math.max(0, Math.ceil((ACT2.ROCK_TIMEBOX_TICKS - s.act2c.t) / 60));
-      return `${ACT2_PHASES.rock.name} ${s.act2c.rocks}/${ACT2.ROCK_COUNT} · ${sec}s`;
+      return `${ACT2_PHASES.rock.name} ${s.act2c.rocks}/${ACT2.ROCK_COUNT} · ${sec}초`;
     }
     const st = s.stack;
     if (!st || st.floors.length === 0) return '';
     const bot = st.floors[0];
     const hp = bot.segs[0]?.hp ?? 0;
     const max = bot.segs[0]?.maxHp ?? 0;
-    return `층 ${st.floors.length} · 밑 ${hp}/${max}`;
+    return `${st.floors.length}층 · ${hp}/${max}`; // 남은 층 · 맨 아래층 남은 내구
   }
 
   return {
     sync(s: GameState): void {
       if (s.score !== lastScore) {
         lastScore = s.score;
-        scoreEl.textContent = String(s.score).padStart(8, '0');
+        // 앞자리 0은 흐리게(.z) — 실제 자릿수만 읽히게
+        const digits = String(s.score);
+        const pad = Math.max(0, 8 - digits.length);
+        scoreEl.innerHTML = `<span class="z">${'0'.repeat(pad)}</span>${digits}`;
       }
       if (s.lives !== lastLives) {
         lastLives = s.lives;
@@ -175,7 +178,7 @@ export function mountHud(
         const rose = s.combo > lastCombo && s.combo > 0;
         const broke = lastCombo > 0 && s.combo === 0;
         lastCombo = s.combo;
-        comboEl.textContent = s.combo > 0 ? `${s.combo} COMBO` : '';
+        comboEl.innerHTML = s.combo > 0 ? `${s.combo}<small>콤보</small>` : '';
         comboEl.classList.toggle('hot', s.combo >= 500 && s.combo < 999);
         comboEl.classList.toggle('mid', s.combo >= 100 && s.combo < 500);
         comboEl.classList.toggle('hi', s.combo >= 50 && s.combo < 100);
@@ -237,11 +240,11 @@ export function mountHud(
 
       if (s.mode === 'bonus' && s.bonus) {
         const sec = Math.ceil(s.bonus.ticksLeft / 60);
-        const t = `${SCREENS.butter.bannerHud} ${sec}s  ${s.bonus.destroyed}/${s.bonus.total}`;
+        const t = `${SCREENS.butter.bannerHud}<small>${sec}초 · ${s.bonus.destroyed}/${s.bonus.total}</small>`;
         if (t !== lastBonus) {
           lastBonus = t;
           bonusEl.hidden = false;
-          bonusEl.textContent = t;
+          bonusEl.innerHTML = t;
         }
       } else if (!bonusEl.hidden) {
         bonusEl.hidden = true;

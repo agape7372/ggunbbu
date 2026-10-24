@@ -8,10 +8,10 @@ import { makeState, advance, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
 import { ACT1, PALETTE, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
-import { loadSave, saveSave, type SaveData, type SaveSettings } from '../storage';
+import { loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
 import type { TouchInput } from './touchLayer';
-import { armAudioUnlock, initAudio, playSfx, resumeIfNeeded, setSoundOn, startBgm, stopBgm } from '../audio/audio';
+import { armAudioUnlock, initAudio, playSfx, resumeIfNeeded, setSoundOn, startBgm, stopBgm, suspendAudio } from '../audio/audio';
 import { consumeAudio } from '../audio/consume';
 import type { BgmTrack } from '../audio/sfx';
 import {
@@ -32,9 +32,10 @@ import { applySettingsPatch as patchSettings, applySettingsToRuntime } from './s
 import {
   applyMissionEvent, ensureDaily, grant, grantOrbit, initAchieveProgress,
   MAX_REVIVES_PER_RUN, ORBIT_PER_AD, ACHIEVES, DAILY_POOL, claim, defById,
-  equip, spendOrbit, orbitCost,
+  equip, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
 } from '../meta';
-import { createAdsPort } from '../platform/ads';
+import { createAdsPort, type AdKind } from '../platform/ads';
+import { minimizeApp, onBackButton, onLifecycle } from '../platform/native';
 import { createIapPort, SKUS, type SkuId } from '../platform/iap';
 import { isDevUnlocked } from '../platform/devUnlock';
 import {
@@ -68,7 +69,8 @@ export function createApp(
   let overlayTicks = 0;
   let pendingAfterOverlay: (() => void) | null = null;
   let butterChallenge = false;
-  let debug = new URLSearchParams(location.search).has('debug');
+  // 디버그 경로(?debug·로고 7탭·가드+필살)는 개발 빌드에만 있다 — 스토어 빌드에선 상수 false로 접혀 빠진다
+  let debug = import.meta.env.DEV && new URLSearchParams(location.search).has('debug');
   let titleTaps = 0;
   let menuIndex = 0;
   let prevTitleGuard = false; // 타이틀 메뉴 가드 엣지 검출용 (P0-6)
@@ -81,6 +83,10 @@ export function createApp(
   // 오염시키지 않는다 — 재화(먼지·궤도) 지급만 유지. 부처버전 문법: 치트 런 = 기록 없음.
   let runExempt = false;
   let dustDirty = false; // 판 도중 재화 지급 발생 표시 — noteMissions 말미 저장 트리거
+  // 「한 판 더」는 방금 그 모드로 — 구역 작전·야근에서 죽었는데 아케이드로 튕기지 않게
+  let lastRun: () => void = () => startArcade();
+  let runLabel = '아케이드';
+  let adBusy = false;
   const ads = createAdsPort();
   const iap = createIapPort();
 
@@ -147,12 +153,14 @@ export function createApp(
   }
 
   function startArcade(): void {
+    lastRun = startArcade;
+    runLabel = '아케이드';
     runExempt = debugOpen();
     save.buddhaMode = loadSave().buddhaMode;
     state = makeState({ seed: debugSeed(0x9e3779b9) });
     applyRunMeta(state);
     butterChallenge = false;
-    if (save.buddhaMode) {
+    if (save.buddhaMode && import.meta.env.DEV) {
       enterAct2Phase(state, 'cathedral');
       state.wazaGauge = 0;
       showOverlay(STORY.intro, 60 * 6);
@@ -203,6 +211,8 @@ export function createApp(
       playSfx('uiDeny');
       return;
     }
+    lastRun = () => startOp(id);
+    runLabel = op.name;
     runExempt = true; // 구역 작전 = 점수·챕터 주입 런 — 영구 기록 비반영 (P1-1)
     state = makeState({ seed: debugSeed(0xc0ffee) });
     applyRunMeta(state, op.gimmick);
@@ -241,8 +251,7 @@ export function createApp(
     if (!prog) return;
     if (boost) {
       if (!ads.ready()) { playSfx('uiDeny'); return; } // 웹: 광고 없음 — 버튼도 안 그리지만 백스톱 (08-30)
-      const r = await ads.showRewarded('missionBoost');
-      if (r !== 'ok') { playSfx('uiDeny'); return; }
+      if (!(await watchAd('missionBoost'))) return;
       applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     }
     const got = claim(prog, def, boost);
@@ -250,7 +259,54 @@ export function createApp(
     grant(save, got.dust, got.orbit);
     saveSave(save);
     playSfx('uiBlip');
-    openMissions();
+    overlay.toast(gainText(got.dust, got.orbit));
+    // 광고를 기다리는 동안 다른 탭으로 갔으면 끌고 오지 않는다
+    if (overlay.getScreen() === 'missions') openMissions();
+  }
+
+  /** 보상형 광고 1편. 불러오는 중·실패·건너뜀을 토스트로 말한다. 진행 중이면 두 번째 탭은 무시. */
+  async function watchAd(kind: AdKind): Promise<boolean> {
+    if (adBusy) return false;
+    adBusy = true;
+    overlay.toast('광고를 불러오는 중…');
+    try {
+      const r = await ads.showRewarded(kind);
+      overlay.toast('');
+      if (r === 'ok') return true;
+      overlay.toast(r === 'skip' ? '끝까지 봐야 받을 수 있습니다.' : '광고를 불러오지 못했습니다. 잠시 뒤 다시 해 주세요.');
+      playSfx('uiDeny');
+      return false;
+    } finally {
+      adBusy = false;
+    }
+  }
+
+  function gainText(dust: number, orbit: number): string {
+    const parts = [dust > 0 ? `먼지 +${dust}` : '', orbit > 0 ? `궤도조각 +${orbit}` : ''].filter(Boolean);
+    return `받았습니다 · ${parts.join(' · ')}`;
+  }
+
+  function doExchange(): void {
+    if (!exchangeDust(save)) { playSfx('uiDeny'); return; }
+    saveSave(save);
+    playSfx('uiBlip');
+    overlay.toast(`먼지 ${DUST_EXCHANGE.dust} → 궤도조각 +${DUST_EXCHANGE.orbit}`);
+    openShop();
+  }
+
+  function resetData(): void {
+    resetSave();
+    save = loadSave();
+    applySettingsToRuntime(save, {
+      setSoundOn,
+      setFeedbackOptions,
+      setLeftHanded: (on) => { touch?.setLeftHanded(on); },
+    });
+    applyCosmetics(save.loadout);
+    menuIndex = 0;
+    playSfx('uiBlip');
+    overlay.showTitle(titleView());
+    overlay.toast('기록을 지웠습니다.');
   }
 
   async function buySku(id: string): Promise<void> {
@@ -270,15 +326,15 @@ export function createApp(
   }
 
   async function adOrbit(): Promise<void> {
-    const r = await ads.showRewarded('orbitPack');
-    if (r !== 'ok') { playSfx('uiDeny'); return; }
+    if (!(await watchAd('orbitPack'))) return;
     const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grantOrbit(save, ORBIT_PER_AD);
     saveSave(save);
     playSfx('uiBlip');
-    openShop();
+    overlay.toast(gainText(0, ORBIT_PER_AD));
+    if (overlay.getScreen() === 'shop') openShop();
   }
 
   function unlockOrbitItem(id: string): void {
@@ -288,6 +344,7 @@ export function createApp(
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
     playSfx('uiBlip');
+    overlay.toast('열었습니다. 꾸미기에서 고르세요.');
     openShop();
   }
 
@@ -301,6 +358,8 @@ export function createApp(
 
   function startTokoton(): void {
     if (!save.act2Cleared && !debugOpen()) return;
+    lastRun = startTokoton;
+    runLabel = SCREENS.tokoton.name;
     runExempt = debugOpen();
     state = makeState({ seed: debugSeed(0x51ed270b), mode: 'tokoton' });
     applyRunMeta(state);
@@ -311,6 +370,8 @@ export function createApp(
   function startButterChallenge(round: number): void {
     const cap = debugOpen() ? 3 : save.butterTierReached;
     if (round < 1 || round > cap) return;
+    lastRun = () => startButterChallenge(round);
+    runLabel = SCREENS.butter.short;
     runExempt = debugOpen();
     state = makeState({ seed: debugSeed(0xabcdef) });
     applyRunMeta(state);
@@ -326,13 +387,15 @@ export function createApp(
     reviving = true;
     // 웹(광고 미배선)은 광고 문구·대기 없이 그냥 일어난다 — 데모 정책 (08-30, P0-2)
     const usedAd = ads.ready();
-    let result: 'ok' | 'fail' | 'skip';
+    let ok: boolean;
     try {
-      result = usedAd ? await ads.showRewarded('revive') : 'ok';
+      ok = usedAd ? await watchAd('revive') : true;
     } finally {
       reviving = false; // 광고 경로가 어떤 이유로든 throw해도 부활 버튼이 세션 내내 안 죽게
     }
-    if (result !== 'ok') { playSfx('uiDeny'); return; }
+    if (!ok) return;
+    // 광고를 기다리는 사이 타이틀로 나갔으면 되살리지 않는다
+    if (!state || scene !== 'gameover') return;
     revivesUsed += 1;
     grantMercyLife(state);
     const daily = ensureDaily(save.daily, Date.now(), ads.ready());
@@ -397,13 +460,43 @@ export function createApp(
       setFeedbackOptions,
       setLeftHanded: (on) => { touch?.setLeftHanded(on); },
     });
-    overlay.showSettings(save.settings);
+    overlay.showSettings(save.settings, settingsFrom === 'pause');
     playSfx('uiBlip');
   }
 
   function openSettings(): void {
     settingsFrom = scene === 'pause' ? 'pause' : 'title';
-    overlay.showSettings(save.settings);
+    overlay.showSettings(save.settings, settingsFrom === 'pause');
+  }
+
+  /** 안드로이드 뒤로가기·Esc 공용. 창 → 하위 화면 → 타이틀 → 앱 내리기 순으로 한 칸씩 물러난다. */
+  function handleBack(): void {
+    if (overlay.modalOpen()) { overlay.closeModal(); return; }
+    const scr = overlay.getScreen();
+    switch (scene) {
+      case 'play': playSfx('uiBlip'); enterPause(); return;
+      case 'pause':
+        playSfx('uiBlip');
+        if (scr === 'settings') backFromSettings(); else resumePause();
+        return;
+      case 'story': skipStory(true); return;
+      case 'gameover':
+      case 'ending': playSfx('uiBlip'); goTitle(); return;
+      case 'title':
+        if (scr !== 'title') { playSfx('uiBlip'); overlay.showTitle(titleView()); return; }
+        minimizeApp();
+        return;
+      default: minimizeApp();
+    }
+  }
+
+  function enterTitleFromBoot(): void {
+    playSfx('uiBlip');
+    scene = 'title';
+    setChrome('title');
+    overlay.showTitle(titleView());
+    bgm('title');
+    if (!save.howtoSeen) overlay.showHowto(true); // 첫 실행 — 조작 네 개부터 보여 준다
   }
 
   function backFromSettings(): void {
@@ -431,13 +524,7 @@ export function createApp(
 
   const hud = mountHud(ensureHudLayer(), { onPause: () => { playSfx('uiBlip'); enterPause(); } });
   overlay = mountOverlay(ensureOverlayLayer(), {
-    onBoot: () => {
-      playSfx('uiBlip');
-      scene = 'title';
-      setChrome('title');
-      overlay.showTitle(titleView());
-      bgm('title');
-    },
+    onBoot: enterTitleFromBoot,
     onArcade: () => { playSfx('uiBlip'); startArcade(); },
     onTokoton: () => {
       if (!save.act2Cleared && !debugOpen()) { playSfx('uiDeny'); return; }
@@ -461,11 +548,12 @@ export function createApp(
         goPlay();
       }
     },
-    onGameOverRetry: () => { playSfx('uiBlip'); startArcade(); },
+    onGameOverRetry: () => { playSfx('uiBlip'); lastRun(); },
     onGameOverTitle: () => { playSfx('uiBlip'); goTitle(); },
     onGameOverRevive: () => { void tryRevive(); },
     onEndingDone: () => { playSfx('uiBlip'); goTitle(); },
     onLogoTap: () => {
+      if (!import.meta.env.DEV) return;
       titleTaps += 1;
       if (titleTaps >= DEBUG_TITLE_TAPS) {
         debug = true;
@@ -484,27 +572,29 @@ export function createApp(
     onAdOrbit: () => { void adOrbit(); },
     onUnlockOrbit: (id) => unlockOrbitItem(id),
     onEquip: (slot, id) => doEquip(slot, id),
+    onExchangeDust: doExchange,
+    onHowtoDone: () => { save.howtoSeen = true; saveSave(save); },
+    onResetData: resetData,
   });
 
-  if (debug || isDevUnlocked()) mountDebugMenu(() => state);
+  if (import.meta.env.DEV && (debug || isDevUnlocked())) mountDebugMenu(() => state);
 
   overlay.showBoot();
   setChrome('boot');
 
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) resumeIfNeeded();
-    else enterPause();
+  // 백그라운드 = 판 멈춤 + 소리 끄기 + 저장. 웹 visibilitychange와 네이티브 appStateChange를 합쳐 듣는다.
+  onLifecycle((fg) => {
+    if (fg) { resumeIfNeeded(); return; }
+    enterPause();
+    suspendAudio();
+    saveSave(save);
   });
+  onBackButton(handleBack);
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
-      const scr = overlay.getScreen();
-      if (scr === 'settings') { e.preventDefault(); backFromSettings(); return; }
-      if (scr === 'butter' || scr === 'ops' || scr === 'missions' || scr === 'shop' || scr === 'custom') {
-        e.preventDefault(); overlay.showTitle(titleView()); return;
-      }
-      if (scene === 'play') { e.preventDefault(); enterPause(); }
-      else if (scene === 'pause') { e.preventDefault(); resumePause(); }
+      e.preventDefault();
+      handleBack();
       return;
     }
     if (e.code === 'KeyP' && overlay.getScreen() !== 'settings') {
@@ -518,24 +608,18 @@ export function createApp(
 
     switch (scene) {
       case 'boot': {
-        if (f.jump || f.guard || f.attack || f.special) {
-          playSfx('uiBlip');
-          scene = 'title';
-          setChrome('title');
-          overlay.showTitle(titleView());
-          bgm('title');
-        }
+        if (f.jump || f.guard || f.attack || f.special) enterTitleFromBoot();
         break;
       }
       case 'title': {
         bgm('title');
         touch?.setPinned(false);
-        if (overlay.getScreen() !== 'title') break;
+        if (overlay.getScreen() !== 'title' || overlay.modalOpen()) break;
         // guard는 홀드 레벨(엣지 아님) — 그대로 쓰면 메뉴가 60Hz로 돈다 (08-30, P0-6)
         // prevTitleGuard는 update 말미에서 씬 무관하게 갱신 — boot를 가드로 넘긴 같은
         // 홀드가 메뉴를 밀거나, 가드 쥔 채 타이틀 복귀 시 스테일 엣지가 생기지 않게 (08-30 검증)
         const guardEdge = f.guard && !prevTitleGuard;
-        if (f.special && f.guard) {
+        if (import.meta.env.DEV && f.special && f.guard) {
           // 디버그 해금 콤보(가드 홀드 + 필살) — 사운드 토글·메뉴 이동과 겹치지 않게 단독 처리
           debug = true;
           mountDebugMenu(() => state);
@@ -716,6 +800,9 @@ export function createApp(
       return;
     }
     if (s.over === 'gameover') {
+      const prevBest = s.mode === 'tokoton' ? save.bestTokoton
+        : butterChallenge && s.bonus ? (save.butterBest[s.bonus.round] ?? 0)
+          : save.bestArcade;
       persist();
       bgm(null);
       scene = 'gameover';
@@ -731,6 +818,8 @@ export function createApp(
         reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
         reviveMax: MAX_REVIVES_PER_RUN,
         line: gameoverQuip(s.score + s.tick),
+        best: !runExempt && s.score > 0 && s.score > prevBest,
+        mode: runLabel,
       });
       return;
     }

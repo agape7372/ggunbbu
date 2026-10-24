@@ -2,19 +2,8 @@
 
 import { ACHIEVES, DAILY_POOL } from '../meta/missions';
 import type { DailyState, MissionDef, MissionProgress } from '../meta/types';
-
-export function missionHtml(): string {
-  return `<div class="ov-missions ov-panel">
-    <h2>미션</h2>
-    ${adBoostOn ? '<p class="ov-manual-lead">광고를 보면 보상이 두 배.</p>' : ''}
-    <p class="ov-records-h" data-el="daily-h">오늘의 미션</p>
-    <div data-el="daily" style="display:flex;flex-direction:column;gap:8px"></div>
-    <p class="ov-records-h" style="margin-top:8px">달성 미션</p>
-    <div data-el="achieve" style="display:flex;flex-direction:column;gap:8px"></div>
-  </div>`;
-}
-
-let adBoostOn = true; // paintMissions가 매 렌더 갱신
+import { ICON } from './icons';
+import { escapeHtml } from './html';
 
 export function paintMissions(
   root: HTMLElement,
@@ -25,50 +14,44 @@ export function paintMissions(
   adBoost: boolean, // 08-30: 광고 경로 실재 여부 — 웹은 false, 부스트 버튼 미렌더 (광고 위장 금지)
   onClaim: (id: string, boost: boolean) => void,
 ): void {
-  adBoostOn = adBoost;
-  root.innerHTML = missionHtml();
-  const dailyH = root.querySelector('[data-el="daily-h"]');
-  if (dailyH) {
-    dailyH.textContent = daily.dateKey
-      ? `오늘의 미션 · ${daily.dateKey}`
-      : '오늘의 미션';
+  root.innerHTML = `
+    <header class="sheet-head">
+      <h2>미션</h2>
+      ${adBoost ? '<p class="sheet-lead">광고를 보고 받으면 보상이 두 배.</p>' : ''}
+    </header>
+    <p class="sec-h">오늘 <small>${escapeHtml(daily.dateKey ?? '')}</small></p>
+    <div data-el="daily"></div>
+    <p class="sec-h">업적</p>
+    <div data-el="achieve"></div>`;
+
+  const dailyBox = root.querySelector('[data-el="daily"]') as HTMLElement;
+  const achieveBox = root.querySelector('[data-el="achieve"]') as HTMLElement;
+  for (const p of daily.items) {
+    const def = defs.find((d) => d.id === p.id) ?? DAILY_POOL.find((d) => d.id === p.id);
+    if (def) dailyBox.appendChild(missionRow(def, p, adBoost));
   }
 
-  const dailyBox = root.querySelector('[data-el="daily"]');
-  const achieveBox = root.querySelector('[data-el="achieve"]');
-  if (dailyBox) {
-    for (const p of daily.items) {
-      const def = findDef(p.id, defs, DAILY_POOL);
-      if (def) dailyBox.appendChild(missionRow(def, p));
-    }
+  const list = achieveDefs.length ? achieveDefs : ACHIEVES;
+  const paired = list.map((def) => ({
+    def,
+    p: achieveProg.find((x) => x.id === def.id) ?? { id: def.id, count: 0, claimed: false },
+  }));
+  // 지금 받을 수 있는 것부터, 받은 것은 한 줄로 접는다(08-30 실측: 11개 같은 크기로 쌓아 3배 스크롤)
+  const rank = (x: { def: MissionDef; p: MissionProgress }): number => {
+    if (x.p.claimed) return 2;
+    return x.p.count >= goalOf(x.def) ? 0 : 1;
+  };
+  paired.sort((a, b) => rank(a) - rank(b));
+  const done: string[] = [];
+  for (const x of paired) {
+    if (x.p.claimed) done.push(x.def.title);
+    else achieveBox.appendChild(missionRow(x.def, x.p, adBoost));
   }
-  if (achieveBox) {
-    const list = achieveDefs.length ? achieveDefs : ACHIEVES;
-    const paired = list.map((def) => ({
-      def,
-      p: achieveProg.find((x) => x.id === def.id) ?? { id: def.id, count: 0, claimed: false },
-    }));
-    // ★11개를 같은 크기로 쌓아 3배 스크롤이 났다(08-30 실측) — 지금 할 수 있는 것부터 올리고,
-    // 끝난 것은 한 줄로 접는다. 정보량은 그대로, 훑는 거리는 줄어든다.
-    const rank = (x: { def: MissionDef; p: MissionProgress }): number => {
-      if (x.p.claimed) return 2;
-      return x.p.count >= goalOf(x.def) ? 0 : 1;
-    };
-    paired.sort((a2, b2) => rank(a2) - rank(b2));
-    const done: string[] = [];
-    for (const x of paired) {
-      if (x.p.claimed) {
-        done.push(x.def.title);
-        continue;
-      }
-      achieveBox.appendChild(missionRow(x.def, x.p));
-    }
-    if (done.length > 0) {
-      const line = document.createElement('p');
-      line.className = 'mission-done';
-      line.textContent = `수령 완료 ${done.length}개 · ${done.join(' · ')}`;
-      achieveBox.appendChild(line);
-    }
+  if (done.length > 0) {
+    const line = document.createElement('p');
+    line.className = 'm-done';
+    line.textContent = `받은 업적 ${done.length}개 · ${done.join(' · ')}`;
+    achieveBox.appendChild(line);
   }
 
   root.onclick = (e) => {
@@ -76,104 +59,46 @@ export function paintMissions(
     if (!t || t.disabled) return;
     const id = t.getAttribute('data-claim-id');
     if (!id) return;
-    const boost = t.getAttribute('data-claim-boost') === '1';
     e.preventDefault();
-    onClaim(id, boost);
+    onClaim(id, t.getAttribute('data-claim-boost') === '1');
   };
 }
 
-function missionRow(def: MissionDef, p: MissionProgress): HTMLElement {
+function missionRow(def: MissionDef, p: MissionProgress, adBoost: boolean): HTMLElement {
   const goal = goalOf(def);
-  const count = Math.max(0, p.count);
+  const count = Math.max(0, Math.min(p.count, goal));
   const ready = !p.claimed && count >= goal;
-  const ratio = Math.max(0, Math.min(1, count / goal));
+
+  const reward = [
+    def.rewardDust > 0 ? `<span aria-label="먼지">${ICON.dust}${def.rewardDust}</span>` : '',
+    def.rewardOrbit > 0 ? `<span aria-label="궤도조각">${ICON.orbit}${def.rewardOrbit}</span>` : '',
+  ].join('');
+  const actions = ready
+    ? `<button type="button" class="btn btn-sm" data-claim-id="${escapeHtml(def.id)}" data-claim-boost="0">받기</button>`
+      + (adBoost ? `<button type="button" class="btn btn-sm" data-claim-id="${escapeHtml(def.id)}" data-claim-boost="1">${ICON.ad}2배</button>` : '')
+    : '';
 
   const wrap = document.createElement('div');
-  wrap.className = 'mission-row';
-
-  const title = document.createElement('p');
-  title.className = 'mission-title';
-  title.textContent = def.title;
-  wrap.appendChild(title);
-
-  const desc = descOf(def);
-  if (desc) {
-    const sub = document.createElement('p');
-    sub.className = 'ov-manual-lead mission-desc';
-    sub.textContent = desc;
-    wrap.appendChild(sub);
-  }
-
-  const bar = document.createElement('div');
-  bar.className = 'bar';
-  const fill = document.createElement('span');
-  fill.className = 'fill';
-  fill.style.width = `${Math.round(ratio * 100)}%`;
-  // ★노랑 = "지금 할 수 있다" 하나로 통일(08-30 2차 감식). 진행 중은 잉크, 수령 가능일 때만 노랑.
-  fill.className = ready ? 'fill is-ready' : 'fill';
-  if (p.claimed) fill.classList.add('is-done');
-  bar.appendChild(fill);
-  wrap.appendChild(bar);
-
-  const meta = document.createElement('p');
-  meta.className = 'mission-meta';
-  meta.textContent = p.claimed
-    ? '수령 완료'
-    : `${count.toLocaleString('ko-KR')} / ${goal.toLocaleString('ko-KR')}  ·  먼지 ${dustOf(def)} · 궤도조각 ${orbitOf(def)}`;
-  wrap.appendChild(meta);
-
-  if (p.claimed) return wrap;
-
-  const row = document.createElement('div');
-  row.style.display = 'grid';
-  row.style.gridTemplateColumns = adBoostOn ? '1fr 1fr' : '1fr';
-  row.style.gap = '4px';
-  row.appendChild(claimBtn(def.id, false, ready, '수령'));
-  if (adBoostOn) row.appendChild(claimBtn(def.id, true, ready, '광고 받고 2배 수령'));
-  wrap.appendChild(row);
+  wrap.className = 'm-row';
+  wrap.innerHTML = `
+    <div class="m-top">
+      <p class="m-title">${escapeHtml(def.title)}</p>
+      <p class="m-count">${fmt(count)} / ${fmt(goal)}</p>
+    </div>
+    ${def.desc ? `<p class="m-desc">${escapeHtml(def.desc)}</p>` : ''}
+    <div class="bar"><span class="fill${ready ? ' is-ready' : ''}" style="width:${Math.round((count / goal) * 100)}%"></span></div>
+    <div class="m-foot">
+      <p class="reward">${reward}</p>
+      <div class="m-actions">${actions}</div>
+    </div>`;
   return wrap;
 }
 
-function claimBtn(id: string, boost: boolean, ready: boolean, label: string): HTMLButtonElement {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = boost ? 'flyer-btn primary' : 'flyer-btn';
-  b.style.minHeight = '44px';
-  b.style.padding = '6px 6px';
-  b.style.fontSize = '11px';
-  b.textContent = label;
-  b.setAttribute('data-claim-id', id);
-  b.setAttribute('data-claim-boost', boost ? '1' : '0');
-  b.disabled = !ready;
-  if (!ready) b.classList.add('locked');
-  return b;
-}
-
-function findDef(
-  id: string,
-  primary: readonly MissionDef[],
-  fallback: readonly MissionDef[],
-): MissionDef | undefined {
-  return primary.find((d) => d.id === id) ?? fallback.find((d) => d.id === id);
-}
-
 function goalOf(d: MissionDef): number {
-  const x = d as MissionDef & { goal?: number; target?: number };
-  const g = x.goal ?? x.target ?? 0;
-  return g > 0 ? g : 1;
+  return d.goal > 0 ? d.goal : 1;
 }
 
-function dustOf(d: MissionDef): number {
-  const x = d as MissionDef & { rewardDust?: number; dust?: number };
-  return x.rewardDust ?? x.dust ?? 0;
+function fmt(n: number): string {
+  return n.toLocaleString('ko-KR');
 }
 
-function orbitOf(d: MissionDef): number {
-  const x = d as MissionDef & { rewardOrbit?: number; orbit?: number };
-  return x.rewardOrbit ?? x.orbit ?? 0;
-}
-
-function descOf(d: MissionDef): string {
-  const x = d as MissionDef & { desc?: string; blurb?: string };
-  return x.desc ?? x.blurb ?? '';
-}

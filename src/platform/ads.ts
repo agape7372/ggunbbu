@@ -15,7 +15,8 @@ export interface AdsPort {
 
 /** AdMob 공식 테스트 리워드 단위 — 실 단위 ID로 교체 전까지 항상 이 값 (shell/README 짝값 표). */
 const TEST_REWARDED_AD_UNIT_ID = 'ca-app-pub-3940256099942544/5224354917';
-const REWARDED_AD_UNIT_ID = TEST_REWARDED_AD_UNIT_ID;
+// 실 ID는 빌드 변수(VITE_ADMOB_REWARDED_ID)로 주입 — 없으면 테스트 단위.
+const REWARDED_AD_UNIT_ID = (import.meta.env.VITE_ADMOB_REWARDED_ID as string | undefined) || TEST_REWARDED_AD_UNIT_ID;
 
 // 플러그인 이벤트 — @capacitor-community/admob RewardAdPluginEvents와 짝
 const REWARD_EVENT = 'onRewardedVideoAdReward';
@@ -51,6 +52,7 @@ function nativeAdSupported(): boolean {
 }
 
 function urlHasDebug1(): boolean {
+  if (!import.meta.env.DEV) return false; // 디버그 경로는 개발 빌드에서만
   try {
     if (typeof location === 'undefined') return false;
     return new URLSearchParams(location.search).get('debug') === '1';
@@ -63,7 +65,12 @@ let initPromise: Promise<void> | null = null;
 function ensureInitialized(admob: AdMobPlugin): Promise<void> {
   if (typeof admob.initialize !== 'function') return Promise.resolve();
   if (initPromise) return initPromise;
-  const p = Promise.resolve(admob.initialize())
+  // 아동 대상 아님·동의 연령 미만 아님·최대 등급 Teen (MaxAdContentRating.Teen = 'Teen' — enum import 금지라 문자열)
+  const p = Promise.resolve(admob.initialize({
+    tagForChildDirectedTreatment: false,
+    tagForUnderAgeOfConsent: false,
+    maxAdContentRating: 'Teen',
+  }))
     .then(() => undefined)
     .catch(() => { initPromise = null; }); // 실패는 기억하지 않는다 — 다음 시도에서 재시도
   initPromise = p;

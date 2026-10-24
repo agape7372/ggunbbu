@@ -95,6 +95,11 @@ export function resumeIfNeeded(): void {
   }
 }
 
+/** 백그라운드 진입 시 호출: 소리를 멈춘다. 복귀는 resumeIfNeeded가 한다. */
+export function suspendAudio(): void {
+  if (ctx?.state === 'running') ctx.suspend().catch(() => undefined);
+}
+
 // ─── 온/오프 ────────────────────────────────────────────────
 
 export function setSoundOn(on: boolean): void {

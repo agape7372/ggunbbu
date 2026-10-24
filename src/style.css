@@ -1,35 +1,69 @@
-/* 건뿌 스타일 — 반응형 레터박스 + 터치 UI 레이어 */
+/* 건뿌 스타일 — 콘셉트 「철거 서류」.
+   아이보리 종이 · 잉크 규칙선 · 도장 · 공사 테이프. 캔버스(월드 아트)는 그대로 두고 이 파일은 UI 층만 맡는다.
+   색 규칙(ART_DIRECTION 계승): 노랑은 화면당 한 곳 = "지금 누를 것". 빨강은 경고·실패만. 그림자 대신 획. */
+
+@font-face {
+  font-family: 'Black Han Sans';
+  src: url('/fonts/display.woff2') format('woff2');
+  font-display: block;
+}
+@font-face {
+  font-family: 'Gunbbu Sans';
+  src: url('/fonts/ui-500.woff2') format('woff2');
+  font-weight: 400 600;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Gunbbu Sans';
+  src: url('/fonts/ui-700.woff2') format('woff2');
+  font-weight: 700 900;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Gunbbu Mono';
+  src: url('/fonts/mono-500.woff2') format('woff2');
+  font-weight: 400 600;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Gunbbu Mono';
+  src: url('/fonts/mono-700.woff2') format('woff2');
+  font-weight: 700 900;
+  font-display: block;
+}
 
 :root {
-  /* 색 */
-  --ink: #1A1A20; /* 잉크 — 기본 텍스트/테두리 */
-  --ivory: #F4F1E8; /* 아이보리 — 카드/버튼 배경 */
-  --paper: #E8E4D8; /* 종이 — 배경 바탕 */
-  --yellow: #FFD200; /* 옐로 — 강조/필살/CTA */
-  --red: #E5302E; /* 레드 — 경고/보스/실패 */
-  --dust: #6E695F; /* 더스트 — 보조 텍스트 */
-  --dust-2: #8A857A; /* 더스트2 — 흐린 보조 텍스트 */
-  --pink: #FF6FA8; /* 핑크 — 가드 게이지 */
+  --ink: #1A1A20;
+  --ivory: #F4F1E8;
+  --paper: #E8E3D5; /* 한 톤 낮은 종이 — 눌림·칸 바탕 */
+  --yellow: #FFD200;
+  --red: #E5302E;
+  --dust: #6E695F;
+  --dust-2: #8A857A;
+  --rule: rgba(26, 26, 32, 0.16);
 
-  /* 간격 (margin/padding/gap 상위 빈도 6개) */
-  --sp-1: 3px; /* 최소 간격 */
-  --sp-2: 4px; /* 촘촘한 간격 */
-  --sp-3: 6px; /* 기본 간격 */
-  --sp-4: 8px; /* 여유 간격 */
-  --sp-5: 12px; /* 섹션 간격 */
-  --sp-6: 16px; /* 넓은 간격 */
-  --sp-7: 24px; /* 화면 여백 */
+  --sp-1: 3px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 24px;
 
-  /* 타이포 (font-size 상위 빈도 6개) */
-  --fs-1: 10px; /* 캡션 */
-  --fs-2: 11px; /* 보조 라벨 */
-  --fs-3: 12px; /* 본문 소 */
-  --fs-4: 13px; /* 본문 */
-  --fs-5: 14px; /* 강조 본문 */
-  --fs-6: 16px; /* 버튼 라벨 */
+  /* 논리 360px 기준. 실기기에서 ×1.05~1.2로 커진다 */
+  --fs-1: 11px;
+  --fs-2: 12px;
+  --fs-3: 13px;
+  --fs-4: 14px;
+  --fs-5: 15px;
+  --fs-6: 17px;
 
-  --font-ui: system-ui, 'Malgun Gothic', sans-serif; /* UI 기본 폰트 */
-  --font-display: Batang, Gungsuh, serif; /* 로고/타이틀 세리프 */
+  --font-display: 'Black Han Sans', 'Gunbbu Sans', sans-serif;
+  --font-ui: 'Gunbbu Sans', system-ui, sans-serif;
+  --font-mono: 'Gunbbu Mono', 'Gunbbu Sans', monospace;
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-pop: cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 
 * {
@@ -38,14 +72,13 @@
   box-sizing: border-box;
 }
 
-/* ★띠가 죽어 보이던 이유는 남는 공간이 아니라 스테이지 안팎 색이 달랐다는 것이다.
-   스테이지 밖이 --paper(#E8E4D8)라 게임이 액자에 갇혀 보였고, index.html의
-   theme-color(#F4F1E8)와도 어긋나 상태바→띠→필드로 톤이 두 번 꺾였다. 같은 아이보리로
-   맞추면 띠가 곧 인쇄 여백이 된다(08-30). */
+/* 스테이지 안팎을 같은 아이보리로 — 남는 띠가 인쇄 여백으로 읽힌다(08-30) */
 html, body {
   width: 100%;
   height: 100%;
   background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--font-ui);
   overflow: hidden;
   touch-action: none;
   overscroll-behavior: none;
@@ -53,6 +86,24 @@ html, body {
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* hidden 속성이 display를 쓰는 클래스(.btn·.cta 등)에 지지 않게 */
+[hidden] { display: none !important; }
+
+button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ic {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
 }
 
 #app {
@@ -67,7 +118,7 @@ html, body {
 #stage {
   position: relative;
   width: 360px;
-  height: 780px; /* = VIEW.H. 논리 캔버스 세로를 늘려 죽은 띠를 필드로 돌렸다(08-30) */
+  height: 780px;
   transform-origin: center;
 }
 
@@ -78,9 +129,8 @@ html, body {
   image-rendering: auto;
 }
 
-/* 터치 조작 존 — VIEW.FIELD_H(610) 아래만. 필드를 가리지 않는다.
-   --field-h 는 main이 config.VIEW.FIELD_H 로 주입.
-   레이어 360×170. 왼쪽 점프, 오른쪽 공격/가드/필살. */
+/* ── 조작 존 ───────────────────────────────────────────────
+   VIEW.FIELD_H(610) 아래 170px. 필드를 가리지 않는다. --field-h 는 main이 주입. */
 #touch-layer {
   position: absolute;
   top: var(--field-h, 470px);
@@ -90,193 +140,165 @@ html, body {
   pointer-events: none;
   overflow: hidden;
   z-index: 3;
+  visibility: hidden;
 }
 
-/* ★그라데이션 워시 제거(08-30) — 필드와 조작존을 색으로 갈라놓아 화면 하단 26%가
-   통짜 크롬처럼 보였다. 경계는 얇은 규칙선 하나면 충분하다("선 하나를 뺄 수 있으면 뺀다"). */
 #touch-layer::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-top: 1px solid rgba(26, 26, 32, 0.16);
+  border-top: 1px solid var(--rule);
   pointer-events: none;
   z-index: 0;
 }
 
-/* 철거 공구 실루엣 — 캔디 원 금지. 잉크/아이보리 플레이트, 히트는 사각 ::before. */
+/* 버튼 = 눌리는 키. 바닥 4px 잉크 턱이 있고, 누르면 턱만큼 내려가며 잉크로 뒤집힌다.
+   (그림자가 아니라 키의 옆면이다 — 흐림 없음.) */
 .tbtn {
   position: absolute;
   margin: 0;
   padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--ink);
-  font-family: system-ui, sans-serif;
-  font-weight: 800;
-  font-size: var(--fs-2);
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-  white-space: nowrap;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  gap: 5px;
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
+  font: 700 var(--fs-3)/1 var(--font-ui);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
-  transition: none;
   touch-action: none;
+  transition: transform 90ms var(--ease-out), box-shadow 90ms var(--ease-out);
   z-index: 1;
 }
 
-/* 히트 영역 확장. 시각 클립과 분리해 overflow clip에 안 잘리게 둔다.
-   ★08-30 실측: -8px 확장이 버튼 간 8px 갭을 먹어 공격↔가드 8.4px·필살↔공격 8.3px 겹쳤다
-   (경계를 누르면 위에 있는 쪽이 먹는다 = 오조작). 이웃이 있는 버튼은 -3px로 좁혀 겹침 0. */
+.tbtn .ic {
+  width: 26px;
+  height: 26px;
+}
+
+/* 히트 확장 — 이웃이 있는 버튼은 -3px(경계 겹침 0 계약, 08-30 실측) */
 .tbtn::before {
   content: '';
   position: absolute;
   inset: -3px;
-  border-radius: 10px;
   pointer-events: auto;
   z-index: -1;
 }
 
-/* 시각 플레이트 (::after). 라벨/히트(::before)는 클립하지 않는다. */
-.tbtn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--ivory);
-  border: 1.5px solid var(--ink);
-  box-sizing: border-box;
-  pointer-events: none;
-  z-index: -1;
-}
-
 .tbtn.active {
-  transform: scale(0.94);
-}
-
-/* 눌림은 잉크 반전 — 카드·버튼과 같은 문법(그림자 이동을 쓰지 않는다) */
-.tbtn.active::after {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--ink);
   background: var(--ink);
-}
-
-.tbtn.active {
   color: var(--ivory);
+  transition: none;
 }
 
-/* ★노랑은 "지금 쓸 수 있다"는 뜻이어야 한다 — 상시 노랑 테두리는 그 뜻을 지운다.
-   기본은 잉크, 게이지가 차면(.ready) 그때 노랑(08-30 2차 감식). */
-.tbtn[data-action="special"]::after {
-  border-width: 2px;
-  /* 미충전 = 점선 먼지색. 실선 잉크면 다른 버튼과 톤이 같아 "지금 못 쓴다"가 안 읽힌다. */
+/* 필살: 못 쓸 땐 점선으로 꺼져 눌려 있고, 차면 노랗게 튀어 오른다 — 노랑 = 지금 쓸 수 있다 */
+#btn-special {
   border-style: dashed;
-  border-color: var(--dust);
+  border-color: var(--dust-2);
+  color: var(--dust);
+  background: transparent;
+  box-shadow: none;
+  transform: translateY(4px);
 }
 
-.tbtn[data-action="special"].ready::after {
+#btn-special.ready {
   border-style: solid;
-  border-color: var(--yellow);
+  border-color: var(--ink);
+  color: var(--ink);
   background: var(--yellow);
+  box-shadow: 0 4px 0 var(--ink);
+  transform: none;
+  animation: key-ready 260ms var(--ease-pop);
 }
 
-.tbtn[data-action="special"].active::after {
-  background: #E6C400;
-  box-shadow: 1px 1px 0 var(--ink), inset 0 0 0 1px var(--ink);
+#btn-special.ready.active {
+  transform: translateY(4px);
+  box-shadow: none;
+  background: var(--ink);
+  color: var(--yellow);
 }
 
-/* 점프: 철판 라운드렉트. 공격: 해머 페이스. 가드: 헬멧. 필살: 경고 플레이트.
-   clip-path는 테두리를 대각으로 잘라 실루엣이 끊기므로 쓰지 않는다. */
-#btn-jump::after {
-  border-radius: 20px;
+/* 깔림: 가드 키가 탈출 키로 바뀐다 — 지금 누를 단 하나라 뒤집어 보인다 */
+#btn-guard.pinned {
+  background: var(--ink);
+  color: var(--yellow);
 }
 
-#btn-attack::after {
-  border-radius: 8px;
-}
+#btn-jump { border-radius: 18px; }
+#btn-attack { border-radius: 8px; }
+#btn-guard { border-radius: 8px 8px 14px 14px; }
+#btn-special { border-radius: 6px; }
 
-#btn-guard::after {
-  border-radius: 10px 10px 16px 16px;
-}
-
-#btn-special::after {
-  border-radius: 6px;
-}
-
-/* 버튼 배치 — #touch-layer(필드 아래 170px) 기준.
-   왼쪽 점프(엄지 홈). 오른쪽: 공격 위, 가드 아래, 필살 안쪽. */
-
-/* 점프는 왼쪽에 홀로 있어 넓게 확장해도 이웃과 안 겹친다 */
 #btn-jump::before { inset: -8px; }
 
-/* ★08-30 7차 — 크기 위계 정정. 이 게임의 컨셉은 "베면 된다"인데 점프(128²=16384)가 공격
-   (122×78=9516)보다 1.7배 컸다. 제일 큰 버튼이 제일 중요한 행동이어야 한다.
-   현행 면적 위계: 공격 10736 > 점프 10000 > 가드 6832 > 필살 3600.
-   ⚠ 이웃 간 겹침 0 계약 유지(::before inset -3px 기준): 필살 우변 220+3=223 < 공격 좌변 228-3=225. */
+/* 면적 위계: 공격 > 점프 > 가드 > 필살(08-30 7차). 이웃 간 히트 겹침 0 유지. */
 #btn-jump {
   left: 10px;
-  top: 44px;
+  top: 40px;
   width: 100px;
   height: 100px;
-  font-size: 18px;
+  font-size: var(--fs-5);
 }
+
+#btn-jump .ic { width: 32px; height: 32px; }
 
 #btn-attack {
   left: 228px;
-  top: 10px;
+  top: 8px;
   width: 122px;
   height: 88px;
   font-size: var(--fs-6);
 }
 
+#btn-attack .ic { width: 34px; height: 34px; }
+
 #btn-guard {
   left: 228px;
   top: 106px;
   width: 122px;
-  height: 56px;
+  height: 52px;
+  flex-direction: row;
+  gap: 8px;
   font-size: var(--fs-5);
 }
 
+#btn-guard .ic { width: 22px; height: 22px; }
+
 #btn-special {
   left: 160px;
-  top: 10px;
+  top: 8px;
   width: 60px;
   height: 60px;
-  font-size: var(--fs-2);
+  gap: 3px;
+  font-size: var(--fs-1);
 }
+
+#btn-special .ic { width: 22px; height: 22px; }
 
 /* 왼손잡이: 점프↔클러스터 통째 스왑 */
-#touch-layer.mirror #btn-jump {
-  left: 250px;   /* 폭 100 기준 우측 정렬 (구 222 는 폭 128 시절 값) */
-}
-
+#touch-layer.mirror #btn-jump { left: 250px; }
 #touch-layer.mirror #btn-attack,
-#touch-layer.mirror #btn-guard {
-  left: 10px;
-}
-
-#touch-layer.mirror #btn-special {
-  left: 140px;
-}
+#touch-layer.mirror #btn-guard { left: 10px; }
+#touch-layer.mirror #btn-special { left: 140px; }
 
 /* HMR로 남은 양측 복제 버튼은 숨긴다 */
-#btn-attack-l,
-#btn-attack-r,
-#btn-guard-l,
-#btn-guard-r,
-#btn-special-l,
-#btn-special-r {
+#btn-attack-l, #btn-attack-r,
+#btn-guard-l, #btn-guard-r,
+#btn-special-l, #btn-special-r {
   display: none !important;
   pointer-events: none;
 }
 
-/* Safe-area inset 미적용 사유: #stage가 transform scale 기반이므로
-   전체 뷰포트 스케일링이 안전 영역과 충돌 가능.
-   버튼은 절대 px로 고정되어 있으므로 safe-area inset 불필요.
-   필요 시 별도 모달/메뉴에서만 적용. */
-
-/* ── UI 레이어 (HUD / 오버레이) ─────────────────────────────── */
+/* ── UI 레이어 ─────────────────────────────────────────── */
 .ui-layer {
   position: absolute;
   inset: 0;
@@ -284,20 +306,8 @@ html, body {
   z-index: 2;
 }
 
-#hud-layer {
-  visibility: hidden;
-  z-index: 2;
-}
-
-#touch-layer {
-  z-index: 3;
-  visibility: hidden;
-}
-
-#overlay-layer {
-  z-index: 10;
-  visibility: hidden;
-}
+#hud-layer { visibility: hidden; z-index: 2; }
+#overlay-layer { z-index: 10; visibility: hidden; }
 
 #overlay-layer.is-open {
   visibility: visible;
@@ -305,66 +315,52 @@ html, body {
   touch-action: manipulation;
 }
 
-#stage.playing > #touch-layer {
-  visibility: visible;
-}
-
+#stage.playing > #touch-layer { visibility: visible; }
 #stage.playing > #hud-layer,
-#stage.paused > #hud-layer {
-  visibility: visible;
-}
+#stage.paused > #hud-layer { visibility: visible; }
 
-/* HUD — 상단 스트립이 캔버스 drawHud를 가림 (렌더러 패치 전 이중 표시 방지) */
+/* ── HUD ──────────────────────────────────────────────────
+   판때기 없음 — 필드를 한 픽셀도 안 먹고 글자에 아이보리 헤일로만(08-30). */
 .hud {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  /* = VIEW.FIELD_TOP. 상시 정보(점수·목숨·모드·게이지)는 이 띠 안에 들어가고 필드는 그 아래서
-     시작한다. 보스·보너스·깔림 같은 단발 배너는 이 높이를 넘어 필드 위에 겹칠 수 있다(의도) —
-     상시가 아니라 그 순간에만 뜨는 줄이라 필드를 상시로 먹지 않는다. */
   min-height: 50px;
-  padding: var(--sp-3) var(--sp-4) 0;
-  /* ★판때기 제거(08-30). 처음엔 얕은 페이드로 남겼는데, 실측하니 건물이 화면에 들어오는
-     첫 250ms 동안 상단 48px이 그 띠 밑을 지난다(진입 순간 = 반응이 가장 필요한 구간).
-     배경을 아예 없애고 글자에 아이보리 헤일로만 준다 — 필드는 한 픽셀도 안 먹는다. */
-  background: none;
+  padding: var(--sp-4) var(--sp-4) 0;
   text-shadow:
     0 1px 0 var(--ivory), 0 -1px 0 var(--ivory),
     1px 0 0 var(--ivory), -1px 0 0 var(--ivory);
-  /* ★ui-monospace는 디지털시계 질감이라 손그림 톤과 충돌했다(08-30 감식).
-     자릿수 정렬은 폰트가 아니라 tabular-nums로 잡는다(.hud-score). */
   font-family: var(--font-ui);
-  font-variant-numeric: tabular-nums; /* HUD 숫자 전부 자릿수 폭 고정 */
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   pointer-events: none;
 }
 
-/* 시각 크기는 유지하되(필드를 덜 먹는다) 히트 영역만 44×44로 넓힌다 — ::before 참조.
-   ★08-30 실측: 세로 22.9px로 플레이 중 유일한 상시 버튼이 기준의 절반이었다. */
 .hud-pause {
   position: absolute;
-  top: 6px;
+  top: 8px;
   left: 8px;
-  width: 44px;
-  height: 22px;
+  width: 36px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   border: 2px solid var(--ink);
   background: var(--ivory);
   color: var(--ink);
-  font-size: var(--fs-1);
-  font-weight: 800;
-  letter-spacing: -0.04em;
   pointer-events: auto;
-  touch-action: manipulation;
   z-index: 1;
 }
 
+.hud-pause .ic { width: 16px; height: 16px; }
+
+/* 시각 36×30, 히트 44×44 */
 .hud-pause::before {
   content: '';
   position: absolute;
-  inset: -11px -0px;
-  pointer-events: auto;
+  inset: -7px -4px;
 }
 
 .hud-pause:active {
@@ -377,30 +373,29 @@ html, body {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--sp-3);
-  padding-left: 52px;
+  padding-left: 44px;
   min-height: 36px;
 }
 
 .hud-col-left { flex: 0 0 auto; }
-.hud-col-mid { flex: 1 1 auto; text-align: center; min-width: 0; }
+.hud-col-mid { flex: 1 1 auto; text-align: center; min-width: 0; padding-top: 1px; }
 .hud-col-right { flex: 0 0 124px; text-align: right; }
 
 .hud-score {
-  font-size: var(--fs-4);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums; /* 8자리 점수가 타격마다 폭이 흔들리지 않게 */
+  font: 700 17px/1.1 var(--font-mono);
+  letter-spacing: 0.02em;
 }
+
+/* 점수 앞자리 0은 흐리게 — 실제 자릿수만 읽히게 */
+.hud-score .z { color: var(--dust-2); }
 
 .hud-lives {
   display: flex;
-  gap: var(--sp-1);
-  margin-top: var(--sp-1);
+  gap: var(--sp-2);
+  margin-top: 5px;
 }
 
-/* ★목숨은 빨간 사각형 3개였다 — 아이콘이 아니라 placeholder처럼 읽혔다(08-30 감식).
-   원 = 졸라맨 머리와 같은 도형, 채움/빈칸으로 남은 수를 말한다. 빨강은 마지막 하나에만. */
+/* 목숨 = 졸라맨 머리와 같은 원. 빨강은 마지막 하나에만. */
 .life {
   display: block;
   width: 10px;
@@ -408,13 +403,10 @@ html, body {
   border: 1.5px solid var(--ink);
   border-radius: 50%;
   background: transparent;
-  /* 글자엔 text-shadow 헤일로가 있는데 점에는 없어 건물 위에서 사라졌다(08-30 3차 감식) */
   box-shadow: 0 0 0 1.5px var(--ivory);
 }
 
-.life.on {
-  background: var(--ink);
-}
+.life.on { background: var(--ink); }
 
 .hud-lives[data-last="1"] .life.on {
   background: var(--red);
@@ -422,14 +414,12 @@ html, body {
 }
 
 .hud-mode {
-  font-size: var(--fs-1);
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: none;
+  font: 700 var(--fs-2)/1.2 var(--font-ui);
+  letter-spacing: 0.02em;
 }
 
 .hud-floor {
-  font-size: var(--fs-1);
+  font: 600 var(--fs-1)/1.3 var(--font-mono);
   color: var(--dust);
   margin-top: 2px;
   white-space: nowrap;
@@ -438,28 +428,28 @@ html, body {
 }
 
 .hud-combo {
-  font-size: var(--fs-3);
-  font-weight: 800;
-  height: 16px;
-  line-height: 16px;
+  height: 20px;
+  font: 20px/20px var(--font-display);
   color: var(--ink);
+  transform-origin: right center;
 }
 
-.hud-combo.hi { color: var(--ink); }
+.hud-combo small {
+  font: 700 var(--fs-1) var(--font-ui);
+  margin-left: 3px;
+}
+
 .hud-combo.mid {
   display: inline-block;
   background: var(--yellow);
   padding: 0 var(--sp-2);
+  text-shadow: none;
 }
 .hud-combo.hot { color: var(--red); }
-.hud-combo.cap {
-  animation: hud-rainbow 0.6s linear infinite;
-}
-/* punch/punch-b는 같은 키프레임 — 강제 리플로우(void offsetWidth) 없이 재시작하려고 번갈아 단다(hud.ts) */
+.hud-combo.cap { animation: hud-rainbow 0.6s linear infinite; }
+/* punch/punch-b는 같은 키프레임 — 강제 리플로우 없이 재시작하려고 번갈아 단다(hud.ts) */
 .hud-combo.punch,
-.hud-combo.punch-b {
-  animation: hud-punch 80ms cubic-bezier(0.27, 1.64, 0.42, 0.64);
-}
+.hud-combo.punch-b { animation: hud-punch 90ms var(--ease-pop); }
 .hud-combo.broke {
   color: var(--dust-2);
   transform: translateY(6px);
@@ -470,25 +460,20 @@ html, body {
   margin-top: var(--sp-2);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
   align-items: flex-end;
 }
 
-/* ★08-30 7차: 두 게이지의 이름이 `title` 속성에만 있었다 — 네이티브 툴팁은 마우스 hover 전용이라
-   모바일에서는 영영 안 뜬다. 화면에 안 그려지는 라벨은 없는 라벨이다. 실제 텍스트로 세운다.
-   컬럼 폭 124px 안에 들어가야 해서 방어 바를 110 → 88px 로 줄였다(라벨 22 + 갭 4 + 바 88 = 114). */
+/* 게이지 이름은 실제 글자로 — title 툴팁은 모바일에서 영영 안 뜬다(08-30 7차) */
 .gauge-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
 }
 
 .gauge-label {
-  font-size: var(--fs-1);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.03em;
+  font: 700 var(--fs-1)/1 var(--font-ui);
   color: var(--ink);
   white-space: nowrap;
 }
@@ -497,13 +482,13 @@ html, body {
   position: relative;
   height: 7px;
   width: 88px;
-  background: #D5D0C4;
+  background: var(--paper);
   overflow: hidden;
-  border: 1px solid var(--ink);
+  border: 1.5px solid var(--ink);
 }
 
-.bar-waza { width: 72px; height: 5px; }
-.bar-boss { width: 100%; height: 6px; margin-top: var(--sp-1); }
+.bar-waza { width: 72px; }
+.bar-boss { width: 100%; height: 7px; margin-top: var(--sp-2); }
 
 .bar .ghost,
 .bar .fill {
@@ -514,16 +499,11 @@ html, body {
   width: 0;
 }
 
-/* ★고스트 추격은 JS가 감쇠값을 굴린다(hud.ts chaseGhost) — CSS 트랜지션을 쓰면 매 프레임
-   목표값이 다시 쓰여 트랜지션이 계속 재시작되고, 설계한 "지연 추격"이 화면에 아예 안 나온다. */
-.bar .ghost {
-  background: rgba(26, 26, 32, 0.18);
-}
-
+/* 고스트 추격은 JS가 감쇠값을 굴린다(hud.ts chaseGhost) — CSS 트랜지션은 매 프레임 재시작된다 */
+.bar .ghost { background: rgba(26, 26, 32, 0.2); }
 .bar .fill { transition: none; }
-/* ★핑크 #FF6FA8은 원작 bougyobar 유래였지만 건뿌 팔레트에 없는 유일한 색이었다.
-   방어=먼지톤, 필살=노랑, 보스=빨강으로 역할을 색으로 가른다(08-30 감식·사용자 지시 개편). */
-.bar-guard .fill { background: var(--dust); }
+/* 역할을 색으로 가른다: 가드=잉크, 필살=노랑(차면 빨강), 보스=빨강 */
+.bar-guard .fill { background: var(--ink); }
 .bar-waza .fill { background: var(--yellow); }
 .bar-waza.full .fill { background: var(--red); }
 .bar-boss .fill { background: var(--red); }
@@ -533,38 +513,39 @@ html, body {
 .hud-cap,
 .hud-pin,
 .hud-waza-ready {
-  margin-top: var(--sp-2);
-  font-size: var(--fs-1);
-  font-weight: 700;
+  margin-top: var(--sp-3);
+  font: 700 var(--fs-2)/1.3 var(--font-ui);
   text-align: center;
 }
 
-.hud-bonus { color: var(--ink); font-size: var(--fs-3); }
+.hud-boss-label { font: 700 var(--fs-2) var(--font-ui); }
+.hud-bonus { font: 18px/1.2 var(--font-display); }
+.hud-bonus small { font: 700 var(--fs-2) var(--font-mono); margin-left: 6px; }
 .hud-cap { color: var(--red); }
-/* ★깔림 안내가 흰 알약 말풍선(2px 테두리 + 불투명 판)이라 그림 한복판에 시스템 알림창이
-   뜬 것처럼 보였다(08-30 감식). 판을 없애고 잉크 글자만 남긴다 — 배경은 필드가 그대로 비친다.
-   가독성은 아이보리 헤일로(text-shadow)로 잡는다. */
+
+/* 깔림 안내 — 판 없이 굵은 헤일로 글자만(08-30) */
 .hud-pin {
   position: absolute;
   left: 50%;
-  top: 545px; /* 필드 하단 근처 — FIELD_H 610 기준(구 418/470) */
+  top: 540px;
   transform: translateX(-50%);
-  width: 260px;
+  width: 280px;
   padding: var(--sp-2) var(--sp-4);
-  font-size: var(--fs-2);
-  font-weight: 800;
-  /* ★08-30 7차: 1px 직교 4방 헤일로는 밝은 배경에서만 통했다 — 어두운 건물 텍스처 위에 깔리면
-     잉크 글자와 배경이 둘 다 어두워 링이 끊긴다. 대각까지 채운 2px 링으로 글자를 완전히 감싼다. */
+  font: 20px/1.25 var(--font-display);
   text-shadow:
     0 2px 0 var(--ivory), 0 -2px 0 var(--ivory),
     2px 0 0 var(--ivory), -2px 0 0 var(--ivory),
-    1px 1px 0 var(--ivory), -1px 1px 0 var(--ivory),
-    1px -1px 0 var(--ivory), -1px -1px 0 var(--ivory),
-    0 0 4px var(--ivory);
+    2px 2px 0 var(--ivory), -2px 2px 0 var(--ivory),
+    2px -2px 0 var(--ivory), -2px -2px 0 var(--ivory),
+    0 0 6px var(--ivory);
 }
-.hud-waza-ready { color: var(--ink); }
 
-/* 오버레이 스크린 */
+.hud-pin small {
+  display: block;
+  font: 700 var(--fs-3)/1.4 var(--font-ui);
+}
+
+/* ── 오버레이 공통 ─────────────────────────────────────── */
 .ov-screen {
   position: absolute;
   inset: 0;
@@ -572,22 +553,879 @@ html, body {
   flex-direction: column;
   align-items: center;
   padding: var(--sp-7) var(--sp-6) var(--sp-6);
-  box-sizing: border-box;
   font-family: var(--font-ui);
   color: var(--ink);
   touch-action: manipulation;
 }
 
-.ov-has-tabs {
-  padding-bottom: 64px;
+.ov-screen[hidden] { display: none !important; }
+
+.ov-has-tabs { padding-bottom: 72px; }
+
+/* 서류 머리 — 고정폭 작은 글자 + 잉크 한 줄 */
+.doc-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--ink);
+  font: 700 10.5px/1.2 var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--dust);
 }
 
+/* 공사 테이프 — 잉크 사선 띠(노랑을 아끼려고 잉크로) */
+.tape {
+  width: 100%;
+  height: 10px;
+  flex: 0 0 auto;
+  background: repeating-linear-gradient(-45deg, var(--ink) 0 7px, transparent 7px 14px);
+}
+
+/* 로고 — 같은 글자 두 장을 사선으로 잘라 윗장을 밀었다(브랜드 표식과 같은 베기) */
+.logo {
+  display: grid;
+  font: 76px/1 var(--font-display);
+  letter-spacing: -0.03em;
+  pointer-events: auto;
+}
+
+.logo > span { grid-area: 1 / 1; }
+
+.logo .cut-a {
+  clip-path: polygon(0 0, 100% 0, 100% 37%, 0 65%);
+  transform: translate(-4px, -4px);
+}
+
+.logo .cut-b {
+  clip-path: polygon(0 65%, 100% 37%, 100% 100%, 0 100%);
+}
+
+.tap-hint {
+  margin-top: auto;
+  font: 700 var(--fs-2) var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--dust);
+  text-align: center;
+}
+
+/* 노랑 버튼 — 화면당 하나. 지금 누를 것. */
+.cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 58px;
+  padding: var(--sp-4) var(--sp-6);
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+.cta-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font: 22px/1.1 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.cta-label .ic { width: 20px; height: 20px; }
+
+.cta-sub {
+  font: 700 var(--fs-1)/1.2 var(--font-ui);
+  letter-spacing: 0.02em;
+}
+
+.cta:active {
+  background: var(--ink);
+  color: var(--yellow);
+}
+
+/* 보조 버튼 */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--sp-4) var(--sp-6);
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  font: 700 var(--fs-5)/1.2 var(--font-ui);
+  pointer-events: auto;
+}
+
+.btn .ic { width: 18px; height: 18px; }
+
+.btn:not(:disabled):active {
+  background: var(--ink);
+  color: var(--ivory);
+}
+
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--dust);
+  min-height: 44px;
+}
+
+.btn-quiet:not(:disabled):active {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* 한 번 더 눌러야 하는 버튼 */
+.btn.confirm {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.btn-sm {
+  width: auto;
+  min-height: 44px;
+  padding: var(--sp-3) var(--sp-5);
+  font-size: var(--fs-3);
+}
+
+.btn:disabled,
+.btn.locked {
+  border-style: dashed;
+  border-color: var(--dust-2);
+  background: transparent;
+  color: var(--dust);
+  cursor: default;
+}
+
+/* 키보드로 고른 메뉴 — 손가락 기기엔 안 보인다 */
+@media (hover: hover) and (pointer: fine) {
+  .selected {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+}
+
+/* ── 표지(부팅) ─────────────────────────────────────────── */
+.ov-cover {
+  background: var(--ivory);
+  justify-content: space-between;
+  padding: 28px 24px 36px;
+}
+
+.cover-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+}
+
+.cover-mark {
+  width: 132px;
+  height: 132px;
+  margin-bottom: var(--sp-2);
+}
+
+.ov-cover .logo { font-size: 96px; }
+
+.ov-cover .logo .cut-a { animation: logo-cut 520ms var(--ease-pop) 280ms both; }
+
+.cover-tag {
+  font: 700 var(--fs-6)/1.4 var(--font-ui);
+}
+
+.cover-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  width: 100%;
+}
+
+.cover-cta .tap-hint {
+  margin: 0;
+  font-size: var(--fs-3);
+  color: var(--ink);
+  animation: soft-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── 타이틀 ─────────────────────────────────────────────── */
+.ov-title {
+  background: var(--ivory);
+  justify-content: space-between;
+  gap: var(--sp-5);
+  padding: 20px 16px 76px;
+  overflow-y: auto;
+}
+
+.ov-title > * { width: 100%; max-width: 328px; }
+
+.title-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.title-head .logo { margin-top: var(--sp-5); }
+
+.title-tag {
+  font: 700 var(--fs-4)/1.4 var(--font-ui);
+}
+
+.ov-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* 모드 목록 — 서류의 번호 붙은 항목 */
+.mode-list {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--ink);
+}
+
+.mode-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--sp-5) 0 var(--sp-5);
+  border: none;
+  border-top: 1px solid var(--rule);
+  background: var(--ivory);
+  color: var(--ink);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.mode-row:first-child { border-top: none; }
+
+.mode-no {
+  font: 700 var(--fs-2) var(--font-mono);
+  color: var(--dust);
+}
+
+.mode-name { font: 700 var(--fs-6)/1.2 var(--font-ui); }
+
+.mode-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: 600 var(--fs-1)/1.2 var(--font-ui);
+  color: var(--dust);
+}
+
+.mode-sub .ic { width: 13px; height: 13px; }
+
+.mode-row:not(:disabled):active { background: var(--paper); }
+
+.mode-row:disabled {
+  cursor: default;
+}
+
+.mode-row:disabled .mode-name { color: var(--dust-2); }
+
+/* 기록 — 세 칸 표 */
+.records {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.records > div {
+  padding: var(--sp-4) var(--sp-3);
+  border-left: 1px solid var(--rule);
+}
+
+.records > div:first-child { border-left: none; }
+
+.records dt {
+  font: 600 10.5px/1.2 var(--font-ui);
+  color: var(--dust);
+}
+
+.records dd {
+  margin-top: var(--sp-2);
+  font: 700 var(--fs-5)/1.1 var(--font-mono);
+}
+
+/* 구역 도감 — 네 칸 */
+.zones {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-3);
+  border: 1.5px dashed var(--dust-2);
+  color: var(--dust-2);
+  font: 700 10.5px/1.25 var(--font-ui);
+}
+
+.zone b { font: 700 10px var(--font-mono); }
+
+.zone.open {
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+}
+
+.ov-buddha {
+  font: 700 var(--fs-1) var(--font-mono);
+  color: var(--red);
+  text-align: center;
+}
+
+/* ── 스토리 ─────────────────────────────────────────────── */
+.ov-story {
+  justify-content: center;
+  background: rgba(244, 241, 232, 0.92);
+  padding-bottom: 40px;
+}
+
+.story-lines {
+  width: 300px;
+  margin-top: auto;
+  text-align: center;
+  font: 700 var(--fs-6)/1.75 var(--font-ui);
+}
+
+.story-lines p { animation: line-in 360ms var(--ease-out) both; }
+.story-lines p:nth-child(2) { animation-delay: 80ms; }
+.story-lines p:nth-child(3) { animation-delay: 160ms; }
+.story-lines p:nth-child(4) { animation-delay: 240ms; }
+.story-lines p:nth-child(n + 5) { animation-delay: 320ms; }
+.story-lines .ov-gap { height: 12px; }
+
+/* ── 카드(일시정지·결과·확인 창) ──────────────────────────
+   두 겹 테두리 = 서식 용지. 화면 가운데 뜬다. */
+.ov-modal-bg {
+  justify-content: center;
+  background: rgba(244, 241, 232, 0.84);
+}
+
+.card {
+  position: relative;
+  width: 312px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-5) 18px 18px;
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  box-shadow: 0 0 0 4px var(--ivory), 0 0 0 5.5px var(--ink);
+  animation: card-in 220ms var(--ease-out) both;
+}
+
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 20px;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--ink);
+  font: 700 10.5px/1.2 var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--dust);
+}
+
+.card-title {
+  font: 34px/1.05 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.card-reason {
+  font: 600 var(--fs-3)/1.5 var(--font-ui);
+  color: var(--dust);
+}
+
+.card-reason b { color: var(--ink); }
+
+.stat-rows {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  row-gap: var(--sp-3);
+  padding: var(--sp-4) 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.stat-rows dt {
+  font: 600 var(--fs-3) var(--font-ui);
+  color: var(--dust);
+}
+
+.stat-rows dd {
+  font: 700 var(--fs-6) var(--font-mono);
+  text-align: right;
+}
+
+.stat-rows dd.big { font-size: 24px; }
+
+.best-tag {
+  align-self: flex-start;
+  padding: 3px var(--sp-3);
+  background: var(--ink);
+  color: var(--ivory);
+  font: 700 var(--fs-1) var(--font-ui);
+  letter-spacing: 0.04em;
+}
+
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -8px -8px -8px 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+.icon-btn:active { background: var(--paper); }
+
+/* 도장 — 찍히는 순간 커졌다가 내려앉는다 */
+.stamp {
+  position: absolute;
+  top: 40px;
+  right: 18px;
+  padding: 6px 12px;
+  border: 3px solid currentColor;
+  border-radius: 6px;
+  font: 28px/1 var(--font-display);
+  color: var(--red);
+  opacity: 0.9;
+  transform: rotate(-12deg);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  animation: stamp-in 340ms var(--ease-pop) 140ms both;
+}
+
+.stamp::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+/* ── 엔딩 ───────────────────────────────────────────────── */
+.ov-ending {
+  background: var(--ivory);
+  justify-content: center;
+  gap: var(--sp-6);
+  padding: 28px 24px 36px;
+}
+
+.ov-ending .doc-meta { margin-bottom: auto; }
+
+.ov-ending .stamp {
+  position: relative;
+  top: auto;
+  right: auto;
+  padding: 12px 22px;
+  font-size: 44px;
+  color: var(--ink);
+  border-width: 4px;
+  transform: rotate(-6deg);
+  animation-name: stamp-in-soft;
+}
+
+.end-sub { font: 700 var(--fs-5)/1.5 var(--font-ui); text-align: center; }
+
+.ov-ending .stat-rows { width: 260px; }
+
+.end-note {
+  font: 600 var(--fs-3)/1.5 var(--font-ui);
+  color: var(--dust);
+  text-align: center;
+}
+
+/* ── 시트(탭 화면·설정) ───────────────────────────────────── */
+.ov-sheet-screen {
+  background: var(--ivory);
+  padding: 18px 16px 72px;
+}
+
+.ov-sheet-screen.no-tabs { padding-bottom: 16px; }
+
+.ov-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  width: 100%;
+  max-width: 328px;
+  flex: 1 1 auto;
+  min-height: 0;
+  text-align: left;
+}
+
+/* 목록이 남는 높이를 먹고 스크롤한다. 머리는 붙어 있다. */
+.ov-sheet > [data-el] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink) transparent;
+}
+
+.ov-sheet > [data-el]::-webkit-scrollbar { width: 3px; }
+.ov-sheet > [data-el]::-webkit-scrollbar-thumb { background: var(--ink); }
+
+.ov-sheet > .btn { flex: 0 0 auto; }
+
+.sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-5);
+  border-bottom: 2px solid var(--ink);
+  background: var(--ivory);
+}
+
+.sheet-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--sp-4);
+}
+
+.sheet-head h2 {
+  font: 30px/1.1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.sheet-lead {
+  font: 600 var(--fs-2)/1.5 var(--font-ui);
+  color: var(--dust);
+}
+
+.wallet {
+  display: flex;
+  gap: var(--sp-5);
+  font: 700 var(--fs-4) var(--font-mono);
+}
+
+.wallet span,
+.reward span,
+.price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.wallet .ic { width: 16px; height: 16px; }
+
+.sec-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: var(--sp-6);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--ink);
+  font: 700 var(--fs-1) var(--font-mono);
+  letter-spacing: 0.1em;
+}
+
+.sec-h:first-child { margin-top: var(--sp-4); }
+.sec-h small { font-weight: 600; letter-spacing: 0.02em; color: var(--dust); }
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-top: var(--sp-4);
+}
+
+/* 미션 */
+.m-row {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-5) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.m-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-4);
+}
+
+.m-title { font: 700 var(--fs-5)/1.3 var(--font-ui); }
+
+.m-count {
+  font: 700 var(--fs-2) var(--font-mono);
+  color: var(--dust);
+  white-space: nowrap;
+}
+
+.m-desc {
+  font: 600 var(--fs-2)/1.45 var(--font-ui);
+  color: var(--dust);
+}
+
+.m-row .bar { width: 100%; height: 6px; }
+.m-row .bar .fill { background: var(--ink); }
+/* 수령 가능만 노랑 — 노랑 = 지금 할 수 있다 */
+.m-row .bar .fill.is-ready { background: var(--yellow); }
+
+.m-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: 44px;
+}
+
+.reward {
+  display: flex;
+  gap: var(--sp-5);
+  font: 700 var(--fs-3) var(--font-mono);
+}
+
+.reward .ic,
+.price .ic { width: 14px; height: 14px; }
+
+.m-actions { display: flex; gap: var(--sp-3); }
+
+.m-done {
+  padding: var(--sp-5) 0;
+  font: 600 var(--fs-2)/1.6 var(--font-ui);
+  color: var(--dust);
+}
+
+/* 상점 */
+.shop-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--sp-3) var(--sp-5);
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.shop-row:not(:disabled):active { background: var(--ink); color: var(--ivory); }
+
+.shop-name { font: 700 var(--fs-4)/1.3 var(--font-ui); }
+.shop-name small {
+  display: block;
+  font: 600 var(--fs-1)/1.4 var(--font-ui);
+  color: var(--dust);
+}
+
+.price { font: 700 var(--fs-4) var(--font-mono); }
+
+.shop-row.owned {
+  border-color: var(--rule);
+  color: var(--dust);
+}
+
+.shop-row.owned .price {
+  font: 700 var(--fs-1) var(--font-ui);
+  padding: 2px 6px;
+  border: 1px solid var(--dust-2);
+}
+
+/* 잔액 부족 — 흐리게 지우지 않고 값만 빨갛게(왜 못 사는지가 읽혀야 한다) */
+.shop-row.short { border-style: dashed; border-color: var(--dust-2); }
+.shop-row.short .price { color: var(--red); }
+
+/* 꾸미기 */
+.pick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+}
+
+.pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 60px;
+  padding: var(--sp-3);
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  font: 700 var(--fs-3)/1.25 var(--font-ui);
+  pointer-events: auto;
+}
+
+.pick small {
+  font: 600 10px var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.pick.on {
+  background: var(--ink);
+  color: var(--ivory);
+}
+
+.pick:disabled {
+  border-style: dashed;
+  border-color: var(--dust-2);
+  background: transparent;
+  color: var(--dust-2);
+  cursor: default;
+}
+
+.pick .ic { width: 15px; height: 15px; }
+
+.pick-note {
+  margin-top: var(--sp-3);
+  font: 600 var(--fs-2)/1.5 var(--font-ui);
+  color: var(--dust);
+}
+
+/* 구역 작전 */
+.op-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+}
+
+.op {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 76px;
+  padding: var(--sp-4) var(--sp-4);
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.op b { font: 700 var(--fs-5)/1.25 var(--font-ui); }
+
+.op small {
+  font: 600 var(--fs-1)/1.4 var(--font-ui);
+  color: var(--dust);
+}
+
+.op:not(:disabled):active { background: var(--paper); }
+
+.op:disabled {
+  border-style: dashed;
+  border-color: var(--dust-2);
+  background: transparent;
+  color: var(--dust-2);
+  cursor: default;
+}
+
+.op:disabled small {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.op .ic { width: 12px; height: 12px; }
+
+/* 설정 */
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 2px;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font: 700 var(--fs-5) var(--font-ui);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.set-row:active { background: var(--paper); }
+.set-row .ic { width: 18px; height: 18px; color: var(--dust); }
+.set-danger { color: var(--red); }
+
+.set-val { font: 700 var(--fs-3) var(--font-mono); }
+
+/* 스위치 — 각진 잉크 상자 */
+.sw {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+}
+
+.sw::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: var(--dust-2);
+  transition: transform 140ms var(--ease-out), background 140ms;
+}
+
+.sw.on { background: var(--ink); }
+
+.sw.on::after {
+  transform: translateX(20px);
+  background: var(--ivory);
+}
+
+.sheet-foot {
+  padding: var(--sp-6) 0 var(--sp-4);
+  font: 600 10.5px/1.7 var(--font-mono);
+  color: var(--dust);
+}
+
+/* ── 하단 탭 ────────────────────────────────────────────── */
 .ov-tabs {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 52px;
+  height: 60px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   border-top: 2px solid var(--ink);
@@ -596,406 +1434,138 @@ html, body {
   pointer-events: auto;
 }
 
-.ov-tabs[hidden] {
-  display: none !important;
-}
+.ov-tabs[hidden] { display: none !important; }
 
 .ov-tab {
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-right: 1px solid var(--ink);
-  background: transparent;
-  color: var(--ink);
-  font-family: inherit;
-  font-size: var(--fs-1);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.ov-tab:last-child {
-  border-right: none;
-}
-
-/* ★노랑은 화면당 한 곳(ART_DIRECTION §5-6). 그 한 곳은 "지금 할 일"인 CTA다 —
-   탭 선택은 색이 아니라 굵기와 밑줄로 말한다(08-30 감식: 타이틀에 노랑이 3곳이었다). */
-.ov-tab.on {
-  background: var(--ivory);
-  box-shadow: inset 0 -3px 0 var(--ink);
-}
-
-.ov-screen[hidden] { display: none !important; }
-
-.ov-boot {
-  justify-content: center;
-  background: var(--ivory);
-}
-
-.ov-boot-mark {
-  font-size: 28px;
-  margin-bottom: var(--sp-4);
-}
-
-.ov-boot-title {
-  font-family: var(--font-display);
-  font-size: 48px;
-  font-weight: 900;
-  letter-spacing: -0.04em;
-}
-
-.ov-boot-cta {
-  margin-top: 18px;
-  font-size: var(--fs-5);
-  font-weight: 700;
-}
-
-/* ★세로가 640 → 780으로 늘어난 뒤 남는 140px이 안내문구 위에 통째로 고여 244px 구멍이
-   됐다(08-30 실측). 위로 붙이지 말고 세로 가운데로 — 남는 공간이 위아래로 갈라져
-   "여백"으로 읽힌다. 짧은 기기에서 넘치면 overflow-y가 받는다. */
-.ov-title {
-  background: var(--ivory);
-  justify-content: center;
-  gap: var(--sp-2);
-  overflow-y: auto;
-}
-
-.ov-logo {
-  font-family: var(--font-display);
-  font-size: 52px;
-  font-weight: 900;
-  letter-spacing: -0.06em;
-  line-height: 1;
-  margin-top: var(--sp-5);
-  pointer-events: auto;
-}
-
-/* 노랑 한 곳 규칙: 타이틀에서 그 한 곳은 "지금 할 일"인 아케이드 시작 버튼이다.
-   로고는 크기로 이미 이긴다 — 색까지 쓰면 강조가 둘로 갈린다(08-30 감식). */
-.ov-logo span { color: var(--ink); }
-
-.ov-logo-en {
-  font-size: var(--fs-2);
-  letter-spacing: 0.28em;
-  color: var(--dust);
-  margin-top: var(--sp-2);
-}
-
-.ov-tag {
-  font-size: var(--fs-3);
-  font-weight: 700;
-  margin: var(--sp-4) 0 var(--sp-6);
-  text-align: center;
-}
-
-.ov-menu {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-  width: 300px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--dust);
+  font: 700 10.5px/1 var(--font-ui);
 }
 
-.flyer-btn {
+.ov-tab .ic { width: 22px; height: 22px; }
+
+.ov-tab.on { color: var(--ink); }
+
+/* 선택 탭 = 위 테두리에 박힌 굵은 잉크 막대 */
+.ov-tab.on::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 24%;
+  right: 24%;
+  height: 4px;
+  background: var(--ink);
+}
+
+.ov-tab:active { background: var(--paper); }
+
+/* 일시정지 경유 화면에선 탭바 차단 — 판을 둔 채 메타 탭으로 새는 입구를 막는다(08-30, P1-2) */
+#stage.paused .ov-tabs { display: none; }
+
+/* ── 확인 창 ─────────────────────────────────────────────── */
+.ov-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6);
+  background: rgba(26, 26, 32, 0.42);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.ov-modal[hidden] { display: none !important; }
+
+.modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  font: 600 var(--fs-3)/1.6 var(--font-ui);
+  touch-action: pan-y;
+}
+
+.modal-body p + p { margin-top: var(--sp-4); }
+.modal-body .muted { color: var(--dust); }
+
+.doc-frame {
   display: block;
   width: 100%;
-  min-height: 44px;
-  padding: var(--sp-4) var(--sp-5);
-  border: 1.5px solid var(--ink);
+  height: 440px;
+  border: 1px solid var(--rule);
+  background: #fff;
+}
+
+/* 조작 안내 — 키 모양 + 한 줄 */
+.howto {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.howto-row {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: var(--sp-5);
+}
+
+.howto-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 40px;
+  border: 2px solid var(--ink);
   background: var(--ivory);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: var(--fs-5);
-  font-weight: 800;
-  cursor: pointer;
-  touch-action: manipulation;
-  pointer-events: auto;
+  box-shadow: 0 3px 0 var(--ink);
 }
 
-.flyer-btn[hidden] { display: none !important; }
-.flyer-btn.primary { background: var(--yellow); }
-.flyer-btn.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
-.flyer-btn.locked,
-.flyer-btn:disabled {
-  /* 잠김은 흐리게 지우는 게 아니라 점선으로 "아직 안 열림"을 말한다(옅은 회색은
-     비활성 placeholder처럼 보여 상태를 못 읽는다 — 08-30 감식). */
-  opacity: 1;
-  border-style: dashed;
-  border-color: var(--dust);
+.howto-key.hot { background: var(--yellow); }
+.howto-key .ic { width: 22px; height: 22px; }
+
+.howto-row b {
+  display: block;
+  font: 700 var(--fs-4)/1.3 var(--font-ui);
+}
+
+.howto-row span {
+  font: 600 var(--fs-2)/1.45 var(--font-ui);
   color: var(--dust);
-  cursor: default;
 }
 
-/* 눌림 = 잉크 반전(도장). 오프셋 그림자는 ART_DIRECTION이 금지한 드롭섀도우라 안 쓴다. */
-.flyer-btn:not(:disabled):active {
+/* ── 토스트 ─────────────────────────────────────────────── */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  z-index: 30;
+  max-width: 300px;
+  padding: 10px 14px;
   background: var(--ink);
   color: var(--ivory);
-}
-
-.flyer-btn.primary:not(:disabled):active {
-  background: var(--ink);
-  color: var(--yellow);
-}
-
-.ov-records {
-  width: 300px;
-  margin-top: var(--sp-6);
-  padding: var(--sp-4) var(--sp-5);
-  border: 2px solid var(--ink);
-  font-size: var(--fs-2);
+  font: 700 var(--fs-3)/1.45 var(--font-ui);
   text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 160ms, transform 160ms var(--ease-out);
+  pointer-events: none;
 }
 
-.ov-records-h {
-  font-weight: 800;
-  margin-bottom: var(--sp-2);
-  letter-spacing: 0.08em;
+.toast.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
-.ov-gallery {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--sp-3);
-  width: 300px;
-  margin-top: var(--sp-5);
-}
-
-.ov-stamp {
-  font-size: var(--fs-1);
-  font-weight: 700;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1.5px dashed var(--dust-2);
-  color: var(--dust-2);
-}
-
-.ov-stamp.open {
-  border-style: solid;
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
-/* 타이틀에선 auto 밀기를 쓰지 않는다 — 스탬프와 안내 사이에 200px짜리 구멍이 생겨
-   "여백"이 아니라 "콘텐츠가 없어서 빈 곳"으로 읽혔다(08-30 감식). 남는 공간은 아래로 모은다. */
-.ov-title .ov-hint {
-  margin-top: var(--sp-6);
-}
-
-.ov-hint {
-  margin-top: auto;
-  padding-top: var(--sp-5);
-  font-size: var(--fs-1);
-  color: var(--dust);
-  text-align: center;
-}
-
-.ov-buddha {
-  font-size: var(--fs-2);
-  margin-top: var(--sp-3);
-}
-
-.ov-dim {
-  justify-content: center;
-  background: rgba(244, 241, 232, 0.88);
-}
-
-.ov-pause { background: rgba(244, 241, 232, 0.72); }
-/* ★로즈 워시(rgba(250,236,232))는 ART_DIRECTION 팔레트에 없는 색이었다 — 실패의 빨강은
-   제목 한 곳으로 충분하다(08-30 감식). */
-.ov-over { background: rgba(244, 241, 232, 0.94); }
-
-.ov-story-lines {
-  width: 300px;
-  text-align: center;
-  font-size: var(--fs-4);
-  line-height: 1.7;
-}
-
-.ov-story-lines .ov-gap { height: 10px; }
-
-.ui-card {
-  width: 300px;
-  padding: var(--sp-6);
-  border: 1.5px solid var(--ink);
-  background: var(--ivory);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-  text-align: center;
-}
-
-.ui-card h2 {
-  font-family: var(--font-display);
-  font-size: 26px;
-  margin-bottom: var(--sp-2);
-}
-
-.ui-card-fail h2 { color: var(--red); }
-
-/* ★탭 화면은 셸(.ui-card) 안에 뷰가 자기 카드를 또 넣어 테두리가 두 겹으로 보였다(08-30 2차 감식).
-   안쪽은 테두리 없는 패널로 — 획은 바깥 카드 하나만 긋는다. */
-/* 미션 행 — 뷰가 인라인으로 찍던 값들을 여기로. 조판은 CSS 한 곳에서만 정한다. */
-.mission-row {
-  border: 1.5px solid var(--ink);
-  padding: var(--sp-3) var(--sp-4);
-  text-align: left;
-}
-
-.mission-title {
-  font-size: var(--fs-3);
-  font-weight: 800;
-}
-
-.mission-desc {
-  margin: var(--sp-1) 0 var(--sp-2);
-}
-
-/* 수령 완료분은 한 줄로 접는다 — 목록이 아니라 영수증처럼 */
-.mission-done {
-  font-size: var(--fs-1);
-  line-height: 1.5;
-  color: var(--dust);
-  border-top: 1px dashed var(--dust-2);
-  padding-top: var(--sp-3);
-}
-
-.mission-meta {
-  font-size: var(--fs-1);
-  margin: var(--sp-2) 0 var(--sp-3);
-  color: var(--dust);
-}
-
-/* 진행 중 = 잉크, 수령 가능 = 노랑, 수령 완료 = 흐린 먼지.
-   ★순서 주의: 특정도가 같으므로(둘 다 클래스 3개) 상태 규칙이 뒤에 와야 이긴다. */
-.mission-row .bar { width: 100%; height: 6px; }
-.mission-row .bar .fill { background: var(--ink); }
-.mission-row .bar .fill.is-ready { background: var(--yellow); }
-.mission-row .bar .fill.is-done { background: var(--dust-2); }
-
-/* 08-30: shopView/customView/opsView 인라인 스타일 클래스화 — 값은 그대로, 토큰으로만 이동 */
-.ov-orbit-h { margin-top: var(--sp-4); }
-.ov-sku-group-h { margin-top: var(--sp-3); }
-.ov-sku-rows { display: flex; flex-direction: column; gap: var(--sp-3); }
-
-.ov-row-btn { text-align: left; }
-.ov-row-line {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  font-size: var(--fs-4);
-}
-.ov-row-extra {
-  display: block;
-  font-size: var(--fs-1);
-  font-weight: 600;
-  color: var(--dust);
-}
-
-.ov-custom-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-2); }
-.ov-custom-btn { padding: var(--sp-3) var(--sp-2); font-size: var(--fs-2); }
-
-.ov-ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
-.ov-op-stamp { font-size: var(--fs-3); padding: var(--sp-3); }
-
-/* ★탭 화면은 카드에 가두지 않는다(08-30 사용자 지시: "미션을 왜 굳이 칸에 가둬놨냐, 팝업처럼 펼쳐").
-   테두리 있는 300px 상자 안에서 스크롤하면 목록이 창문 너머로 보이는 꼴이 된다.
-   시트 = 화면을 그대로 쓰는 한 장. 획은 제목 밑줄 하나로 충분하다. */
-.ov-sheet {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-  width: 100%;
-  max-width: 328px;
-  flex: 1 1 auto;
-  min-height: 0;
-  text-align: left;
-}
-
-/* 제목은 시트 직계일 수도(취급설명서), 뷰 패널 안쪽일 수도(미션·상점·꾸미기) 있다 */
-.ov-sheet h2 {
-  font-family: var(--font-display);
-  font-size: 26px;
-  line-height: 1.2;
-  padding-bottom: var(--sp-3);
-  border-bottom: 1.5px solid var(--ink);
-}
-
-/* 시트 안에서는 목록이 남는 높이를 전부 먹고, 뒤로 버튼은 바닥에 붙는다 */
-.ov-sheet > [data-el] {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.ov-sheet > .flyer-btn {
-  flex: 0 0 auto;
-}
-
-.ov-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-  text-align: left;
-}
-
-.ui-card-manual {
-  text-align: left;
-}
-
-.ov-manual-lead {
-  font-size: var(--fs-2);
-  line-height: 1.5;
-  color: var(--dust);
-  margin-bottom: var(--sp-2);
-}
-
-.ov-manual-keys {
-  font-size: var(--fs-1);
-  color: var(--dust);
-  line-height: 1.4;
-}
-
-.ov-pause-stats,
-.ov-over-score,
-.ov-over-line {
-  font-size: var(--fs-3);
-}
-
-.ov-ending {
-  background: #EAE6DA;
-  justify-content: center;
-}
-
-.ov-end-stamp {
-  font-family: var(--font-display);
-  font-size: 36px;
-  font-weight: 900;
-}
-
-.ov-end-sub {
-  margin-top: 10px;
-  font-size: var(--fs-4);
-}
-
-.ov-end-score {
-  margin-top: 18px;
-  font-size: var(--fs-4);
-  font-weight: 700;
-}
-
-.ov-end-note {
-  margin-top: var(--sp-4);
-  font-size: var(--fs-3);
-  color: var(--dust);
-  text-align: center;
-}
-
-.blink {
-  animation: hud-blink 1s step-end infinite;
-}
-
+/* ── 움직임 ─────────────────────────────────────────────── */
 @keyframes hud-punch {
-  from { transform: scale(1.4); }
+  from { transform: scale(1.45); }
   to { transform: scale(1); }
 }
 
@@ -1006,37 +1576,51 @@ html, body {
   100% { color: var(--red); }
 }
 
-@keyframes hud-blink {
-  50% { opacity: 0; }
+@keyframes key-ready {
+  from { transform: translateY(4px) scale(0.9); }
+  to { transform: none; }
+}
+
+@keyframes logo-cut {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-4px, -4px); }
+}
+
+@keyframes soft-pulse {
+  50% { opacity: 0.35; }
+}
+
+@keyframes line-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes stamp-in {
+  from { opacity: 0; transform: rotate(-12deg) scale(2.2); }
+  60% { opacity: 0.95; }
+  to { opacity: 0.9; transform: rotate(-12deg) scale(1); }
+}
+
+@keyframes stamp-in-soft {
+  from { opacity: 0; transform: rotate(-6deg) scale(1.8); }
+  to { opacity: 0.9; transform: rotate(-6deg) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hud-combo.punch,
   .hud-combo.punch-b,
   .hud-combo.cap,
-  .blink {
+  .cover-cta .tap-hint,
+  .story-lines p,
+  .card,
+  .stamp,
+  #btn-special.ready,
+  .ov-cover .logo .cut-a {
     animation: none;
   }
 }
-
-/* 08-30(E-5): 시스템 스크롤바가 전단지 톤을 깨고 콘텐츠 위에 겹침 — 잉크색 얇은 바로 통일 */
-/* ★08-30 실측 정정: `.ui-card [style*=…]`는 후손 셀렉터라 인라인 overflow-y를 자기 자신이
-   가진 .ov-missions·.ov-custom엔 안 걸렸다(5탭 중 3탭이 시스템 스크롤바). 자기 자신도 잡는다. */
-.ov-shop,
-.ov-ops,
-.ui-card[style*="overflow-y"],
-.ui-card [style*="overflow-y"],
-.ov-screen [data-el="mission-list"] {
-  scrollbar-width: thin;
-  scrollbar-color: var(--ink) transparent;
-}
-.ov-shop::-webkit-scrollbar { width: 4px; }
-.ov-shop::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 2px; }
-.ov-shop::-webkit-scrollbar-track { background: transparent; }
-
-/* 08-30(P1-2): 일시정지 경유 화면(취급설명서)에선 하단 탭바 차단 — pause 씬을 둔 채
-   메타 탭으로 새면 화면·씬이 어긋나고 진행 중 판이 소실되던 경로의 입구를 막는다. */
-#stage.paused .ov-tabs { display: none; }
-
-/* 08-30 스윕: customView 잠금 칸 실루엣 — 클래스만 있고 규칙이 없던 사문 복구 */
-.flyer-btn.silhouette { filter: grayscale(1); opacity: 0.38; }

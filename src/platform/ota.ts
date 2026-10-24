@@ -13,8 +13,11 @@
 // 웹은 `window.Capacitor.Plugins.CapacitorUpdater` 런타임 조회로만 접근한다(native.ts와 같은 패턴).
 import { isNative, nativePlugin } from './native';
 
-/** 정적 배포처 — 서버 로직 없음(manifest.json + bundles/*.zip 두 종류뿐) */
-const OTA_BASE = 'https://gunbbu-ota.vercel.app';
+/** 정적 배포처 — 서버 로직 없음(manifest.json + bundles/*.zip 두 종류뿐). 비어 있으면 OTA를 끈다.
+ * ★2026-10-25 기본값을 비웠다. 옛 주소 gunbbu-ota.vercel.app은 한 번도 배포된 적 없는 **주인 없는 이름**이었고,
+ * 체크섬도 같은 매니페스트에서 오므로 누가 그 이름을 먼저 차지하면 설치된 앱에 임의 번들을 밀어 넣을 수 있었다.
+ * 우리가 소유한 호스트를 세운 뒤에만 빌드 변수 VITE_OTA_BASE로 켠다(docs/RELEASE.md OTA 절). */
+const OTA_BASE: string = (import.meta.env.VITE_OTA_BASE as string | undefined) ?? '';
 const MANIFEST_URL = `${OTA_BASE}/manifest.json`;
 const FETCH_TIMEOUT_MS = 6000;
 /** 부팅 경로를 막지 않게 확인을 뒤로 미루는 시간 */
@@ -93,6 +96,7 @@ async function fetchManifest(): Promise<OtaManifest | null> {
  * 반환값 없음 — UI는 OTA를 기다리지 않는다.
  */
 export function initOta(): void {
+  if (!OTA_BASE) return; // 배포처 미설정 = OTA 꺼짐(1.0 기본)
   if (!isNative()) return; // 웹(브라우저·PWA)에선 OTA 개념 자체가 없다 — 새로고침이 곧 갱신
   if (!updater()) return; // 플러그인 미탑재 셸
   setTimeout(() => void checkAndStage(), CHECK_DELAY_MS);

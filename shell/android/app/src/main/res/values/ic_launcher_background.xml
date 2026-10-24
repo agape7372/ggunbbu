@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- 브랜드 아이보리. 어댑티브 아이콘 배경과 스플래시 배경이 같이 쓴다(웹 #F4F1E8과 짝값). -->
+    <color name="ic_launcher_background">#F4F1E8</color>
 </resources>

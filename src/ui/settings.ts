@@ -3,7 +3,7 @@
 
 import { saveSave, type SaveData, type SaveSettings } from '../storage';
 
-export const SHAKE_LABEL = ['흔들림 없음', '흔들림 약함', '흔들림 기본'] as const;
+export const SHAKE_LABEL = ['없음', '약하게', '기본'] as const;
 
 export interface SettingsSinks {
   setSoundOn(on: boolean): void;

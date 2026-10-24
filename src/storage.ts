@@ -26,6 +26,7 @@ export interface SaveData {
   loadout: Loadout;
   daily: DailyState | null;
   achieves: MissionProgress[];
+  howtoSeen: boolean; // 첫 실행 조작 안내를 봤는지 (무버전 추가 키)
 }
 
 export const DEFAULT_SAVE: SaveData = {
@@ -50,6 +51,7 @@ export const DEFAULT_SAVE: SaveData = {
   loadout: { ...DEFAULT_LOADOUT },
   daily: null,
   achieves: initAchieveProgress(),
+  howtoSeen: false,
 };
 
 /**
@@ -107,6 +109,7 @@ export function loadSave(): SaveData {
       loadout: validateLoadout(data.loadout),
       daily: isDailyState(data.daily) ? data.daily : null,
       achieves: Array.isArray(data.achieves) ? data.achieves.filter(isProgress) : initAchieveProgress(),
+      howtoSeen: typeof data.howtoSeen === 'boolean' ? data.howtoSeen : DEFAULT_SAVE.howtoSeen,
     };
 
     return result;

@@ -1,18 +1,21 @@
-// 타이틀 / 스토리 / 일시정지 / 설정 / 결과 / 엔딩 DOM 오버레이.
-// 원작 UI 카피 미사용 — 건뿌 병맛 한국어만.
+// 표지 / 타이틀 / 스토리 / 일시정지 / 설정 / 결과 / 엔딩 DOM 오버레이 + 확인 창 + 토스트.
+// 원작 UI 카피 미사용 — 건뿌 병맛 한국어만. 콘셉트 「철거 서류」(style.css 머리말).
 
 import type { SaveData, SaveSettings } from '../storage';
-import { SCREENS, TAGLINE, TITLE, TITLE_EN } from '../content';
+import { SCREENS, TAGLINE, TITLE } from '../content';
 import { fillGallery } from './gallery';
 import { SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
+import { nativeAppVersion } from '../platform/native';
 import { paintOps } from './opsView';
 import { paintMissions } from './missionView';
 import { paintShop } from './shopView';
 import { paintCustom } from './customView';
+import { ICON } from './icons';
 import { ACHIEVES, DAILY_POOL } from '../meta';
 import { APP_VERSION } from '../version';
 import type { DailyState, Loadout, MissionProgress } from '../meta/types';
+import { escapeHtml } from './html';
 
 export type OverlayScreen =
   | 'none'
@@ -51,6 +54,10 @@ export interface GameOverView {
   reviveLeft: number;
   reviveMax: number;
   line: string;
+  /** 이번 판이 그 모드 최고 기록을 넘었나 */
+  best: boolean;
+  /** 카드 머리에 찍는 모드 이름 */
+  mode: string;
 }
 
 export interface EndingView {
@@ -92,7 +99,10 @@ export interface OverlayHandlers {
   onBuySku(id: string): void;
   onAdOrbit(): void;
   onUnlockOrbit(id: string): void;
+  onExchangeDust(): void;
   onEquip(slot: string, id: string): void;
+  onHowtoDone(): void;
+  onResetData(): void;
 }
 
 export interface OverlayApi {
@@ -102,7 +112,7 @@ export interface OverlayApi {
   setTitleSelected(index: number): void;
   showStory(lines: readonly string[]): void;
   showPause(v: PauseView): void;
-  showSettings(s: SaveSettings): void;
+  showSettings(s: SaveSettings, fromPause: boolean): void;
   showButterPick(tier: number): void;
   showGameOver(v: GameOverView): void;
   showEnding(v: EndingView): void;
@@ -110,12 +120,21 @@ export interface OverlayApi {
   showMissions(daily: DailyState, achieves: MissionProgress[], adBoost: boolean): void;
   showShop(inv: { dust: number; orbit: number }, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
   showCustom(loadout: Loadout, owned: ReadonlySet<string>): void;
+  /** 조작 안내 창. first = 첫 실행(닫으면 onHowtoDone) */
+  showHowto(first: boolean): void;
+  /** 확인 창이 떠 있나 — 뒤로가기가 창부터 닫는다 */
+  modalOpen(): boolean;
+  closeModal(): void;
+  toast(text: string): void;
   hide(): void;
 }
 
 const TAB_SCREENS: ReadonlySet<OverlayScreen> = new Set([
   'title', 'ops', 'missions', 'shop', 'custom', 'settings', 'butter',
 ]);
+
+const TOAST_MS = 2400;
+const QUIT_CONFIRM_MS = 3000;
 
 export function ensureOverlayLayer(): HTMLElement {
   let el = document.getElementById('overlay-layer');
@@ -128,194 +147,263 @@ export function ensureOverlayLayer(): HTMLElement {
   return el;
 }
 
+/** 사선으로 잘린 로고 — 같은 글자 두 장(style.css .logo) */
+function logoHtml(extra = ''): string {
+  const t = escapeHtml(TITLE);
+  return `<h1 class="logo" aria-label="${t}"${extra}><span class="cut-a" aria-hidden="true">${t}</span><span class="cut-b" aria-hidden="true">${t}</span></h1>`;
+}
+
+function modeRow(act: string, no: string): string {
+  return `<button type="button" class="mode-row" data-act="${act}" data-el="${act}">
+    <span class="mode-no">${no}</span><span class="mode-name"></span><span class="mode-sub"></span>
+  </button>`;
+}
+
+const HOWTO_ROWS: readonly { icon: keyof typeof ICON; name: string; desc: string; hot?: boolean }[] = [
+  { icon: 'attack', name: '공격', desc: '닿은 층을 벤다. 이어 베면 콤보.' },
+  { icon: 'jump', name: '점프', desc: '한 번 누르면 한 번 뛴다.' },
+  { icon: 'guard', name: '가드', desc: '떨어지는 건물을 튕겨 올린다. 막대만큼.' },
+  { icon: 'special', name: '필살', desc: '막대가 차면 노랗게 켜진다.', hot: true },
+];
+
 export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi {
   root.innerHTML = `
-    <div class="ov-screen ov-boot" data-screen="boot" data-act="boot">
-      <p class="ov-boot-mark">▶</p>
-      <p class="ov-boot-title">${TITLE}</p>
-      <p class="ov-boot-cta blink">탭하여 시작</p>
+    <div class="ov-screen ov-cover" data-screen="boot" data-act="boot">
+      <p class="doc-meta"><span>건뿌 철거사무소</span><span>제 0001 호</span></p>
+      <div class="cover-mid">
+        <img class="cover-mark" src="./icons/icon-512.png" alt="" />
+        ${logoHtml()}
+        <p class="cover-tag">${TAGLINE}</p>
+      </div>
+      <div class="cover-cta">
+        <div class="tape" aria-hidden="true"></div>
+        <p class="tap-hint">누르면 시작</p>
+      </div>
     </div>
 
     <div class="ov-screen ov-title ov-has-tabs" data-screen="title" hidden>
-      <h1 class="ov-logo" data-act="logo">건뿌<span>!!</span></h1>
-      <p class="ov-logo-en">${TITLE_EN}</p>
-      <p class="ov-tag">${TAGLINE}</p>
+      <header class="title-head">
+        <p class="doc-meta"><span>철거 허가 · 1인 작업</span><span>GUNBBU</span></p>
+        ${logoHtml(' data-act="logo"')}
+        <p class="title-tag">${TAGLINE}</p>
+      </header>
       <div class="ov-menu">
-        <button type="button" class="flyer-btn primary selected" data-act="arcade">${SCREENS.menu.arcade}</button>
-        <button type="button" class="flyer-btn" data-act="tokoton" data-el="tokoton">토코톤 — 잠김</button>
-        <button type="button" class="flyer-btn" data-act="butter" data-el="butter">버터바 챌린지 — 잠김</button>
-        <button type="button" class="flyer-btn" data-act="ops">${SCREENS.menu.ops}</button>
+        <button type="button" class="cta" data-act="arcade" data-el="arcade">
+          <span class="cta-label">${SCREENS.menu.arcade}</span>
+          <span class="cta-sub">${SCREENS.menu.arcadeSub}</span>
+        </button>
+        <div class="mode-list">
+          ${modeRow('tokoton', '02')}
+          ${modeRow('butter', '03')}
+          ${modeRow('ops', '04')}
+        </div>
       </div>
-      <div class="ov-records">
-        <p class="ov-records-h">${SCREENS.title.records}</p>
-        <p data-el="records"></p>
-      </div>
-      <div class="ov-gallery" data-el="gallery"></div>
-      <p class="ov-hint" data-el="title-hint"></p>
-      <p class="ov-buddha" data-el="buddha" hidden>${SCREENS.title.buddha}</p>
+      <section>
+        <dl class="records" data-el="records"></dl>
+        <div class="zones" data-el="gallery"></div>
+        <p class="ov-buddha" data-el="buddha" hidden>${SCREENS.title.buddha}</p>
+      </section>
     </div>
 
-    <div class="ov-screen ov-dim ov-story" data-screen="story" data-act="story-skip" hidden>
-      <div class="ov-story-lines" data-el="story"></div>
-      <p class="ov-hint">탭하면 다음</p>
+    <div class="ov-screen ov-story" data-screen="story" data-act="story-skip" hidden>
+      <div class="story-lines" data-el="story"></div>
+      <p class="tap-hint">누르면 넘김</p>
     </div>
 
-    <div class="ov-screen ov-dim ov-pause" data-screen="pause" hidden>
-      <div class="ui-card">
-        <h2>잠깐!</h2>
-        <p class="ov-pause-stats" data-el="pause-stats"></p>
-        <button type="button" class="flyer-btn primary" data-act="resume">계속 부수기</button>
-        <button type="button" class="flyer-btn" data-act="pause-settings">취급설명서</button>
-        <button type="button" class="flyer-btn" data-act="quit">포기하고 퇴근</button>
+    <div class="ov-screen ov-modal-bg" data-screen="pause" hidden>
+      <div class="card" role="dialog" aria-modal="true" aria-label="잠깐">
+        <p class="card-meta"><span>작업 일지</span><span>일시 중지</span></p>
+        <h2 class="card-title">잠깐</h2>
+        <dl class="stat-rows" data-el="pause-stats"></dl>
+        <div class="card-actions">
+          <button type="button" class="cta" data-act="resume"><span class="cta-label">계속 부수기</span></button>
+          <button type="button" class="btn" data-act="pause-settings">${ICON.settings}설정</button>
+          <button type="button" class="btn btn-quiet" data-act="quit" data-el="quit">그만두기</button>
+        </div>
       </div>
     </div>
 
-    <div class="ov-screen ov-dim ov-settings ov-has-tabs" data-screen="settings" hidden>
+    <div class="ov-screen ov-sheet-screen ov-has-tabs" data-screen="settings" data-el="settings-screen" hidden>
       <div class="ov-sheet">
-        <h2>취급설명서</h2>
-        <p class="ov-manual-lead">본 기기는 하늘에서 떨어지는 건물을 부수는 가정용 철거기입니다. 전원 투입 전 아래를 확인하십시오.</p>
-        <button type="button" class="flyer-btn" data-act="set-sound" data-el="set-sound">소리 켜짐</button>
-        <button type="button" class="flyer-btn" data-act="set-vib" data-el="set-vib">진동 켜짐</button>
-        <button type="button" class="flyer-btn" data-act="set-hand" data-el="set-hand">왼손잡이 꺼짐</button>
-        <button type="button" class="flyer-btn" data-act="set-shake" data-el="set-shake">흔들림 기본</button>
-        <p class="ov-manual-keys">키보드: 점프 ↑/W · 가드 ↓/S · 공격 Z · 필살 X · 일시정지 Esc</p>
-        <p class="ov-manual-keys">모델 GUNBBU · 버전 v${APP_VERSION}</p>
-        <button type="button" class="flyer-btn primary" data-act="set-back">뒤로</button>
+        <div data-el="settings-body">
+          <header class="sheet-head"><h2>설정</h2></header>
+          <p class="sec-h">게임</p>
+          <button type="button" class="set-row" data-act="set-sound"><span>소리</span><span class="sw" data-el="set-sound"></span></button>
+          <button type="button" class="set-row" data-act="set-vib"><span>진동</span><span class="sw" data-el="set-vib"></span></button>
+          <button type="button" class="set-row" data-act="set-shake"><span>화면 흔들림</span><span class="set-val" data-el="set-shake"></span></button>
+          <button type="button" class="set-row" data-act="set-hand"><span>왼손 조작</span><span class="sw" data-el="set-hand"></span></button>
+          <p class="sec-h">도움말</p>
+          <button type="button" class="set-row" data-act="howto"><span>조작 안내</span>${ICON.next}</button>
+          <button type="button" class="set-row" data-act="privacy"><span>개인정보 처리방침</span>${ICON.next}</button>
+          <button type="button" class="set-row" data-act="credits"><span>글꼴 저작권</span>${ICON.next}</button>
+          <button type="button" class="set-row set-danger" data-act="reset" data-el="reset-row"><span>기록 지우기</span>${ICON.next}</button>
+          <p class="sheet-foot">GUNBBU <span data-el="ver">v${APP_VERSION}</span><br>키보드: 점프 ↑ · 가드 ↓ · 공격 Z · 필살 X · 멈춤 Esc</p>
+        </div>
+        <button type="button" class="btn" data-act="set-back" data-el="set-back">뒤로</button>
       </div>
     </div>
 
-    <div class="ov-screen ov-dim ov-butter ov-has-tabs" data-screen="butter" hidden>
-      <div class="ui-card">
-        <h2>버터바 챌린지</h2>
-        <p class="ov-manual-lead">경험한 회차만 다시 부술 수 있습니다.</p>
-        <div data-el="butter-rounds"></div>
-        <button type="button" class="flyer-btn" data-act="butter-back">뒤로</button>
+    <div class="ov-screen ov-sheet-screen ov-has-tabs" data-screen="butter" hidden>
+      <div class="ov-sheet">
+        <div data-el="butter-body">
+          <header class="sheet-head">
+            <h2>버터바 챌린지</h2>
+            <p class="sheet-lead">만나 본 회차만 다시 할 수 있습니다.</p>
+          </header>
+          <div class="list" data-el="butter-rounds"></div>
+        </div>
+        <button type="button" class="btn" data-act="butter-back">뒤로</button>
       </div>
     </div>
 
-    <div class="ov-screen ov-dim ov-over" data-screen="gameover" hidden>
-      <div class="ui-card ui-card-fail">
-        <h2>${SCREENS.gameover.title}</h2>
-        <p class="ov-over-line" data-el="over-line"></p>
-        <p class="ov-over-score" data-el="over-score"></p>
-        <button type="button" class="flyer-btn primary" data-act="go-revive" data-el="go-revive">광고 보고 일어나기</button>
-        <button type="button" class="flyer-btn" data-act="go-continue" data-el="go-continue">이어하기</button>
-        <button type="button" class="flyer-btn" data-act="go-retry">한 판 더</button>
-        <button type="button" class="flyer-btn" data-act="go-title">타이틀로</button>
+    <div class="ov-screen ov-modal-bg" data-screen="gameover" hidden>
+      <div class="card" role="dialog" aria-modal="true" aria-label="${SCREENS.gameover.title}">
+        <p class="card-meta"><span>철거 보고서</span><span data-el="over-mode"></span></p>
+        <h2 class="card-title">${SCREENS.gameover.title}</h2>
+        <span class="stamp" aria-hidden="true">반려</span>
+        <p class="card-reason">사유: <b data-el="over-line"></b></p>
+        <dl class="stat-rows" data-el="over-stats"></dl>
+        <p class="best-tag" data-el="over-best" hidden>신기록</p>
+        <div class="card-actions">
+          <button type="button" class="cta" data-act="go-revive" data-el="go-revive"></button>
+          <button type="button" class="btn" data-act="go-continue" data-el="go-continue">${SCREENS.gameover.continue}</button>
+          <button type="button" class="btn" data-act="go-retry" data-el="go-retry">한 판 더</button>
+          <button type="button" class="btn btn-quiet" data-act="go-title">타이틀로</button>
+        </div>
       </div>
     </div>
 
-    <div class="ov-screen ov-dim ov-has-tabs" data-screen="ops" hidden>
+    <div class="ov-screen ov-sheet-screen" data-screen="ops" hidden>
       <div class="ov-sheet">
         <div data-el="ops-list"></div>
-        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
+        <button type="button" class="btn" data-act="meta-back">뒤로</button>
       </div>
     </div>
 
-    <div class="ov-screen ov-dim ov-has-tabs" data-screen="missions" hidden>
-      <div class="ov-sheet">
-        <div data-el="mission-list"></div>
-        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
-      </div>
+    <div class="ov-screen ov-sheet-screen ov-has-tabs" data-screen="missions" hidden>
+      <div class="ov-sheet"><div data-el="mission-list"></div></div>
     </div>
 
-    <div class="ov-screen ov-dim ov-has-tabs" data-screen="shop" hidden>
-      <div class="ov-sheet">
-        <div data-el="shop-list"></div>
-        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
-      </div>
+    <div class="ov-screen ov-sheet-screen ov-has-tabs" data-screen="shop" hidden>
+      <div class="ov-sheet"><div data-el="shop-list"></div></div>
     </div>
 
-    <div class="ov-screen ov-dim ov-has-tabs" data-screen="custom" hidden>
-      <div class="ov-sheet">
-        <div data-el="custom-list"></div>
-        <button type="button" class="flyer-btn" data-act="meta-back">뒤로</button>
-      </div>
+    <div class="ov-screen ov-sheet-screen ov-has-tabs" data-screen="custom" hidden>
+      <div class="ov-sheet"><div data-el="custom-list"></div></div>
     </div>
 
     <div class="ov-screen ov-ending" data-screen="ending" data-act="ending" hidden>
-      <p class="ov-end-stamp">${SCREENS.result.success}</p>
-      <p class="ov-end-sub">${SCREENS.result.petals}</p>
-      <p class="ov-end-score" data-el="end-score"></p>
-      <p class="ov-end-note" data-el="end-note"></p>
-      <p class="ov-hint blink">탭하면 타이틀로</p>
+      <p class="doc-meta"><span>철거 보고서</span><span>최종</span></p>
+      <span class="stamp">${SCREENS.result.success}</span>
+      <p class="end-sub">${SCREENS.result.petals}</p>
+      <dl class="stat-rows" data-el="end-stats"></dl>
+      <p class="end-note" data-el="end-note"></p>
+      <p class="tap-hint">누르면 타이틀로</p>
     </div>
 
     <nav class="ov-tabs" data-el="tabs" hidden>
-      <button type="button" class="ov-tab" data-act="tab-play" data-tab="title">${SCREENS.tabs.play}</button>
-      <button type="button" class="ov-tab" data-act="tab-missions" data-tab="missions">${SCREENS.tabs.missions}</button>
-      <button type="button" class="ov-tab" data-act="tab-custom" data-tab="custom">${SCREENS.tabs.custom}</button>
-      <button type="button" class="ov-tab" data-act="tab-shop" data-tab="shop">${SCREENS.tabs.shop}</button>
-      <button type="button" class="ov-tab" data-act="tab-more" data-tab="settings">${SCREENS.tabs.more}</button>
+      <button type="button" class="ov-tab" data-act="tab-play" data-tab="title">${ICON.play}${SCREENS.tabs.play}</button>
+      <button type="button" class="ov-tab" data-act="tab-missions" data-tab="missions">${ICON.missions}${SCREENS.tabs.missions}</button>
+      <button type="button" class="ov-tab" data-act="tab-custom" data-tab="custom">${ICON.custom}${SCREENS.tabs.custom}</button>
+      <button type="button" class="ov-tab" data-act="tab-shop" data-tab="shop">${ICON.shop}${SCREENS.tabs.shop}</button>
+      <button type="button" class="ov-tab" data-act="tab-more" data-tab="settings">${ICON.settings}${SCREENS.tabs.more}</button>
     </nav>
+
+    <div class="ov-modal" data-el="modal" hidden>
+      <div class="card" role="dialog" aria-modal="true">
+        <p class="card-meta"><span data-el="modal-meta"></span>
+          <button type="button" class="icon-btn" data-act="modal-close" data-el="modal-x" aria-label="닫기">${ICON.close}</button></p>
+        <h2 class="card-title" data-el="modal-title"></h2>
+        <div class="modal-body" data-el="modal-body"></div>
+        <div class="card-actions" data-el="modal-actions"></div>
+      </div>
+    </div>
   `;
+
+  // 토스트는 오버레이가 닫힌 플레이 중에도 보이게 스테이지에 직접 붙인다
+  const toastEl = document.createElement('p');
+  toastEl.className = 'toast';
+  toastEl.setAttribute('role', 'status');
+  (root.parentElement ?? root).appendChild(toastEl);
+  let toastTimer = 0;
 
   let screen: OverlayScreen = 'none';
   let settings: SaveSettings | null = null;
   let titleView: TitleView | null = null;
   let opsOpts = { unlockedChapters: 0, allOpen: false, act2Cleared: false };
+  let quitArmed = 0;
+  let resetArmed = false;
+  let howtoFirst = false;
 
   const $ = (name: string): HTMLElement => root.querySelector(`[data-el="${name}"]`) as HTMLElement;
 
+  // 설치된 앱이면 스토어 버전(versionName)을 보여 준다 — 웹 번들 버전은 OTA용이라 다를 수 있다
+  void nativeAppVersion().then((v) => { if (v) $('ver').textContent = `v${v}`; });
+
   function paintTabs(name: OverlayScreen): void {
     const tabs = $('tabs');
-    const show = TAB_SCREENS.has(name);
-    tabs.hidden = !show;
+    tabs.hidden = !TAB_SCREENS.has(name);
     const key = name === 'ops' || name === 'butter' ? 'title' : name;
     tabs.querySelectorAll<HTMLButtonElement>('.ov-tab').forEach((btn) => {
-      btn.classList.toggle('on', btn.getAttribute('data-tab') === key);
+      const on = btn.getAttribute('data-tab') === key;
+      btn.classList.toggle('on', on);
+      if (on) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
     });
   }
 
   function show(name: OverlayScreen): void {
     screen = name;
-    if (name === 'none') {
-      root.classList.remove('is-open');
-      root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => { el.hidden = true; });
-      paintTabs(name);
-      return;
-    }
-    root.classList.add('is-open');
+    closeModal();
+    root.classList.toggle('is-open', name !== 'none');
     root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => {
       el.hidden = el.getAttribute('data-screen') !== name;
     });
     paintTabs(name);
   }
 
+  function statRows(rows: readonly [string, string, boolean?][]): string {
+    return rows.map(([k, v, big]) => `<dt>${k}</dt><dd${big ? ' class="big"' : ''}>${v}</dd>`).join('');
+  }
+
+  function setMode(act: string, name: string, sub: string, open: boolean): void {
+    const row = $(act) as HTMLButtonElement;
+    row.disabled = !open;
+    (row.querySelector('.mode-name') as HTMLElement).textContent = name;
+    (row.querySelector('.mode-sub') as HTMLElement).innerHTML = open ? escapeHtml(sub) : `${ICON.lock}${escapeHtml(sub)}`;
+  }
+
   function paintTitle(v: TitleView): void {
     titleView = v;
-    const tok = $('tokoton') as HTMLButtonElement;
-    const but = $('butter') as HTMLButtonElement;
-    tok.textContent = v.tokotonOpen ? SCREENS.menu.tokoton : SCREENS.menu.tokotonLocked;
-    tok.disabled = !v.tokotonOpen;
-    tok.classList.toggle('locked', !v.tokotonOpen);
-    but.textContent = v.butterTier > 0 ? SCREENS.menu.butter(v.butterTier) : SCREENS.menu.butterLocked;
-    but.disabled = v.butterTier <= 0;
-    but.classList.toggle('locked', v.butterTier <= 0);
-    $('records').textContent =
-      `아케이드 ${v.bestArcade.toLocaleString()}  ·  토코톤 ${v.bestTokoton.toLocaleString()}  ·  콤보 ${v.maxCombo}`;
-    $('title-hint').textContent = SCREENS.title.hint;
-    const buddha = $('buddha');
-    buddha.hidden = !v.buddhaMode;
-    const gal = $('gallery');
-    fillGallery(gal, v.unlockedChapters);
+    const m = SCREENS.menu;
+    setMode('tokoton', m.tokoton, v.tokotonOpen ? m.tokotonSub : m.tokotonLocked, v.tokotonOpen);
+    setMode('butter', m.butter, v.butterTier > 0 ? m.butterSub(v.butterTier) : m.butterLocked, v.butterTier > 0);
+    setMode('ops', m.ops, m.opsSub, true);
+    $('records').innerHTML = [
+      [SCREENS.title.best, v.bestArcade.toLocaleString('ko-KR')],
+      [SCREENS.title.tokotonBest, v.bestTokoton.toLocaleString('ko-KR')],
+      [SCREENS.title.maxCombo, v.maxCombo.toLocaleString('ko-KR')],
+    ].map(([k, n]) => `<div><dt>${k}</dt><dd>${n}</dd></div>`).join('');
+    $('buddha').hidden = !v.buddhaMode;
+    fillGallery($('gallery'), v.unlockedChapters);
     setTitleSelected(v.selected);
   }
 
   function setTitleSelected(index: number): void {
     if (titleView) titleView.selected = index;
     const acts = ['arcade', 'tokoton', 'butter', 'ops'];
-    root.querySelectorAll('.ov-menu .flyer-btn').forEach((btn) => {
-      btn.classList.toggle('selected', btn.getAttribute('data-act') === acts[index]);
-    });
+    acts.forEach((act, i) => $(act).classList.toggle('selected', i === index));
   }
 
   function paintSettings(s: SaveSettings): void {
     settings = s;
-    $('set-sound').textContent = s.sound ? '소리 켜짐' : '소리 꺼짐';
-    $('set-vib').textContent = s.vibration ? '진동 켜짐' : '진동 꺼짐';
-    $('set-hand').textContent = s.leftHanded ? '왼손잡이 켜짐' : '왼손잡이 꺼짐';
+    $('set-sound').classList.toggle('on', s.sound);
+    $('set-vib').classList.toggle('on', s.vibration);
+    $('set-hand').classList.toggle('on', s.leftHanded);
     $('set-shake').textContent = SHAKE_LABEL[s.shakeLevel];
+    for (const [act, on] of [['set-sound', s.sound], ['set-vib', s.vibration], ['set-hand', s.leftHanded]] as const) {
+      root.querySelector(`[data-act="${act}"]`)?.setAttribute('aria-pressed', String(on));
+    }
   }
 
   function paintButter(tier: number): void {
@@ -324,12 +412,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     for (let r = 1; r <= 3; r++) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'flyer-btn';
+      b.className = 'btn';
       b.textContent = SCREENS.butter.rounds[r - 1];
       if (r > tier) {
         b.disabled = true;
-        b.classList.add('locked');
-        b.textContent += ' — 잠김';
+        b.insertAdjacentHTML('afterbegin', ICON.lock);
       } else {
         b.setAttribute('data-act', `butter-${r}`);
       }
@@ -337,9 +424,93 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     }
   }
 
+  function disarmQuit(): void {
+    window.clearTimeout(quitArmed);
+    quitArmed = 0;
+    const q = $('quit');
+    q.classList.remove('confirm');
+    q.textContent = '그만두기';
+  }
+
+  // ── 확인 창 ──
+  interface ModalAction { label: string; act: string; kind?: 'cta' | 'btn' | 'quiet' | 'danger' }
+  function openModal(o: { meta: string; title: string; html: string; actions: readonly ModalAction[]; closable?: boolean }): void {
+    $('modal-meta').textContent = o.meta;
+    $('modal-title').textContent = o.title;
+    $('modal-body').innerHTML = o.html;
+    $('modal-x').hidden = o.closable === false;
+    $('modal-actions').innerHTML = o.actions.map((a) => {
+      const cls = a.kind === 'cta' ? 'cta' : a.kind === 'quiet' ? 'btn btn-quiet' : a.kind === 'danger' ? 'btn confirm' : 'btn';
+      const label = a.kind === 'cta' ? `<span class="cta-label">${a.label}</span>` : a.label;
+      return `<button type="button" class="${cls}" data-act="${a.act}">${label}</button>`;
+    }).join('');
+    $('modal').hidden = false;
+    root.classList.add('is-open'); // 플레이 중(오버레이 닫힘)에도 뜰 수 있게
+  }
+
+  function closeModal(): void {
+    const m = $('modal');
+    if (m.hidden) return;
+    m.hidden = true;
+    $('modal-body').innerHTML = ''; // iframe 정리
+    resetArmed = false;
+    if (screen === 'none') root.classList.remove('is-open');
+    if (howtoFirst) { howtoFirst = false; h.onHowtoDone(); }
+  }
+
+  function openDoc(title: string, src: string): void {
+    openModal({
+      meta: '문서',
+      title,
+      html: `<iframe class="doc-frame" src="${src}" title="${escapeHtml(title)}"></iframe>`,
+      actions: [],
+    });
+  }
+
+  function showHowto(first: boolean): void {
+    howtoFirst = first;
+    const rows = HOWTO_ROWS.map((r) =>
+      `<div class="howto-row"><span class="howto-key${r.hot ? ' hot' : ''}">${ICON[r.icon]}</span><p><b>${r.name}</b><span>${r.desc}</span></p></div>`,
+    ).join('');
+    openModal({
+      meta: '작업 안내',
+      title: '이렇게 부순다',
+      html: `<p class="muted">하늘에서 건물이 떨어진다. 바닥에 닿기 전에 벤다. 깔리면 가드로 빠져나온다.</p><div class="howto">${rows}</div>`,
+      actions: [{ label: first ? '시작' : '닫기', act: 'modal-close', kind: first ? 'cta' : 'btn' }],
+      closable: !first,
+    });
+  }
+
+  function showCredits(): void {
+    openModal({
+      meta: '저작권',
+      title: '글꼴',
+      html: `<p><b>Black Han Sans</b><br><span class="muted">The Black Han Sans Project Authors · SIL Open Font License 1.1</span></p>
+        <p><b>Gunbbu Sans · Gunbbu Mono</b><br><span class="muted">IBM Plex Sans KR · IBM Plex Mono(IBM Corp.)에서 쓰는 글자만 남긴 판. SIL Open Font License 1.1</span></p>
+        <p class="muted">그림·소리·문구는 건뿌가 직접 만들었습니다.</p>`,
+      actions: [
+        { label: 'Black Han Sans 라이선스', act: 'doc-ofl-bhs' },
+        { label: 'IBM Plex 라이선스', act: 'doc-ofl-plex' },
+      ],
+    });
+  }
+
+  function confirmReset(): void {
+    resetArmed = true;
+    openModal({
+      meta: '확인',
+      title: '기록을 지울까요?',
+      html: '<p>최고 점수, 해금, 먼지·궤도조각, 꾸미기가 모두 지워집니다. 되돌릴 수 없습니다.</p>',
+      actions: [
+        { label: '지우기', act: 'reset-yes', kind: 'danger' },
+        { label: '그만두기', act: 'modal-close', kind: 'quiet' },
+      ],
+    });
+  }
+
   root.addEventListener('click', (e) => {
     const t = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
-    if (!t) return;
+    if (!t || (t as HTMLButtonElement).disabled) return;
     const act = t.getAttribute('data-act');
     if (!act) return;
     e.preventDefault();
@@ -355,27 +526,39 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         else { paintButter(tier); show('butter'); }
         break;
       }
-      case 'settings': h.onOpenSettings(); break;
       case 'story-skip': h.onStorySkip(); break;
       case 'resume': h.onPauseResume(); break;
       case 'pause-settings': h.onOpenSettings(); break;
-      case 'quit': h.onPauseQuit(); break;
-      case 'set-back': h.onSettingsBack(); break;
-      case 'set-sound':
-        if (settings) h.onSettingsPatch({ sound: !settings.sound });
-        break;
-      case 'set-vib':
-        if (settings) h.onSettingsPatch({ vibration: !settings.vibration });
-        break;
-      case 'set-hand':
-        if (settings) h.onSettingsPatch({ leftHanded: !settings.leftHanded });
-        break;
-      case 'set-shake':
-        if (settings) {
-          const next = ((settings.shakeLevel + 1) % 3) as 0 | 1 | 2;
-          h.onSettingsPatch({ shakeLevel: next });
+      case 'quit': {
+        // 판을 버리는 버튼 — 한 번 더 눌러야 한다(3초 안)
+        if (!quitArmed) {
+          const q = $('quit');
+          q.classList.add('confirm');
+          q.textContent = '한 번 더 누르면 그만둡니다';
+          quitArmed = window.setTimeout(disarmQuit, QUIT_CONFIRM_MS);
+        } else {
+          disarmQuit();
+          h.onPauseQuit();
         }
         break;
+      }
+      case 'set-back': h.onSettingsBack(); break;
+      case 'set-sound': if (settings) h.onSettingsPatch({ sound: !settings.sound }); break;
+      case 'set-vib': if (settings) h.onSettingsPatch({ vibration: !settings.vibration }); break;
+      case 'set-hand': if (settings) h.onSettingsPatch({ leftHanded: !settings.leftHanded }); break;
+      case 'set-shake':
+        if (settings) h.onSettingsPatch({ shakeLevel: ((settings.shakeLevel + 1) % 3) as 0 | 1 | 2 });
+        break;
+      case 'howto': showHowto(false); break;
+      case 'privacy': openDoc('개인정보 처리방침', './privacy.html'); break;
+      case 'credits': showCredits(); break;
+      case 'doc-ofl-bhs': openDoc('Black Han Sans', './fonts/OFL-BlackHanSans.txt'); break;
+      case 'doc-ofl-plex': openDoc('IBM Plex', './fonts/OFL-IBMPlex.txt'); break;
+      case 'reset': confirmReset(); break;
+      case 'reset-yes':
+        if (resetArmed) { closeModal(); h.onResetData(); }
+        break;
+      case 'modal-close': closeModal(); break;
       case 'butter-1': h.onButterRound(1); break;
       case 'butter-2': h.onButterRound(2); break;
       case 'butter-3': h.onButterRound(3); break;
@@ -397,10 +580,10 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     }
   });
 
-  function showOpsPanel(): void {
-    paintOps($('ops-list'), opsOpts, (id) => h.onOpsPick(id));
-    show('ops');
-  }
+  // 창 바깥(어두운 바탕)을 누르면 닫는다 — 첫 실행 안내는 버튼으로만
+  $('modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget && !howtoFirst) closeModal();
+  });
 
   const api: OverlayApi = {
     getScreen: () => screen,
@@ -414,25 +597,50 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       show('story');
     },
     showPause(v: PauseView): void {
-      $('pause-stats').textContent = SCREENS.result.pauseStats(v.score, v.combo);
+      disarmQuit();
+      $('pause-stats').innerHTML = statRows([
+        ['점수', v.score.toLocaleString('ko-KR'), true],
+        ['콤보', v.combo.toLocaleString('ko-KR')],
+      ]);
       show('pause');
     },
-    showSettings(s: SaveSettings): void { paintSettings(s); show('settings'); },
+    showSettings(s: SaveSettings, fromPause: boolean): void {
+      paintSettings(s);
+      $('set-back').hidden = !fromPause;
+      $('settings-screen').classList.toggle('no-tabs', fromPause);
+      // 판 도중엔 기록 지우기를 숨긴다 — 진행 중인 판과 저장이 엇갈리는 길을 막는다
+      $('reset-row').hidden = fromPause;
+      show('settings');
+    },
     showButterPick(tier: number): void { paintButter(tier); show('butter'); },
     showGameOver(v: GameOverView): void {
+      $('over-mode').textContent = v.mode;
       $('over-line').textContent = v.line;
-      $('over-score').textContent = SCREENS.result.overScore(v.score, v.combo);
-      const cont = $('go-continue') as HTMLButtonElement;
-      cont.hidden = !v.canContinue;
-      const rev = $('go-revive') as HTMLButtonElement;
+      $('over-stats').innerHTML = statRows([
+        ['점수', v.score.toLocaleString('ko-KR'), true],
+        ['최고 콤보', v.combo.toLocaleString('ko-KR')],
+      ]);
+      $('over-best').hidden = !v.best;
+      $('go-continue').hidden = !v.canContinue;
+      const rev = $('go-revive');
       rev.hidden = !v.canRevive;
-      rev.textContent = (v.adRevive ? SCREENS.gameover.revive : SCREENS.gameover.reviveFree)(v.reviveLeft, v.reviveMax);
-      if (!v.canRevive) rev.textContent = SCREENS.gameover.reviveGone;
+      const label = (v.adRevive ? SCREENS.gameover.revive : SCREENS.gameover.reviveFree)(v.reviveLeft, v.reviveMax);
+      rev.innerHTML = `<span class="cta-label">${v.adRevive ? ICON.ad : ''}${escapeHtml(label)}</span>`;
+      // 노랑은 하나 — 일어날 수 있으면 일어나기가, 아니면 한 판 더가 노랑이다
+      const retry = $('go-retry');
+      if (v.canRevive) {
+        retry.className = 'btn';
+        retry.textContent = '한 판 더';
+      } else {
+        retry.className = 'cta';
+        retry.innerHTML = '<span class="cta-label">한 판 더</span>';
+      }
       show('gameover');
     },
     showOps(opts): void {
       opsOpts = opts;
-      showOpsPanel();
+      paintOps($('ops-list'), opsOpts, (id) => h.onOpsPick(id));
+      show('ops');
     },
     showMissions(daily, achieves, adBoost): void {
       paintMissions(
@@ -452,9 +660,12 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         inv,
         owned,
         paths,
-        (id) => h.onBuySku(id),
-        () => h.onAdOrbit(),
-        (id) => h.onUnlockOrbit(id),
+        {
+          onBuy: (id) => h.onBuySku(id),
+          onAdPack: () => h.onAdOrbit(),
+          onOrbit: (id) => h.onUnlockOrbit(id),
+          onExchange: () => h.onExchangeDust(),
+        },
       );
       show('shop');
     },
@@ -463,11 +674,24 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       show('custom');
     },
     showEnding(v: EndingView): void {
-      $('end-score').textContent = SCREENS.result.endScore(v.score, v.maxCombo);
+      $('end-stats').innerHTML = statRows([
+        ['점수', v.score.toLocaleString('ko-KR'), true],
+        ['최고 콤보', v.maxCombo.toLocaleString('ko-KR')],
+      ]);
       $('end-note').textContent = v.fullCombo
         ? SCREENS.result.fullComboNote
         : SCREENS.result.tokotonUnlock;
       show('ending');
+    },
+    showHowto,
+    modalOpen: () => !$('modal').hidden,
+    closeModal,
+    toast(text: string): void {
+      window.clearTimeout(toastTimer);
+      if (!text) { toastEl.classList.remove('on'); return; }
+      toastEl.textContent = text;
+      toastEl.classList.add('on');
+      toastTimer = window.setTimeout(() => toastEl.classList.remove('on'), TOAST_MS);
     },
     hide(): void { show('none'); },
   };
@@ -475,11 +699,6 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   return api;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
-  ));
-}
 
 export function titleViewFromSave(save: SaveData, selected: number, debugOpen = false): TitleView {
   const unlocked = debugOpen || isDevUnlocked();
@@ -491,7 +710,7 @@ export function titleViewFromSave(save: SaveData, selected: number, debugOpen = 
     bestTokoton: save.bestTokoton,
     maxCombo: save.maxCombo,
     unlockedChapters: unlocked ? 3 : save.unlockedChapters,
-    buddhaMode: save.buddhaMode,
+    buddhaMode: save.buddhaMode && import.meta.env.DEV,
     soundOn: save.settings.sound,
   };
 }

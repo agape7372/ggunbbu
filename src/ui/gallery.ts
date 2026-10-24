@@ -1,7 +1,7 @@
-// 타이틀 챕터 도감. 해금 데이터 = save.unlockedChapters (0~3).
-// overlay.ts paintTitle → fillGallery 연결됨.
+// 타이틀 구역 도감 — 네 칸. 해금 데이터 = save.unlockedChapters (0~3).
 
 import { REGIONS, SCREENS } from '../content';
+import { escapeHtml } from './html';
 
 export interface GalleryStamp {
   index: 0 | 1 | 2 | 3;
@@ -28,17 +28,12 @@ export function galleryStamps(unlockedChapters: number): readonly GalleryStamp[]
 
 export function galleryStampsHtml(unlockedChapters: number): string {
   return galleryStamps(unlockedChapters).map((s) =>
-    `<span class="ov-stamp${s.open ? ' open' : ''}">${escapeHtml(s.label)}</span>`,
+    `<span class="zone${s.open ? ' open' : ''}"><b>0${s.index + 1}</b>${escapeHtml(s.label)}</span>`,
   ).join('');
 }
 
-/** `.ov-gallery` 노드에 스탬프를 채운다. overlay paintTitle 연결용. */
+/** `.zones` 노드에 칸을 채운다. overlay paintTitle 연결용. */
 export function fillGallery(el: HTMLElement, unlockedChapters: number): void {
   el.innerHTML = galleryStampsHtml(unlockedChapters);
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
-  ));
-}

@@ -1,6 +1,9 @@
 // Pointer Events 가상 버튼. 제스처(스와이프) 없음 — 홀드+연타+동시 입력 지연을 피한다.
 // 버튼 DOM은 #touch-layer 안에 두고, 히트 영역은 CSS가 FIELD_H 아래로 클립한다.
 // 왼쪽 점프, 오른쪽 공격/가드/필살. 왼손잡이는 .mirror 로 좌우 스왑.
+// 버튼 = 그림(ICON) + 이름표. 그림만으로는 처음 보는 사람이 못 읽는다.
+
+import { ICON } from '../ui/icons';
 
 export type TouchAction = 'jump' | 'guard' | 'attack' | 'special';
 
@@ -11,7 +14,7 @@ export interface TouchInput {
   pressed: Record<TouchAction, boolean>;
   /** pressed 플래그 초기화 (sim 루프가 매 프레임 호출) */
   clearPressed(): void;
-  /** 가드 상태 → 라벨 '가드' ↔ '⬆탈출' 스왑 */
+  /** 깔림 상태 → 가드 버튼이 '탈출' 버튼으로 바뀐다 */
   setPinned(pinned: boolean): void;
   /** 필살 게이지 충전 완료 → 필살 버튼만 노랑(노랑 = "지금 쓸 수 있다") */
   setSpecialReady(ready: boolean): void;
@@ -42,7 +45,7 @@ const BUTTON_LABELS: Record<TouchAction, string> = {
 
 const ACTIONS = Object.keys(BUTTON_LABELS) as TouchAction[];
 const ACTION_SET = new Set<string>(ACTIONS);
-const BUTTON_PINNED_LABEL = '⬆탈출';
+const BUTTON_PINNED_LABEL = '탈출';
 
 /** 같은 탭이 pointer + 호환 mouse로 두 번 들어오는 기기용 */
 const GHOST_MOUSE_MS = 650;
@@ -203,8 +206,9 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
       pinned = next;
       const label = pinned ? BUTTON_PINNED_LABEL : BUTTON_LABELS.guard;
       for (const btn of buttonsByAction.guard) {
-        btn.textContent = label;
+        btn.innerHTML = buttonFace(pinned ? 'escape' : 'guard', label);
         btn.setAttribute('aria-label', label);
+        btn.classList.toggle('pinned', pinned);
       }
     },
 
@@ -233,7 +237,11 @@ function ensureButton(container: HTMLElement, id: string, action: TouchAction): 
   btn.tabIndex = -1;
   btn.setAttribute('data-action', action);
   btn.setAttribute('aria-label', BUTTON_LABELS[action]);
-  btn.textContent = BUTTON_LABELS[action];
+  btn.innerHTML = buttonFace(action, BUTTON_LABELS[action]);
   if (btn.parentElement !== container) container.appendChild(btn);
   return btn;
+}
+
+function buttonFace(icon: keyof typeof ICON, label: string): string {
+  return `${ICON[icon]}<span>${label}</span>`;
 }

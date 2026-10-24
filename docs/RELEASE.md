@@ -1,13 +1,16 @@
 <!-- ★08-30: levain(르방이) 셸 릴리스 절차서를 건뿌용으로 각색 이식(ROADMAP Wave 4).
      루트≠셸 구조 차이: 건뿌는 웹 게임이 루트, 셸은 shell/ 하위 별도 패키지다.
      아래 본문에서 android/ 는 shell/android/, 프로젝트 루트 명령은 shell/ 기준으로 읽는다.
-     ★08-30 갱신: OTA는 배선 완료(§8) — 호스팅 gunbbu-ota.vercel.app, 버전 출처는 src/version.ts 하나. -->
+     ★08-30 갱신: OTA는 배선 완료(§8) — 호스팅 gunbbu-ota.vercel.app, 버전 출처는 src/version.ts 하나.
+     ★10-25 정정: AdMob은 "해당 없음"이 아니다(보상형 광고 실사용) · 개인정보처리방침은 public/privacy.html 하나(§7·§8) · Play 첫 출시 절차 §7-1 추가. -->
 
 # 건뿌 — 빌드·릴리스 절차
 
 > podoal 셸(`D:\podoal-shell-spike\README.md`)에서 절차만 이식. 건뿌는 **로컬 번들 셸**이라
-> `server.url` 라이브 리로드·FCM·Firebase·AdMob·딥링크 관련 절차는 전부 해당 없음.
-> (OTA 정적 배포처는 별개 — §8.)
+> `server.url` 라이브 리로드·FCM·Firebase·딥링크 관련 절차는 해당 없음.
+> **AdMob은 해당 없음이 아니다** — 보상형 광고를 실제로 쓴다(`@capacitor-community/admob`).
+> 광고 ID 선언·Data Safety·개인정보처리방침·실 AdMob ID 교체가 모두 적용된다(§7·§7-1,
+> 답변 원고는 [STORE_LISTING.md](STORE_LISTING.md)). (OTA 정적 배포처는 별개 — §8.)
 
 ## 1. 로컬 검증 (+ GitHub Actions는 Pages 배포에 살아 있다 — push마다 test·build)
 
@@ -18,6 +21,9 @@ npm run dev           # 웹 확인 (Chrome 모바일 뷰포트)
 ```
 
 ## 1-1. ★APK/AAB를 새로 구우면 OTA도 같이 발행한다 (levain 2026-08-24 실사고)
+
+> ★2026-10-25: 1.0은 OTA가 꺼져 있어(§8) 이 절은 **OTA를 켠 뒤부터** 적용한다. 그 전까지 `src/version.ts`(웹 번들 버전,
+> 지금 0.1.0)는 앱 동작에 쓰이지 않는다. 설정 화면 맨 아래 버전은 앱에서는 셸 `versionName`을, 웹에서는 번들 버전을 보여 준다.
 
 **증상**: 새로 설치한 APK가 홈으로 나갔다 오면 옛날 화면으로 되돌아간다. 브라우저(dev)는 최신인데 폰만 구버전 — "폰이랑 브라우저 버전이 다른" 상태.
 
@@ -80,9 +86,10 @@ npx @capacitor/assets generate --android \
   --iconBackgroundColor "#E8D9C4" --splashBackgroundColor "#E8D9C4"
 ```
 
-생성기가 만드는 밀도별 스플래시 비트맵(~19MB)은 **전부 삭제**하고
-`res/drawable/splash.xml`(단색 #E8D9C4) + `styles.xml` `windowSplashScreen*`으로 대체
-(아이콘 mipmap은 유지, `drawable-{land,port}*`·`drawable-night`만 제거 — podoal과 같은 정리).
+★현재 상태(2026-10-25 확인): 스플래시 비트맵을 지우지 **않았다**. `shell/android/app/src/main/res/drawable/splash.png`와
+`drawable-{land,port}-*/splash.png`가 그대로 있고 `styles.xml`의 `AppTheme.NoActionBarLaunch`가
+`@drawable/splash`를 배경으로 쓴다(`splash.xml`은 없다). 생성기 기본 이미지라서 이번 작업에서
+**브랜드 스플래시로 교체할 예정**이다. 교체가 끝나면 이 절을 실제 결과(어떤 파일을 남기고 지웠는지)로 다시 쓴다.
 아이콘 원본은 `assets/icon/`에 버전관리.
 
 ## 5. 서명·키스토어 (★미생성 — 사용자 작업)
@@ -96,7 +103,8 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
   -alias gunbbu -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-- 생성 후: `shell/android/key.properties`(gitignore) 작성 — storeFile·storePassword·keyAlias·keyPassword.
+- 생성 후: `shell/android/key.properties` 작성 — storeFile·storePassword·keyAlias·keyPassword.
+  `shell/android/.gitignore`가 `key.properties`·`*.jks`·`*.keystore`를 막는다(2026-10-25 추가). 그래도 커밋 전에 `git status`로 한 번 본다.
 - **키 분실 = Play 업데이트 영구 불가.** 생성 즉시 keystore와 credentials.txt를 별도 백업.
 - 릴리스: `cd android && JAVA_HOME="D:/android-toolchain/jdk21" ./gradlew bundleRelease`
   → `android/app/build/outputs/bundle/release/app-release.aab`
@@ -119,23 +127,51 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 - key.properties의 storePassword/keyPassword 둘 다 채울 것 — 하나라도 비면
   "Given final block not properly padded".
 
-## 7. Play Console 내부테스트 제출물 체크리스트
+## 7. Play Console 제출물 체크리스트
 
 - [ ] 서명 AAB (`bundleRelease` + keystore)
-- [ ] **개인정보처리방침 URL** — 페이지는 작성됨(`ota/privacy.html`). OTA 배포처를 한 번
-      올리면 `https://gunbbu-ota.vercel.app/privacy.html`이 그대로 제출 URL이 된다(§8)
+- [ ] **개인정보처리방침 URL** — `https://agape7372.github.io/ggunbbu/privacy.html`.
+      정본은 `public/privacy.html` 하나(웹 빌드에 실려 Pages로 공개되고 앱 안에서도 보인다).
+      제출 전에 Pages 배포를 거쳐 이 주소가 실제로 열리는지 확인한다
 - [ ] **광고 동의(UMP)** — AdMob 초기화만 있고 유럽(EEA·영국) 동의 절차는 **미구현**.
-      배포 국가를 한국 등으로 좁히거나, EEA를 포함하려면 UMP를 붙인 뒤 제출할 것
-- [ ] **Data Safety 폼** — "수집하는 데이터 없음, 제3자 공유 없음, 모든 데이터 기기 내 저장"
+      배포 국가는 대한민국만 켠다(§7-1). EEA·영국을 넣으려면 UMP를 붙인 뒤 제출할 것
+- [ ] **Data Safety 폼** — 「수집·공유 예」(Google Mobile Ads SDK: 대략적 위치·진단·광고 ID 등·앱 상호작용).
+      개발자가 직접 수집하는 데이터는 없음. 항목별 답은 [STORE_LISTING.md](STORE_LISTING.md) 「데이터 보안」이 정본
+- [ ] **광고 ID 선언** — 「예, 광고 목적」 (같은 문서)
+- [ ] **실 AdMob ID 교체** — 지금 매니페스트의 앱 ID(`AndroidManifest.xml`)와 광고 단위 ID(`src/platform/ads.ts`)는
+      둘 다 Google 공식 테스트 값이다. 실 ID로 바꾼 AAB를 올려야 광고 수익이 생긴다(짝값 표는 `shell/README.md`).
+      앱 ID는 네이티브라 AAB 재빌드가 필요하다
 - [ ] 콘텐츠 등급 설문 — 전체이용가(폭력·도박·공포 요소 0)
-- [ ] 스토어 등록정보: 앱 이름 "건뿌", 짧은 설명, 자세한 설명
+- [ ] 스토어 등록정보: 앱 이름 「건뿌 - 떨어지는 건물 베기」, 짧은 설명, 자세한 설명 (원고는 STORE_LISTING.md)
+- [ ] 대상 연령 「16~17세, 18세 이상」 (STORE_LISTING.md 「앱 카테고리·태그」)
 - [ ] 아이콘 512×512 PNG
 - [ ] 피처 그래픽 1024×500
 - [ ] 스크린샷 최소 2장 (폰 세로)
-- [ ] 내부테스트 트랙 테스터 이메일 등록
+- [ ] 내부테스트 트랙 테스터 이메일 등록 (프로덕션 전 단계는 §7-1 비공개 테스트)
 - [ ] targetSdk — 현재 `android/variables.gradle`이 **36**(Android 16). 정본은 그 파일이지 이 줄이 아니다
 
-## 8. OTA(웹 번들 갱신) — 2026-08-30 배선 완료
+## 7-1. 첫 출시 절차 (Play, 개인 개발자 계정)
+
+1. **비공개 테스트 12명 × 14일.** 개인 개발자 계정은 **새 앱마다** 비공개 테스트 트랙에서 테스터 12명이
+   14일 동안 참여해야 프로덕션 액세스를 신청할 수 있다. 이 계정의 포도알·종이톡도 그 과정을 거쳤다.
+   건뿌도 예외가 아니다 — 내부테스트만으로는 프로덕션에 못 간다. 14일은 12명이 모인 뒤부터 센다고 보고 일정을 잡는다.
+2. **배포 국가는 대한민국만.** UMP(광고 동의)를 구현하지 않았으므로 EEA·영국을 켜지 않는다.
+3. **Android 개발자 인증.** 이 패키지(`com.zaballgam.gunbbu`)를 개발자 인증에 등록한다. appId는 Play 등록 후 바꿀 수 없다(§6).
+4. **16KB 메모리 페이지 대응 확인.** 네이티브 `.so`가 있으면 16KB 정렬이어야 한다(targetSdk 36).
+   2026-10-25 기준 디버그 APK에는 `.so`가 0개였다(`unzip -l <apk> | grep "\.so$"`).
+   릴리스 AAB로 다시 세어 보고, 하나라도 나오면 정렬(`zipalign -c -P 16 -v 4`)을 점검한다. 결과는 여기에 기록한다.
+5. **광고 ID 선언.** 앱 콘텐츠에서 「예, 광고 목적」 (STORE_LISTING.md).
+6. **실광고가 라이브인 동안 테스터에게 광고를 눌러 달라고 하지 않는다.** 본인 기기에서 누르는 것도 포함이다.
+   무효 트래픽으로 판정되면 AdMob 계정이 정지될 수 있다. 확인용은 테스트 광고 단위 ID나 테스트 기기 등록으로만 한다.
+
+## 8. OTA(웹 번들 갱신) — 2026-08-30 배선 완료 · ★1.0은 꺼짐
+
+> ★2026-10-25: **1.0은 OTA를 끈 채 낸다.** `gunbbu-ota.vercel.app`은 한 번도 배포된 적 없는 주인 없는 이름이었고,
+> 체크섬이 같은 매니페스트에서 오므로 그 이름을 남이 먼저 차지하면 설치된 앱에 임의 번들을 밀어 넣을 수 있었다.
+> 지금 `src/platform/ota.ts`의 배포처는 빌드 변수 `VITE_OTA_BASE`(기본 빈 값 = 꺼짐)다. 켜려면 ① 우리가 소유한
+> 호스트를 먼저 세우고(배포 성공을 curl로 확인) ② `VITE_OTA_BASE=<주소> npm run build`로 굽고 ③ 그 셸을 새로 출시한다.
+> 켜기 전까지 아래 절차와 위 「같은 코드로 OTA를 한 번 더 발행」 규칙은 적용되지 않는다. 방침(public/privacy.html)에도
+> 업데이트 확인 접속을 적지 않았으니, 켤 때 방침에 배포처를 추가한다.
 
 `@capgo/capacitor-updater`(shell/ 의존성) + 정적 호스팅 `https://gunbbu-ota.vercel.app`
 (`manifest.json` + `bundles/*.zip` 두 파일뿐, 서버 로직 없음). 앱이 부팅 3초 뒤 매니페스트를 읽고
@@ -211,10 +247,12 @@ curl -s https://gunbbu-ota.vercel.app/manifest.json   # version 확인
 **Play 정책**: 웹 자산(JS/HTML/CSS·이미지) 무선 갱신은 허용 범위. 네이티브 코드·권한 교체는 금지 —
 이 구조는 전자만 다루므로 해당 없음. 위 표의 "안 되는 것"이 필요해지면 통상 절차(§2~§6)로 AAB 재배포.
 
-**개인정보처리방침 호스팅**: 같은 정적 배포처가 `privacy.html`도 서빙한다 —
-`https://gunbbu-ota.vercel.app/privacy.html` (Play 콘솔 §7 체크리스트의 URL 항목).
+**개인정보처리방침 호스팅**: OTA 배포처(`ota/`)에는 두지 않는다. 정본은 `public/privacy.html` 하나이고
+웹 빌드를 통해 GitHub Pages `https://agape7372.github.io/ggunbbu/privacy.html`로 공개된다(Play 콘솔 §7의 URL 항목).
+OTA 번들에도 같은 파일이 실려 앱 안 표시용으로 쓰인다. `ota/index.html`의 링크는 위 Pages 주소를 가리킨다.
 
 
 ## 9. 릴리스 게이트
 
-[QA.md](QA.md) 전항 통과 + vitest green + `vite build` 경고 0 이 릴리스 조건.
+vitest green + `npx tsc --noEmit` 클린 + `vite build` 경고 0 이 릴리스 조건.
+(옛 문장이 가리키던 `docs/QA.md`는 존재하지 않아 참조를 지웠다. 실기기 확인 항목은 `docs/DEVLOG.md`에 남긴다.)

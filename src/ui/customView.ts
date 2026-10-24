@@ -1,7 +1,10 @@
-// 커스텀 탭 조각. 장착만 — 판정·대미지는 바꾸지 않는다.
+// 꾸미기 탭 조각. 장착만 — 필살 종류 말고는 판정·대미지를 바꾸지 않는다.
 
 import { DEFAULT_LOADOUT, isOwned } from '../meta/loadout';
 import type { BladeId, BodyId, LettersId, Loadout, WazaId } from '../meta/types';
+import { WAZA_COPY } from '../content/world';
+import { ICON } from './icons';
+import { escapeHtml } from './html';
 
 type Slot = 'body' | 'blade' | 'waza' | 'letters';
 
@@ -47,51 +50,33 @@ const SECTIONS: readonly CatalogSection[] = [
   { slot: 'letters', title: '효과글자', items: LETTER_ITEMS },
 ];
 
-export function customHtml(): string {
-  const blocks = SECTIONS.map((sec) =>
-    `<p class="ov-records-h">${escapeHtml(sec.title)}</p>
-     <div data-el="${sec.slot}" class="ov-custom-grid"></div>`,
-  ).join('');
-  return `<div class="ov-custom ov-panel">
-    <h2>커스텀</h2>
-    <p class="ov-manual-lead">색과 글자만 바뀝니다. 세기는 그대로.</p>
-    ${blocks}
-  </div>`;
-}
-
 export function paintCustom(
   root: HTMLElement,
   loadout: Loadout,
   owned: ReadonlySet<string>,
   onEquip: (slot: string, id: string) => void,
 ): void {
-  root.innerHTML = customHtml();
-  for (const sec of SECTIONS) {
-    const box = root.querySelector(`[data-el="${sec.slot}"]`);
-    if (!box) continue;
+  const blocks = SECTIONS.map((sec) => {
     const current = equippedId(loadout, sec.slot);
-    for (const item of sec.items) {
+    const picks = sec.items.map((item) => {
       const open = isOwned(owned, sec.slot, item.id);
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'flyer-btn ov-custom-btn';
-      btn.setAttribute('data-equip-slot', sec.slot);
-      btn.setAttribute('data-equip-id', item.id);
-      if (!open) {
-        btn.disabled = true;
-        btn.classList.add('locked', 'silhouette');
-        btn.textContent = '';
-        const mark = document.createElement('span');
-        mark.setAttribute('aria-hidden', 'true');
-        mark.textContent = '●';
-        btn.append(mark, document.createTextNode(' 잠김 · 상점')); // 해금 경로 안내 (08-30, D-3)
-      } else {
-        btn.textContent = item.name;
-        if (current === item.id) btn.classList.add('selected');
-      }
-      box.appendChild(btn);
-    }
-  }
+      const on = open && current === item.id;
+      // 잠김은 여는 곳을 말한다 — 상점 (08-30, D-3)
+      return open
+        ? `<button type="button" class="pick${on ? ' on' : ''}" data-equip-slot="${sec.slot}" data-equip-id="${item.id}" aria-pressed="${on}">${escapeHtml(item.name)}${on ? '<small>장착</small>' : ''}</button>`
+        : `<button type="button" class="pick" disabled>${ICON.lock}${escapeHtml(item.name)}<small>상점</small></button>`;
+    }).join('');
+    const note = sec.slot === 'waza'
+      ? `<p class="pick-note">${escapeHtml(WAZA_COPY[equippedId(loadout, 'waza') as WazaId].desc)}</p>`
+      : '';
+    return `<p class="sec-h">${escapeHtml(sec.title)}</p><div class="pick-grid">${picks}</div>${note}`;
+  }).join('');
+  root.innerHTML = `
+    <header class="sheet-head">
+      <h2>꾸미기</h2>
+      <p class="sheet-lead">필살 말고는 색과 모양만 바뀝니다. 세기는 그대로.</p>
+    </header>
+    ${blocks}`;
   root.onclick = (e) => {
     const t = (e.target as HTMLElement).closest('[data-equip-slot]') as HTMLButtonElement | null;
     if (!t || t.disabled) return;
@@ -110,8 +95,3 @@ function equippedId(loadout: Loadout, slot: Slot): string {
   return loadout.letters || DEFAULT_LOADOUT.letters;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
-  ));
-}

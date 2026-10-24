@@ -23,7 +23,7 @@ export const MAX_REVIVES_PER_RUN = 3;
 
 /** 표시명 · index 별칭 */
 export const DUST_NAME = '먼지';
-export const ORBIT_NAME = '궤도';
+export const ORBIT_NAME = '궤도조각';
 export const REVIVE_MAX = MAX_REVIVES_PER_RUN;
 export const MISSION_AD_MULT = 2;
 
@@ -72,6 +72,17 @@ export function spendOrbit(inv: Wallet, n: number): boolean {
   if (n < 0) return false;
   if (inv.orbit < n) return false;
   inv.orbit -= n;
+  return true;
+}
+
+/** 먼지 → 궤도조각 교환 단위 */
+export const DUST_EXCHANGE = { dust: 50, orbit: 5 } as const;
+
+/** 먼지 50을 궤도조각 5로 바꾼다. 모자라면 false, 지갑 불변. */
+export function exchangeDust(inv: Wallet): boolean {
+  if (inv.dust < DUST_EXCHANGE.dust) return false;
+  inv.dust -= DUST_EXCHANGE.dust;
+  inv.orbit += DUST_EXCHANGE.orbit;
   return true;
 }
 

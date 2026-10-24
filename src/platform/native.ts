@@ -86,3 +86,30 @@ export function onLifecycle(cb: (fg: boolean) => void): void {
     } catch { /* 동기 throw도 삼킨다 — 라이프사이클 구독 실패가 부팅을 못 막게 */ }
   }
 }
+
+/**
+ * 안드로이드 뒤로가기 구독 — ★리스너가 하나라도 붙으면 Capacitor 기본 동작(웹뷰 뒤로·앱 종료)이 꺼진다.
+ * 그래서 호출부가 스스로 닫기·최소화를 책임져야 한다. 웹·플러그인 부재에선 no-op.
+ */
+export function onBackButton(cb: () => void): void {
+  const app = plugin('App');
+  if (!app?.addListener) return;
+  try {
+    void app.addListener('backButton', cb as unknown as never).catch(() => undefined);
+  } catch { /* 구독 실패가 부팅을 못 막게 */ }
+}
+
+/** 앱을 백그라운드로 보낸다(종료 아님). 웹·플러그인 부재에선 no-op. */
+export function minimizeApp(): void {
+  void plugin('App')?.minimizeApp?.().catch(() => undefined);
+}
+
+/** 설치된 앱의 스토어 버전(versionName). 웹·플러그인 부재·실패면 null. */
+export async function nativeAppVersion(): Promise<string | null> {
+  try {
+    const info = (await plugin('App')?.getInfo?.()) as { version?: string } | undefined;
+    return info?.version ?? null;
+  } catch {
+    return null;
+  }
+}

@@ -1,5 +1,5 @@
 // 캐시 버전: 변경 시점마다 갱신해야 한다 (배포 시 사용자 캐시 무효화)
-const CACHE_VERSION = 'v7-integrated-assets';
+const CACHE_VERSION = 'v8-redesign';
 const CACHE_PREFIX = 'gunbbu-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 // 빌드 플러그인이 실행 번들과 이미지 매니페스트에서 채운다.
@@ -16,6 +16,12 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './fonts/display.woff2',
+  './fonts/ui-500.woff2',
+  './fonts/ui-700.woff2',
+  './fonts/mono-500.woff2',
+  './fonts/mono-700.woff2',
+  './privacy.html',
 ];
 
 function addShell(cache) {
@@ -57,7 +63,7 @@ function isCacheableAsset(url) {
   if (path.endsWith('/sw.js')) return false;
   // 루트 앵커(/^\/icons/)는 Pages 서브경로에서 실패 → 경로 어디에든 매칭
   if (path.endsWith('manifest.webmanifest') || path.endsWith('.webmanifest')) return true;
-  if (/\/(icons|assets|img)\//.test(path)) return true;
+  if (/\/(icons|assets|img|fonts)\//.test(path)) return true;
   return /\.(svg|png|jpg|jpeg|webp|ico|woff2?|js|css)$/.test(path);
 }
 

@@ -311,7 +311,7 @@ function drawNumPopups(ctx: CanvasRenderingContext2D): void {
     ctx.save();
     ctx.globalAlpha = Math.min(1, t * 2.2);
     ctx.translate(p.x, p.y);
-    ctx.font = `bold ${Math.round(13 * p.scale * pop)}px sans-serif`;
+    ctx.font = `${Math.round(13 * p.scale * pop)}px "Black Han Sans", sans-serif`;
     ctx.textAlign = 'center';
     // ★08-30 7차 이중 외곽선: 아이보리 헤일로 하나만 두면 **배경색과 같은 색**이라
     // 밝은 건물 면 위에서 통째로 사라진다(사용자 영상 판정). 잉크 링을 바깥에 하나 더 둘러
@@ -339,7 +339,7 @@ function drawPopups(ctx: CanvasRenderingContext2D): void {
     ctx.globalAlpha = a;
     ctx.translate(p.x, p.y - (24 - p.ticks) * 0.8);
     ctx.rotate(-0.08);
-    ctx.font = `bold ${Math.round(14 * p.scale)}px sans-serif`;
+    ctx.font = `${Math.round(14 * p.scale)}px "Black Han Sans", sans-serif`;
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
     ctx.lineWidth = 5;

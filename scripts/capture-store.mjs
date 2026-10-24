@@ -14,6 +14,13 @@ try {
     const page = await browser.newPage({viewport,deviceScaleFactor:1});
     page.on('pageerror', e=>report.errors.push(e.message));
     page.on('response', r=>{if(r.url().includes('/img/')&&!r.ok())report.imageFailures.push(r.url());});
+    // 타이틀이 빈 기록(0·???)으로 찍히지 않게 중간 진행 저장을 심는다
+    await page.addInitScript(()=>{
+      if(localStorage.getItem('gunbbu.v1'))return;
+      localStorage.setItem('gunbbu.v1',JSON.stringify({v:1,bestArcade:1284500,bestTokoton:0,maxCombo:212,act2Cleared:true,buddhaMode:false,
+        unlockedChapters:4,butterTierReached:2,butterBest:{},howtoSeen:true,settings:{sound:false,vibration:true,leftHanded:false,shakeLevel:2},
+        dust:136,orbit:52,owned:['tenchi','ink','wire','flyer'],loadout:{},daily:null,achieves:[]}));
+    });
     await openTitle(page, url);
     await showDebugMenu(page, false);
     const capture = async (number,scene) => {

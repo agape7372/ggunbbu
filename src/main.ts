@@ -45,13 +45,18 @@ const input = createInput(touch);
 const app = createApp(ctx, input, touch);
 mountInstallPrompt();
 
-if (new URLSearchParams(location.search).has('debug')) {
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('debug')) {
   mountDebugPanel(() => app.getState());
   (window as unknown as { __app: typeof app }).__app = app; // 브라우저 검증용
 }
 
 // PNG 에셋 프리로드 — 개별 실패는 assets.ts가 삼키므로 여기선 폴백만 방어적으로 감싼다.
 // 로딩 실패/미존재 파일이어도 게임은 그대로 시작된다.
+// 캔버스 글자는 글꼴이 늦으면 조용히 대체 글꼴로 그려진다 — 최대 1.5초만 기다린다.
+await Promise.race([
+  document.fonts?.load('16px "Black Han Sans"'),
+  new Promise((r) => setTimeout(r, 1500)),
+]).catch(() => {});
 await preloadAssets().catch(() => {});
 refreshFloorSheetAssets();
 

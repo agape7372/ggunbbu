@@ -3,9 +3,11 @@
 export {
   applyAdBoost,
   COSMETIC_ORBIT_COST,
+  DUST_EXCHANGE,
   DUST_NAME,
   DUST_PER_BUILDING,
   DUST_PER_SPECIAL,
+  exchangeDust,
   grant,
   grantDust,
   grantOrbit,

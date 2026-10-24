@@ -25,9 +25,12 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="preload" href="./fonts/display.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="./fonts/ui-700.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="./fonts/ui-500.woff2" as="font" type="font/woff2" crossorigin />
   <title>건뿌!! GUNBBU</title>
   <style>
-    /* 스플래시·뷰포트 셸 — style.css(터치 UI)보다 먼저 그리고 :root로 height만 이김 */
+    /* 스플래시·뷰포트 셸 — style.css보다 먼저 그린다. 네이티브 스플래시(아이보리 + 표식)와 같은 그림이라 이음매가 안 보인다. */
     html:root {
       height: 100%;
       height: -webkit-fill-available;
@@ -42,23 +45,18 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 16px;
       background: #F4F1E8;
       color: #1A1A20;
       font-family: system-ui, sans-serif;
-      letter-spacing: 0.12em;
     }
     #boot-splash .boot-mark {
-      font-size: 28px;
-      font-weight: 800;
+      width: 112px;
+      height: 112px;
     }
     #boot-splash .boot-msg {
+      min-height: 1.4em;
       font-size: 13px;
-      opacity: 0.7;
-    }
-    #boot-splash.is-error .boot-msg {
-      opacity: 1;
-      letter-spacing: 0;
     }
     @media (display-mode: standalone), (display-mode: fullscreen) {
       html:root {
@@ -69,8 +67,8 @@
 </head>
 <body>
   <div id="boot-splash">
-    <div class="boot-mark">건뿌</div>
-    <p class="boot-msg" data-boot-msg>불러오는 중</p>
+    <img class="boot-mark" src="./icons/icon-192.png" width="112" height="112" alt="건뿌" />
+    <p class="boot-msg" data-boot-msg></p>
     <noscript>JavaScript가 필요합니다.</noscript>
   </div>
   <div id="app">
