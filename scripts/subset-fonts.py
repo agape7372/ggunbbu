@@ -7,7 +7,7 @@
   IBMPlexMono-Medium.ttf · IBMPlexMono-Bold.ttf
 
 출력: public/fonts/*.woff2 + src/assets/font-glyphs.json(서브셋에 넣은 글자 목록).
-tests/font-glyphs.test.ts 가 소스 글자 ⊆ 목록을 검사한다 — 새 문구를 넣고 테스트가 깨지면 이 스크립트를 다시 돌린다.
+tests/font-glyphs.test.mjs 가 소스 글자 ⊆ 목록을 검사한다 — 새 문구를 넣고 테스트가 깨지면 이 스크립트를 다시 돌린다.
 사용자 입력 칸이 없는 게임이라(이름 입력 없음) 쓰인 글자만으로 충분하다. 입력 칸이 생기면 KS X 1001 2350자로 넓힐 것.
 요구: pip install fonttools brotli
 """
