@@ -283,7 +283,7 @@ export const ACT2 = {
   CHECKPOINTS: [40, 148, 168] as const,    // 이어하기 콤보 재설정 값
 } as const;
 
-// ── 달 보스 [튜닝: 50+100+80=230, 임계 50/150] ──────────────────
+// ── 집행기 보스 [튜닝: 50+100+80=230, 임계 50/150] ──────────────
 // "원문 50 100 80"의 원문 = 나무위키 서술이지 원작 파일이 아니다.
 export const BOSS = {
   HP: 230,
@@ -292,7 +292,13 @@ export const BOSS = {
   HOVER_LOW: 100,         // 딜 창 고도
   RECOVER_TICKS: 60,      // 패턴 종료 회복 틈 (≈6타)
   ROAR_TICKS: 45,         // 티어 전이 무적 포효
-  W: 80, H: 64,
+  W: VIEW.LANE_W, H: 88,
+  // 외형과 판정을 분리한다. 기존 타격 여유 64는 그림 높이와 무관하다.
+  HIT_REACH: 64,
+  BODY_W: 250, BODY_H: 44, BODY_BOTTOM: 32,
+  JAW_W: 30, JAW_H: 44, JAW_X: 115,
+  CABLE_X: 82,
+  INTRO: { TICKS: 180, ARRIVE: 48, RELEASE: 66, BREAK: 102, CLEAR: 138 },
   CHARGE: { TELE: 40, DESCEND: 30, DASH: 20, STAGGER: 60 },
   PB_CHARGE: { TELEPORT: 6, TELE: 18, DASH: 8, STAGGER: 45, CHAIN_CHANCE: 0.5 },
   MULTI_CHARGE: { COUNT: 3, REAIM: 20, STAGGER: 75 },

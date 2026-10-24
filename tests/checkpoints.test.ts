@@ -20,7 +20,7 @@ describe('콤보 체크포인트 산술 (원작 정본)', () => {
     expect(rock).toBeGreaterThanOrEqual(220);
     expect(rock).toBeLessThanOrEqual(230);
   });
-  it('달 HP = 230 (원문 50+100+80)', () => expect(BOSS.HP).toBe(230));
+  it('본체 HP = 230 (원문 50+100+80)', () => expect(BOSS.HP).toBe(230));
   it('티어 임계 50/150', () => {
     expect(BOSS.TIER1_DMG).toBe(50);
     expect(BOSS.TIER2_DMG).toBe(150);

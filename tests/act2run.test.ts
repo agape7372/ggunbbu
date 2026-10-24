@@ -162,7 +162,7 @@ describe('2막 헤드리스 완주 (최상위 수용 기준)', () => {
   // 인정했듯 보스전도 숙련 영역이고, 연타 주기를 원작(≈100ms)에 맞추면서 대미지가
   // 빨라져 강화 패턴 도달이 앞당겨졌다. 게임 정확성(230HP·티어 50/150·격파 경로)은
   // boss.test.ts가 검증하고, 여기서는 "보스전이 실제로 진행되는가"를 본다.
-  it('달 보스: 타격이 누적되고 티어가 정상 상승한다', () => {
+  it('집행기 보스: 타격이 누적되고 티어가 정상 상승한다', () => {
     const s = freshPhase('moon', 42);
     const { runUntil } = makeRunner(s);
     runUntil((x) => x.boss!.dmg >= 150 || x.over !== null, 60 * 60 * 5);
@@ -171,7 +171,7 @@ describe('2막 헤드리스 완주 (최상위 수용 기준)', () => {
     expect(s.boss!.hp).toBe(230 - s.boss!.dmg);     // HP 회계 일치
   }, 120_000);
 
-  it('달 보스: HP 소진 → 격파 → 클리어 (구조 검증)', () => {
+  it('집행기 보스: HP 소진 → 격파 → 클리어 (구조 검증)', () => {
     const s = freshPhase('moon', 42);
     const { runUntil } = makeRunner(s);
     runUntil((x) => x.boss!.dmg >= 20 || x.over !== null, 60 * 60);

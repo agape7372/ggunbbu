@@ -1,0 +1,13 @@
+집행기 부품 아틀라스 — 2026-09-06
+Built-in image_gen (imagegen). 원본 PNG의 알파를 보존하고 public/img/char/executor-atlas.png로 복사.
+Runtime: src/render/executor.ts. 본체/좌집게/우집게를 source rectangle로 분할하고 케이블·상태등은 코드로 그린다.
+
+Use case: stylized-concept
+Asset type: production 2D game sprite atlas, THREE isolated mechanical parts for runtime articulation.
+Primary request: Create the broad demolition grab beam boss called an execution machine for a minimalist stickman building-cutting game. This is a flat front orthographic elevation, absolutely no perspective.
+Canvas: landscape 1536x1024, genuine transparent background. THREE disconnected components with large transparent gaps, NO labels or dividers.
+Top component: one extremely wide shallow rectangular crossbeam, centered across the top half. Its visible bounding box approximately x=68..1468, y=140..386 (width 1400, height 246, ratio 5.7:1). Perfectly horizontal top and bottom. Flat solid dusty neutral grey #AEB0B2, thin uniform dark ink #1A1A20 outline, two fine vertical panel seams. Exactly one very small EMPTY outlined round indicator socket at its exact center, GREY inside, NO yellow because the game will light this socket. Two tiny attachment circles near the left and right of the beam. No cables, no claws attached to this component.
+Lower left component: one short stout left jaw centered around x=425 y=730, within x=300..550 y=540..940. A vertical flat grey bar with one small circular hinge at the top, bending RIGHT at the bottom into a short inward-pointing horizontal toe, like an L. Thin ink outline. It must look like a simple industrial grip bracket, not an animal limb.
+Lower right component: exact mirrored right jaw centered around x=1110 y=730, within x=985..1235 y=540..940. A vertical bar bending LEFT at the bottom. Same scale, height and grey fill as left.
+Style: exceptionally clean understated flat line illustration. Continuous fine rounded ink strokes at approximately 6px on this source canvas (about 1px at gameplay size). Solid uniform fills, no texture whatsoever. Dry absurd bureaucratic machine, faceless and unemotional. Full visible components, generous alpha padding all around.
+Constraints: no text, lettering, numbers, watermark, grid, checkered background, floor, shadows, gradients, bevels, highlights, rust, grain, bolts beyond the minimal hinges, hazard stripes, yellow, blue, red, moon, craters, face, eyes, windows, cables, perspective, volumetric rendering, 3D. Transparent alpha is essential. Exactly THREE parts: one beam, two separate mirror jaws.

@@ -13,6 +13,9 @@ export interface AssetEntry {
   /** 배경: 소스가 dest보다 크면 아래(스카이라인)를 맞춘다. */
   align?: 'top' | 'bottom';
   frames?: number;
+  /** 층 시트 전용 세로 행 메타. floorSheetCache.ts가 분할한다. */
+  rows?: number;
+  rowH?: number;
   slice9?: [number, number, number, number];
   /** 이 색에 가까운 픽셀을 투명 처리 (아이보리 배경 시트용). */
   chroma?: string;
@@ -65,9 +68,10 @@ function applyChroma(image: HTMLImageElement, hex: string): LoadedImage {
   }
 }
 
-function sourceSize(image: LoadedImage): { w: number; h: number } {
-  if (image instanceof HTMLCanvasElement) return { w: image.width, h: image.height };
-  return { w: image.naturalWidth, h: image.naturalHeight };
+export function imageSize(image: LoadedImage): { w: number; h: number } {
+  return 'naturalWidth' in image
+    ? { w: image.naturalWidth, h: image.naturalHeight }
+    : { w: image.width, h: image.height };
 }
 
 /**
@@ -106,6 +110,7 @@ function loadOne(key: string, entry: AssetEntry): Promise<void> {
 
 /** manifest의 모든 이미지를 병렬 로드. 개별 실패는 삼키므로 이 프라미스는 항상 resolve된다. */
 export async function preloadAssets(): Promise<void> {
+  loaded.clear(); // 재로드가 실패한 키에 이전 이미지가 남지 않게 한다.
   await Promise.all(
     Object.entries(manifest.images).map(([key, entry]) => loadOne(key, entry))
   );
@@ -148,7 +153,7 @@ export function drawAsset(
   const entry = manifest.images[key];
   if (!image || !entry) return false;
 
-  const src = sourceSize(image);
+  const src = imageSize(image);
   if (src.w < 1 || src.h < 1) return false;
 
   const frames = entry.frames && entry.frames > 0 ? entry.frames : 1;
@@ -185,7 +190,7 @@ export function drawBackdrop(
   const image = loaded.get(key);
   const entry = manifest.images[key];
   if (!image || !entry) return false;
-  const src = sourceSize(image);
+  const src = imageSize(image);
   if (src.w < 1 || src.h < 1 || dw < 1 || dh < 1) return false;
 
   const scale = Math.max(dw / src.w, dh / src.h);

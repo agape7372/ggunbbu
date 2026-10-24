@@ -13,7 +13,7 @@
 - **낙하물 베기 + 가드 + 필살기**
 - **스토리 진행으로 해금되는 건축양식 챕터 4종** — 유럽, 아시아, 동아시아, 현대
 - **버터바 이벤트 스테이지** — 1겹~100겹
-- **2막 보스전** — 감시위성 보름호
+- **2막 보스전** — 건물을 집어 던지는 철거 집게보 집행기
 - **토코톤 엔드리스**
 - **PWA 오프라인 지원**
 
@@ -31,10 +31,20 @@ npm test                 # 테스트 실행
 npm run build            # 프로덕션 빌드
 ```
 
-아이콘 재생성:
+이미지 작업물은 이 저장소에 통합되어 있다. 런타임 PNG는 `public/img/`, 스토어 파일은
+`assets/store/`, 생성 원본·프롬프트는 `assets/ref/`에 보관한다.
+
+아이콘 배치와 이미지 관리:
 ```bash
-node scripts/gen-icons.mjs
+npm run icons
+npm run images:prepare -- --sharp-module <sharp 패키지 경로>
+npm run images:capture -- --url http://127.0.0.1:5174 --playwright-module <Playwright 패키지 경로>
+npm run images:check -- --url http://127.0.0.1:5175 --playwright-module <Playwright 패키지 경로>
 ```
+
+촬영에는 dev 서버, 오프라인 검사에는 build 후 preview 서버가 필요하다. `sharp`와
+Playwright는 작업용 외부 도구이며 런타임 의존성은 아니다. 전체 산출물은
+[이미지 안내](assets/store/README.md), 제작 사양은 [IMAGE_PROMPTS](docs/IMAGE_PROMPTS.md)를 참고한다.
 
 ## 기술 스택
 

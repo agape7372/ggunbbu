@@ -101,7 +101,7 @@ export const ACHIEVES: readonly MissionDef[] = [
     id: 'first_act2',
     kind: 'achieve',
     title: '2막 입성',
-    desc: '보름호가 궤도에서 내려오는 것을 본다.',
+    desc: '하늘의 철거 장치를 향해 2막에 진입한다.',
     goal: 1,
     rewardDust: 50,
     rewardOrbit: ORBIT_MISSION_BASE * 2,
@@ -109,8 +109,8 @@ export const ACHIEVES: readonly MissionDef[] = [
   {
     id: 'moon_clear',
     kind: 'achieve',
-    title: '보름호 격파',
-    desc: '위성을 궤도 밖으로 민다.',
+    title: '집행기 격파',
+    desc: '철거 집게를 부수고 집행을 정지한다.',
     goal: 1,
     rewardDust: 80,
     rewardOrbit: ORBIT_MISSION_BASE * 3,
@@ -417,4 +417,3 @@ function resetUnclaimedTrack(list: MissionProgress[], track: MissionTrack): void
     if (p.count < goalOf(p.id)) p.count = 0;
   }
 }
-

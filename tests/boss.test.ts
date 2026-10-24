@@ -1,9 +1,10 @@
-// 보스 FSM: 티어 전이 50/150, 격파, 드론/대포는 달 HP 미산입 [정본].
+// 보스 FSM: 티어 전이 50/150, 격파, 드론/대포는 본체 HP 미산입 [정본].
 import { describe, it, expect } from 'vitest';
 import { makeState, advance } from '../src/core/sim';
 import { enterAct2Phase } from '../src/core/act2';
 import { EMPTY_INPUT, type GameState } from '../src/core/types';
 import { BOSS } from '../src/config';
+import { stepBoss, tryHitBoss, specialHitBoss } from '../src/core/boss';
 
 function bossState(): GameState {
   const s = makeState({ seed: 777 });
@@ -11,7 +12,33 @@ function bossState(): GameState {
   return s;
 }
 
-describe('달 보스 [정본]', () => {
+describe('집행기 보스', () => {
+  it('등장은 타격/점수 없이 진행되고 빈 집게가 저공 딜 창에 도착한다', () => {
+    const s = bossState(); const b = s.boss!;
+    for (let i = 0; i < BOSS.INTRO.TICKS; i++) {
+      expect(tryHitBoss(s, -1000, 2000)).toBe(false);
+      specialHitBoss(s);
+      stepBoss(s);
+    }
+    expect(b.hp).toBe(230);
+    expect(s.combo).toBe(0);
+    expect(s.score).toBe(0);
+    expect(s.entities).toHaveLength(0);
+    expect(b.st).toBe('idle');
+    expect(b.y).toBe(BOSS.HOVER_LOW);
+    expect(b.hittable).toBe(true);
+  });
+
+  it('커진 그림이 기존 공격 거리까지 늘리지 않으며 밑면에 타격 이벤트를 낸다', () => {
+    const s = bossState(); const b = s.boss!;
+    b.st = 'idle'; b.hittable = true; b.y = 140;
+    expect(tryHitBoss(s, 0, 75)).toBe(false);
+    expect(tryHitBoss(s, 0, 76)).toBe(true);
+    expect(b.hp).toBe(229);
+    expect(s.events.filter(e => e.kind === 'bossHit')).toEqual([
+      { kind: 'bossHit', y: 108, n: 229 },
+    ]);
+  });
   it('진입 시 콤보 리셋 + HP 230', () => {
     const s = makeState();
     s.combo = 228;
@@ -34,7 +61,7 @@ describe('달 보스 [정본]', () => {
     expect(b.tier).toBe(2);
   });
 
-  it('드론 격파는 달 HP 미산입, 콤보/점수는 정상 [정본]', () => {
+  it('드론 격파는 본체 HP 미산입, 콤보/점수는 정상 [정본]', () => {
     const s = bossState();
     const b = s.boss!;
     const hp0 = b.hp;

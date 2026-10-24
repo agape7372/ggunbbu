@@ -1,22 +1,21 @@
 // 캐시 버전: 변경 시점마다 갱신해야 한다 (배포 시 사용자 캐시 무효화)
-const CACHE_VERSION = 'gunbbu-v4';
+const CACHE_VERSION = 'v7-integrated-assets';
 const CACHE_PREFIX = 'gunbbu-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
+// 빌드 플러그인이 실행 번들과 이미지 매니페스트에서 채운다.
+const BUILD_ASSETS = [];
+const IMAGE_ASSETS = [];
 
-// 앱 셸: 게임 로드에 필요한 정적 자산 (Vite 해시 파일명은 runtime 캐시 → cache-first)
+// 앱 셸: 이미지와 Vite 해시 JS/CSS를 첫 설치에서 함께 프리캐시한다.
 // 상대 경로 = SW 스코프 기준 → GitHub Pages 서브경로(/ggunbbu/)에서도 유효
 const APP_SHELL = [
+  ...BUILD_ASSETS,
+  ...IMAGE_ASSETS,
   './',
   './index.html',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './img/bg/europe.png',
-  './img/bg/asia.png',
-  './img/bg/eastasia.png',
-  './img/bg/modern.png',
-  './img/bg/act2.png',
-  './img/bg/moon.png',
 ];
 
 function addShell(cache) {
@@ -114,8 +113,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isCacheableAsset(url)) {
+    // 빌드에 포함된 해시 파일은 요청 Origin과 무관하게 같은 내용이다.
+    // Vary: Origin 서버에서도 preload와 crossorigin module 요청이 같은 캐시를 쓴다.
+    const bundled = BUILD_ASSETS.some((file) => new URL(file, self.location.href).href === url.href);
     event.respondWith(
-      caches.match(request).then((cached) => {
+      caches.match(request, { ignoreVary: bundled }).then((cached) => {
         if (cached) return cached;
         return fetch(request).then((response) => {
           if (response.ok) {

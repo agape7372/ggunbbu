@@ -4,3 +4,15 @@ dist/
 .DS_Store
 ota/bundles/
 dist-feel.zip
+
+# 참고·검수용 이미지(재현에 필요 없음). 이미지 파이프라인 원본은 assets/ref/generated/ 와
+# image-production-*.json 만 추적한다(scripts/prepare-image-assets.mjs 입력).
+assets/ref/image-qa/
+assets/ref/pre-image-production/
+assets/ref/geonppu-*.png
+assets/ref/bg-*-skyline.png
+assets/ref/bg-*-360x640.png
+assets/ref/gunbbu-*-810x*.png
+assets/ref/*-preview.png
+assets/ref/*-2026-08-22.*
+tmp/

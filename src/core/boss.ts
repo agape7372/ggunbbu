@@ -1,4 +1,4 @@
-// 달 보스(위성 "보름호") FSM.
+// 철거 집게보 "집행기" FSM. moon 페이즈 ID는 저장/미션 호환용으로 유지.
 // [정본] HP 230 (= 원문 50+100+80), 티어 임계 누적대미지 50/150, 230+타 격파.
 // 패턴: 돌진/영거리(B)/강화돌진(C)/번개5/번개9(C)/드론5/대포3(C).
 
@@ -43,8 +43,14 @@ export function stepBoss(s: GameState): void {
 
   switch (b.st) {
     case 'enter': {
-      b.y = Math.max(BOSS.HOVER_HIGH, b.y - 200 * TICK);
-      if (b.stTick >= 90) { setSt(b, 'idle'); b.y = BOSS.HOVER_LOW; b.hittable = true; }
+      // 물고 온 층을 놓는 연출 → 빈 집게가 내려온다. 연출용 층은 점수/피격 대상이 아니다.
+      const arrive = Math.min(1, b.stTick / BOSS.INTRO.ARRIVE);
+      const lower = Math.max(0, Math.min(1,
+        (b.stTick - BOSS.INTRO.CLEAR) / (BOSS.INTRO.TICKS - BOSS.INTRO.CLEAR)));
+      const ease = (t: number): number => t * t * (3 - 2 * t);
+      b.y = (VIEW.H + 80) + (BOSS.HOVER_HIGH - VIEW.H - 80) * ease(arrive)
+        + (BOSS.HOVER_LOW - BOSS.HOVER_HIGH) * ease(lower);
+      if (b.stTick >= BOSS.INTRO.TICKS) { setSt(b, 'idle'); b.y = BOSS.HOVER_LOW; b.hittable = true; }
       break;
     }
     case 'idle': { // 회복 틈 — 저공 호버, 딜 창
@@ -304,7 +310,7 @@ function defeatBoss(s: GameState): void {
   }
 }
 
-/** 보스·드론·대포 타격 시도. [정본] 드론/대포 격파는 달 HP 미산입 */
+/** 보스·드론·대포 타격 시도. 드론/대포 격파는 본체 HP 미산입. */
 export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
   const b = s.boss;
   if (!b) return false;
@@ -330,11 +336,11 @@ export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
   }
 
   // 본체
-  if (b.hittable && b.y >= lo && b.y <= hi + BOSS.H) {
+  if (b.hittable && b.y >= lo && b.y <= hi + BOSS.HIT_REACH) {
     b.hp -= 1;
     b.dmg += 1;
     registerHit(s);
-    s.events.push({ kind: 'bossHit', y: b.y, n: b.hp });
+    s.events.push({ kind: 'bossHit', y: b.y - BOSS.BODY_BOTTOM, n: b.hp });
     if (b.hp <= 0 && b.st !== 'defeated') {
       defeatBoss(s);
     }
@@ -346,9 +352,9 @@ export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
 /** 필살기가 보스에 닿을 때 (sim 호출) */
 export function specialHitBoss(s: GameState): void {
   const b = s.boss;
-  if (!b || b.st === 'defeated') return;
+  if (!b || b.st === 'defeated' || b.st === 'enter') return;
   b.hp -= 10;
   b.dmg += 10;
-  s.events.push({ kind: 'bossHit', y: b.y, n: b.hp });
+  s.events.push({ kind: 'bossHit', y: b.y - BOSS.BODY_BOTTOM, n: b.hp });
   if (b.hp <= 0) defeatBoss(s);
 }

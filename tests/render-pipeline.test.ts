@@ -1,18 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { PLAYER } from '../src/config';
+import { BOSS, PLAYER, VIEW } from '../src/config';
 import manifest from '../src/assets/manifest.json';
 import { backdropKey } from '../src/render/background';
-import { BOSS_SHEET, PLAYER_SHEET, bossSheetFrame, playerSheetFrame } from '../src/render/frames';
+import { PLAYER_SHEET, playerSheetFrame } from '../src/render/frames';
+import { executorPose } from '../src/render/executor';
+import { initBoss } from '../src/core/boss';
 import { drawAsset, hasAsset } from '../src/render/assets';
+import { floorImageKey } from '../src/render/floorSheets';
 
 describe('render pipeline', () => {
+  it('floor decoration keeps special materials and single-floor grades visible', () => {
+    expect(floorImageKey('hard', 'europe', 0, 1)).toBe('europe:hard');
+    expect(floorImageKey('weak', 'asia', 0, 4)).toBe('asia:entrance');
+    expect(floorImageKey('hard', 'eastasia', 3, 4)).toBe('eastasia:roof');
+    expect(floorImageKey('hard', 'modern', 1, 4)).toBe('modern:hard');
+    expect(floorImageKey('butter', 'modern', 0, 10)).toBe('butter');
+    expect(floorImageKey('cathedral', 'europe', 0, 3, 'glass')).toBe('cathedral');
+  });
+
+  it('glass and ice zones select their sheet rows, including the outer floors', () => {
+    expect(floorImageKey('weak', 'modern', 0, 3, 'glass')).toBe('glass');
+    expect(floorImageKey('hard', 'eastasia', 2, 3, 'ice')).toBe('ice');
+    expect(floorImageKey('mid', 'modern', 1, 3, 'none')).toBe('modern:mid');
+  });
+
   it('manifest lists all four chapter backgrounds', () => {
     const images = manifest.images as Record<string, { src: string; frames?: number }>;
     for (const theme of ['europe', 'asia', 'eastasia', 'modern']) {
       expect(images[`bg-${theme}`]?.src).toBe(`bg/${theme}.png`);
     }
     expect(images.player.frames).toBe(PLAYER_SHEET.length);
-    expect(images.boss.frames).toBe(BOSS_SHEET.length);
+    expect(images.boss.frames).toBeUndefined();
+    expect(manifest.images.boss.w).toBe(VIEW.LANE_W);
   });
 
   it('backdropKey follows mode and chapter', () => {
@@ -21,7 +40,7 @@ describe('render pipeline', () => {
     expect(backdropKey({ mode: 'act1', chapter: 2, act2Phase: null })).toBe('bg-eastasia');
     expect(backdropKey({ mode: 'tokoton', chapter: 3, act2Phase: null })).toBe('bg-modern');
     expect(backdropKey({ mode: 'act2', chapter: 0, act2Phase: 'cathedral' })).toBe('bg-act2');
-    expect(backdropKey({ mode: 'act2', chapter: 0, act2Phase: 'moon' })).toBe('bg-moon');
+    expect(backdropKey({ mode: 'act2', chapter: 0, act2Phase: 'moon' })).toBe('bg-executor');
     expect(backdropKey({ mode: 'bonus', chapter: 0, act2Phase: null })).toBe('bg-bonus');
   });
 
@@ -37,12 +56,15 @@ describe('render pipeline', () => {
     expect(playerSheetFrame('dead', 0)).toBe(10);
   });
 
-  it('bossSheetFrame maps combat states', () => {
-    expect(bossSheetFrame('idle')).toBe(0);
-    expect(bossSheetFrame('charging')).toBe(1);
-    expect(bossSheetFrame('descend')).toBe(1);
-    expect(bossSheetFrame('stagger')).toBe(2);
-    expect(bossSheetFrame('defeated')).toBe(3);
+  it('executor closes at the damage tick and recoils during guard recovery', () => {
+    const boss = initBoss(); boss.st = 'charging'; boss.pattern = 'charge';
+    expect(executorPose(boss).open).toBeGreaterThan(0);
+    boss.stTick = Math.floor(BOSS.CHARGE.DASH / 2);
+    expect(executorPose(boss).open).toBe(0);
+    expect(executorPose(boss).lift).toBeCloseTo(0);
+    boss.st = 'stagger'; boss.stTick = 12;
+    expect(executorPose(boss).lift).toBeLessThan(0);
+    expect(executorPose(boss).open).toBeGreaterThan(0);
   });
 
   it('missing PNG assets fall back instead of throwing', () => {

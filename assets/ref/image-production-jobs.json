@@ -1,0 +1,218 @@
+[
+  {
+    "id": "floors-europe",
+    "source": "assets/ref/generated/floors-europe.png",
+    "output": "public/img/floors/europe.png",
+    "width": 270,
+    "height": 340,
+    "kind": "floors",
+    "bands": [
+      0,
+      284,
+      565,
+      839,
+      1091,
+      1408
+    ],
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-8a112990-51c3-4450-b9ac-184cb121003f.png"
+  },
+  {
+    "id": "player",
+    "source": "assets/ref/generated/player.png",
+    "output": "public/img/char/player.png",
+    "width": 506,
+    "height": 60,
+    "kind": "player",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-085a4d0f-fcee-4db5-b182-60245d3dec2e.png"
+  },
+  {
+    "id": "bg-act2",
+    "source": "assets/ref/generated/bg-act2.png",
+    "output": "public/img/bg/act2.png",
+    "width": 360,
+    "height": 640,
+    "kind": "background",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-e8ff7c25-391a-4ca5-a124-437f4458680b.png"
+  },
+  {
+    "id": "ent-bolt",
+    "source": "assets/ref/generated/ent-bolt.png",
+    "output": "public/img/char/bolt.png",
+    "width": 12,
+    "height": 40,
+    "kind": "sprite",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-c340c21d-40eb-42f5-939a-254ef0e79828.png"
+  },
+  {
+    "id": "ent-boltCue",
+    "source": "assets/ref/generated/ent-boltCue.png",
+    "output": "public/img/char/bolt-cue.png",
+    "width": 12,
+    "height": 12,
+    "kind": "sprite",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-55e5a453-fb7c-4ade-8b48-a42d9fcb799b.png"
+  },
+  {
+    "id": "ent-rock",
+    "source": "assets/ref/generated/ent-rock.png",
+    "output": "public/img/char/rock.png",
+    "width": 24,
+    "height": 20,
+    "kind": "sprite",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-b00825e1-715e-4897-9279-f9cf2ab98f93.png"
+  },
+  {
+    "id": "ent-shotOk",
+    "source": "assets/ref/generated/ent-shotOk.png",
+    "output": "public/img/char/shot-ok.png",
+    "width": 16,
+    "height": 10,
+    "kind": "sprite",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-ea4a82b8-4191-4960-82e7-c7d75bdfe431.png"
+  },
+  {
+    "id": "ent-shotNo",
+    "source": "assets/ref/generated/ent-shotNo.png",
+    "output": "public/img/char/shot-no.png",
+    "width": 16,
+    "height": 10,
+    "kind": "sprite",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-ceaffd40-344b-4313-bbb9-920129e4b99c.png"
+  },
+  {
+    "id": "ent-rabbit",
+    "source": "assets/ref/generated/ent-rabbit.png",
+    "output": "public/img/char/rabbit.png",
+    "width": 28,
+    "height": 20,
+    "kind": "sprite",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-6242528a-0f68-4f5c-b5f0-7424781c2020.png"
+  },
+  {
+    "id": "ent-cannon",
+    "source": "assets/ref/generated/ent-cannon.png",
+    "output": "public/img/char/cannon.png",
+    "width": 24,
+    "height": 28,
+    "kind": "sprite",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-3d1a938c-27be-415e-a307-35046642e47c.png"
+  },
+  {
+    "id": "floors-asia",
+    "source": "assets/ref/generated/floors-asia.png",
+    "output": "public/img/floors/asia.png",
+    "width": 270,
+    "height": 340,
+    "kind": "floors",
+    "bands": [
+      0,
+      290,
+      557,
+      863,
+      1115,
+      1408
+    ],
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-9f0b41cc-6c8d-4008-bd45-ea3eb1e8086a.png"
+  },
+  {
+    "id": "floors-eastasia",
+    "source": "assets/ref/generated/floors-eastasia.png",
+    "output": "public/img/floors/eastasia.png",
+    "width": 270,
+    "height": 340,
+    "kind": "floors",
+    "bands": [
+      0,
+      307,
+      620,
+      911,
+      1118,
+      1408
+    ],
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-9add58ba-9ee7-4052-922c-bc0a6dbb53df.png"
+  },
+  {
+    "id": "floors-modern",
+    "source": "assets/ref/generated/floors-modern.png",
+    "output": "public/img/floors/modern.png",
+    "width": 270,
+    "height": 340,
+    "kind": "floors",
+    "bands": [
+      0,
+      283,
+      555,
+      889,
+      1122,
+      1408
+    ],
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-e42a98d9-8da9-4e8d-8826-c26e6b1dcea8.png"
+  },
+  {
+    "id": "floors-special",
+    "source": "assets/ref/generated/floors-special.png",
+    "output": "public/img/floors/special.png",
+    "width": 270,
+    "height": 476,
+    "kind": "floors",
+    "bands": [
+      0,
+      232,
+      464,
+      710,
+      960,
+      1198,
+      1420,
+      1666
+    ],
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-6cd7e5a9-8ce4-47ad-9ba8-4746b1d061d9.png"
+  },
+  {
+    "id": "store-title-kv",
+    "source": "assets/ref/generated/store-title-kv.png",
+    "output": "assets/store/title-kv.png",
+    "width": 360,
+    "height": 640,
+    "kind": "store",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-beafdb51-fa40-414a-a7d8-ab15007313d8.png"
+  },
+  {
+    "id": "store-feature-graphic",
+    "source": "assets/ref/generated/store-feature-graphic.png",
+    "output": "assets/store/feature-graphic.png",
+    "width": 1024,
+    "height": 500,
+    "kind": "store",
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-18101ce3-a9bb-41a0-b96e-04f17d8cbdec.png"
+  },
+  {
+    "id": "app-icon",
+    "source": "assets/ref/generated/app-icon.png",
+    "output": "assets/store/icon-512.png",
+    "width": 512,
+    "height": 512,
+    "kind": "icon",
+    "variants": [
+      {
+        "output": "assets/brand/icon-192.png",
+        "width": 192,
+        "height": 192
+      },
+      {
+        "output": "assets/brand/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    ],
+    "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-46fc8094-cce4-493f-a0fc-f41c973b3dc6.png"
+  },
+  {
+    "id": "boss",
+    "source": "assets/ref/generated/boss.png",
+    "output": "public/img/char/executor-atlas.png",
+    "width": 1536,
+    "height": 1024,
+    "kind": "atlas",
+    "originalSource": "C:/Users/agape/.codex/generated_images/01a072a0-33a0-76c3-a102-b44e555f5d20/exec-b084dfaa-33c0-4e52-9f1f-3bbfbbadcd1b.png"
+  }
+]

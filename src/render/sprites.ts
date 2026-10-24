@@ -1,15 +1,18 @@
-// 건뿌 — 프로시저럴 픽셀아트 스프라이트 모듈.
+// 건뿌 — PNG 스프라이트 그리기와 프로시저럴 폴백.
 // 오프스크린 캔버스에 최초 1회 사전 렌더 후 drawImage로 복사(성능).
 // 동적 요소(크랙 오버레이, 보스 렌즈 점멸)만 실시간 재계산.
 // 원작(대불·달토끼·사무라이) 도상 금지 — 순수 창작 도안.
 
 import type {
-  PlayerPose, FallingStack, BossState, Entity, Theme, Material,
+  PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
   FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon,
 } from '../core/types';
-import { VIEW, PALETTE, PLAYER, BOSS, ACT2, STACK } from '../config';
+import { VIEW, PALETTE, PLAYER, ACT2, STACK } from '../config';
 import { drawAsset } from './assets';
-import { bossSheetFrame, entityAssetKey, playerSheetFrame } from './frames';
+import { drawExecutor } from './executor';
+import { floorImageKey, floorMaterialKey } from './floorSheets';
+import { floorSheetTile } from './floorSheetCache';
+import { entityAssetKey, playerSheetFrame } from './frames';
 
 // ── 공통 색상 ────────────────────────────────────────────────────
 const OUTLINE = '#0A0A14';
@@ -126,7 +129,7 @@ const SPECIAL_COLORS: Record<Exclude<Material, Tier>, TierColors> = {
   cathedral: { base: '#AEB0B2', dark: '#929496', light: '#bcbec0', accent: '#606162' },
   lobby: { base: '#989A9D', dark: '#808184', light: '#a4a6aa', accent: '#545556' },
   office: { base: '#C0BEB8', dark: '#a1a09b', light: '#cfcdc7', accent: '#6a6965' },
-  penthouse: { base: '#989A9D', dark: '#808184', light: '#FFD200', accent: '#C79E00' },
+  penthouse: { base: '#989A9D', dark: '#808184', light: '#1A1A20', accent: '#545556' },
 };
 
 function fillBase(c: CanvasRenderingContext2D, w: number, h: number, t: TierColors): void {
@@ -293,7 +296,7 @@ function drawSpecialDetail(c: CanvasRenderingContext2D, w: number, h: number, ma
   } else {
     c.fillStyle = t.light;
     c.fillRect(0, 2, w, 2);
-    c.fillRect(0, h - 4, w, 2); // 금장 띠
+    c.fillRect(0, h - 4, w, 2); // 잉크 트림선
   }
 }
 
@@ -309,17 +312,19 @@ function renderMatTile(c: CanvasRenderingContext2D, w: number, h: number, mat: M
   }
 }
 
-function tileKey(mat: Material, theme: Theme): string {
-  return mat === 'weak' || mat === 'mid' || mat === 'hard' ? `${theme}:${mat}` : mat;
-}
-
 function drawTileInstance(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  mat: Material, theme: Theme, seg: FloorSeg
+  mat: Material, theme: Theme, seg: FloorSeg, imageKey = floorMaterialKey(mat, theme)
 ): void {
-  const cv = tileCache!.get(tileKey(mat, theme));
-  if (cv) ctx.drawImage(cv, x, y, w, h);
+  const materialKey = floorMaterialKey(mat, theme);
+  const cv = floorSheetTile(imageKey) ?? floorSheetTile(materialKey) ?? tileCache!.get(materialKey);
+  if (cv) {
+    const smooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(cv, x, y, w, h);
+    ctx.imageSmoothingEnabled = smooth;
+  }
   drawCrackOverlay(ctx, x, y, w, h, seg.hp, seg.maxHp);
 }
 
@@ -585,81 +590,6 @@ function pickPlayerFrame(pose: PlayerPose, animTick: number): PFrame {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 보스 "보름호" — 고장난 감시위성 (80×64)
-// ══════════════════════════════════════════════════════════════
-type BossFrameKind = 'idle' | 'charging' | 'stagger' | 'defeated';
-
-function buildBossFrame(kind: BossFrameKind): HTMLCanvasElement {
-  const { cv, c } = mkCanvas(BOSS.W, BOSS.H);
-  const cx = BOSS.W / 2, cy = BOSS.H / 2;
-  const lean = kind === 'charging' ? -8 : 0;
-  const tilt = kind === 'stagger' ? 6 : 0;
-  const dim = kind === 'defeated';
-  const bodyColor = dim ? '#4a5158' : '#8a95a3';
-  const bodyDark = dim ? '#33383d' : '#5f6b78';
-
-  c.save();
-  c.translate(cx + lean * 0.3, cy);
-  c.rotate((tilt * Math.PI) / 180);
-  block(c, -20, -18, 40, 36, bodyColor); // 원형 본체(사각 근사)
-  block(c, -14, -24, 28, 8, bodyDark); // 상단 캡
-  block(c, -38, -4, 16, 8, PALETTE.BLUE); // 태양광 패널 좌
-  block(c, 22, -4, 16, 8, PALETTE.BLUE); // 태양광 패널 우
-  block(c, -2, -30, 2, 8, bodyDark); // 안테나
-  block(c, -8, -6, 16, 16, '#2a2e33'); // 렌즈 하우징
-  c.fillStyle = dim ? '#5a2a2a' : '#c05050';
-  c.beginPath();
-  c.arc(0, 2, 6, 0, Math.PI * 2);
-  c.fill(); // 금간 렌즈
-  c.fillStyle = dim ? '#7a3a3a' : PALETTE.RED;
-  c.fillRect(-2, 0, 4, 4); // 빨강 점광
-  c.strokeStyle = '#1a1d20';
-  c.lineWidth = 1;
-  c.beginPath();
-  c.moveTo(-6, -4);
-  c.lineTo(0, 2);
-  c.lineTo(4, -2);
-  c.stroke(); // 금 간 선
-  c.restore();
-
-  if (kind === 'charging') {
-    c.fillStyle = PALETTE.YELLOW;
-    c.fillRect(cx + 22, cy - 4, 10, 3);
-    c.fillRect(cx + 26, cy + 2, 8, 3);
-    c.fillStyle = PALETTE.RED;
-    c.fillRect(cx + 30, cy - 1, 6, 2); // 추진 불꽃
-  }
-  if (kind === 'stagger') {
-    c.strokeStyle = PALETTE.YELLOW;
-    c.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
-      c.beginPath();
-      c.moveTo(cx + Math.cos(a) * 22, cy + Math.sin(a) * 22);
-      c.lineTo(cx + Math.cos(a) * 30, cy + Math.sin(a) * 30);
-      c.stroke(); // 스파크
-    }
-  }
-  if (kind === 'defeated') {
-    c.fillStyle = 'rgba(120,120,120,0.4)';
-    c.beginPath();
-    c.arc(cx - 10, cy - 26, 6, 0, Math.PI * 2);
-    c.fill();
-    c.beginPath();
-    c.arc(cx + 12, cy - 30, 8, 0, Math.PI * 2);
-    c.fill(); // 연기
-  }
-  return cv;
-}
-
-function bossX(boss: BossState): number {
-  if (boss.st === 'charging' || boss.st === 'descend' || boss.st === 'attacking') {
-    return VIEW.LANE_X[boss.targetLane];
-  }
-  return VIEW.W / 2;
-}
-
-// ══════════════════════════════════════════════════════════════
 // 엔티티 (bolt/rock/shot/rabbit/cannon)
 // ══════════════════════════════════════════════════════════════
 function buildBoltIcon(): HTMLCanvasElement {
@@ -817,7 +747,6 @@ function drawCannonEntity(ctx: CanvasRenderingContext2D, e: Cannon, _groundY: nu
 // ══════════════════════════════════════════════════════════════
 let initialized = false;
 let tileCache: Map<string, HTMLCanvasElement> | null = null;
-let bossCache: Map<BossFrameKind, HTMLCanvasElement> | null = null;
 let entityCache: Map<string, HTMLCanvasElement> | null = null;
 
 export function initSprites(): void {
@@ -839,11 +768,6 @@ export function initSprites(): void {
   }
 
   rebuildPlayerFrames();
-
-  bossCache = new Map();
-  (['idle', 'charging', 'stagger', 'defeated'] as const).forEach((kind) => {
-    bossCache!.set(kind, buildBossFrame(kind));
-  });
 
   entityCache = new Map();
   entityCache.set('bolt', buildBoltIcon());
@@ -893,7 +817,8 @@ export function drawPlayer(
 /** groundY = 캔버스상 지면 y. floors[0]=최하층이 stack.y(물리, 지면0·위+)에서 시작해 위로 쌓임.
  *  단일 레인이라 층은 세그먼트 1개 — 일반 variant는 건물 폭(LANE_W=270) 중앙 정렬,
  *  butterbar는 좁은 폭(BUTTER_W=90)으로 같은 자리에 그린다. */
-export function drawStack(ctx: CanvasRenderingContext2D, stack: FallingStack, groundY: number): void {
+export function drawStack(ctx: CanvasRenderingContext2D, stack: FallingStack, groundY: number,
+  gimmick: GimmickId = 'none'): void {
   initSprites();
   const isButter = stack.variant === 'butterbar';
   const totalW = isButter ? VIEW.BUTTER_W : VIEW.LANE_W;
@@ -909,38 +834,23 @@ export function drawStack(ctx: CanvasRenderingContext2D, stack: FallingStack, gr
   }
 
   let cumH = 0;
-  for (const floor of stack.floors) {
+  for (const [index, floor] of stack.floors.entries()) {
     const floorTopY = bottomY - cumH - floor.h;
-    drawTileInstance(ctx, baseX, floorTopY, totalW, floor.h, floor.mat, stack.theme, floor.segs[0]);
+    const key = floorImageKey(floor.mat, stack.theme, index, stack.floors.length, gimmick);
+    drawTileInstance(ctx, baseX, floorTopY, totalW, floor.h, floor.mat, stack.theme, floor.segs[0], key);
+    // 지붕/입구/기믹도 인접한 원래 층의 내구도를 짧은 잉크 눈금으로 보여준다.
+    if (key !== floorMaterialKey(floor.mat, stack.theme)) {
+      ctx.fillStyle = PALETTE.INK;
+      for (let hp = 0; hp < Math.min(3, floor.segs[0].hp); hp++)
+        ctx.fillRect(baseX + 8 + hp * 5, floorTopY + floor.h - 6, 2, 3);
+    }
     cumH += floor.h;
   }
   ctx.restore();
 }
 
 export function drawBoss(ctx: CanvasRenderingContext2D, boss: BossState, groundY: number): void {
-  initSprites();
-  const kind: BossFrameKind =
-    boss.st === 'charging' ? 'charging' :
-    boss.st === 'stagger' ? 'stagger' :
-    boss.st === 'defeated' ? 'defeated' : 'idle';
-  const cv = bossCache!.get(kind)!;
-  const x = bossX(boss);
-  const cy = groundY - boss.y; // boss.y = 표시 고도(본체 중심 기준)
-  if (!drawAsset(ctx, 'boss', x, cy, bossSheetFrame(boss.st))) {
-    ctx.drawImage(cv, x - BOSS.W / 2, cy - BOSS.H / 2);
-  }
-  if (boss.hittable) {
-    const blinkOn = Math.floor(boss.stTick / 8) % 2 === 0;
-    if (blinkOn) {
-      ctx.save();
-      ctx.globalAlpha = 0.85;
-      ctx.fillStyle = PALETTE.RED;
-      ctx.beginPath();
-      ctx.arc(x, cy, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
+  drawExecutor(ctx, boss, groundY);
 }
 
 export function drawEntity(ctx: CanvasRenderingContext2D, e: Entity, groundY: number): void {

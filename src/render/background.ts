@@ -12,7 +12,7 @@ export interface BackdropInput {
 
 export function backdropKey(s: BackdropInput): string {
   if (s.mode === 'bonus') return 'bg-bonus';
-  if (s.mode === 'act2') return s.act2Phase === 'moon' ? 'bg-moon' : 'bg-act2';
+  if (s.mode === 'act2') return s.act2Phase === 'moon' ? 'bg-executor' : 'bg-act2';
   const theme = ACT1.CHAPTER_THEMES[((s.chapter % 4) + 4) % 4];
   return `bg-${theme}`;
 }

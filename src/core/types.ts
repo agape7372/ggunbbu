@@ -151,7 +151,7 @@ export type BossSt =
   | 'rising' | 'attacking' | 'stagger' | 'roar' | 'defeated';
 
 export interface BossState {
-  /** 남은 격파 필요 타격 수 (초기 MOON_HP=230) */
+  /** 남은 격파 필요 타격 수 (초기 BOSS.HP=230) */
   hp: number;
   /** 누적 대미지 (티어 판정용) */
   dmg: number;

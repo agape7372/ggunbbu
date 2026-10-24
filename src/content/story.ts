@@ -12,7 +12,7 @@ export const CHAPTER_LINES: readonly (readonly string[])[] = [
   ],
   [
     REGIONS[1].headline + '.',
-    `위성 「${BOSS_NAME}」가 던진다.`,
+    `「${BOSS_NAME}」가 던진다.`,
     '건물이 먼저 떨어진다.',
   ],
   [
@@ -31,8 +31,8 @@ export const CHAPTER_LINES: readonly (readonly string[])[] = [
 export const ACT2_INTRO: readonly string[] = [
   '— 최종 국면 —',
   '',
-  `${BOSS_NAME}가 궤도에서 내려온다.`,
-  '지구의 지붕을 걷어내겠다는 뜻.',
+  '하늘에서 집게가 내려왔다.',
+  '건물만 집으라는 지시는 없었다.',
   '',
   `협상 인턴은 ${HERO}.`,
   '명함엔 「견습」이라 적혀 있다.',
@@ -44,11 +44,11 @@ export const ACT2_INTRO: readonly string[] = [
 export const ENDING_LINES: readonly string[] = [
   '— 작전성공 —',
   '',
-  `${BOSS_NAME}는 궤도 밖으로 밀려났다.`,
+  '집행이 정지되었다.',
   '지구는 절반쯤 무너져 있다.',
   `베어 낸 쪽은 전부 ${HERO}다.`,
   '',
-  '위성은 무허가 철거로 기소되었다.',
+  '담당자는 끝내 나타나지 않았다.',
   `${HERO}는 실기에 합격했다.`,
   '필기는 여전히 미응시.',
   '',

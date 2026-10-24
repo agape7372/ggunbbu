@@ -5,49 +5,49 @@
     "bg-europe": {
       "src": "bg/europe.png",
       "w": 360,
-      "h": 610,
+      "h": 640,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-asia": {
       "src": "bg/asia.png",
       "w": 360,
-      "h": 610,
+      "h": 640,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-eastasia": {
       "src": "bg/eastasia.png",
       "w": 360,
-      "h": 610,
+      "h": 640,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-modern": {
       "src": "bg/modern.png",
       "w": 360,
-      "h": 610,
+      "h": 640,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-act2": {
       "src": "bg/act2.png",
       "w": 360,
-      "h": 610,
+      "h": 640,
       "anchor": "topleft",
       "align": "bottom"
     },
-    "bg-moon": {
-      "src": "bg/moon.png",
+    "bg-executor": {
+      "src": "bg/modern.png",
       "w": 360,
-      "h": 610,
+      "h": 640,
       "anchor": "topleft",
       "align": "bottom"
     },
     "bg-bonus": {
       "src": "bg/modern.png",
       "w": 360,
-      "h": 610,
+      "h": 640,
       "anchor": "topleft",
       "align": "bottom"
     },
@@ -56,80 +56,91 @@
       "w": 46,
       "h": 60,
       "anchor": "foot",
-      "frames": 11,
-      "chroma": "#F4F1E8"
+      "frames": 11
     },
     "boss": {
-      "src": "char/boss.png",
-      "w": 80,
-      "h": 64,
+      "src": "char/executor-atlas.png",
+      "w": 270,
+      "h": 88,
       "anchor": "center",
-      "frames": 4,
-      "chroma": "#F4F1E8"
+      "smooth": true
     },
     "ent-bolt": {
       "src": "char/bolt.png",
       "w": 12,
       "h": 40,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+      "anchor": "center"
     },
     "ent-boltCue": {
       "src": "char/bolt-cue.png",
       "w": 12,
       "h": 12,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+      "anchor": "center"
     },
     "ent-rock": {
       "src": "char/rock.png",
       "w": 24,
       "h": 20,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+      "anchor": "center"
     },
     "ent-shotOk": {
       "src": "char/shot-ok.png",
       "w": 16,
       "h": 10,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+      "anchor": "center"
     },
     "ent-shotNo": {
       "src": "char/shot-no.png",
       "w": 16,
       "h": 10,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+      "anchor": "center"
     },
     "ent-rabbit": {
       "src": "char/rabbit.png",
       "w": 28,
       "h": 20,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+      "anchor": "center"
     },
     "ent-cannon": {
       "src": "char/cannon.png",
       "w": 24,
       "h": 28,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+      "anchor": "center"
     },
-    "fx-hit": {
-      "src": "fx/hit.png",
-      "w": 24,
-      "h": 24,
-      "anchor": "center",
-      "frames": 3,
-      "chroma": "#F4F1E8"
+    "floors-europe": {
+      "src": "floors/europe.png",
+      "w": 270,
+      "h": 340,
+      "rows": 5,
+      "rowH": 68
     },
-    "fx-slash": {
-      "src": "fx/slash.png",
-      "w": 48,
-      "h": 48,
-      "anchor": "center",
-      "chroma": "#F4F1E8"
+    "floors-asia": {
+      "src": "floors/asia.png",
+      "w": 270,
+      "h": 340,
+      "rows": 5,
+      "rowH": 68
+    },
+    "floors-eastasia": {
+      "src": "floors/eastasia.png",
+      "w": 270,
+      "h": 340,
+      "rows": 5,
+      "rowH": 68
+    },
+    "floors-modern": {
+      "src": "floors/modern.png",
+      "w": 270,
+      "h": 340,
+      "rows": 5,
+      "rowH": 68
+    },
+    "floors-special": {
+      "src": "floors/special.png",
+      "w": 270,
+      "h": 476,
+      "rows": 7,
+      "rowH": 68
     }
   }
 }

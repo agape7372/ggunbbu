@@ -5,6 +5,7 @@ import { initTouchLayer } from './input/touch';
 import { createInput } from './input/input';
 import { createApp, mountDebugPanel } from './ui/scenes';
 import { preloadAssets } from './render/assets';
+import { refreshFloorSheetAssets } from './render/floorSheetCache';
 import { loadSave } from './storage';
 import { mountInstallPrompt } from './ui/installPrompt';
 import { notifyAppReady, onLifecycle, isNative } from './platform/native';
@@ -52,6 +53,7 @@ if (new URLSearchParams(location.search).has('debug')) {
 // PNG 에셋 프리로드 — 개별 실패는 assets.ts가 삼키므로 여기선 폴백만 방어적으로 감싼다.
 // 로딩 실패/미존재 파일이어도 게임은 그대로 시작된다.
 await preloadAssets().catch(() => {});
+refreshFloorSheetAssets();
 
 // ── 고정 타임스텝 루프 ──
 let acc = 0;
@@ -86,8 +88,9 @@ if ('serviceWorker' in navigator) {
       .then((rs) => Promise.all(rs.map((r) => r.unregister())))
       .catch(() => undefined);
   } else if (import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
-    });
+    // 이미지 preload의 await 동안 load 이벤트가 먼저 끝날 수 있다.
+    const register = (): void => { void navigator.serviceWorker.register('./sw.js').catch(() => {}); };
+    if (document.readyState === 'complete') register();
+    else window.addEventListener('load', register, { once: true });
   }
 }

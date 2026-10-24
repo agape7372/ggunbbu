@@ -170,7 +170,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
 
   const g = VIEW.GROUND_Y;
-  if (s.stack) { drawStackShadow(ctx, s.stack, g); drawStack(ctx, s.stack, g); }
+  if (s.stack) { drawStackShadow(ctx, s.stack, g); drawStack(ctx, s.stack, g, s.gimmick); }
   drawDebris(ctx, s, g);
   drawGroundRocks(ctx, s.groundRocks, g);
   for (const e of s.entities) {

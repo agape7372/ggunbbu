@@ -7,8 +7,8 @@ import type { Act2Phase, Theme } from '../core/types';
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
 export const HERO = '뿌뿌';
 
-/** 2막 보스. 고장난 감시위성 — 파괴자의 얼굴. */
-export const BOSS_NAME = '보름호';
+/** 2막 보스. 하늘에서 건물을 집어 던지는 무인 철거 집게보. */
+export const BOSS_NAME = '집행기';
 
 export const TITLE = '건뿌!!';
 export const TITLE_EN = 'GUNBBU';
@@ -251,7 +251,7 @@ export const ACT2_PHASES: Record<Act2Phase, PhaseCopy> = {
   moon: {
     id: 'moon',
     name: BOSS_NAME,
-    banner: [`— 파괴자 ${BOSS_NAME} —`, '얼굴이 내려온다. 지붕을 걷는다.'],
+    banner: [`— 철거 집행 ${BOSS_NAME} —`, '건물만 집으라는 지시는 없었다.'],
   },
 };
 
