@@ -12,6 +12,7 @@ export const ONOMATO = {
   specialTetsu: '철벽!!',
   bossDefeat: '작전성공',
   guardAirBounce: '탁!',
+  hatBreak: '깡!',
 } as const;
 
 /** HUD 밈. 렌더가 아직 안 붙인 자막. */
@@ -36,6 +37,7 @@ export function onomatoFor(kind: string, combo: number): string | null {
     case 'specialTetsu': return ONOMATO.specialTetsu;
     case 'bossDefeat': return ONOMATO.bossDefeat;
     case 'guardAirBounce': return ONOMATO.guardAirBounce;
+    case 'hatBreak': return ONOMATO.hatBreak;
     default: return null;
   }
 }

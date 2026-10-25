@@ -2,7 +2,7 @@
 // 수치/페이즈 id는 config·core가 정본. 여기는 표시용 문자열만.
 // 멸망해가는 지구. 하늘이 건물을 뽑아 던지고, 자격 없는 졸라맨이 벤다.
 
-import type { Act2Phase, Theme } from '../core/types';
+import type { Act2Phase, ItemId, Theme, WeaponId } from '../core/types';
 
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
 export const HERO = '뿌뿌';
@@ -216,6 +216,33 @@ export const WAZA_COPY: Record<WazaCopyId, WazaCopy> = {
     desc: '부수지 않는다. 튕기고 버틴다.',
     blurb: '부수지 않는다. 튕기고 버틴다.',
   },
+};
+
+/** 무기 1종. 수치는 config WEAPON 정본 — 문구만. 대미지는 전부 같다(체크포인트 산술). */
+export interface WeaponCopy {
+  name: string;
+  desc: string;
+}
+
+export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
+  sword: { name: '철거칼', desc: '고르게 쓴다. 기본.' },
+  hammer: { name: '오함마', desc: '칠 때마다 건물을 더 띄운다. 짧다.' },
+  crowbar: { name: '빠루', desc: '멀리 닿는다. 필살이 느리다.' },
+  grinder: { name: '그라인더', desc: '필살이 빨리 찬다. 덜 띄운다.' },
+};
+
+/** 보급 상자에서 나오는 것. pop = 열릴 때 머리 위에 뜨는 말. */
+export interface ItemCopy {
+  name: string;
+  desc: string;
+  pop: string;
+}
+
+export const ITEM_COPY: Record<ItemId, ItemCopy> = {
+  hat: { name: '안전모', desc: '한 번 깔려도 버틴다.', pop: '안전모!' },
+  coffee: { name: '믹스커피', desc: '필살 반 칸.', pop: '필살 +50' },
+  gloves: { name: '장갑', desc: '가드를 채운다.', pop: '가드 가득' },
+  dust: { name: '먼지 자루', desc: '먼지 10.', pop: '먼지 +10' },
 };
 
 export interface PhaseCopy {

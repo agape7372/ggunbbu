@@ -1,5 +1,5 @@
 import { SAVE_KEY } from './config';
-import { DEFAULT_LOADOUT, validateLoadout, type Loadout } from './meta/loadout';
+import { DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, validateLoadout, type Loadout } from './meta/loadout';
 import { initAchieveProgress, type DailyState, type MissionProgress } from './meta/missions';
 
 export interface SaveSettings {
@@ -47,7 +47,7 @@ export const DEFAULT_SAVE: SaveData = {
   },
   dust: 0,
   orbit: 0,
-  owned: ['tenchi', 'ink', 'wire', 'flyer'],
+  owned: [...DEFAULT_OWNED_IDS],
   loadout: { ...DEFAULT_LOADOUT },
   daily: null,
   achieves: initAchieveProgress(),

@@ -11,6 +11,8 @@
 // (행동 불변식 주장 위주). 근거는 CLAUDE.md 불변 규칙 2 — 여기 숫자는 그 사본이다.
 // 체크포인트 산술(30/40/148/168/180/228/230)은 tests/checkpoints.test.ts가 가드한다.
 
+import type { ItemId, WeaponId } from './core/types';
+
 export const TICK = 1 / 60;
 export const TPS = 60;
 
@@ -154,6 +156,41 @@ export const STACK = {
   TOWER_G: 1190, TOWER_VTERM: 170,
   ROCK_G: 1700, ROCK_VTERM: 544,
   TOKOTON_G_MAX: 4080, TOKOTON_VTERM_MAX: 952,
+} as const;
+
+// ── 무기 [튜닝] ──────────────────────────────────────────────────
+// 대미지는 전부 1, 공격 프레임(1/3/2)도 전부 같다 — 체크포인트가 층 HP 합(=타격 수)이고,
+// 프레임을 무기마다 바꾸면 3f 입력 버퍼 안에서 탭이 버려진다(10-25 반론 실측: 8탭/s에 오함마 50% 유실).
+// 그래서 무기는 세 칸만 바꾼다: 사거리(건물 판정창 위끝) · 띄우기(타격 밀어올림) · 필살 게이지 배율.
+//   ⚠ 띄우기 상한: 연타 1주기(7f) 동안 건물이 **1막 어디서든 가라앉아야** 한다 — 안 그러면
+//   "연타만으로는 못 버틴다"(STACK.HIT_LIFT_V 주석)가 깨진다. 조건 lift < ACT1_G[0]·8/120 ≈ 102.
+//   tests/weapons.test.ts가 지킨다.
+//   ⚠ 사거리는 건물(1막·대성당·마천루)에만 먹는다. 2막 표적은 ACT2.REACH·BOSS.HIT_REACH 고정.
+// shake = 타격·층붕괴 흔들림 배율(렌더 전용).
+export interface WeaponSpec {
+  reach: number;
+  lift: number;
+  gauge: number;
+  shake: number;
+}
+export const WEAPON: Record<WeaponId, WeaponSpec> = {
+  sword: { reach: PLAYER.ATTACK_REACH, lift: STACK.HIT_LIFT_V, gauge: 1, shake: 1 },
+  hammer: { reach: 60, lift: 95, gauge: 1, shake: 1.6 },     // 띄우기 ↑ / 사거리 ↓
+  crowbar: { reach: 88, lift: STACK.HIT_LIFT_V, gauge: 0.8, shake: 1 }, // 사거리 ↑ / 필살 ↓
+  grinder: { reach: PLAYER.ATTACK_REACH, lift: 65, gauge: 1.4, shake: 0.8 }, // 필살 ↑ / 띄우기 ↓
+};
+
+// ── 보급 상자 [튜닝] ─────────────────────────────────────────────
+// 1막·토코톤 완파 3·8·13…번째에 상자 하나. 바로 지급하고 낙하·열림은 렌더 연출이다
+// (한 레인이라 상자는 반드시 졸라맨에게 떨어진다 — 결정 없는 낙하를 시뮬에 둘 이유가 없다).
+// 종류는 고정 순서 — 난수(rngState)를 쓰면 스포너 결정성이 흔들린다. 점수 배수·목숨은 넣지 않는다
+// (점수 = 1막 진행도 p라 배수가 곧 난이도 가속, 목숨은 광고 부활과 겹침 — 10-25 반론).
+export const SUPPLY = {
+  EVERY: 5,
+  FIRST: 3,
+  // 첫 상자가 안전모 — 머리에 보이고 첫 깔림을 막아 줘서 상자가 뭔지 바로 안다
+  ROTATION: ['hat', 'coffee', 'gloves', 'dust'] as readonly ItemId[],
+  COFFEE_GAUGE: 50,
 } as const;
 
 // ── 잔해(파편) 물리 ─────────────────────────────────────────────
@@ -357,6 +394,10 @@ export const JUICE: Record<string, JuiceSpec> = {
   guardAirBounce: { hitstop: 2, shake: 3, flash: 3, particles: 5 },
   bossHit:        { hitstop: 2, shake: 1, flash: 2, particles: 4 },
   bossDefeat:     { hitstop: 30, shake: 12, flash: 4, particles: 64 },
+  // ⚠ 히트스톱 0 고정: 게이지 없이 필살을 연타하면 매번 나오는 이벤트라 멈춤이 붙으면 시뮬이 선다(B-10).
+  guardDenied:    { hitstop: 0, shake: 2, flash: 0, particles: 0 },
+  supply:         { hitstop: 0, shake: 0, flash: 0, particles: 8 },
+  hatBreak:       { hitstop: 3, shake: 4, flash: 0, particles: 10 },
 };
 export const JUICE_SYS = {
   SHAKE_MAX_AMP: 12,
@@ -374,6 +415,7 @@ export const HAPTIC = {
   hit: 8, floorCollapse: 20, stackDestroy: [30, 20, 30],
   butterCollapse: 10, special: [100, 50, 200], hurt: 60,
   guardBounce: 15, headBonk: 12, bossDefeat: [100, 50, 100, 50, 200],
+  supply: 10, hatBreak: [30, 20, 30],
   HIT_THROTTLE: 3,        // 연타 시 3회당 1회
 } as const;
 

@@ -7,6 +7,8 @@ export {
   DUST_NAME,
   DUST_PER_BUILDING,
   DUST_PER_SPECIAL,
+  DUST_PER_SUPPLY,
+  dustCost,
   exchangeDust,
   grant,
   grantDust,
@@ -19,8 +21,10 @@ export {
   ORBIT_PER_AD,
   orbitCost,
   REVIVE_MAX,
+  spendDust,
   spendOrbit,
   WAZA_ORBIT_COST,
+  WEAPON_DUST_COST,
 } from './economy';
 export type { Wallet } from './economy';
 
@@ -35,8 +39,9 @@ export {
   validateLoadout as parseLoadout,
   WAZA_CATALOG,
   WAZA_IDS,
+  WEAPON_IDS,
 } from './loadout';
-export type { BladeSkinId, BodySkinId, LetterSkinId, Loadout, WazaId } from './loadout';
+export type { BladeSkinId, BodySkinId, LetterSkinId, Loadout, WazaId, WeaponId } from './loadout';
 export type StickSkinId = import('./loadout').BodySkinId;
 export const WAZA_UNLOCK_DEFAULT = ['tenchi'] as const;
 

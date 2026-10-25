@@ -99,6 +99,7 @@ export interface OverlayHandlers {
   onBuySku(id: string): void;
   onAdOrbit(): void;
   onUnlockOrbit(id: string): void;
+  onUnlockDust(id: string): void;
   onExchangeDust(): void;
   onEquip(slot: string, id: string): void;
   onHowtoDone(): void;
@@ -500,7 +501,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     openModal({
       meta: '확인',
       title: '기록을 지울까요?',
-      html: '<p>최고 점수, 해금, 먼지·궤도조각, 꾸미기가 모두 지워집니다. 되돌릴 수 없습니다.</p>',
+      html: '<p>최고 점수, 해금, 먼지·궤도조각, 장비가 모두 지워집니다. 되돌릴 수 없습니다.</p>',
       actions: [
         { label: '지우기', act: 'reset-yes', kind: 'danger' },
         { label: '그만두기', act: 'modal-close', kind: 'quiet' },
@@ -664,6 +665,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           onBuy: (id) => h.onBuySku(id),
           onAdPack: () => h.onAdOrbit(),
           onOrbit: (id) => h.onUnlockOrbit(id),
+          onDust: (id) => h.onUnlockDust(id),
           onExchange: () => h.onExchangeDust(),
         },
       );

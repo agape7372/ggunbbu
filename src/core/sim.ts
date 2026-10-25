@@ -9,6 +9,7 @@ import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from 
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
 import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
+import { absorbWithHat, onBuildingDown } from './items';
 import { specialHitBoss } from './boss';
 
 export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): GameState {
@@ -42,6 +43,9 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     over: null,
     gimmick: 'none',
     waza: 'tenchi',
+    weapon: 'sword',
+    drops: 0,
+    hat: false,
     tokotonCycle: 0,
   };
 }
@@ -58,6 +62,8 @@ export function advance(s: GameState, input: InputFrame): void {
   }
   // 이번 틱에 발행되는 이벤트만 히트스톱 주입 대상 (advance 말미 참조)
   const evStart = s.events.length;
+  // 보급 상자는 틱 시작 모드로 센다 — 마지막 건물이 챕터 경계를 넘기면 같은 틱에 모드가 바뀐다
+  const countsDrops = s.mode === 'act1' || s.mode === 'tokoton';
 
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
   if (input.special && s.player.pose !== 'dead' && s.player.pose !== 'special') {
@@ -140,6 +146,13 @@ export function advance(s: GameState, input: InputFrame): void {
   else if (s.mode === 'tokoton') stepTokoton(s);
   else if (s.mode === 'bonus') stepBonus(s);
   else if (s.mode === 'act2') stepAct2(s);
+
+  // ── 보급 상자 (완파 수) ── 완파 경로가 여럿(타격·필살·깔림 Z)이라 이벤트로 모아 센다
+  if (countsDrops) {
+    for (let i = evStart; i < s.events.length; i++) {
+      if (s.events[i].kind === 'stackDestroy') onBuildingDown(s);
+    }
+  }
 
   // ── 히트스톱 주입 (JUICE 테이블) ──
   // ★08-30: 렌더러가 s.hitstop을 쓰던 역방향 오염(P0-5)을 제거하고 core가 직접 주입한다.
@@ -430,8 +443,12 @@ function onStackGrounded(s: GameState): void {
   onPlayerCrushed(s);
 }
 
-/** 깔림 진입 [정본: 접지 = 라이프 1 손실] */
+/** 깔림 진입 [정본: 접지 = 라이프 1 손실]. 안전모를 쓰고 있으면 모자가 대신 받는다 */
 function onPlayerCrushed(s: GameState): void {
+  if (s.hat) {
+    absorbWithHat(s);
+    return;
+  }
   loseLife(s);
   if (s.over) return;
   breakCombo(s);

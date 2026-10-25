@@ -5,10 +5,10 @@
 
 import type {
   PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
-  FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon,
+  FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId,
 } from '../core/types';
 import { VIEW, PALETTE, PLAYER, ACT2, STACK } from '../config';
-import { drawAsset } from './assets';
+import { drawAsset, hasAsset } from './assets';
 import { drawExecutor } from './executor';
 import { floorImageKey, floorMaterialKey } from './floorSheets';
 import { floorSheetTile } from './floorSheetCache';
@@ -332,7 +332,24 @@ function drawTileInstance(
 // 플레이어 "뿌뿌" — 졸라맨 라인아트. 얼굴 없음(빈 원 머리), 선+원 조합만 사용.
 // 원작(대불·사무라이) 도상 금지 — 순수 창작 도안.
 // ══════════════════════════════════════════════════════════════
-interface PFrame { cv: HTMLCanvasElement; ax: number; ay: number; }
+/** ax/ay = 캔버스 안 발 기준점(논리 px), hx/hy = 기준점에서 본 머리 중심(안전모 자리). */
+interface PFrame { cv: HTMLCanvasElement; ax: number; ay: number; hx: number; hy: number; }
+
+// 졸라맨 프레임만 2배로 굽고 절반으로 찍는다 — 칼 아닌 무기는 늘 프로시저럴이라 계단이 보인다.
+const SS = 2;
+// 쇠머리·갈고리·원판·참격 호가 캔버스 끝에서 잘리지 않게 사방 여백(논리 px).
+const PAD = 6;
+
+function mkFrame(w: number, h: number): { cv: HTMLCanvasElement; c: CanvasRenderingContext2D } {
+  const r = mkCanvas((w + PAD * 2) * SS, (h + PAD * 2) * SS);
+  r.c.scale(SS, SS);
+  r.c.translate(PAD, PAD);
+  return r;
+}
+
+function pframe(cv: HTMLCanvasElement, ax: number, ay: number, headX: number, headY: number): PFrame {
+  return { cv, ax: ax + PAD, ay: ay + PAD, hx: headX - ax, hy: headY - ay };
+}
 type PlayerFrameKey =
   | 'idle' | 'jump' | 'attack0' | 'attack1' | 'attack2'
   | 'guardG' | 'guardA' | 'guardBreak' | 'special' | 'pinned' | 'dead';
@@ -371,6 +388,76 @@ export function setPlayerCosmetics(bodyColor: string, bladeColor: string): void 
   playerFrames = null;
 }
 
+let playerWeapon: WeaponId = 'sword';
+const IRON = '#948E82';      // 오함마 쇠머리
+const DISC = '#E2DED3';      // 그라인더 원판
+const HAT_WHITE = '#FFFFFF'; // 안전모 — 아이보리보다 밝게
+
+/** 장착 무기 — 렌더러가 매 프레임 s.weapon을 넘긴다. 바뀔 때만 프레임을 다시 굽는다. */
+export function setPlayerWeapon(w: WeaponId): void {
+  if (playerWeapon === w) return;
+  playerWeapon = w;
+  playerFrames = null;
+}
+
+/** PNG 시트 키. 'player'는 기본 룩 + 철거칼 전용, 다른 무기는 'player-<무기>'(없으면 프로시저럴). */
+function playerPngKey(): string | null {
+  if (cosmeticsActive) return null;
+  const key = playerWeapon === 'sword' ? 'player' : `player-${playerWeapon}`;
+  return hasAsset(key) ? key : null;
+}
+
+function playerBob(pose: PlayerPose, animTick: number): number {
+  return pose === 'idle' && Math.floor(animTick / 20) % 2 === 1 ? -1 : 0; // 2f 숨쉬기
+}
+
+// player.png 머리 중심 — 발 기준점(셀 가로 중앙·바닥) 대비 [dx, dy]. PLAYER_SHEET 순서.
+// 10-25 알파 실측(46×60 셀). pinned·dead는 눕거나 납작해 안전모를 그리지 않는다(null).
+const SHEET_HEAD: ReadonlyArray<readonly [number, number] | null> = [
+  [-1, -35], [13, -34.5], [-11.5, -30], [-2.5, -20.5], [0, -21.5],
+  [4, -33.5], [-3, -31.5], [-3, -32], [4, -22], null, null,
+];
+const SHEET_HEAD_R = 5;
+
+function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  const R = r + 1;
+  const base = cy - r * 0.2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, base, R, Math.PI, 0);          // 반구 돔
+  ctx.lineTo(cx + R + 3.5, base + 0.5);      // 앞챙
+  ctx.lineTo(cx + R + 3.5, base + 2);
+  ctx.lineTo(cx - R - 0.5, base + 2);
+  ctx.closePath();
+  ctx.fillStyle = HAT_WHITE;
+  ctx.fill();
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** 안전모 — 렌더러가 s.hat일 때 drawPlayer 직후 같은 인자로 부른다. 머리 위치는 drawPlayer와 같은 프레임에서 읽는다. */
+export function drawHat(
+  ctx: CanvasRenderingContext2D,
+  pose: PlayerPose,
+  animTick: number,
+  x: number,
+  footCanvasY: number,
+): void {
+  if (pose === 'pinned' || pose === 'dead') return;
+  initSprites();
+  const footY = footCanvasY + playerBob(pose, animTick);
+  if (playerPngKey()) {
+    const h = SHEET_HEAD[playerSheetFrame(pose, animTick)];
+    if (h) hardHat(ctx, x + h[0], footY + h[1], SHEET_HEAD_R);
+    return;
+  }
+  const f = pickPlayerFrame(pose, animTick);
+  hardHat(ctx, x + f.hx, footY + f.hy, HEAD_R);
+}
+
 /** pts를 순서대로 잇는 폴리라인 획. 관절 굽힘은 점 3개 이상으로 표현. */
 function stroke(c: CanvasRenderingContext2D, pts: [number, number][]): void {
   if (pts.length < 2) return;
@@ -397,14 +484,103 @@ function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, 
   c.stroke();
 }
 
-/** 무기: 손잡이→칼끝 직선 1개 + 손잡이 위치에 반지름 1.5 원. */
+/** 무기: 손(hx,hy)과 방향(→tx,ty)은 포즈 그대로, 길이·머리 모양만 장착 무기별로 바꾼다. */
 function weapon(c: CanvasRenderingContext2D, hx: number, hy: number, tx: number, ty: number): void {
-  stroke(c, [[hx, hy], [tx, ty]]);
-  circle(c, hx, hy, 1.5);
+  const L = Math.hypot(tx - hx, ty - hy) || 1;
+  const ux = (tx - hx) / L, uy = (ty - hy) / L;
+  const nx = -uy, ny = ux;
+  const at = (k: number, side = 0): [number, number] => [hx + ux * L * k + nx * side, hy + uy * L * k + ny * side];
+  switch (playerWeapon) {
+    case 'hammer': {
+      // 오함마: 자루 끝에 가로로 긴 쇠머리(T자). 뭉툭한 네모는 가방으로 읽힌다(10-25 캡처).
+      const [ex, ey] = at(1);
+      stroke(c, [[hx, hy], [ex, ey]]);
+      c.save();
+      c.translate(ex, ey);
+      c.rotate(Math.atan2(uy, ux));
+      c.fillStyle = IRON;
+      c.fillRect(-2.5, -7.5, 6, 15);
+      c.strokeStyle = LINE;
+      c.lineWidth = LINE_W;
+      c.lineJoin = 'round';
+      c.strokeRect(-2.5, -7.5, 6, 15);
+      c.restore();
+      break;
+    }
+    case 'crowbar': {
+      // 빠루: 칼의 1.28배 막대(손 뒤로 조금 남김) + 앞끝 갈고리
+      const [bx, by] = at(-0.14);
+      const [fx, fy] = at(1.14);
+      stroke(c, [[bx, by], [fx, fy]]);
+      c.beginPath();
+      c.moveTo(fx, fy);
+      c.quadraticCurveTo(fx + ux * 4, fy + uy * 4, fx + ux * 2 + nx * 5, fy + uy * 2 + ny * 5);
+      c.stroke();
+      circle(c, hx, hy, 1.5);
+      break;
+    }
+    case 'grinder': {
+      // 그라인더: 굵은 짧은 몸통 + 옆 손잡이 + 끝 원판
+      const [ex, ey] = at(0.5);
+      stroke(c, [at(0.18), at(0.18, -5)]);
+      c.lineWidth = 4.5;
+      c.beginPath();
+      c.moveTo(hx, hy);
+      c.lineTo(ex, ey);
+      c.stroke();
+      circle(c, ex + ux * 2, ey + uy * 2, 4.5, DISC);
+      c.fillStyle = LINE;
+      c.beginPath();
+      c.arc(ex + ux * 2, ey + uy * 2, 1.2, 0, Math.PI * 2);
+      c.fill();
+      break;
+    }
+    default:
+      stroke(c, [[hx, hy], [tx, ty]]);
+      circle(c, hx, hy, 1.5);
+  }
+}
+
+/** attack 타격 프레임의 참격 호 — 무기별 모양, 호는 하나. */
+function slashArc(c: CanvasRenderingContext2D): void {
+  c.strokeStyle = ARC;
+  c.lineCap = 'round';
+  c.beginPath();
+  switch (playerWeapon) {
+    case 'hammer':   // 짧고 굵게
+      c.lineWidth = 5.5;
+      c.moveTo(WCX + 31, 50);
+      c.quadraticCurveTo(WCX + 36, 38, WCX + 28, 28);
+      break;
+    case 'crowbar':  // 위로 더 길게
+      c.lineWidth = 3;
+      c.moveTo(WCX + 31, 52);
+      c.quadraticCurveTo(WCX + 42, 20, WCX + 14, -4);
+      break;
+    case 'grinder':  // 원판에서 시작
+      c.lineWidth = 3;
+      c.moveTo(WCX + 29, 40);
+      c.quadraticCurveTo(WCX + 34, 22, WCX + 18, 10);
+      break;
+    default:         // 칼끝에서 시작해 위로 휘어지는 호
+      c.lineWidth = 3;
+      c.moveTo(WCX + 30, 50);
+      c.quadraticCurveTo(WCX + 34, 26, WCX + 18, 10);
+  }
+  c.stroke();
+  if (playerWeapon === 'grinder') {
+    // 원판에서 튀는 불꽃 틱 3개
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(WCX + 31, 46); c.lineTo(WCX + 35, 48);
+    c.moveTo(WCX + 31, 43); c.lineTo(WCX + 36, 42);
+    c.moveTo(WCX + 29, 49); c.lineTo(WCX + 32, 52);
+    c.stroke();
+  }
 }
 
 function buildIdle(): PFrame {
-  const { cv, c } = mkCanvas(STAND_W, STAND_H);
+  const { cv, c } = mkFrame(STAND_W, STAND_H);
   circle(c, CX, HEAD_Y, HEAD_R);
   stroke(c, [[CX, HEAD_Y + HEAD_R], [CX, HIP_Y]]);              // 목~골반
   stroke(c, [[CX, HIP_Y], [CX - 7, FOOT_Y]]);                   // 왼다리
@@ -412,11 +588,11 @@ function buildIdle(): PFrame {
   stroke(c, [[CX, SHOULDER_Y], [CX - 9, 34]]);                  // 왼팔 — 자연스럽게 늘어짐
   stroke(c, [[CX, SHOULDER_Y], [CX + 9, 30]]);                  // 오른팔 — 칼을 다리 바깥쪽으로
   weapon(c, CX + 9, 30, CX + 13, 55);
-  return { cv, ax: CX, ay: FOOT_Y };
+  return pframe(cv, CX, FOOT_Y, CX, HEAD_Y);
 }
 
 function buildJump(): PFrame {
-  const { cv, c } = mkCanvas(STAND_W, STAND_H);
+  const { cv, c } = mkFrame(STAND_W, STAND_H);
   circle(c, CX, HEAD_Y - 1, HEAD_R);
   stroke(c, [[CX, HEAD_Y - 1 + HEAD_R], [CX, HIP_Y - 2]]);
   stroke(c, [[CX, HIP_Y - 2], [CX - 9, HIP_Y + 2], [CX - 7, 50]]); // 무릎을 몸쪽으로 접음
@@ -424,11 +600,12 @@ function buildJump(): PFrame {
   stroke(c, [[CX, SHOULDER_Y - 1], [CX - 10, 30]]);
   stroke(c, [[CX, SHOULDER_Y - 1], [CX + 9, 30]]);
   weapon(c, CX + 9, 30, CX + 16, 44);                              // 칼은 뒤로 흘림
-  return { cv, ax: CX, ay: FOOT_Y };
+  return pframe(cv, CX, FOOT_Y, CX, HEAD_Y - 1);
 }
 
 function buildAttack(stage: 0 | 1 | 2): PFrame {
-  const { cv, c } = mkCanvas(WIDE_W, WIDE_H);
+  const { cv, c } = mkFrame(WIDE_W, WIDE_H);
+  let head: [number, number]; // 안전모 자리 — 각 분기 circle()과 같은 값
   if (stage === 0) {
     // 예열 — 몸을 뒤로 살짝 젖히고 칼을 머리 위로. 궤적 없음.
     circle(c, WCX - 3, HEAD_Y - 3, HEAD_R);
@@ -438,6 +615,7 @@ function buildAttack(stage: 0 | 1 | 2): PFrame {
     stroke(c, [[WCX, SHOULDER_Y], [WCX - 9, 32]]);
     stroke(c, [[WCX, SHOULDER_Y], [WCX + 7, 9]]);
     weapon(c, WCX + 7, 9, WCX + 11, 1);
+    head = [WCX - 3, HEAD_Y - 3];
   } else if (stage === 1) {
     // 타격 — 깊은 런지, 앞무릎 굽힘·뒷다리 뻗음, 칼이 아래로. 여기에만 참격 궤적.
     circle(c, WCX + 14, HEAD_Y + 1, HEAD_R);
@@ -447,13 +625,8 @@ function buildAttack(stage: 0 | 1 | 2): PFrame {
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX - 2, 18]]);                // 반대팔(균형)
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX + 22, 34]]);               // 칼 든 팔
     weapon(c, WCX + 22, 34, WCX + 30, 50);
-    c.strokeStyle = ARC;
-    c.lineWidth = 3;
-    c.lineCap = 'round';
-    c.beginPath();
-    c.moveTo(WCX + 30, 50);
-    c.quadraticCurveTo(WCX + 34, 26, WCX + 18, 10); // 칼끝에서 시작해 위로 휘어지는 참격 호 (하나만)
-    c.stroke();
+    slashArc(c);
+    head = [WCX + 14, HEAD_Y + 1];
   } else {
     // 여운 — 런지 유지, 칼이 끝까지 내려간 상태. 궤적 없음.
     circle(c, WCX + 14, HEAD_Y + 3, HEAD_R);
@@ -463,12 +636,13 @@ function buildAttack(stage: 0 | 1 | 2): PFrame {
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX - 4, 20]]);
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX + 16, 44]]);
     weapon(c, WCX + 16, 44, WCX + 10, 58);
+    head = [WCX + 14, HEAD_Y + 3];
   }
-  return { cv, ax: WCX, ay: FOOT_Y };
+  return pframe(cv, WCX, FOOT_Y, head[0], head[1]);
 }
 
 function buildGuard(air: boolean): PFrame {
-  const { cv, c } = mkCanvas(STAND_W, STAND_H);
+  const { cv, c } = mkFrame(STAND_W, STAND_H);
   const hip = air ? HIP_Y - 4 : HIP_Y - 2;
   const legEndY = air ? 48 : FOOT_Y;                 // 공중가드는 발이 지면에서 떨어짐
   const spreadIn = air ? 6 : 9, spreadOut = air ? 11 : 9; // 공중가드는 무릎이 더 접혀 실루엣이 다름
@@ -487,11 +661,11 @@ function buildGuard(air: boolean): PFrame {
     stroke(c, [[CX, SHOULDER_Y - 1], [CX + 16, HEAD_Y + 2], [CX + 14, 4]]);
     weapon(c, CX - 10, 3, CX + 16, 3);
   }
-  return { cv, ax: CX, ay: FOOT_Y };
+  return pframe(cv, CX, FOOT_Y, CX, HEAD_Y);
 }
 
 function buildGuardBreak(): PFrame {
-  const { cv, c } = mkCanvas(STAND_W, STAND_H);
+  const { cv, c } = mkFrame(STAND_W, STAND_H);
   circle(c, CX - 6, HEAD_Y + 3, HEAD_R);                     // 뒤로 젖혀진 머리
   stroke(c, [[CX - 6, HEAD_Y + 3 + HEAD_R], [CX, HIP_Y]]);   // 몸이 뒤로 기울어짐
   stroke(c, [[CX, HIP_Y], [CX - 10, FOOT_Y - 2]]);
@@ -499,11 +673,11 @@ function buildGuardBreak(): PFrame {
   stroke(c, [[CX, SHOULDER_Y], [CX - 16, 18]]);              // 팔이 벌어짐
   stroke(c, [[CX, SHOULDER_Y], [CX + 14, 28]]);
   weapon(c, CX + 14, 28, CX + 22, 42);                       // 칼을 놓칠 듯 뒤로 젖혀짐
-  return { cv, ax: CX, ay: FOOT_Y };
+  return pframe(cv, CX, FOOT_Y, CX - 6, HEAD_Y + 3);
 }
 
 function buildSpecial(): PFrame {
-  const { cv, c } = mkCanvas(WIDE_W, WIDE_H);
+  const { cv, c } = mkFrame(WIDE_W, WIDE_H);
   // 화면을 가르는 대각 참격 — 양손 칼, 깊은 런지 팔로우스루
   circle(c, WCX + 10, HEAD_Y + 5, HEAD_R);
   stroke(c, [[WCX + 10, HEAD_Y + 5 + HEAD_R], [WCX + 2, HIP_Y + 4]]);
@@ -525,11 +699,11 @@ function buildSpecial(): PFrame {
   c.moveTo(2, 8);
   c.quadraticCurveTo(36, 18, 58, 55);
   c.stroke();
-  return { cv, ax: WCX, ay: FOOT_Y };
+  return pframe(cv, WCX, FOOT_Y, WCX + 10, HEAD_Y + 5);
 }
 
 function buildPinned(): PFrame {
-  const { cv, c } = mkCanvas(FLAT_W, FLAT_H);
+  const { cv, c } = mkFrame(FLAT_W, FLAT_H);
   const fy = FLAT_H - 4;
   circle(c, FLAT_W / 2, 8, 6);
   stroke(c, [[10, fy - 4], [FLAT_W - 10, fy - 4]]);          // 납작해진 몸통
@@ -537,18 +711,18 @@ function buildPinned(): PFrame {
   stroke(c, [[18, fy - 4], [6, fy]]);
   stroke(c, [[FLAT_W - 18, fy - 4], [FLAT_W - 4, fy - 10]]);
   stroke(c, [[FLAT_W - 18, fy - 4], [FLAT_W - 6, fy]]);
-  return { cv, ax: FLAT_W / 2, ay: fy + 4 };
+  return pframe(cv, FLAT_W / 2, fy + 4, FLAT_W / 2, 8);
 }
 
 function buildDead(): PFrame {
-  const { cv, c } = mkCanvas(FLAT_W, FLAT_H);
+  const { cv, c } = mkFrame(FLAT_W, FLAT_H);
   const fy = FLAT_H - 6;
   circle(c, 10, fy - 6, 6);                                  // 머리가 한쪽으로 기울어짐
   stroke(c, [[14, fy - 4], [FLAT_W - 8, fy - 10]]);          // 등을 대고 벌렁 누움(대각) — pinned와 실루엣 차별화
   stroke(c, [[20, fy - 3], [16, fy + 2]]);                   // 팔다리가 힘없이 늘어짐(비대칭)
   stroke(c, [[FLAT_W - 12, fy - 8], [FLAT_W - 6, fy - 1]]);
   stroke(c, [[FLAT_W - 20, fy - 9], [FLAT_W - 22, fy - 18]]);
-  return { cv, ax: FLAT_W / 2, ay: fy + 4 };
+  return pframe(cv, FLAT_W / 2, fy + 4, 10, fy - 6);
 }
 
 let playerFrames: Record<PlayerFrameKey, PFrame> | null = null;
@@ -793,23 +967,22 @@ export function drawPlayer(
   facing: 1 | -1 = 1
 ): void {
   initSprites();
-  const frame = pickPlayerFrame(pose, animTick);
-  const bob = pose === 'idle' && Math.floor(animTick / 20) % 2 === 1 ? -1 : 0; // 2f 숨쉬기
-  const footY = footCanvasY + bob;
-  const sheet = playerSheetFrame(pose, animTick);
+  const footY = footCanvasY + playerBob(pose, animTick);
   // ★코스메틱 방침(08-30 검증 P1): PNG 시트는 기본 룩 전용 — 비기본 body/blade 장착 시
   // 프로시저럴이 이긴다. 안 그러면 Wave 3 PNG 투입 순간 팔리는 코스메틱이 무음 사망.
   // (PNG 틴트 패스·색상별 시트는 ROADMAP Wave 3 후속 검토.)
-  const usePng = !cosmeticsActive;
+  // 무기: 'player' 시트는 칼 든 그림이라 철거칼일 때만. 다른 무기는 'player-<무기>' 시트가 있으면 그것.
+  const key = playerPngKey();
   ctx.save();
   if (facing === -1) {
     ctx.translate(x, 0);
     ctx.scale(-1, 1);
-    if (!usePng || !drawAsset(ctx, 'player', 0, footY, sheet)) {
-      ctx.drawImage(frame.cv, -frame.ax, footY - frame.ay);
-    }
-  } else if (!usePng || !drawAsset(ctx, 'player', x, footY, sheet)) {
-    ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay);
+    x = 0;
+  }
+  if (!key || !drawAsset(ctx, key, x, footY, playerSheetFrame(pose, animTick))) {
+    const frame = pickPlayerFrame(pose, animTick);
+    ctx.imageSmoothingEnabled = true; // 2배 프레임을 절반으로 — 이 save 안에서만
+    ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay, frame.cv.width / SS, frame.cv.height / SS);
   }
   ctx.restore();
 }

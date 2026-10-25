@@ -26,6 +26,16 @@ export const ICON = {
   lock: svg('<path d="M5 11h14v10H5z"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
   dust: svg('<circle cx="7" cy="15" r="2.5"/><circle cx="15.5" cy="16" r="3"/><circle cx="12" cy="7.5" r="2"/>'),
   orbit: svg('<circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-25 12 12)"/>'),
+  // 보급 상자
+  hat: svg('<path d="M4 16a8 8 0 0 1 16 0z"/><path d="M2 20h20M12 8v4"/>'),
+  coffee: svg('<path d="M8 2h8v20H8z"/><path d="M8 6h8M8 18h8M12 10v4"/>'),
+  gloves: svg('<path d="M6 21v-7l-2-4 2-1 2 3V5h2v6V4h2v7V5h2v7V7h2v8l-2 6zM7 17h9"/>'),
+  sack: svg('<path d="M9 3h6l1 5c3 2 4 5 4 8 0 3-2 5-5 5H9c-3 0-5-2-5-5 0-3 1-6 4-8z"/><path d="M8 8h8"/>'),
+  // 무기
+  sword: svg('<path d="M20 4 8 16M5 13l6 6M7 17l-4 4"/>'),
+  hammer: svg('<path d="M4 3h16v7H4z"/><path d="M12 10v11"/>'),
+  crowbar: svg('<path d="M20 3 7 16l-3 5 5-3M20 3h-3M20 3v3"/>'),
+  grinder: svg('<circle cx="9" cy="9" r="6"/><path d="M9 9h.01M13.5 13.5 21 21"/>'),
   close: svg('<path d="m6 6 12 12M18 6 6 18"/>'),
   next: svg('<path d="m9 6 6 6-6 6"/>'),
 } as const;

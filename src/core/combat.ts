@@ -6,11 +6,12 @@
 //   →0: ① 지면 가드 바운스 ② 구조물 접지(깔림) ③ 플레이어 피격 전부
 //       ④ 집행기 보스 개시 — 카운터만 0, fullCombo 유지, comboBreak 이벤트 없음
 //       ⑤ 2막 이어하기 — 콤보를 체크포인트(40/148/168)로 재설정, fullCombo 소멸
-//   유지: 헛스윙 / 점프 가드 / 점프 / 시간 경과 / 1막→2막 / 필살기 / 가드 브레이크.
+//   유지: 헛스윙 / 점프 가드 / 점프 / 시간 경과 / 1막→2막 / 필살기 / 가드 브레이크
+//         / 안전모가 대신 받은 깔림(items.ts absorbWithHat — ②에서 빠진다).
 
 import type { GameState, Lane } from './types';
 import { damageStack } from './building';
-import { GIMMICK, GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK } from '../config';
+import { GIMMICK, GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
 import { VIEW } from '../config';
 import { rand } from './rng';
 
@@ -34,6 +35,11 @@ export function gaugePerHit(combo: number): number {
   return Math.min(WAZA_GAUGE.PER_HIT_MAX, WAZA_GAUGE.PER_HIT_BASE + Math.floor(combo / WAZA_GAUGE.PER_HIT_DIV));
 }
 
+/** 이번 타격이 채우는 필살 게이지 — 콤보 계단 × 무기 배율 */
+export function hitGauge(s: GameState): number {
+  return gaugePerHit(s.combo) * WEAPON[s.weapon].gauge;
+}
+
 export function addGauge(s: GameState, n: number): void {
   const before = s.wazaGauge;
   s.wazaGauge = Math.max(0, Math.min(WAZA_GAUGE.MAX, s.wazaGauge + n));
@@ -44,12 +50,12 @@ export function addGauge(s: GameState, n: number): void {
 export function registerHit(s: GameState, opts?: { scoreBonus?: number; noGauge?: boolean }): void {
   addCombo(s);
   addScore(s, SCORE.BASE_HIT * Math.min(s.combo, SCORE.COMBO_CAP) + (opts?.scoreBonus ?? 0));
-  if (!opts?.noGauge) addGauge(s, gaugePerHit(s.combo));
+  if (!opts?.noGauge) addGauge(s, hitGauge(s));
 }
 
-/** 공격 히트박스 수직 범위 (물리 좌표) */
-export function attackRange(footY: number): [number, number] {
-  return [footY - 8, footY + PLAYER.ATTACK_REACH];
+/** 공격 히트박스 수직 범위 (물리 좌표). reach = 무기 사거리(건물 판정에만 넘긴다) */
+export function attackRange(footY: number, reach: number = PLAYER.ATTACK_REACH): [number, number] {
+  return [footY - 8, footY + reach];
 }
 
 /**
@@ -59,13 +65,14 @@ export function attackRange(footY: number): [number, number] {
 export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   const stack = s.stack;
   if (!stack) return false;
-  const [lo, hi] = attackRange(footY);
+  const weapon = WEAPON[s.weapon];
+  const [lo, hi] = attackRange(footY, weapon.reach);
   const mat = stack.floors.length > 0 ? stack.floors[0].mat : 'weak';
   const yHit = stack.y;
   const res = damageStack(stack, lane, lo, hi, 1);
   if (res === 'miss') return false;
 
-  stack.vy = Math.max(stack.vy, STACK.HIT_LIFT_V);
+  stack.vy = Math.max(stack.vy, weapon.lift);
   stack.resting = false;
 
   if (res === 'collapse') {

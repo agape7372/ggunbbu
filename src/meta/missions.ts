@@ -18,7 +18,8 @@ export type MissionTrack =
   | 'moon'
   | 'butter'
   | 'pin'
-  | 'revive';
+  | 'revive'
+  | 'crate';
 
 export interface MissionEvent {
   kind: string;
@@ -92,6 +93,15 @@ export const DAILY_POOL: readonly MissionDef[] = [
     desc: '끊기 전에 서른. 워밍업.',
     goal: 30,
     rewardDust: 12,
+    rewardOrbit: 8,
+  },
+  {
+    id: 'crate_3',
+    kind: 'daily',
+    title: '보급 상자 셋',
+    desc: '한 판이 아니어도 된다. 오늘 셋.',
+    goal: 3,
+    rewardDust: 15,
     rewardOrbit: 8,
   },
 ];
@@ -193,6 +203,7 @@ export const TRACK_BY_ID: Readonly<Record<string, MissionTrack>> = {
   butter_perfect: 'butter',
   pin_escape: 'pin',
   revive_3: 'revive',
+  crate_3: 'crate',
 };
 
 /** 생존 미션이 인정하는 구역 키(영문 id · 한글 지명). */
@@ -282,7 +293,7 @@ export function applyJuiceToMissions(
  * 이벤트 종류 → 카운트 갱신(제자리 변이).
  * stackDestroy / special / hit·floorCollapse(combo) / adWatched
  * + moonClear / act2Enter / butterPerfect / pinEscape / revive
- * + survive·zoneSurvive / runStart(부활 런 리셋)  (clingSlash는 08-30 cling 삭제와 함께 제거)
+ * + survive·zoneSurvive / runStart(부활 런 리셋) / supply(보급 상자)  (clingSlash는 08-30 cling 삭제와 함께 제거)
  */
 export function applyMissionEvent(
   daily: DailyState,
@@ -308,6 +319,10 @@ export function applyMissionEvent(
       maxOnTrack(daily.items, 'combo', combo);
       maxOnTrack(achieves, 'combo', combo);
     }
+    return;
+  }
+  if (kind === 'supply') {
+    addOnTrack(daily.items, 'crate', 1);
     return;
   }
   if (kind === 'adWatched') {

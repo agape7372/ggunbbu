@@ -28,8 +28,15 @@ function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[]
       return ['whiff'];
     case 'hit':
       if (!e.mat && s.boss?.pattern === 'rabbits') return ['cancel'];
+      if (s.weapon === 'hammer') return ['hitHammer'];
+      if (s.weapon === 'crowbar') return ['hitBar'];
+      if (s.weapon === 'grinder') return ['hitGrind'];
       if (e.mat && STRONG_MAT.has(e.mat)) return ['hitStrong'];
       return ['hit'];
+    case 'supply':
+      return ['supply'];
+    case 'hatBreak':
+      return ['hatBreak'];
     case 'floorCollapse':
       return ['floorCollapse'];
     case 'stackDestroy':

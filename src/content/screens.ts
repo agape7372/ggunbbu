@@ -28,7 +28,7 @@ export const SCREENS = {
   tabs: {
     play: '플레이',
     missions: '미션',
-    custom: '꾸미기',
+    custom: '장비',
     shop: '상점',
     more: '설정',
   },

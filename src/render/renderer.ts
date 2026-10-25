@@ -2,11 +2,11 @@
 // core는 events만 발행 — 오디오는 src/audio/consume.ts, 클리어는 씬.
 
 import type { GameState } from '../core/types';
-import { CAMERA, COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, STACK, VIEW } from '../config';
-import { onomatoFor, CAPTIONS } from '../content';
+import { CAMERA, COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, STACK, VIEW, WEAPON } from '../config';
+import { onomatoFor, CAPTIONS, ITEM_COPY } from '../content';
 import {
-  initSprites, drawPlayer, drawStack, drawBoss, drawEntity,
-  drawGroundRocks, drawStackShadow, setPlayerCosmetics,
+  initSprites, drawPlayer, drawHat, drawStack, drawBoss, drawEntity,
+  drawGroundRocks, drawStackShadow, setPlayerCosmetics, setPlayerWeapon,
 } from './sprites';
 import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
@@ -78,7 +78,9 @@ export function consumeEvents(s: GameState): void {
   for (const e of s.events) {
     const spec = JUICE[e.kind];
     if (spec) {
-      trauma = Math.min(1, Math.max(trauma, spec.shake / JUICE_SYS.SHAKE_MAX_AMP));
+      // 무기 손맛 — 타격·층붕괴 흔들림만 무기 배율을 탄다 (오함마 묵직, 그라인더 가볍게)
+      const weaponShake = e.kind === 'hit' || e.kind === 'floorCollapse' ? WEAPON[s.weapon].shake : 1;
+      trauma = Math.min(1, Math.max(trauma, (spec.shake * weaponShake) / JUICE_SYS.SHAKE_MAX_AMP));
       if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#1A1A20'; }
       // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
     }
@@ -107,14 +109,20 @@ export function consumeEvents(s: GameState): void {
       word = onomatoFor(s.waza === 'ageba' ? 'specialAgeba' : s.waza === 'tetsu' ? 'specialTetsu' : 'special', combo);
     }
     if (word && combo >= 999) word = CAPTIONS.combo999;
+    // 상자는 뭘 받았는지가 정보다 — 콤보 자막보다 앞선다
+    const supply = e.kind === 'supply';
+    if (supply && e.item) word = ITEM_COPY[e.item].pop;
     if (word) {
       if (popups.length >= JUICE_SYS.ONOMATOPOEIA_MAX) popups.shift();
+      let scale = 1 + Math.min(combo / 500, 0.8);
+      if (e.kind === 'special' || e.kind === 'bossDefeat') scale = 2.4;
+      else if (supply || e.kind === 'hatBreak') scale = 1.3;
       popups.push({
         text: word,
         x: VIEW.LANE_X[0] + ((combo * 13) % 30) - 15,
         y: VIEW.GROUND_Y - (e.y ?? 100) - 30 + cam,
-        ticks: e.kind === 'special' ? 40 : 24,
-        scale: e.kind === 'special' || e.kind === 'bossDefeat' ? 2.4 : 1 + Math.min(combo / 500, 0.8),
+        ticks: e.kind === 'special' || supply ? 40 : 24,
+        scale,
       });
     }
     // 진동 (연타 스로틀)
@@ -186,8 +194,12 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 접촉 피드백은 core가 발행하는 headBonk 이벤트(먼지·소리·진동)가 진다.
   // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2)
   const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES;
+  setPlayerWeapon(s.weapon);
   if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
-    drawPlayer(ctx, s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], g - s.player.y);
+    const px = VIEW.LANE_X[s.player.lane];
+    const footY = g - s.player.y;
+    drawPlayer(ctx, s.player.pose, s.player.poseTick, px, footY);
+    if (s.hat) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY);
   }
   ctx.restore();
 

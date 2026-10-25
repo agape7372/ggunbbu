@@ -33,6 +33,7 @@ import {
   applyMissionEvent, ensureDaily, grant, grantOrbit, initAchieveProgress,
   MAX_REVIVES_PER_RUN, ORBIT_PER_AD, ACHIEVES, DAILY_POOL, claim, defById,
   equip, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
+  dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY,
 } from '../meta';
 import { createAdsPort, type AdKind } from '../platform/ads';
 import { minimizeApp, onBackButton, onLifecycle } from '../platform/native';
@@ -121,6 +122,7 @@ export function createApp(
 
   function applyRunMeta(s: GameState, gimmick: GimmickId = 'none'): void {
     s.waza = save.loadout.waza;
+    s.weapon = save.loadout.weapon;
     s.gimmick = gimmick;
     revivesUsed = 0;
     const daily = ensureDaily(save.daily, Date.now(), ads.ready());
@@ -344,7 +346,17 @@ export function createApp(
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
     playSfx('uiBlip');
-    overlay.toast('열었습니다. 꾸미기에서 고르세요.');
+    overlay.toast('열었습니다. 장비에서 고르세요.');
+    openShop();
+  }
+
+  function unlockDustItem(id: string): void {
+    const cost = dustCost(id);
+    if (cost == null || !spendDust(save, cost)) { playSfx('uiDeny'); return; }
+    if (!save.owned.includes(id)) save.owned = [...save.owned, id];
+    saveSave(save);
+    playSfx('uiBlip');
+    overlay.toast('샀습니다. 장비에서 고르세요.');
     openShop();
   }
 
@@ -571,6 +583,7 @@ export function createApp(
     onBuySku: (id) => { void buySku(id); },
     onAdOrbit: () => { void adOrbit(); },
     onUnlockOrbit: (id) => unlockOrbitItem(id),
+    onUnlockDust: (id) => unlockDustItem(id),
     onEquip: (slot, id) => doEquip(slot, id),
     onExchangeDust: doExchange,
     onHowtoDone: () => { save.howtoSeen = true; saveSave(save); },
@@ -740,8 +753,9 @@ export function createApp(
       if (e.kind === 'chapterUnlock' && (e.n ?? 0) >= 2) {
         applyMissionEvent(daily, save.achieves, { kind: 'zoneSurvive', zone: 'eastasia' });
       }
-      if (e.kind === 'stackDestroy') { grant(save, 2, 0); dustDirty = true; }
-      if (e.kind === 'special') { grant(save, 1, 0); dustDirty = true; }
+      if (e.kind === 'stackDestroy') { grant(save, DUST_PER_BUILDING, 0); dustDirty = true; }
+      if (e.kind === 'special') { grant(save, DUST_PER_SPECIAL, 0); dustDirty = true; }
+      if (e.kind === 'supply' && e.item === 'dust') { grant(save, DUST_PER_SUPPLY, 0); dustDirty = true; }
     }
     // 판 도중 이탈(탭 종료·데스크톱 강제 종료)에도 재화가 안 날아가게 — 틱마다가 아니라
     // 지급 발생 프레임에만 저장 (08-30, P1-2 잔여)

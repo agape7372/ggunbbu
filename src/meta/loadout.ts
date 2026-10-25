@@ -1,10 +1,10 @@
-// 필살·코스메틱 로드아웃. 해금 집합은 호출측 owned가 정본.
-// tenchi / ink / wire / flyer 는 항상 소유.
+// 필살·무기·코스메틱 로드아웃. 해금 집합은 호출측 owned가 정본.
+// tenchi / sword / ink / wire / flyer 는 항상 소유.
 
-import type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, WazaId } from './types';
+import type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, WazaId, WeaponId } from './types';
 
-export type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, WazaId };
-export type EquipSlot = 'waza' | CosmeticSlot;
+export type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, WazaId, WeaponId };
+export type EquipSlot = 'waza' | 'weapon' | CosmeticSlot;
 
 /** index.ts 호환 별칭 — 슬롯 id는 types.ts가 정본. */
 export type BodySkinId = BodyId;
@@ -15,20 +15,23 @@ export type StickSkinId = BodyId;
 export const WAZA_UNLOCK_DEFAULT: readonly WazaId[] = ['tenchi'];
 
 export const WAZA_IDS: readonly WazaId[] = ['tenchi', 'ageba', 'tetsu'];
+export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder'];
 export const BODY_IDS: readonly BodyId[] = ['ink', 'amber', 'slate'];
 export const BLADE_IDS: readonly BladeId[] = ['wire', 'rebar', 'crescent'];
 export const LETTERS_IDS: readonly LettersId[] = ['flyer', 'stamp', 'orbit'];
 
 const WAZA_SET: ReadonlySet<string> = new Set(WAZA_IDS);
+const WEAPON_SET: ReadonlySet<string> = new Set(WEAPON_IDS);
 const BODY_SET: ReadonlySet<string> = new Set(BODY_IDS);
 const BLADE_SET: ReadonlySet<string> = new Set(BLADE_IDS);
 const LETTERS_SET: ReadonlySet<string> = new Set(LETTERS_IDS);
 
-export const DEFAULT_OWNED_IDS: readonly string[] = ['tenchi', 'ink', 'wire', 'flyer'];
+export const DEFAULT_OWNED_IDS: readonly string[] = ['tenchi', 'sword', 'ink', 'wire', 'flyer'];
 const DEFAULT_OWNED: ReadonlySet<string> = new Set(DEFAULT_OWNED_IDS);
 
 export const DEFAULT_LOADOUT: Loadout = {
   waza: 'tenchi',
+  weapon: 'sword',
   body: 'ink',
   blade: 'wire',
   letters: 'flyer',
@@ -59,6 +62,7 @@ export function ownedDefaults(): Set<string> {
 
 export function slotOf(id: string): EquipSlot | undefined {
   if (WAZA_SET.has(id)) return 'waza';
+  if (WEAPON_SET.has(id)) return 'weapon';
   if (BODY_SET.has(id)) return 'body';
   if (BLADE_SET.has(id)) return 'blade';
   if (LETTERS_SET.has(id)) return 'letters';
@@ -68,6 +72,7 @@ export function slotOf(id: string): EquipSlot | undefined {
 function belongs(slot: string, id: string): boolean {
   switch (slot) {
     case 'waza': return WAZA_SET.has(id);
+    case 'weapon': return WEAPON_SET.has(id);
     case 'body': return BODY_SET.has(id);
     case 'blade': return BLADE_SET.has(id);
     case 'letters': return LETTERS_SET.has(id);
@@ -84,7 +89,7 @@ export function isOwned(owned: ReadonlySet<string>, slot: string, id: string): b
 
 /**
  * 소유한 아이템만 장착. 아니면 동일 참조를 돌려준다.
- * slot = waza | body | blade | letters.
+ * slot = waza | weapon | body | blade | letters.
  */
 export function equip(
   loadout: Loadout,
@@ -97,6 +102,9 @@ export function equip(
     case 'waza':
       if (loadout.waza === id) return loadout;
       return { ...loadout, waza: id as WazaId };
+    case 'weapon':
+      if (loadout.weapon === id) return loadout;
+      return { ...loadout, weapon: id as WeaponId };
     case 'body':
       if (loadout.body === id) return loadout;
       return { ...loadout, body: id as BodyId };
@@ -126,6 +134,7 @@ export function validateLoadout(raw: unknown): Loadout {
   const rec = raw as Record<string, unknown>;
   return {
     waza: pickId(rec.waza, WAZA_IDS, DEFAULT_LOADOUT.waza),
+    weapon: pickId(rec.weapon, WEAPON_IDS, DEFAULT_LOADOUT.weapon), // 무기 칸 없던 옛 저장 = 철거칼
     body: pickId(rec.body, BODY_IDS, DEFAULT_LOADOUT.body),
     blade: pickId(rec.blade, BLADE_IDS, DEFAULT_LOADOUT.blade),
     letters: pickId(rec.letters, LETTERS_IDS, DEFAULT_LOADOUT.letters),

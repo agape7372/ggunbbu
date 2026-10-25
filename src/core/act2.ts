@@ -3,9 +3,9 @@
 
 import type { GameState, Lane } from './types';
 import { makeFloor, makeStack } from './building';
-import { registerHit, hurtPlayer, addScore, addGauge, addCombo, gaugePerHit } from './combat';
+import { registerHit, hurtPlayer, addScore, addGauge, addCombo, hitGauge } from './combat';
 import { guardActive, makePlayer } from './player';
-import { ACT2, GUARD_GAUGE, PLAYER, SCORE, STACK, TICK, VIEW } from '../config';
+import { ACT2, GUARD_GAUGE, PLAYER, SCORE, STACK, TICK, VIEW, WEAPON } from '../config';
 import { initBoss, stepBoss, tryHitBoss } from './boss';
 
 export function enterAct2(s: GameState): void {
@@ -22,6 +22,7 @@ export function enterAct2(s: GameState): void {
   s.act2c = { spawned: false, bolts: 0, rocks: 0, cd: 0, t: 0 };
   s.fullCombo = true; // 2막 로컬 풀콤보 판정 시작
   s.checkpoint = 0;
+  s.hat = false; // 안전모는 1막 것 — 2막 피격(hurtPlayer)은 모자가 안 받는다
   s.events.push({ kind: 'phaseClear', n: 0 });
 }
 
@@ -35,6 +36,7 @@ export function enterAct2Phase(s: GameState, phase: NonNullable<GameState['act2P
   s.groundRocks = 0;
   s.boss = null;
   s.hitstop = 0;
+  s.hat = false;
   s.act2c = { spawned: false, bolts: 0, rocks: 0, cd: 0, t: 0 };
   s.stackSpawnCd = ACT2.INTERLUDE_TICKS;
   if (phase === 'moon') { s.boss = initBoss(); s.combo = 0; }
@@ -237,7 +239,7 @@ export function tryHitAct2Targets(s: GameState): boolean {
     const e = s.entities[i];
     if (e.kind === 'rock' && e.lane === p.lane && e.y >= lo && e.y <= hi) {
       e.hp -= 1;
-      e.vy = Math.max(e.vy, STACK.HIT_LIFT_V);
+      e.vy = Math.max(e.vy, WEAPON[s.weapon].lift);
       const remnant = !!e.remnant;
       if (e.hp <= 0) s.entities.splice(i, 1);
       if (remnant) addCombo(s); // [정본] 격파 잔해 = 콤보만, 점수 없음
@@ -264,7 +266,7 @@ export function tryHitAct2Targets(s: GameState): boolean {
       registerHit(s);
     } else {
       addScore(s, SCORE.BASE_HIT * Math.min(Math.max(s.combo, 1), SCORE.COMBO_CAP));
-      addGauge(s, gaugePerHit(s.combo));
+      addGauge(s, hitGauge(s));
     }
     s.events.push({ kind: 'hit', lane: p.lane, y: 20, combo: s.combo });
     return true;

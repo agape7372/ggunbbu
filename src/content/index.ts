@@ -23,6 +23,8 @@ import {
   TITLE,
   TITLE_EN,
   WAZA_COPY,
+  WEAPON_COPY,
+  ITEM_COPY,
 } from './world';
 import {
   butterChallengeEnd,
@@ -61,6 +63,8 @@ export {
   TITLE,
   TITLE_EN,
   WAZA_COPY,
+  WEAPON_COPY,
+  ITEM_COPY,
 };
 
 /** scenes.ts 가 쓰던 형태. 줄만 교체되고 키는 동일. */

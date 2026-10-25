@@ -178,13 +178,23 @@ export type GimmickId = 'none' | 'glass' | 'ice' | 'night' | 'orbit';
 /** 장착 필살. 체크포인트 타격 수에 영향을 주면 안 된다. */
 export type WazaId = 'tenchi' | 'ageba' | 'tetsu';
 
+/**
+ * 장착 무기. 대미지는 전부 1이다 — 2막 체크포인트가 층 HP 합(=타격 수)이라 대미지를 바꾸면
+ * 산술이 깨진다. 무기는 사거리·띄우기·필살 게이지 배율만 바꾼다(config WEAPON).
+ */
+export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder';
+
+/** 보급 상자에서 나오는 것. 고정 순서로 돈다(config SUPPLY.ROTATION) — 확률 없음. */
+export type ItemId = 'gloves' | 'coffee' | 'hat' | 'dust';
+
 /** 타격감 이벤트 — core가 발행, 렌더/오디오/햅틱이 소비 (JUICE 매트릭스 키) */
 export type JuiceKind =
   | 'hit' | 'floorCollapse' | 'stackDestroy' | 'butterCollapse'
   | 'special' | 'hurt' | 'guardBounce' | 'guardAirBounce' | 'bossHit' | 'bossDefeat'
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
-  | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash';
+  | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
+  | 'supply' | 'hatBreak';
 
 export interface JuiceEvent {
   kind: JuiceKind;
@@ -195,6 +205,8 @@ export interface JuiceEvent {
   combo?: number;
   /** 부가 수치 (완파 층수 등) */
   n?: number;
+  /** supply: 상자에서 나온 것 */
+  item?: ItemId;
 }
 
 export interface PhaseCounters {
@@ -273,6 +285,12 @@ export interface GameState {
   gimmick: GimmickId;
   /** 이번 주행 장착 필살 */
   waza: WazaId;
+  /** 이번 주행 장착 무기 */
+  weapon: WeaponId;
+  /** 이번 판 1막·토코톤 완파 수 — 보급 상자 주기 */
+  drops: number;
+  /** 안전모를 쓰고 있다 — 다음 깔림 1회를 막는다. 2막에 들어가면 벗는다 */
+  hat: boolean;
   /** 토코톤 버터바 사이클 진입 인덱스 — 히트스톱이 경계 틱을 삼켜도 소실 없게 (08-30 검증) */
   tokotonCycle: number;
 }

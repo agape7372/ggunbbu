@@ -22,7 +22,10 @@ export function mountHud(
       <div class="hud-row hud-row-top">
         <div class="hud-col hud-col-left">
           <div class="hud-score" data-el="score">00000000</div>
-          <div class="hud-lives" data-el="lives"></div>
+          <div class="hud-life-row">
+            <div class="hud-lives" data-el="lives"></div>
+            <span class="hud-hat" data-el="hat" role="img" aria-label="안전모" hidden>${ICON.hat}</span>
+          </div>
         </div>
         <div class="hud-col hud-col-mid">
           <div class="hud-mode" data-el="mode"></div>
@@ -64,6 +67,7 @@ export function mountHud(
   const el = (name: string): HTMLElement => root.querySelector(`[data-el="${name}"]`) as HTMLElement;
   const scoreEl = el('score');
   const livesEl = el('lives');
+  const hatEl = el('hat');
   const modeEl = el('mode');
   const floorEl = el('floor');
   const comboEl = el('combo');
@@ -93,6 +97,7 @@ export function mountHud(
 
   let lastScore = -1;
   let lastLives = -1;
+  let lastHat: boolean | null = null;
   let lastCombo = -1;
   let lastMode = '';
   let lastFloor = '';
@@ -160,6 +165,11 @@ export function mountHud(
         livesEl.innerHTML = livesHtml(s.lives);
         // 마지막 하나만 빨강 — 빨강을 아껴야 위험 신호로 읽힌다(ART_DIRECTION).
         livesEl.dataset.last = s.lives === 1 ? '1' : '';
+      }
+
+      if (s.hat !== lastHat) {
+        lastHat = s.hat;
+        hatEl.hidden = !s.hat;
       }
 
       const mt = modeText(s);

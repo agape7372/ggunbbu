@@ -12,6 +12,20 @@ export const DUST_PER_BUILDING = 2;
 /** 필살기 1회당 먼지 */
 export const DUST_PER_SPECIAL = 1;
 
+/** 보급 상자 '먼지 자루' 1개 */
+export const DUST_PER_SUPPLY = 10;
+
+/** 무기는 먼지로 산다 — 플레이로 쌓은 재화가 손맛을 바꾸는 길. 철거칼은 기본 소유 */
+export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
+  hammer: 300,
+  crowbar: 300,
+  grinder: 400,
+};
+
+export function dustCost(id: string): number | undefined {
+  return Object.prototype.hasOwnProperty.call(WEAPON_DUST_COST, id) ? WEAPON_DUST_COST[id] : undefined;
+}
+
 /** 광고 1편당 궤도 */
 export const ORBIT_PER_AD = 8;
 
@@ -72,6 +86,14 @@ export function spendOrbit(inv: Wallet, n: number): boolean {
   if (n < 0) return false;
   if (inv.orbit < n) return false;
   inv.orbit -= n;
+  return true;
+}
+
+/** 먼지 n을 쓴다. 모자라면 false, 잔액 불변. */
+export function spendDust(inv: Wallet, n: number): boolean {
+  if (n < 0) return false;
+  if (inv.dust < n) return false;
+  inv.dust -= n;
   return true;
 }
 

@@ -8,7 +8,8 @@ export type SfxName =
   | 'pinned' | 'lifeLost' | 'boltCue' | 'boltStrike' | 'cancel'
   | 'rockWhistle' | 'rockLand' | 'bossTele' | 'bossPbTele'
   | 'zap' | 'zap2' | 'zap3'
-  | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect';
+  | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect'
+  | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak';
 
 export type BgmTrack = 'title' | 'act1' | 'act2a' | 'butter' | 'bolt' | 'boss' | 'ending';
 
@@ -142,6 +143,39 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   hitStrong: (ctx, dest, t, rate) => {
     playOsc(ctx, dest, t, 'square', 160, 0.06, 0.4, rate, { freqEnd: 90, attack: 0.002 });
     playNoise(ctx, dest, t, 0.05, 0.25, { filterType: 'highpass', freqStart: 800 });
+  },
+
+  // 망치 — hitStrong보다 저음·긴 '쿵'
+  hitHammer: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 110, 0.18, 0.5, rate, { freqEnd: 45, attack: 0.002 });
+    playOsc(ctx, dest, t, 'square', 130, 0.07, 0.3, rate, { freqEnd: 70, attack: 0.002 });
+    playNoise(ctx, dest, t, 0.06, 0.2, { filterType: 'lowpass', freqStart: 700, freqEnd: 200 });
+  },
+
+  // 쇠막대 — 짧고 높은 금속성 '깡'
+  hitBar: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'triangle', 1500, 0.1, 0.35, rate, { freqEnd: 1100, attack: 0.001 });
+    playOsc(ctx, dest, t, 'square', 2300, 0.05, 0.12, rate, { freqEnd: 1800, attack: 0.001 });
+  },
+
+  // 그라인더 — 밴드패스 노이즈 버즈 '지익'
+  hitGrind: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.09, 0.35, { filterType: 'bandpass', freqStart: 3500, freqEnd: 2200 });
+    playOsc(ctx, dest, t, 'sawtooth', 240, 0.08, 0.15, rate, { freqEnd: 200, attack: 0.002 });
+  },
+
+  // 보급 상자 — '통' + 두 음 상승 차임
+  supply: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 160, 0.08, 0.4, rate, { freqEnd: 90, attack: 0.002 });
+    playOsc(ctx, dest, t + 0.09, 'sine', 659.25, 0.1, 0.28, rate, { attack: 0.004 });
+    playOsc(ctx, dest, t + 0.16, 'sine', 987.77, 0.09, 0.28, rate, { attack: 0.004 });
+  },
+
+  // 안전모가 대신 맞음 — 금속 '깡!' + 깨짐 노이즈
+  hatBreak: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'triangle', 1200, 0.14, 0.4, rate, { freqEnd: 800, attack: 0.001 });
+    playOsc(ctx, dest, t, 'square', 1800, 0.06, 0.15, rate, { freqEnd: 1300, attack: 0.001 });
+    playNoise(ctx, dest, t + 0.03, 0.12, 0.25, { filterType: 'highpass', freqStart: 2500 });
   },
 
   // 헛스윙 — 타격보다 얇고 짧게 (slash 이벤트)

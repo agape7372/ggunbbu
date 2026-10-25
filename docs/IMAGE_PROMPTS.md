@@ -196,7 +196,7 @@
 {
   "id": "player",
   "filename": "char/player.png",
-  "consumer": "src/render/sprites.ts:884 / :887 (drawAsset(ctx,'player',…,sheet)), 프레임 인덱스 = src/render/frames.ts:25 playerSheetFrame",
+  "consumer": "src/render/sprites.ts drawPlayer (playerPngKey → drawAsset(ctx,'player',…,sheet)) · drawHat (SHEET_HEAD 머리 좌표), 프레임 인덱스 = src/render/frames.ts playerSheetFrame",
   "gen_size": "2024x240 (4배)",
   "final_size": "506x60",
   "cells": "가로 11칸, 셀 46x60, 기준점 = 발(anchor foot). 순서는 frames.ts PLAYER_SHEET 배열 그대로",
@@ -215,7 +215,36 @@
     "pinned와 dead가 검은 실루엣만으로 구분된다",
     "노랑은 4번·9번 두 칸뿐"
   ],
-  "notes": "09-06 제작: 원본 알파와 아이보리 매트 추출을 파일에 반영해 런타임 chroma 없이 소비한다. ★셀 순서를 바꾸면 게임이 엉뚱한 포즈를 보여준다 — frames.ts:8-20 PLAYER_SHEET가 정본. 필살(9번)에 노랑을 넣는 건 sprites.ts buildSpecial()이 실제로 대각선 노란 참격을 그리기 때문이다. 비기본 코스메틱 장착 시엔 PNG 대신 프로시저럴이 이긴다(sprites.ts:879 usePng) — 이 시트는 기본 룩 전용이다."
+  "notes": "09-06 제작: 원본 알파와 아이보리 매트 추출을 파일에 반영해 런타임 chroma 없이 소비한다. ★셀 순서를 바꾸면 게임이 엉뚱한 포즈를 보여준다 — frames.ts:8-20 PLAYER_SHEET가 정본. 필살(9번)에 노랑을 넣는 건 sprites.ts buildSpecial()이 실제로 대각선 노란 참격을 그리기 때문이다. 비기본 코스메틱 장착 시엔 PNG 대신 프로시저럴이 이긴다(sprites.ts playerPngKey) — 이 시트는 기본 룩 + 철거칼 전용이다. ★10-25: 칼 그림이 박혀 있어 다른 무기는 아래 `player-<무기>` 시트가 맡는다. 안전모가 이 시트의 머리 좌표표(`SHEET_HEAD`, 알파 실측)를 쓰므로 다시 만들면 표도 다시 잰다."
+}
+```
+
+#### player-hammer · player-crowbar · player-grinder (10-25 신설 — 미제작)
+
+무기만 다른 `player` 시트 셋. 파일이 생기면 `sprites.ts` `playerPngKey()`가 바로 집는다. **매니페스트 항목은 파일과 같이 넣는다**(파일 없는 키 금지) — `player`와 같은 `frames`·`anchor`.
+
+```json
+{
+  "id": "player-<weapon>",
+  "filename": "char/player-<weapon>.png",
+  "consumer": "src/render/sprites.ts drawPlayer (playerPngKey = 'player-' + s.weapon) · drawHat (SHEET_HEAD를 player와 같이 쓴다)",
+  "gen_size": "2024x240 (4배)",
+  "final_size": "506x60",
+  "cells": "player와 같다 — 가로 11칸, 셀 46x60, 발 기준점, 순서 = frames.ts PLAYER_SHEET",
+  "chroma": null,
+  "prompt": "player 슬롯 prompt를 그대로 쓰고, subject의 블레이드 문장만 아래 무기 문장으로 바꾼다. 포즈·머리 위치·크기·지면선은 player.png와 같게.",
+  "weapon": {
+    "hammer": "A sledgehammer instead of the blade: a straight thin handle about as long as the blade, ending in a WIDE, THIN rectangular iron head set crosswise like a letter T. Iron head filled flat #948E82 with the same ink outline. The head must be clearly wider than it is thick so it never reads as a box or a bag.",
+    "crowbar": "A crowbar instead of the blade: one straight ink line about 1.3 times the blade length, extending a little behind the grip, ending in a small curled claw hook. No fill.",
+    "grinder": "An angle grinder instead of the blade: a short thick body line held in the hand, a tiny side handle sticking out of it, and a round cutting disc at the front end filled flat #E2DED3 with an ink outline and a dot at its center."
+  },
+  "negative": "player 슬롯 negative + 칼날을 그대로 둔 채 무기를 하나 더 그린 것, 무기에 노랑, 머리 위치가 player.png와 다른 칸",
+  "accept": [
+    "player.png 위에 반투명으로 겹치면 11칸 모두 머리 원이 같은 자리",
+    "36px 높이로 줄여도 무기 넷이 실루엣만으로 갈린다",
+    "노랑은 4번·9번 참격 두 칸뿐"
+  ],
+  "notes": "10-25: 지금은 철거칼만 PNG라 무기를 바꾸면 졸라맨이 선 그림 폴백(선이 굵고 키가 큼)으로 바뀐다. 이 시트 셋이 들어오면 사라진다. 선 그림 무기 모양 = sprites.ts weapon()."
 }
 ```
 
@@ -583,6 +612,34 @@
     "#F4F1E8 픽셀 0"
   ],
   "notes": "1~5행은 butter/cathedral/lobby/office/penthouse 재질에 대응한다. 6~7행은 glass/ice GimmickId인 구역의 일반 층에 적용한다. 펜트하우스는 PNG와 프로시저럴 모두 잉크 트림선으로 통일했다. 7행 모두 소비 연결 완료."
+}
+```
+
+### 4-7. 보급 상자 (10-25 신설 — 미제작)
+
+#### crate
+```json
+{
+  "id": "crate",
+  "filename": "char/crate.png",
+  "consumer": "src/render/effects.ts drawCrates — drawAsset(ctx,'crate',x,상자 중심 y). 실패하면 프로시저럴 상자(뚜껑이 젖혀지는 연출 포함)",
+  "gen_size": "80x60 (4배)",
+  "final_size": "20x15",
+  "cells": "none",
+  "anchor": "center",
+  "chroma": null,
+  "prompt": {
+    "subject": "A small closed wooden supply crate seen from the front: a plain box with a thin lid line near the top and one cross-shaped strap band (one vertical, one horizontal ink line). No label, no text, no logo, no nails, no wood grain.",
+    "style": "@common",
+    "composition": "The crate fills the frame with a hairline ivory margin, perfectly front-on, no perspective.",
+    "color": "Ivory #F4F1E8 ground, crate face flat #B9B3A6, ink #1A1A20 outline and strap. Zero yellow."
+  },
+  "negative": "@common text, label, logo, wood grain texture, nails, perspective, shading, yellow",
+  "accept": [
+    "20×15에서 상자로 읽힌다",
+    "띠 십자 하나만"
+  ],
+  "notes": "10-25: PNG가 들어오면 닫힌 상자 그림 하나로 대신한다 — 뚜껑 연출은 사라지고 내용물이 솟는 연출은 남는다. 매니페스트에 anchor 'center'로 넣을 것."
 }
 ```
 
