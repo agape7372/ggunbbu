@@ -21,21 +21,47 @@ describe('OTA 버전 비교', () => {
 });
 
 describe('매니페스트 파싱', () => {
-  const ok = { version: '1.0.1', url: 'https://x/bundles/1.0.1.zip', checksum: 'abc' };
+  const BASE = 'https://ota.example.com';
+  const ok = { version: '1.0.1', url: `${BASE}/bundles/1.0.1.zip`, checksum: 'abc' };
 
-  it('필수 3필드가 있으면 통과', () => {
-    expect(parseManifest(ok)?.version).toBe('1.0.1');
+  it('필수 3필드가 있고 번들 주소가 배포처 https 아래면 통과', () => {
+    expect(parseManifest(ok, BASE)?.version).toBe('1.0.1');
   });
 
   it('필수 필드가 하나라도 없거나 타입이 다르면 null — 조용히 "업데이트 없음"이 된다', () => {
-    expect(parseManifest({ ...ok, checksum: undefined })).toBeNull();
-    expect(parseManifest({ ...ok, version: 1 })).toBeNull();
-    expect(parseManifest(null)).toBeNull();
-    expect(parseManifest('nope')).toBeNull();
+    expect(parseManifest({ ...ok, checksum: undefined }, BASE)).toBeNull();
+    expect(parseManifest({ ...ok, version: 1 }, BASE)).toBeNull();
+    expect(parseManifest(null, BASE)).toBeNull();
+    expect(parseManifest('nope', BASE)).toBeNull();
+  });
+
+  it('번들 주소가 평문 http·남의 호스트·표기 장난이면 null (T9: 매니페스트가 임의 번들을 끌어오지 못한다)', () => {
+    const withUrl = (url: string) => parseManifest({ ...ok, url }, BASE);
+    expect(withUrl('http://ota.example.com/bundles/1.zip')).toBeNull();            // 평문
+    expect(withUrl('https://evil.example.net/bundles/1.zip')).toBeNull();          // 다른 호스트
+    expect(withUrl('https://ota.example.com.evil.net/bundles/1.zip')).toBeNull();  // 접두사만 같은 호스트
+    expect(withUrl('https://ota.example.com@evil.net/bundles/1.zip')).toBeNull();  // userinfo 장난
+    expect(withUrl('https://ota.example.com\\@evil.net/x.zip')).toBeNull();        // 역슬래시
+    expect(withUrl('/bundles/1.zip')).toBeNull();                                  // 상대 주소
+    expect(withUrl(`${BASE}/bundles/1.zip`)?.url).toBe(`${BASE}/bundles/1.zip`);
+  });
+
+  it('배포처가 비었거나 http면 어떤 주소도 받지 않는다 (OTA 꺼짐 = 기본값)', () => {
+    expect(parseManifest(ok, '')).toBeNull();
+    expect(parseManifest({ ...ok, url: 'http://ota.example.com/b.zip' }, 'http://ota.example.com')).toBeNull();
+    expect(parseManifest(ok)).toBeNull(); // 테스트 환경은 VITE_OTA_BASE 없음
+  });
+
+  it('VITE_OTA_BASE 끝의 슬래시는 떼어 쓴다 — 안 떼면 //manifest.json·//bundles가 된다', async () => {
+    vi.stubEnv('VITE_OTA_BASE', 'https://ota.example.com//');
+    vi.resetModules();
+    const fresh = await import('../src/platform/ota');
+    expect(fresh.parseManifest(ok)?.url).toBe(ok.url); // 기본 base = 환경값(슬래시 제거본)
+    vi.unstubAllEnvs();
   });
 
   it('선택 필드는 타입이 어긋나면 버리되 파싱은 성공', () => {
-    const m = parseManifest({ ...ok, size: 'big', minNative: '1.0' });
+    const m = parseManifest({ ...ok, size: 'big', minNative: '1.0' }, BASE);
     expect(m?.size).toBeUndefined();
     expect(m?.minNative).toBe('1.0');
   });

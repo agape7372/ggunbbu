@@ -18,10 +18,10 @@
 
 ```bash
 cd shell
-npm install
+npm ci
 npm run web:build     # 루트 build → www 복사
 npx cap sync android
-cd android && gradlew assembleDebug
+npm run apk           # android/gradlew assembleDebug (윈도우·맥·리눅스 공통, JAVA_HOME 필요)
 ```
 
 한글 경로 함정: `android/gradle.properties`의 `android.overridePathCheck=true` 필수 (levain 실측).

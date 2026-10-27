@@ -7,7 +7,7 @@
     "web:build": "cd .. && npm run build && node shell/scripts/copy-dist.mjs",
     "sync": "npx cap sync android",
     "open": "npx cap open android",
-    "apk": "cd android && gradlew assembleDebug"
+    "apk": "node scripts/apk.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.1.0",
@@ -16,8 +16,6 @@
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/haptics": "^8.0.2",
-    "@capacitor/preferences": "^8.0.1",
-    "@capacitor/status-bar": "^8.0.3",
     "@capgo/capacitor-updater": "^8.51.14"
   }
 }

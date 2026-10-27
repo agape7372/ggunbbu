@@ -43,6 +43,12 @@ export const VIEW = {
   BUTTER_W: 90,               // 버터바 폭 (좁은 낙하물 — 건물과 구분)
   FLOOR_H: 68,                       // 120 × 0.5625
   GROUND_Y: 610,         // 캔버스 픽셀상 지면 라인 (렌더 변환용) = FIELD_H
+  // 적응형 해상도 [튜닝] — 저사양 폰에서 메인 캔버스 배율만 한 단계씩 낮춘다(세션 중 다시 올리지 않음)
+  DPR_LADDER: [2, 1.5, 1] as const,
+  ADAPT_WINDOW_MS: 1000,   // 최근 이 시간의 평균 프레임 간격을 본다
+  ADAPT_SLOW_MS: 20,       // 평균 간격이 이보다 길면 느린 상태(50fps 미만)
+  ADAPT_HOLD_MS: 2000,     // 느린 상태가 이만큼 이어지면 한 단계 내린다
+  ADAPT_MAX_DT_MS: 100,    // 한 번 크게 멈춘 프레임은 이 값으로 자른다(백그라운드 복귀·GC 한 번에 안 흔들리게)
 } as const;
 
 // ── 카메라 (렌더 전용. 시뮬 y는 그대로) ─────────────────────────
@@ -198,7 +204,6 @@ export const DEBRIS = {
   GRAVITY: 1780,     // px/s²
   BOUNCE_VY: -0.25,  // 지면 반사 시 vy 감쇠 배수
   BOUNCE_VX: 0.7,    // 지면 반사 시 vx 감쇠 배수
-  LIFE_F: 90,        // 소멸까지 수명(프레임)
 } as const;
 
 // ── 재질 HP 테이블 [튜닝] (구조도 계획서 유래 — 원작 대조 없음) ──
@@ -260,7 +265,8 @@ export const SPECIAL = {
   IFRAMES: 120,           // 발동 프레임부터 무적 [튜닝]
   // (히트스톱은 JUICE.special.hitstop이 단일 출처 — 08-30 이중 정의 제거)
   IMMUNE_DMG: 10,         // 2막 면역 구조물엔 최하층 10대미지만
-  MOON_DMG: 10,
+  MOON_DMG: 10,           // 필살기가 보스에 주는 대미지
+  AGEBA_ITER_MAX: 24,     // 올려베기 연속 타격 안전 상한 (HP3×6층 + 여유)
   POSE_TICKS: 48,         // 연출만. 시뮬 파괴는 발동 틱에 끝난다
   AGEBA_FLOORS: 6,        // 올려베기: 발끝에서 위로 최대 층수
   TETSU_V: 1190,          // 철벽: 지면 가드와 같은 띄움. 파괴 없음
@@ -308,7 +314,7 @@ export const ACT2 = {
   BOLT_RHYTHM_GAP: 30,                     // 후반 8발 120BPM = 30f/발
   BOLT_CUE_TICKS: 30,                      // 낙하 30f(500ms) 전 큐
   BOLT_FALL_V: 2000, BOLT_ZONE_V: 600,
-  BOLT_ZONE_Y: 160, BOLT_ZONE_TICKS: 16,   // 존 통과 16f = 타격 창
+  BOLT_ZONE_Y: 160,
   ROCK_COUNT: 24, ROCK_HP: 2,              // +48 = 228 ∈ [220,230]
   ROCK_GAP_START: 120, ROCK_GAP_END: 60,
   ROCK_TIMEBOX_TICKS: 2400,                // 40s
@@ -317,7 +323,6 @@ export const ACT2 = {
   // 2막 전 대상(번개·화산탄·전기탄·보스·더미) 타격 리치. 1막 ATTACK_REACH(68, 층 1개)와
   // 별개 — 계획서 원명세 128 유지. 08-30 act2.ts 하드코딩에서 config로 승격(수치 무변경).
   REACH: 128,
-  CHECKPOINTS: [40, 148, 168] as const,    // 이어하기 콤보 재설정 값
 } as const;
 
 // ── 집행기 보스 [튜닝: 50+100+80=230, 임계 50/150] ──────────────
@@ -327,6 +332,7 @@ export const BOSS = {
   TIER1_DMG: 50, TIER2_DMG: 150,
   HOVER_HIGH: 480,        // 타격 불가 고도
   HOVER_LOW: 100,         // 딜 창 고도
+  ENTER_Y_OFFSET: 80,     // 등장 시작 높이 = 화면 위 + 이만큼
   RECOVER_TICKS: 60,      // 패턴 종료 회복 틈 (≈6타)
   ROAR_TICKS: 45,         // 티어 전이 무적 포효
   W: VIEW.LANE_W, H: 88,
@@ -339,7 +345,7 @@ export const BOSS = {
   CHARGE: { TELE: 40, DESCEND: 30, DASH: 20, STAGGER: 60 },
   PB_CHARGE: { TELEPORT: 6, TELE: 18, DASH: 8, STAGGER: 45, CHAIN_CHANCE: 0.5 },
   MULTI_CHARGE: { COUNT: 3, REAIM: 20, STAGGER: 75 },
-  RISE: { UP: 60, BOLT_GAP_5: 45, WAVE_GAP_9: 60, DOWN_WINDOW: 90 },
+  RISE: { BOLT_GAP_5: 45, WAVE_GAP_9: 60, DOWN_WINDOW: 90 },
   RABBIT: { COUNT: 5, ENTER_GAP: 30, FIRE_DELAY: 20, LEAVE: 30, HP: 1, SHOT_V: 480 },
   CANNON: {
     COUNT: 3, AIM_GAP: 40, AIM_TELE: 30, SHOT_V: 700, SPARK_V: 300, SPARK_H: 24, HP: 2,

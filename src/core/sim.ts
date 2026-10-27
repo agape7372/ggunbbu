@@ -245,7 +245,7 @@ function applyAgeba(s: GameState): void {
   // AGEBA_FLOORS(6)가 도달 불가라 80궤도 해금이 기본기(천지)보다 약했다.
   // 올려베기 = 밴드 안 층을 최대 6층 붕괴할 때까지 연속 타격 + 강한 띄움(파밍 유지가 니치).
   let destroyed = 0;
-  let iter = 24; // HP3×6층 안전 상한
+  let iter = SPECIAL.AGEBA_ITER_MAX;
   while (iter-- > 0 && destroyed < SPECIAL.AGEBA_FLOORS && s.stack && s.stack.floors.length > 0) {
     const st = s.stack;
     const yHit = st.y;

@@ -7,20 +7,20 @@ import { registerHit, hurtPlayer, addScore } from './combat';
 import { guardActive } from './player';
 import { rand, randInt } from './rng';
 import { spawnBolt } from './act2';
-import { BOSS, SCORE, TICK, VIEW } from '../config';
+import { BOSS, SCORE, SPECIAL, TICK, VIEW } from '../config';
 
 export function initBoss(): BossState {
   return {
     hp: BOSS.HP, dmg: 0, tier: 0,
     st: 'enter', stTick: 0,
     pattern: null, lastPattern: null, step: 0,
-    y: VIEW.H + 80, targetLane: 0, hittable: false,
+    y: VIEW.H + BOSS.ENTER_Y_OFFSET, targetLane: 0, hittable: false,
   };
 }
 
 function tierPool(tier: 0 | 1 | 2): BossPattern[] {
   if (tier === 0) return ['charge', 'riseBolt5', 'rabbits'];
-  if (tier === 1) return ['charge', 'riseBolt5', 'rabbits'];
+  if (tier === 1) return ['charge', 'riseBolt5', 'rabbits', 'pbCharge']; // 영거리 돌진을 첫 선택지로도 — 티어0과의 체감 차
   return ['multiCharge', 'riseBolt9', 'rabbits', 'cannons'];
 }
 
@@ -48,7 +48,8 @@ export function stepBoss(s: GameState): void {
       const lower = Math.max(0, Math.min(1,
         (b.stTick - BOSS.INTRO.CLEAR) / (BOSS.INTRO.TICKS - BOSS.INTRO.CLEAR)));
       const ease = (t: number): number => t * t * (3 - 2 * t);
-      b.y = (VIEW.H + 80) + (BOSS.HOVER_HIGH - VIEW.H - 80) * ease(arrive)
+      const enterY = VIEW.H + BOSS.ENTER_Y_OFFSET;
+      b.y = enterY + (BOSS.HOVER_HIGH - enterY) * ease(arrive)
         + (BOSS.HOVER_LOW - BOSS.HOVER_HIGH) * ease(lower);
       if (b.stTick >= BOSS.INTRO.TICKS) { setSt(b, 'idle'); b.y = BOSS.HOVER_LOW; b.hittable = true; }
       break;
@@ -353,8 +354,8 @@ export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
 export function specialHitBoss(s: GameState): void {
   const b = s.boss;
   if (!b || b.st === 'defeated' || b.st === 'enter') return;
-  b.hp -= 10;
-  b.dmg += 10;
+  b.hp -= SPECIAL.MOON_DMG;
+  b.dmg += SPECIAL.MOON_DMG;
   s.events.push({ kind: 'bossHit', y: b.y - BOSS.BODY_BOTTOM, n: b.hp });
   if (b.hp <= 0) defeatBoss(s);
 }

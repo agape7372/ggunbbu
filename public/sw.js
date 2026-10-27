@@ -1,5 +1,6 @@
-// 캐시 버전: 변경 시점마다 갱신해야 한다 (배포 시 사용자 캐시 무효화)
-const CACHE_VERSION = 'v9-hires'; // 2배 해상도 PNG — 같은 이름의 옛 1배 그림이 캐시에 남으면 새 매니페스트와 어긋난다
+// 캐시 버전: 빌드 플러그인(scripts/lib/offline-shell.mjs)이 번들 파일명과 public/img 목록·크기 해시로 채운다.
+// 손으로 올리지 않는다 — 같은 이름으로 그림을 바꿔도 해시가 달라져 옛 캐시가 버려진다.
+const CACHE_VERSION = '__BUILD__';
 const CACHE_PREFIX = 'gunbbu-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 // 빌드 플러그인이 실행 번들과 이미지 매니페스트에서 채운다.

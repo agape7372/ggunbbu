@@ -15,6 +15,15 @@ gradle.taskGraph.whenReady { graph ->
     if (wantsRelease && !keystorePropertiesFile.exists() && !project.hasProperty('android.injected.signing.store.file')) {
         throw new GradleException("shell/android/key.properties 없음 — 서명 없이 릴리스를 굽지 않는다 (storeFile·storePassword·keyAlias·keyPassword 필요, 정본: docs/RELEASE.md)")
     }
+    // 테스트 AdMob 앱 ID(발행자 3940256099942544)를 단 채 릴리스가 나가면 Play 심사·수익 단계에서야 발각된다.
+    // 디버그 빌드는 막지 않는다. 일부러 테스트 ID로 릴리스를 굽는 경우(내부 시험 등)만 -PallowTestAds 로 우회.
+    if (wantsRelease && !project.hasProperty('allowTestAds')) {
+        def manifestText = file('src/main/AndroidManifest.xml').text
+        def adId = (manifestText =~ /APPLICATION_ID"[^>]*value="([^"]*)"/)
+        if (adId.find() && adId.group(1).contains('3940256099942544')) {
+            throw new GradleException("AndroidManifest 의 AdMob 앱 ID가 Google 테스트 값이다 (${adId.group(1)}) — 실 앱 ID로 바꾸거나, 일부러 굽는 거라면 -PallowTestAds (정본: docs/RELEASE.md)")
+        }
+    }
 }
 
 android {

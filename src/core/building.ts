@@ -81,11 +81,6 @@ export function floorSpan(stack: FallingStack, i: number): [number, number] {
   return [bottom, bottom + stack.floors[i].h];
 }
 
-/** 스택 전체 높이 */
-export function stackHeight(stack: FallingStack): number {
-  return stack.floors.reduce((a, f) => a + f.h, 0);
-}
-
 /**
  * 히트박스 [lo, hi]와 겹치는 가장 낮은 층에 dmg. 층 붕괴 시 true 반환.
  * 반환: 'miss' | 'hit' | 'collapse'

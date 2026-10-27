@@ -21,14 +21,3 @@ export function rand(s: { rngState: number }): number {
 export function randInt(s: { rngState: number }, n: number): number {
   return Math.floor(rand(s) * n);
 }
-
-/** 가중 추첨: weights 합 1 불필요 */
-export function randPick(s: { rngState: number }, weights: readonly number[]): number {
-  const total = weights.reduce((a, b) => a + b, 0);
-  let x = rand(s) * total;
-  for (let i = 0; i < weights.length; i++) {
-    x -= weights[i];
-    if (x < 0) return i;
-  }
-  return weights.length - 1;
-}

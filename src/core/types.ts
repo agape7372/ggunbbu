@@ -209,14 +209,6 @@ export interface JuiceEvent {
   item?: ItemId;
 }
 
-export interface PhaseCounters {
-  boltsSpawned: number;
-  rocksSpawned: number;
-  /** 페이즈 경과 틱 (화산탄 타임박스 등) */
-  phaseTick: number;
-  /** 다음 스폰까지 틱 */
-  spawnCd: number;
-}
 
 export interface BonusState {
   /** 이벤트 회차 1~3 (토코톤 4+ = 100겹 반복) */

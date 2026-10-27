@@ -6,6 +6,8 @@ import { createInput } from './input/input';
 import { createApp, mountDebugPanel } from './ui/scenes';
 import { preloadAssets } from './render/assets';
 import { refreshFloorSheetAssets } from './render/floorSheetCache';
+import { createAdaptiveDpr } from './render/adaptiveDpr';
+import { createInsetProbe, fitStageBox } from './render/stageFit';
 import { loadSave } from './storage';
 import { mountInstallPrompt } from './ui/installPrompt';
 import { notifyAppReady, onLifecycle, isNative } from './platform/native';
@@ -18,26 +20,31 @@ const ctx = canvas.getContext('2d')!;
 // Wave 3 실PNG 투입 시 appReadyTimeout 10s를 잠식하고, 상류 throw에 신호가 유실돼 롤백 루프).
 notifyAppReady();
 
-// dpr ≤2 클램프 + 픽셀아트 설정
+// dpr ≤ dprCap(처음 2) 클램프 + 픽셀아트 설정. dprCap은 적응형 해상도가 내리기만 한다.
+let dprCap: number = VIEW.DPR_LADDER[0];
+let curDpr = 1;
 function setupCanvas(): void {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = VIEW.W * dpr;
-  canvas.height = VIEW.H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  curDpr = Math.min(window.devicePixelRatio || 1, dprCap);
+  canvas.width = VIEW.W * curDpr;
+  canvas.height = VIEW.H * curDpr;
+  ctx.setTransform(curDpr, 0, 0, curDpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 }
 
-// 레터박스
+// 레터박스 — 안전영역(상태바·제스처 바)을 뺀 상자 안에서 스케일하고 가운데로 앉힌다
+const insetProbe = createInsetProbe();
 function fitStage(): void {
   const stage = document.getElementById('stage')!;
   stage.style.setProperty('--field-h', `${VIEW.FIELD_H}px`);
-  const scale = Math.min(window.innerWidth / VIEW.W, window.innerHeight / VIEW.H);
-  stage.style.transform = `scale(${scale})`;
+  const { scale, dx, dy } = fitStageBox(window.innerWidth, window.innerHeight, insetProbe.read());
+  stage.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
 }
 
 setupCanvas();
 fitStage();
 window.addEventListener('resize', () => { setupCanvas(); fitStage(); });
+window.addEventListener('orientationchange', fitStage);
+insetProbe.watch(fitStage); // 늦게 도착한 인셋·내비 모드 전환
 
 const touch = initTouchLayer(document.getElementById('touch-layer')!);
 touch.setLeftHanded(loadSave().settings.leftHanded);
@@ -64,14 +71,21 @@ refreshFloorSheetAssets();
 let acc = 0;
 let last = performance.now();
 let paused = false;
+const adaptiveDpr = createAdaptiveDpr();
 
 function frame(now: number): void {
   requestAnimationFrame(frame);
   if (paused) { last = now; return; }
-  acc += Math.min((now - last) / 1000, 0.25);
+  const dtMs = now - last;
+  acc += Math.min(dtMs / 1000, 0.25);
   last = now;
   let ticked = false;
   while (acc >= TICK) { app.update(TICK); acc -= TICK; ticked = true; }
+  // 프레임이 계속 늦으면 캔버스 배율을 한 단계 낮춘다. 배율을 다시 잡으면 캔버스가 비므로 이 프레임에 바로 다시 그린다.
+  if (curDpr > VIEW.DPR_LADDER[VIEW.DPR_LADDER.length - 1]) {
+    const lower = adaptiveDpr.sample(dtMs, curDpr);
+    if (lower !== null) { dprCap = lower; setupCanvas(); ticked = true; }
+  }
   // 시뮬 틱이 한 번이라도 돈 프레임에만 그린다 — 고주사율 폰에서도 draw당 줄어드는 값(흔들림·번쩍·타이머)이
   // 프레임 수가 아니라 틱마다 줄어든다. 캔버스는 안 지우면 마지막 그림이 그대로 남는다.
   if (ticked) app.draw();

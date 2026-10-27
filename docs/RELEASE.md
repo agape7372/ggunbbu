@@ -41,18 +41,23 @@ curl -s https://gunbbu-ota.vercel.app/manifest.json   # version 확인
 
 ## 2. Android 빌드
 
+shell/README.md 와 같은 순서다(셸은 별도 패키지라 `shell/`에서 돈다). 웹 빌드가 `shell/www`로 복사된 뒤에 sync 해야
+낡은 웹이 앱에 실리지 않는다.
+
 ```bash
-npm run build && npx cap sync android
-cd android
-JAVA_HOME="D:/android-toolchain/jdk21" ./gradlew assembleDebug
-# 산출물: android/app/build/outputs/apk/debug/app-debug.apk
+cd shell
+npm ci                 # 처음 한 번 (또는 package-lock 이 바뀐 뒤)
+npm run web:build      # 루트 build(타입·예산 검사 포함) → shell/www 복사
+npx cap sync android
+JAVA_HOME="D:/android-toolchain/jdk21" npm run apk   # android/gradlew assembleDebug — 윈도우·맥·리눅스 공통
+# 산출물: shell/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 - 버전 올리기: 루트에서 `npm run version:native -- <versionName> [versionCode]` —
   gradle 두 값을 같이 올리고 다음에 발행할 OTA 버전까지 알려준다(내려가는 값은 거부).
 - 스토어 등록정보·Data Safety·콘텐츠 등급 답변 원고: [STORE_LISTING.md](STORE_LISTING.md).
 - `android/local.properties`(sdk.dir)는 기기별 — 커밋 금지. 새 PC에선 `sdk.dir=D:\\android-toolchain\\sdk` 직접 생성.
-- 릴리스: `./gradlew bundleRelease` → 서명 AAB.
+- 릴리스: `shell/android`에서 `./gradlew bundleRelease` → 서명 AAB. 테스트 광고 ID 가드는 §7.
 
 ## 3. 에뮬레이터 (D:\android-toolchain — podoal에서 검증된 조합)
 
@@ -86,11 +91,13 @@ npx @capacitor/assets generate --android \
   --iconBackgroundColor "#E8D9C4" --splashBackgroundColor "#E8D9C4"
 ```
 
-★현재 상태(2026-10-25 확인): 스플래시 비트맵을 지우지 **않았다**. `shell/android/app/src/main/res/drawable/splash.png`와
-`drawable-{land,port}-*/splash.png`가 그대로 있고 `styles.xml`의 `AppTheme.NoActionBarLaunch`가
-`@drawable/splash`를 배경으로 쓴다(`splash.xml`은 없다). 생성기 기본 이미지라서 이번 작업에서
-**브랜드 스플래시로 교체할 예정**이다. 교체가 끝나면 이 절을 실제 결과(어떤 파일을 남기고 지웠는지)로 다시 쓴다.
-아이콘 원본은 `assets/icon/`에 버전관리.
+★현재 상태(2026-10-27 확인): 스플래시는 아이보리 단색 + 가운데 표식이다(10-25 커밋 `6fb349d`가 교체).
+`styles.xml`의 `AppTheme.NoActionBarLaunch`가 `Theme.SplashScreen`을 부모로 `windowSplashScreenBackground`
+(`@color/ic_launcher_background`)와 `windowSplashScreenAnimatedIcon`(`@drawable/splash_icon`, `drawable-nodpi`)을 읽는다 —
+Android 12+ 시스템 스플래시와 androidx 호환 경로(API 24~30)가 같은 두 값을 쓴다.
+`drawable/splash.png`와 `drawable-{land,port}-*/splash.png`는 구형 템플릿 호환용으로 **남겨 둔** 파일이다.
+`BridgeActivity`가 곧바로 `AppTheme.NoActionBar`로 바꾸므로 사실상 보이지 않는다. 위 `@capacitor/assets` 명령으로
+다시 만들지 않는다 — PNG 재생성은 `scripts/gen-native-icons.mjs`. 아이콘 원본은 `assets/icon/`에 버전관리.
 
 ## 5. 서명·키스토어 (★미생성 — 사용자 작업)
 
@@ -141,6 +148,11 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 - [ ] **실 AdMob ID 교체** — 지금 매니페스트의 앱 ID(`AndroidManifest.xml`)와 광고 단위 ID(`src/platform/ads.ts`)는
       둘 다 Google 공식 테스트 값이다. 실 ID로 바꾼 AAB를 올려야 광고 수익이 생긴다(짝값 표는 `shell/README.md`).
       앱 ID는 네이티브라 AAB 재빌드가 필요하다
+- [ ] **릴리스 가드 통과** — 테스트 ID가 실려 나가는 걸 기계가 막는다(2026-10-27).
+      웹: `GUNBBU_RELEASE=1 VITE_ADMOB_REWARDED_ID=ca-app-pub-<발급 값> npm run build` — `scripts/check-release.mjs`가 빌드 맨 앞에서
+      빈 값·테스트 단위·형식 오류면 중단한다(`npm run check:release`로 단독 실행). 환경변수로만 읽으므로 `.env` 파일 값은 같이 export 한다.
+      셸: `bundleRelease`·`assembleRelease`는 `AndroidManifest.xml`의 AdMob 앱 ID에 테스트 발행자 번호가 있으면 GradleException.
+      테스트 ID로 일부러 굽는 내부 시험만 `-PallowTestAds`. 디버그 빌드는 막지 않는다
 - [ ] 콘텐츠 등급 설문 — 전체이용가(폭력·도박·공포 요소 0)
 - [ ] 스토어 등록정보: 앱 이름 「건뿌 - 떨어지는 건물 베기」, 짧은 설명, 자세한 설명 (원고는 STORE_LISTING.md)
 - [ ] 대상 연령 「16~17세, 18세 이상」 (STORE_LISTING.md 「앱 카테고리·태그」)
@@ -172,6 +184,13 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 > 호스트를 먼저 세우고(배포 성공을 curl로 확인) ② `VITE_OTA_BASE=<주소> npm run build`로 굽고 ③ 그 셸을 새로 출시한다.
 > 켜기 전까지 아래 절차와 위 「같은 코드로 OTA를 한 번 더 발행」 규칙은 적용되지 않는다. 방침(public/privacy.html)에도
 > 업데이트 확인 접속을 적지 않았으니, 켤 때 방침에 배포처를 추가한다.
+>
+> **켜기 전 조건 (2026-10-27, `ota.ts`에 반영됨)**
+> 1. `VITE_OTA_BASE`는 `https://`로 시작해야 켜진다(평문 http는 꺼짐). 끝 슬래시는 코드가 떼어 쓰지만 쓰지 않는 편이 낫다.
+> 2. 매니페스트의 `url`은 **https이고 `VITE_OTA_BASE` 아래**여야 한다. 다른 호스트·상대 주소·`@`/역슬래시 표기 장난은 무시한다.
+>    `scripts/ota-release.mjs`가 만드는 `<base>/bundles/<버전>.zip` 형태는 그대로 통과한다.
+> 3. 아직 없는 것 — **출처 서명**. 체크섬이 같은 매니페스트에서 오므로 호스트를 소유한 사람이 곧 신뢰 근거다.
+>    켜기 전에 Capgo 서명(공개키를 `shell/capacitor.config.ts`에 넣고 번들에 서명) 또는 허용 SHA 고정 중 하나를 넣을 것.
 
 `@capgo/capacitor-updater`(shell/ 의존성) + 정적 호스팅 `https://gunbbu-ota.vercel.app`
 (`manifest.json` + `bundles/*.zip` 두 파일뿐, 서버 로직 없음). 앱이 부팅 3초 뒤 매니페스트를 읽고

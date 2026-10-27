@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { makeState, advance } from '../src/core/sim';
 import { enterAct2Phase } from '../src/core/act2';
 import { EMPTY_INPUT, type GameState } from '../src/core/types';
-import { BOSS } from '../src/config';
+import { BOSS, SPECIAL } from '../src/config';
 import { stepBoss, tryHitBoss, specialHitBoss } from '../src/core/boss';
 
 function bossState(): GameState {
@@ -190,5 +190,31 @@ describe('집행기 보스', () => {
     for (let i = 0; i < 600; i++) { advance(a, EMPTY_INPUT); advance(b, EMPTY_INPUT); }
     expect(a.boss!.pattern).toBe(b.boss!.pattern);
     expect(a.rngState).toBe(b.rngState);
+  });
+
+  it('패턴 풀: 티어0엔 영거리 돌진이 직접 안 뽑히고, 티어1부터 시드 1~40 안에서 뽑힌다', () => {
+    const picked = (tier: 0 | 1): Set<string> => {
+      const seen = new Set<string>();
+      for (let seed = 1; seed <= 40; seed++) {
+        const s = makeState({ seed });
+        enterAct2Phase(s, 'moon');
+        const b = s.boss!;
+        b.tier = tier; b.dmg = tier === 1 ? BOSS.TIER1_DMG : 0;
+        b.st = 'idle'; b.stTick = BOSS.RECOVER_TICKS; b.lastPattern = null;
+        stepBoss(s);
+        seen.add(b.pattern!);
+      }
+      return seen;
+    };
+    expect(picked(0).has('pbCharge')).toBe(false);
+    expect(picked(1).has('pbCharge')).toBe(true);
+  });
+
+  it('필살기 대미지는 SPECIAL.MOON_DMG 한 곳에서 나온다', () => {
+    const s = bossState(); const b = s.boss!;
+    b.st = 'idle'; b.hittable = true;
+    specialHitBoss(s);
+    expect(b.hp).toBe(BOSS.HP - SPECIAL.MOON_DMG);
+    expect(b.dmg).toBe(SPECIAL.MOON_DMG);
   });
 });
