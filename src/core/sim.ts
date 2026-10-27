@@ -497,8 +497,9 @@ function stepAct1(s: GameState): void {
   s.p = Math.min(1, s.score / ACT1.UNLOCK_SCORE);
 
   // 챕터 전환 → 해금 이벤트 + 버터바 보너스 스테이지 진입
+  // 특별작전(기믹 판)은 시간제라 경계를 넘어도 그 구역에 머문다 — 난이도만 p를 따라 오른다
   const ch = chapterOf(s.p);
-  if (ch > s.chapter) {
+  if (ch > s.chapter && s.gimmick === 'none') {
     s.chapter = ch;
     s.events.push({ kind: 'chapterUnlock', n: ch });
     enterBonus(s, ch); // 회차 = 통과한 경계 수 (1~3)
@@ -506,7 +507,7 @@ function stepAct1(s: GameState): void {
   }
 
   // 2막 전환 [정본: 게이지 리셋, 콤보 유지]
-  if (s.score >= ACT1.UNLOCK_SCORE) {
+  if (s.score >= ACT1.UNLOCK_SCORE && s.gimmick === 'none') {
     enterAct2(s);
     return;
   }

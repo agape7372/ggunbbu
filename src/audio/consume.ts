@@ -1,7 +1,7 @@
 // GameState.events → SFX. core는 이벤트만 발행, 이 모듈이 프레임마다 소비(클리어는 씬).
 // boltCue/land 등은 kind 재사용 — 페이즈·보스 상태로 전용 프리셋을 고른다.
 import type { GameState, JuiceEvent, JuiceKind, Material } from '../core/types';
-import { AUDIO, BOSS } from '../config';
+import { AUDIO, BOSS, JUICE, TPS } from '../config';
 import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
 
@@ -44,7 +44,11 @@ export function consumeAudio(s: GameState): void {
     const mapped = mapEvent(e, s, kinds);
     if (mapped) {
       const semis = e.kind === 'hit' ? comboSemitones(e.combo ?? 0) : 0;
-      for (const name of mapped) playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
+      for (const name of mapped) {
+        // 필살 폭발은 히트스톱이 풀리는 틱에 화면에서 터진다 — 폭발음도 그 박자로 늦춘다
+        if (name === 'special') playSfx(name, { delay: JUICE.special.hitstop / TPS });
+        else playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
+      }
     }
     if (e.kind === 'special' || e.kind === 'bossDefeat') pulseDuckBgm();
   }
@@ -84,7 +88,7 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
     case 'butterCollapse':
       return ['butterPop'];
     case 'special':
-      return ['special'];
+      return ['whiff', 'special']; // 입력 틱 = 휘두름, 폭발음은 consumeAudio가 늦춘다
     case 'hurt':
       return ['pinned'];
     case 'guardBounce':

@@ -464,7 +464,7 @@ export const HAPTIC = {
   hit: 14, floorCollapse: 20, stackDestroy: [30, 20, 30],
   butterCollapse: 10, special: [100, 50, 200], hurt: 60,
   guardBounce: 15, headBonk: 12, bossDefeat: [100, 50, 100, 50, 200],
-  supply: 10, hatBreak: [30, 20, 30],
+  supply: 10, hatBreak: [30, 20, 30], pinEscape: [20, 30, 20],
   bossHit: 14, lifeLost: [60, 40, 90], gaugeFull: [12, 30, 12], guardDenied: 10,
   boltStrike: 25, bonusPerfect: [20, 30, 20, 30, 40], phaseClear: [20, 30, 40],
   HIT_THROTTLE: 3,        // 연타 시 3회당 1회 (hit·bossHit는 카운터를 따로 쓴다)

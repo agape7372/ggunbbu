@@ -1,12 +1,12 @@
 // 구역작전 기믹 4종(glass · ice · night · orbit) — core 분기 한 건씩 + 시각 시그니처(렌더 읽기 전용).
 // core 동작은 바꾸지 않는 묶음이다: 수치는 config(GIMMICK · STACK)에서 읽어 와 "기믹이 켜졌을 때만" 달라짐을 본다.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { GIMMICK, JUICE_SYS, PALETTE, PLAYER, STACK } from '../src/config';
+import { ACT1, GIMMICK, JUICE_SYS, PALETTE, PLAYER, STACK } from '../src/config';
 import { makeFloor, makeStack } from '../src/core/building';
 import { destroyStack, tryGuardBounce } from '../src/core/combat';
-import { makeState } from '../src/core/sim';
+import { advance, makeState } from '../src/core/sim';
 import { spawnAct1Building } from '../src/core/spawner';
-import type { GameState, GimmickId } from '../src/core/types';
+import { EMPTY_INPUT, type GameState, type GimmickId } from '../src/core/types';
 import { drawEffects, resetEffects, spawnFromEvent } from '../src/render/effects';
 import { fillSmallPaperPockets } from '../src/render/skylineWindows';
 
@@ -180,5 +180,22 @@ describe('night — 스카이라인 창 채우기(순수 픽셀 처리)', () => 
     const px = new Uint8ClampedArray(w * h * 4).fill(255);
     for (let y = 0; y < h; y++) { const o = (y * w + 4) * 4; px[o] = px[o + 1] = px[o + 2] = 26; } // 세로선 → 왼쪽 4열 조각
     expect(fillSmallPaperPockets(px, w, h, 200, [26, 26, 32])).toBe(0);
+  });
+});
+
+describe('특별작전은 구역 경계를 넘어도 그 구역에 머문다', () => {
+  it('기믹 판은 경계·2막 문턱을 넘는 점수에도 act1에 남고, 기본 판은 넘어간다', () => {
+    for (const g of ['glass', 'orbit', 'none'] as const) {
+      const s = arcade(g);
+      s.score = ACT1.UNLOCK_SCORE; // 경계 셋과 2막 문턱을 한꺼번에 넘긴 점수
+      advance(s, EMPTY_INPUT);
+      if (g === 'none') {
+        expect(s.mode).not.toBe('act1');
+      } else {
+        expect(s.mode).toBe('act1');
+        expect(s.chapter).toBe(0);
+        expect(s.events.some((e) => e.kind === 'chapterUnlock')).toBe(false);
+      }
+    }
   });
 });
