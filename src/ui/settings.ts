@@ -4,10 +4,13 @@
 import { saveSave, type SaveData, type SaveSettings } from '../storage';
 
 export const SHAKE_LABEL = ['없음', '약하게', '기본'] as const;
+export const FLASH_LABEL = SHAKE_LABEL;
 
 export interface SettingsSinks {
   setSoundOn(on: boolean): void;
-  setFeedbackOptions(o: { shakeLevel: 0 | 1 | 2; vibration: boolean }): void;
+  setBgmOn(on: boolean): void;
+  setSfxOn(on: boolean): void;
+  setFeedbackOptions(o: { shakeLevel: 0 | 1 | 2; vibration: boolean; flashLevel: 0 | 1 | 2 }): void;
   setLeftHanded(on: boolean): void;
 }
 
@@ -19,11 +22,10 @@ export function applySettingsPatch(
 ): SaveSettings {
   Object.assign(save.settings, patch);
   if (patch.sound !== undefined) sinks.setSoundOn(patch.sound);
-  if (patch.vibration !== undefined || patch.shakeLevel !== undefined) {
-    sinks.setFeedbackOptions({
-      shakeLevel: save.settings.shakeLevel,
-      vibration: save.settings.vibration,
-    });
+  if (patch.bgm !== undefined) sinks.setBgmOn(patch.bgm);
+  if (patch.sfx !== undefined) sinks.setSfxOn(patch.sfx);
+  if (patch.vibration !== undefined || patch.shakeLevel !== undefined || patch.flashLevel !== undefined) {
+    sinks.setFeedbackOptions(feedbackOf(save.settings));
   }
   if (patch.leftHanded !== undefined) sinks.setLeftHanded(patch.leftHanded);
   saveSave(save);
@@ -34,12 +36,15 @@ export function cycleShakeLevel(level: 0 | 1 | 2): 0 | 1 | 2 {
   return ((level + 1) % 3) as 0 | 1 | 2;
 }
 
+function feedbackOf(s: SaveSettings): { shakeLevel: 0 | 1 | 2; vibration: boolean; flashLevel: 0 | 1 | 2 } {
+  return { shakeLevel: s.shakeLevel, vibration: s.vibration, flashLevel: s.flashLevel };
+}
+
 /** 부팅 시 저장값을 터치/셰이크/소리에 한 번 밀어넣는다. */
 export function applySettingsToRuntime(save: SaveData, sinks: SettingsSinks): void {
   sinks.setSoundOn(save.settings.sound);
-  sinks.setFeedbackOptions({
-    shakeLevel: save.settings.shakeLevel,
-    vibration: save.settings.vibration,
-  });
+  sinks.setBgmOn(save.settings.bgm);
+  sinks.setSfxOn(save.settings.sfx);
+  sinks.setFeedbackOptions(feedbackOf(save.settings));
   sinks.setLeftHanded(save.settings.leftHanded);
 }

@@ -6,12 +6,15 @@
 import type { GameState, GimmickId } from '../core/types';
 import { makeState, advance, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
-import { ACT1, PALETTE, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, AUDIO, PALETTE, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
 import type { TouchInput } from './touchLayer';
-import { armAudioUnlock, initAudio, playSfx, resumeIfNeeded, setSoundOn, startBgm, stopBgm, suspendAudio } from '../audio/audio';
+import {
+  armAudioUnlock, duckBgm, initAudio, playSfx, resumeIfNeeded, setBgmOn, setSfxOn, setSoundOn,
+  startBgm, stopBgm, suspendAudio,
+} from '../audio/audio';
 import { consumeAudio } from '../audio/consume';
 import type { BgmTrack } from '../audio/sfx';
 import {
@@ -28,7 +31,7 @@ import { mountHud, ensureHudLayer } from './hud';
 import {
   mountOverlay, ensureOverlayLayer, titleViewFromSave, type OverlayApi,
 } from './overlay';
-import { applySettingsPatch as patchSettings, applySettingsToRuntime } from './settings';
+import { applySettingsPatch as patchSettings, applySettingsToRuntime, type SettingsSinks } from './settings';
 import {
   applyMissionEvent, ensureDaily, grant, grantOrbit, initAchieveProgress,
   MAX_REVIVES_PER_RUN, ORBIT_PER_AD, ACHIEVES, DAILY_POOL, claim, defById,
@@ -91,11 +94,14 @@ export function createApp(
   const ads = createAdsPort();
   const iap = createIapPort();
 
-  applySettingsToRuntime(save, {
+  const settingsSinks: SettingsSinks = {
     setSoundOn,
+    setBgmOn,
+    setSfxOn,
     setFeedbackOptions,
     setLeftHanded: (on) => { touch?.setLeftHanded(on); },
-  });
+  };
+  applySettingsToRuntime(save, settingsSinks);
   initRenderer();
   applyCosmetics(save.loadout); // 코스메틱 실반영 (08-30, P1-3)
   armAudioUnlock();
@@ -260,7 +266,7 @@ export function createApp(
     if (got.dust === 0 && got.orbit === 0) { playSfx('uiDeny'); return; }
     grant(save, got.dust, got.orbit);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast(gainText(got.dust, got.orbit));
     // 광고를 기다리는 동안 다른 탭으로 갔으면 끌고 오지 않는다
     if (overlay.getScreen() === 'missions') openMissions();
@@ -270,6 +276,7 @@ export function createApp(
   async function watchAd(kind: AdKind): Promise<boolean> {
     if (adBusy) return false;
     adBusy = true;
+    duckBgm('ad', true);
     overlay.toast('광고를 불러오는 중…');
     try {
       const r = await ads.showRewarded(kind);
@@ -280,6 +287,7 @@ export function createApp(
       return false;
     } finally {
       adBusy = false;
+      duckBgm('ad', false);
     }
   }
 
@@ -291,7 +299,7 @@ export function createApp(
   function doExchange(): void {
     if (!exchangeDust(save)) { playSfx('uiDeny'); return; }
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast(`먼지 ${DUST_EXCHANGE.dust} → 궤도조각 +${DUST_EXCHANGE.orbit}`);
     openShop();
   }
@@ -299,14 +307,10 @@ export function createApp(
   function resetData(): void {
     resetSave();
     save = loadSave();
-    applySettingsToRuntime(save, {
-      setSoundOn,
-      setFeedbackOptions,
-      setLeftHanded: (on) => { touch?.setLeftHanded(on); },
-    });
+    applySettingsToRuntime(save, settingsSinks);
     applyCosmetics(save.loadout);
     menuIndex = 0;
-    playSfx('uiBlip');
+    playSfx('uiBack');
     overlay.showTitle(titleView());
     overlay.toast('기록을 지웠습니다.');
   }
@@ -323,7 +327,7 @@ export function createApp(
     if (r !== 'ok') { playSfx('uiDeny'); return; }
     applySku(id as SkuId);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     openShop();
   }
 
@@ -334,7 +338,7 @@ export function createApp(
     applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grantOrbit(save, ORBIT_PER_AD);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast(gainText(0, ORBIT_PER_AD));
     if (overlay.getScreen() === 'shop') openShop();
   }
@@ -345,7 +349,7 @@ export function createApp(
     if (!spendOrbit(save, cost)) { playSfx('uiDeny'); return; }
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast('열었습니다. 장비에서 고르세요.');
     openShop();
   }
@@ -355,7 +359,7 @@ export function createApp(
     if (cost == null || !spendDust(save, cost)) { playSfx('uiDeny'); return; }
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast('샀습니다. 장비에서 고르세요.');
     openShop();
   }
@@ -364,7 +368,7 @@ export function createApp(
     save.loadout = equip(save.loadout, slot, id, ownedSet());
     applyCosmetics(save.loadout); // 즉시 반영 — 팔리는 물건은 실제로 바뀐다 (P1-3)
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('stamp');
     openCustom();
   }
 
@@ -416,7 +420,7 @@ export function createApp(
     if (usedAd) applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grant(save, 0, 0);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('stamp');
     goPlay();
   }
 
@@ -467,11 +471,7 @@ export function createApp(
   }
 
   function applySettingsPatch(p: Partial<SaveSettings>): void {
-    patchSettings(save, p, {
-      setSoundOn,
-      setFeedbackOptions,
-      setLeftHanded: (on) => { touch?.setLeftHanded(on); },
-    });
+    patchSettings(save, p, settingsSinks);
     overlay.showSettings(save.settings, settingsFrom === 'pause');
     playSfx('uiBlip');
   }
@@ -488,14 +488,14 @@ export function createApp(
     switch (scene) {
       case 'play': playSfx('uiBlip'); enterPause(); return;
       case 'pause':
-        playSfx('uiBlip');
+        playSfx(scr === 'settings' ? 'uiBack' : 'uiBlip');
         if (scr === 'settings') backFromSettings(); else resumePause();
         return;
       case 'story': skipStory(true); return;
       case 'gameover':
-      case 'ending': playSfx('uiBlip'); goTitle(); return;
+      case 'ending': playSfx('uiBack'); goTitle(); return;
       case 'title':
-        if (scr !== 'title') { playSfx('uiBlip'); overlay.showTitle(titleView()); return; }
+        if (scr !== 'title') { playSfx('uiBack'); overlay.showTitle(titleView()); return; }
         minimizeApp();
         return;
       default: minimizeApp();
@@ -503,7 +503,7 @@ export function createApp(
   }
 
   function enterTitleFromBoot(): void {
-    playSfx('uiBlip');
+    playSfx('uiOk');
     scene = 'title';
     setChrome('title');
     overlay.showTitle(titleView());
@@ -520,50 +520,50 @@ export function createApp(
   }
 
   function confirmTitle(): void {
-    if (menuIndex === 0) { playSfx('uiBlip'); startArcade(); }
+    if (menuIndex === 0) { playSfx('uiOk'); startArcade(); }
     else if (menuIndex === 1) {
       if (!save.act2Cleared && !debugOpen()) { playSfx('uiDeny'); return; }
-      playSfx('uiBlip');
+      playSfx('uiOk');
       startTokoton();
     } else if (menuIndex === 2) {
       if (save.butterTierReached <= 0 && !debugOpen()) { playSfx('uiDeny'); return; }
-      playSfx('uiBlip');
+      playSfx('uiOk');
       const tier = debugOpen() ? Math.max(3, save.butterTierReached) : save.butterTierReached;
       if (tier === 1) startButterChallenge(1);
       else overlay.showButterPick(tier);
-    } else { playSfx('uiBlip'); overlay.showOps(opsOpts()); }
+    } else { playSfx('uiOk'); overlay.showOps(opsOpts()); }
   }
 
   const hud = mountHud(ensureHudLayer(), { onPause: () => { playSfx('uiBlip'); enterPause(); } });
   overlay = mountOverlay(ensureOverlayLayer(), {
     onBoot: enterTitleFromBoot,
-    onArcade: () => { playSfx('uiBlip'); startArcade(); },
+    onArcade: () => { playSfx('uiOk'); startArcade(); },
     onTokoton: () => {
       if (!save.act2Cleared && !debugOpen()) { playSfx('uiDeny'); return; }
-      playSfx('uiBlip');
+      playSfx('uiOk');
       startTokoton();
     },
-    onButterRound: (round) => { playSfx('uiBlip'); startButterChallenge(round); },
-    onButterBack: () => { playSfx('uiBlip'); overlay.showTitle(titleView()); },
+    onButterRound: (round) => { playSfx('uiOk'); startButterChallenge(round); },
+    onButterBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
     onOpenSettings: () => { playSfx('uiBlip'); openSettings(); },
     onStorySkip: () => skipStory(true),
     onPauseResume: () => { playSfx('uiBlip'); resumePause(); },
-    onPauseQuit: () => { playSfx('uiBlip'); persist(); goTitle(); },
-    onSettingsBack: () => { playSfx('uiBlip'); backFromSettings(); },
+    onPauseQuit: () => { playSfx('uiBack'); persist(); goTitle(); },
+    onSettingsBack: () => { playSfx('uiBack'); backFromSettings(); },
     onSettingsPatch: applySettingsPatch,
     onGameOverContinue: () => {
       if (!state || scene !== 'gameover') return;
       if (state.mode === 'act2' && state.checkpoint > 0) {
-        playSfx('uiBlip');
+        playSfx('uiOk');
         continueFromCheckpoint(state);
         state.wazaGauge = 0;
         goPlay();
       }
     },
-    onGameOverRetry: () => { playSfx('uiBlip'); lastRun(); },
-    onGameOverTitle: () => { playSfx('uiBlip'); goTitle(); },
+    onGameOverRetry: () => { playSfx('uiOk'); lastRun(); },
+    onGameOverTitle: () => { playSfx('uiBack'); goTitle(); },
     onGameOverRevive: () => { void tryRevive(); },
-    onEndingDone: () => { playSfx('uiBlip'); goTitle(); },
+    onEndingDone: () => { playSfx('uiBack'); goTitle(); },
     onLogoTap: () => {
       if (!import.meta.env.DEV) return;
       titleTaps += 1;
@@ -573,12 +573,12 @@ export function createApp(
         overlay.showTitle(titleView());
       }
     },
-    onOpsPick: (id) => { playSfx('uiBlip'); startOp(id); },
+    onOpsPick: (id) => { playSfx('uiOk'); startOp(id); },
     onOpenOps: () => { playSfx('uiBlip'); overlay.showOps(opsOpts()); },
     onOpenMissions: () => { playSfx('uiBlip'); openMissions(); },
     onOpenShop: () => { playSfx('uiBlip'); openShop(); },
     onOpenCustom: () => { playSfx('uiBlip'); openCustom(); },
-    onMetaBack: () => { playSfx('uiBlip'); overlay.showTitle(titleView()); },
+    onMetaBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
     onClaimMission: (id, boost) => { void claimMission(id, boost); },
     onBuySku: (id) => { void buySku(id); },
     onAdOrbit: () => { void adOrbit(); },
@@ -618,6 +618,7 @@ export function createApp(
 
   function update(): void {
     const f = input.sample();
+    duckBgm('menu', scene === 'pause' || overlay.getScreen() === 'settings');
 
     switch (scene) {
       case 'boot': {
@@ -688,7 +689,7 @@ export function createApp(
         bgm('ending');
         overlayTicks -= 1;
         if (overlayTicks <= 0 || f.attack) {
-          if (f.attack) playSfx('uiBlip');
+          if (f.attack) playSfx('uiBack');
           goTitle();
         }
         break;
@@ -701,16 +702,19 @@ export function createApp(
           if (revivesUsed < MAX_REVIVES_PER_RUN) {
             void tryRevive();
           } else {
-            playSfx('uiBlip');
             const s = state!;
             if (s.mode === 'act2' && s.checkpoint > 0) {
+              playSfx('uiOk');
               continueFromCheckpoint(s);
               s.wazaGauge = 0;
               goPlay();
-            } else goTitle();
+            } else {
+              playSfx('uiBack');
+              goTitle();
+            }
           }
         } else if (f.special) {
-          playSfx('uiBlip');
+          playSfx('uiBack');
           goTitle();
         }
         break;
@@ -819,6 +823,7 @@ export function createApp(
           : save.bestArcade;
       persist();
       bgm(null);
+      playSfx('runEnd', { delay: AUDIO.RUN_END_DELAY }); // 목숨 소리(lifeLost)가 끝난 뒤 판 종료 신호
       scene = 'gameover';
       overlayTicks = 45;
       setChrome('gameover');

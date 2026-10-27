@@ -4,7 +4,7 @@
 import type { SaveData, SaveSettings } from '../storage';
 import { SCREENS, TAGLINE, TITLE } from '../content';
 import { fillGallery } from './gallery';
-import { SHAKE_LABEL } from './settings';
+import { FLASH_LABEL, SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
 import { nativeAppVersion } from '../platform/native';
 import { paintOps } from './opsView';
@@ -230,8 +230,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           <header class="sheet-head"><h2>설정</h2></header>
           <p class="sec-h">게임</p>
           <button type="button" class="set-row" data-act="set-sound"><span>소리</span><span class="sw" data-el="set-sound"></span></button>
+          <button type="button" class="set-row" data-act="set-bgm"><span>음악</span><span class="sw" data-el="set-bgm"></span></button>
+          <button type="button" class="set-row" data-act="set-sfx"><span>효과음</span><span class="sw" data-el="set-sfx"></span></button>
           <button type="button" class="set-row" data-act="set-vib"><span>진동</span><span class="sw" data-el="set-vib"></span></button>
           <button type="button" class="set-row" data-act="set-shake"><span>화면 흔들림</span><span class="set-val" data-el="set-shake"></span></button>
+          <button type="button" class="set-row" data-act="set-flash"><span>번쩍임</span><span class="set-val" data-el="set-flash"></span></button>
           <button type="button" class="set-row" data-act="set-hand"><span>왼손 조작</span><span class="sw" data-el="set-hand"></span></button>
           <p class="sec-h">도움말</p>
           <button type="button" class="set-row" data-act="howto"><span>조작 안내</span>${ICON.next}</button>
@@ -399,10 +402,13 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   function paintSettings(s: SaveSettings): void {
     settings = s;
     $('set-sound').classList.toggle('on', s.sound);
+    $('set-bgm').classList.toggle('on', s.bgm);
+    $('set-sfx').classList.toggle('on', s.sfx);
     $('set-vib').classList.toggle('on', s.vibration);
     $('set-hand').classList.toggle('on', s.leftHanded);
     $('set-shake').textContent = SHAKE_LABEL[s.shakeLevel];
-    for (const [act, on] of [['set-sound', s.sound], ['set-vib', s.vibration], ['set-hand', s.leftHanded]] as const) {
+    $('set-flash').textContent = FLASH_LABEL[s.flashLevel];
+    for (const [act, on] of [['set-sound', s.sound], ['set-bgm', s.bgm], ['set-sfx', s.sfx], ['set-vib', s.vibration], ['set-hand', s.leftHanded]] as const) {
       root.querySelector(`[data-act="${act}"]`)?.setAttribute('aria-pressed', String(on));
     }
   }
@@ -545,10 +551,15 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       }
       case 'set-back': h.onSettingsBack(); break;
       case 'set-sound': if (settings) h.onSettingsPatch({ sound: !settings.sound }); break;
+      case 'set-bgm': if (settings) h.onSettingsPatch({ bgm: !settings.bgm }); break;
+      case 'set-sfx': if (settings) h.onSettingsPatch({ sfx: !settings.sfx }); break;
       case 'set-vib': if (settings) h.onSettingsPatch({ vibration: !settings.vibration }); break;
       case 'set-hand': if (settings) h.onSettingsPatch({ leftHanded: !settings.leftHanded }); break;
       case 'set-shake':
         if (settings) h.onSettingsPatch({ shakeLevel: ((settings.shakeLevel + 1) % 3) as 0 | 1 | 2 });
+        break;
+      case 'set-flash':
+        if (settings) h.onSettingsPatch({ flashLevel: ((settings.flashLevel + 1) % 3) as 0 | 1 | 2 });
         break;
       case 'howto': showHowto(false); break;
       case 'privacy': openDoc('개인정보 처리방침', './privacy.html'); break;

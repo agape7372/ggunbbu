@@ -146,3 +146,23 @@ function pickId<T extends string>(value: unknown, allowed: readonly T[], fallbac
     ? (value as T)
     : fallback;
 }
+
+const CATALOG_IDS: ReadonlySet<string> = new Set([
+  ...WAZA_IDS, ...WEAPON_IDS, ...BODY_IDS, ...BLADE_IDS, ...LETTERS_IDS,
+]);
+
+/** 저장 owned를 카탈로그 교집합으로 거른다(중복 제거). 모르는 id·문자열 아닌 값은 버린다. */
+export function sanitizeOwned(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [...DEFAULT_OWNED_IDS];
+  return [...new Set(raw.filter((x): x is string => typeof x === 'string' && CATALOG_IDS.has(x)))];
+}
+
+/** 소유하지 않은 칸은 기본값으로 되돌린다. 기본 소유는 isOwned가 늘 통과시킨다. */
+export function enforceOwnedLoadout(loadout: Loadout, owned: readonly string[]): Loadout {
+  const set = new Set(owned);
+  const out = { ...loadout };
+  for (const slot of ['waza', 'weapon', 'body', 'blade', 'letters'] as const) {
+    if (!isOwned(set, slot, out[slot])) (out as Record<string, string>)[slot] = DEFAULT_LOADOUT[slot];
+  }
+  return out;
+}

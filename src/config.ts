@@ -442,3 +442,39 @@ export const PALETTE = {
 
 // ── 저장 ────────────────────────────────────────────────────────
 export const SAVE_KEY = 'gunbbu.v1';
+
+// ── 소리 (B1) ───────────────────────────────────────────────────
+// 믹스: 마스터 컴프레서(리미터 겸용) + 버스 상향. 수치는 OfflineAudioContext 렌더로 잰 출발점.
+export const AUDIO = {
+  COMP: { THRESHOLD: -12, KNEE: 6, RATIO: 12, ATTACK: 0.003, RELEASE: 0.15 },
+  SFX_BUS: 0.9,
+  BGM_BUS: 0.5,
+  /** 스케줄러 — 룩어헤드 0.2초·인터벌 25ms. 이만큼 이상 밀리면 따라잡지 않고 건너뛴다. */
+  LOOKAHEAD_MS: 25,
+  SCHEDULE_AHEAD_S: 0.2,
+  LATE_SKIP_S: 0.05,
+  /** 켜고 끄는 페이드(클릭 팝 방지) · 음악 정지 페이드 */
+  FADE_TC: 0.02,
+  STOP_FADE_S: 0.12,
+  /** BGM 덕킹 — 메뉴(일시정지·설정·광고 대기)는 상시, 필살·보스 격파는 0.3초 */
+  DUCK_MENU: 0.3,
+  DUCK_PULSE: 0.35,
+  DUCK_PULSE_S: 0.3,
+  DUCK_TC: 0.05,
+  /** 콤보 층 — 햇 8분 / 아르페지오. 마디 경계에서만 켜고 끈다. */
+  COMBO_HAT: 50,
+  COMBO_ARP: 150,
+  /** 멜로디 이중 발음 detune(±cent) */
+  DETUNE_CENTS: 6,
+  /** BGM 음량 — MEL은 이중 발음 한 쪽 몫. 킥 스텝에선 멜로디를 KICK_MEL_MUL배로 눌러 피크를 낮춘다. */
+  LEVEL: { MEL: 0.14, BASS: 0.3, KICK: 0.4, HAT: 0.18, KICK_MEL_MUL: 0.7, LAYER_HAT: 0.1, LAYER_ARP: 0.08 },
+  /** 콤보 이정표 — 경계 통과 때 한 번 */
+  MILESTONES: [50, 100, 200, 500, 999],
+  /** 한 틱에 이만큼보다 크게 뛴 콤보는 타격이 아니다(이어하기) — 이정표로 세지 않는다 */
+  MILESTONE_MAX_JUMP: 5,
+  /** 타격음 피치 사다리 — 장조 펜타토닉, 상한 +7반음, 내려가지 않는다 */
+  PITCH_LADDER: [0, 2, 4, 7],
+  PITCH_STEP_COMBO: 10,
+  /** 판 종료 신호음 — 목숨 소리(lifeLost)가 끝난 뒤 */
+  RUN_END_DELAY: 0.5,
+} as const;

@@ -1,5 +1,7 @@
 import { SAVE_KEY } from './config';
-import { DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, validateLoadout, type Loadout } from './meta/loadout';
+import {
+  DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, enforceOwnedLoadout, sanitizeOwned, validateLoadout, type Loadout,
+} from './meta/loadout';
 import { initAchieveProgress, type DailyState, type MissionProgress } from './meta/missions';
 
 export interface SaveSettings {
@@ -7,6 +9,9 @@ export interface SaveSettings {
   vibration: boolean;
   leftHanded: boolean;
   shakeLevel: 0 | 1 | 2; // 0=off 1=약 2=기본
+  flashLevel: 0 | 1 | 2; // 화면 번쩍임 — 0=off 1=약 2=기본
+  bgm: boolean; // 음악 (sound = 전체 음소거가 우선)
+  sfx: boolean; // 효과음
 }
 
 export interface SaveData {
@@ -44,6 +49,9 @@ export const DEFAULT_SAVE: SaveData = {
     vibration: true,
     leftHanded: false,
     shakeLevel: 2,
+    flashLevel: 2,
+    bgm: true,
+    sfx: true,
   },
   dust: 0,
   orbit: 0,
@@ -54,69 +62,68 @@ export const DEFAULT_SAVE: SaveData = {
   howtoSeen: false,
 };
 
+const BAK_KEY = `${SAVE_KEY}.bak`;
+const BAD_KEY = `${SAVE_KEY}.bad`;
+
 /**
  * localStorage에서 저장 데이터를 읽고 검증한다.
- * 손상·부재·파싱 실패 시 기본값의 복사본을 반환한다.
+ * 사다리: 본 키 → .bak(저장 성공 때마다 갱신) → 기본값. 본 키 원문이 깨졌으면 .bad에 남긴다.
  */
 export function loadSave(): SaveData {
   // SSR 또는 localStorage 부재 가드
   if (typeof localStorage === 'undefined') {
     return structuredClone(DEFAULT_SAVE);
   }
-
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) {
-      return structuredClone(DEFAULT_SAVE);
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-
-    // 타입 검증 및 부분 손상 복구
-    if (typeof parsed !== 'object' || parsed === null) {
-      return structuredClone(DEFAULT_SAVE);
-    }
-
-    // ★08-30: 파싱 순서 = parse → migrate(raw) → validateAndClamp (levain persistence 문법).
-    // 구 코드는 `v !== 1 → 전체 초기화`였다 — 스키마를 올리는 순간, 그리고 미래 버전에서
-    // 롤백하는 순간 전 사용자 세이브가 전멸하는 지뢰. 이제 어떤 v라도 버리지 않고
-    // 마이그레이션 후 필드 검증이 살릴 수 있는 만큼 살린다(clamp — 버리지 않는다).
-    const data = migrate(parsed as Record<string, unknown>);
-
-    // 필드별 타입가드 및 clamp 보정
-    const result: SaveData = {
-      v: 1,
-      bestArcade: num(data.bestArcade, DEFAULT_SAVE.bestArcade, 99_999_999),
-      bestTokoton: num(data.bestTokoton, DEFAULT_SAVE.bestTokoton, 99_999_999),
-      maxCombo: num(data.maxCombo, DEFAULT_SAVE.maxCombo, 999),
-      act2Cleared:
-        typeof data.act2Cleared === 'boolean'
-          ? data.act2Cleared
-          : DEFAULT_SAVE.act2Cleared,
-      buddhaMode:
-        typeof data.buddhaMode === 'boolean'
-          ? data.buddhaMode
-          : DEFAULT_SAVE.buddhaMode,
-      unlockedChapters: num(data.unlockedChapters, DEFAULT_SAVE.unlockedChapters, 3),
-      butterTierReached: num(data.butterTierReached, DEFAULT_SAVE.butterTierReached, 3),
-      butterBest: clampButterBest(data.butterBest),
-      settings: validateSettings(data.settings),
-      dust: num(data.dust, 0),
-      orbit: num(data.orbit, 0),
-      owned: Array.isArray(data.owned)
-        ? data.owned.filter((x): x is string => typeof x === 'string')
-        : [...DEFAULT_SAVE.owned],
-      loadout: validateLoadout(data.loadout),
-      daily: isDailyState(data.daily) ? data.daily : null,
-      achieves: Array.isArray(data.achieves) ? data.achieves.filter(isProgress) : initAchieveProgress(),
-      howtoSeen: typeof data.howtoSeen === 'boolean' ? data.howtoSeen : DEFAULT_SAVE.howtoSeen,
-    };
-
-    return result;
+    const main = parseSlot(raw);
+    if (main) return main;
+    if (raw) localStorage.setItem(BAD_KEY, raw); // 덮어쓰기 전에 깨진 원문 보존
+    return parseSlot(localStorage.getItem(BAK_KEY)) ?? structuredClone(DEFAULT_SAVE);
   } catch {
-    // JSON 파싱 실패 또는 기타 예외
     return structuredClone(DEFAULT_SAVE);
   }
+}
+
+/** 원문 하나를 파싱·검증한다. 비었거나 객체가 아니거나 깨졌으면 null. */
+function parseSlot(raw: string | null): SaveData | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  return normalize(parsed as Record<string, unknown>);
+}
+
+function normalize(raw: Record<string, unknown>): SaveData {
+  // ★08-30: 파싱 순서 = parse → migrate(raw) → validateAndClamp (levain persistence 문법).
+  // 구 코드는 `v !== 1 → 전체 초기화`였다 — 스키마를 올리는 순간, 그리고 미래 버전에서
+  // 롤백하는 순간 전 사용자 세이브가 전멸하는 지뢰. 이제 어떤 v라도 버리지 않고
+  // 마이그레이션 후 필드 검증이 살릴 수 있는 만큼 살린다(clamp — 버리지 않는다).
+  const data = migrate(raw);
+  const owned = sanitizeOwned(data.owned); // BL-13: 카탈로그 교집합
+  return {
+    v: 1,
+    bestArcade: num(data.bestArcade, DEFAULT_SAVE.bestArcade, 99_999_999),
+    bestTokoton: num(data.bestTokoton, DEFAULT_SAVE.bestTokoton, 99_999_999),
+    maxCombo: num(data.maxCombo, DEFAULT_SAVE.maxCombo, 999),
+    act2Cleared: typeof data.act2Cleared === 'boolean' ? data.act2Cleared : DEFAULT_SAVE.act2Cleared,
+    buddhaMode: typeof data.buddhaMode === 'boolean' ? data.buddhaMode : DEFAULT_SAVE.buddhaMode,
+    unlockedChapters: num(data.unlockedChapters, DEFAULT_SAVE.unlockedChapters, 3),
+    butterTierReached: num(data.butterTierReached, DEFAULT_SAVE.butterTierReached, 3),
+    butterBest: clampButterBest(data.butterBest),
+    settings: validateSettings(data.settings),
+    dust: num(data.dust, 0),
+    orbit: num(data.orbit, 0),
+    owned,
+    loadout: enforceOwnedLoadout(validateLoadout(data.loadout), owned),
+    daily: isDailyState(data.daily) ? data.daily : null,
+    achieves: Array.isArray(data.achieves) ? data.achieves.filter(isProgress) : initAchieveProgress(),
+    howtoSeen: typeof data.howtoSeen === 'boolean' ? data.howtoSeen : DEFAULT_SAVE.howtoSeen,
+  };
 }
 
 /**
@@ -173,11 +180,16 @@ function validateSettings(settings: unknown): SaveSettings {
     shakeLevel: isValidShakeLevel(s.shakeLevel)
       ? s.shakeLevel
       : DEFAULT_SAVE.settings.shakeLevel,
+    flashLevel: isValidShakeLevel(s.flashLevel)
+      ? s.flashLevel
+      : DEFAULT_SAVE.settings.flashLevel,
+    bgm: typeof s.bgm === 'boolean' ? s.bgm : DEFAULT_SAVE.settings.bgm,
+    sfx: typeof s.sfx === 'boolean' ? s.sfx : DEFAULT_SAVE.settings.sfx,
   };
 }
 
 /**
- * shakeLevel이 0 | 1 | 2 중 하나인지 검증한다.
+ * shakeLevel·flashLevel이 0 | 1 | 2 중 하나인지 검증한다.
  */
 function isValidShakeLevel(value: unknown): value is 0 | 1 | 2 {
   return typeof value === 'number' && (value === 0 || value === 1 || value === 2);
@@ -201,7 +213,7 @@ function clampButterBest(v: unknown): Record<number, number> {
 
 
 /**
- * 저장 데이터를 localStorage에 저장한다.
+ * 저장 데이터를 localStorage에 저장한다. 본 키가 써진 뒤에만 .bak을 같은 내용으로 갱신한다.
  * 실패 시(QuotaExceededError 포함) 조용히 무시한다.
  */
 export function saveSave(d: SaveData): void {
@@ -210,7 +222,9 @@ export function saveSave(d: SaveData): void {
   }
 
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(d));
+    const json = JSON.stringify(d);
+    localStorage.setItem(SAVE_KEY, json);
+    localStorage.setItem(BAK_KEY, json);
   } catch {
     // QuotaExceededError 포함 모든 예외를 무시한다.
     // 게임은 저장 실패에도 계속 동작한다.
@@ -226,7 +240,8 @@ export function resetSave(): void {
   }
 
   try {
-    localStorage.removeItem(SAVE_KEY);
+    // 백업까지 지운다 — 남기면 다음 로드가 지운 기록을 되살린다
+    for (const k of [SAVE_KEY, BAK_KEY, BAD_KEY]) localStorage.removeItem(k);
   } catch {
     // 삭제 실패도 무시한다.
   }

@@ -1,7 +1,8 @@
 // GameState.events → SFX. core는 이벤트만 발행, 이 모듈이 프레임마다 소비(클리어는 씬).
 // boltCue/land 등은 kind 재사용 — 페이즈·보스 상태로 전용 프리셋을 고른다.
 import type { GameState, JuiceEvent, JuiceKind, Material } from '../core/types';
-import { playSfx } from './audio';
+import { AUDIO, BOSS } from '../config';
+import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
 
 const STRONG_MAT: ReadonlySet<Material> = new Set(['hard', 'cathedral', 'lobby', 'penthouse']);
@@ -10,19 +11,58 @@ const COMBO_DROP_COVER: ReadonlySet<JuiceKind> = new Set([
   'guardBounce', 'hurt', 'butterCollapse',
 ]);
 
+/** 기본 타격 3변형(중음·저음·노이즈 비중) — 라운드로빈으로 반복 피로를 던다 */
+const HIT_VARIANTS: readonly SfxName[] = ['hit', 'hitLow', 'hitTick'];
+let hitRR = 0;
+let prevCombo = 0;
+let bossBreakFired = false;
+
+/** 콤보 → 타격음 피치(반음). 장조 펜타토닉 사다리, 상한 +7, 내려가지 않는다. */
+export function comboSemitones(combo: number): number {
+  const ladder = AUDIO.PITCH_LADDER;
+  return ladder[Math.min(ladder.length - 1, Math.floor(combo / AUDIO.PITCH_STEP_COMBO))];
+}
+
+/**
+ * 콤보가 이정표(50/100/200/500/999)를 올라서는 틱이면 그 값, 아니면 null.
+ * 이어하기(체크포인트 콤보 168)처럼 한 번에 크게 뛰는 건 타격이 아니므로 세지 않는다.
+ */
+export function comboMilestone(prev: number, now: number): number | null {
+  if (now <= prev || now - prev > AUDIO.MILESTONE_MAX_JUMP) return null;
+  for (let i = AUDIO.MILESTONES.length - 1; i >= 0; i--) {
+    const m = AUDIO.MILESTONES[i];
+    if (prev < m && now >= m) return m;
+  }
+  return null;
+}
+
 export function consumeAudio(s: GameState): void {
   const kinds = new Set<JuiceKind>();
   for (const e of s.events) kinds.add(e.kind);
 
   for (const e of s.events) {
     const mapped = mapEvent(e, s, kinds);
-    if (!mapped) continue;
-    const semis = e.kind === 'hit' ? Math.floor(((e.combo ?? 0) / 10) % 12) : 0;
-    for (const name of mapped) playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
+    if (mapped) {
+      const semis = e.kind === 'hit' ? comboSemitones(e.combo ?? 0) : 0;
+      for (const name of mapped) playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
+    }
+    if (e.kind === 'special' || e.kind === 'bossDefeat') pulseDuckBgm();
+  }
+
+  if (comboMilestone(prevCombo, s.combo) !== null) playSfx('milestone');
+  prevCombo = s.combo;
+  setComboLayer(s.combo);
+
+  // 보스 입장 BREAK(집게가 놓은 층이 부서지는 틱) — 상태 읽기, 이벤트 없음. 한 번만.
+  const b = s.boss;
+  if (b?.st === 'enter' && b.stTick >= BOSS.INTRO.BREAK) {
+    if (!bossBreakFired) { bossBreakFired = true; playSfx('bossRoar'); }
+  } else {
+    bossBreakFired = false;
   }
 }
 
-function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[] | null {
+export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[] | null {
   switch (e.kind) {
     case 'slash':
       return ['whiff'];
@@ -32,7 +72,7 @@ function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[]
       if (s.weapon === 'crowbar') return ['hitBar'];
       if (s.weapon === 'grinder') return ['hitGrind'];
       if (e.mat && STRONG_MAT.has(e.mat)) return ['hitStrong'];
-      return ['hit'];
+      return [HIT_VARIANTS[hitRR++ % HIT_VARIANTS.length]];
     case 'supply':
       return ['supply'];
     case 'hatBreak':
@@ -79,10 +119,14 @@ function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[]
       return ['uiBlip'];
     case 'bonusPerfect':
       return ['perfect'];
-    case 'phaseClear':
-      return [(e.n ?? 0) >= 100 ? 'bossRoar' : 'gaugeFull'];
+    case 'phaseClear': {
+      // 100+ = 보스 티어 포효 · 2막 구역 도달 = checkpoint · 그 밖(2막 진입·버터바 끝) = 도장
+      const n = e.n ?? 0;
+      if (n >= 100) return ['bossRoar'];
+      return [s.mode === 'act2' && n > 0 ? 'checkpoint' : 'stamp'];
+    }
     case 'chapterUnlock':
-      return ['gaugeFull'];
+      return ['stamp'];
     default:
       return null;
   }
