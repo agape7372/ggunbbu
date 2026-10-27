@@ -184,3 +184,84 @@ describe('깔림 방치 사이클 (08-30 4차)', () => {
     expect(s.stack).toBeNull();
   });
 });
+
+// ── C5: 진짜 깔림 탈출만 pinEscape 이벤트를 낸다 ──────────────────────────
+// 옛 휴리스틱(scenes: 깔림 → 깔림 아님·죽음 아님)은 방치 손실의 자비 바운스(pose=idle)와
+// Z 실패까지 탈출로 세서, 무입력으로 죽기만 해도 업적 「깔림 탈출」이 열렸다.
+describe('깔림 탈출 이벤트 (pinEscape)', () => {
+  const count = (s: GameState): number => s.events.filter((e) => e.kind === 'pinEscape').length;
+
+  function pinnedUnder(mat: 'hard' | 'lobby'): GameState {
+    const s = makeState();
+    s.lives = 9;
+    s.stack = makeStack({
+      variant: 'building', theme: 'europe',
+      floors: [makeFloor(mat), makeFloor(mat), makeFloor(mat)],
+      y: 100,
+    });
+    s.stack.vy = -600;
+    while (s.player.pose !== 'pinned' && s.tick < 300) advance(s, EMPTY_INPUT);
+    expect(s.player.pose).toBe('pinned');
+    while (s.hitstop > 0) advance(s, EMPTY_INPUT);
+    s.events.length = 0;
+    return s;
+  }
+
+  it('방치 손실은 탈출이 아니다', () => {
+    const s = pinnedByStack();
+    s.events.length = 0;
+    expect(neglectUntil(s, (x) => x.player.pose === 'idle')).toBeGreaterThan(0);
+    expect(s.events.some((e) => e.kind === 'lifeLost')).toBe(true);
+    expect(count(s)).toBe(0);
+  });
+
+  it('가드로 빠져나오면 정확히 1개', () => {
+    const s = pinnedUnder('hard');
+    advance(s, inp({ guard: true }));
+    expect(s.player.pose).not.toBe('pinned');
+    expect(count(s)).toBe(1);
+  });
+
+  it('Z로 층을 부수고 빠져나오면 1개', () => {
+    const s = pinnedUnder('hard');
+    advance(s, inp({ attack: true }));
+    expect(s.player.pose).not.toBe('pinned');
+    expect(count(s)).toBe(1);
+  });
+
+  it('Z가 층을 못 부수면(고HP) 자비 바운스일 뿐 탈출이 아니다', () => {
+    const s = pinnedUnder('lobby');
+    const lives = s.lives;
+    advance(s, inp({ attack: true }));
+    expect(s.lives).toBe(lives - 1);
+    expect(count(s)).toBe(0);
+  });
+
+  it('필살로 빠져나오면 1개', () => {
+    const s = pinnedUnder('hard');
+    s.wazaGauge = 100;
+    advance(s, inp({ special: true }));
+    expect(s.player.pose).not.toBe('pinned');
+    expect(count(s)).toBe(1);
+  });
+
+  it('돌더미 깔림도 가드로 빠지면 1개, 방치 손실은 0개', () => {
+    const rocks = (): GameState => {
+      const s = makeState();
+      s.lives = 9;
+      s.stackSpawnCd = 100000;
+      s.groundRocks = 2;
+      s.player.pose = 'pinned';
+      s.player.pinTick = 0;
+      return s;
+    };
+    const s = rocks();
+    advance(s, inp({ guard: true }));
+    expect(s.player.pose).not.toBe('pinned');
+    expect(count(s)).toBe(1);
+
+    const t = rocks();
+    neglectUntil(t, (x) => x.lives < 9);
+    expect(count(t)).toBe(0);
+  });
+});

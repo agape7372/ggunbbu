@@ -1,6 +1,6 @@
 // ★08-30: 세이브 전멸 지뢰 제거 가드 — v 불일치·손상에도 기록을 살린다 (levain 사다리 이식)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadSave, saveSave, DEFAULT_SAVE } from '../src/storage';
+import { loadSave, saveSave, resetSave, DEFAULT_SAVE } from '../src/storage';
 import { SAVE_KEY } from '../src/config';
 
 // node 환경 — 최소 localStorage 폴리필
@@ -80,5 +80,138 @@ describe('howtoSeen 무버전 키', () => {
     expect(loadSave().howtoSeen).toBe(false);
     store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true }));
     expect(loadSave().howtoSeen).toBe(true);
+  });
+});
+
+describe('백업 사다리 (T7)', () => {
+  const BAK = `${SAVE_KEY}.bak`;
+  const BAD = `${SAVE_KEY}.bad`;
+
+  it('저장에 성공하면 .bak도 같은 내용으로 갱신된다', () => {
+    saveSave({ ...structuredClone(DEFAULT_SAVE), bestArcade: 777 });
+    expect(store.get(BAK)).toBe(store.get(SAVE_KEY));
+    expect(JSON.parse(store.get(BAK)!).bestArcade).toBe(777);
+  });
+
+  it('본 키가 깨지면 .bak으로 살리고, 깨진 원문은 .bad에 남긴다', () => {
+    saveSave({ ...structuredClone(DEFAULT_SAVE), bestArcade: 4242, dust: 9 });
+    store.set(SAVE_KEY, '{"bestArcade": 99,'); // 쓰다 끊긴 JSON
+    const d = loadSave();
+    expect(d.bestArcade).toBe(4242);
+    expect(d.dust).toBe(9);
+    expect(store.get(BAD)).toBe('{"bestArcade": 99,');
+  });
+
+  it('본 키가 사라져도 .bak이 있으면 살린다', () => {
+    saveSave({ ...structuredClone(DEFAULT_SAVE), maxCombo: 321 });
+    store.delete(SAVE_KEY);
+    expect(loadSave().maxCombo).toBe(321);
+  });
+
+  it('둘 다 깨지면 기본값', () => {
+    store.set(SAVE_KEY, '{x');
+    store.set(BAK, 'nope');
+    expect(loadSave().bestArcade).toBe(0);
+  });
+
+  it('기록 지우기는 .bak·.bad까지 지운다 — 지운 기록이 되살아나면 안 된다', () => {
+    saveSave({ ...structuredClone(DEFAULT_SAVE), bestArcade: 5 });
+    store.set(BAD, 'x');
+    resetSave();
+    expect(store.has(SAVE_KEY) || store.has(BAK) || store.has(BAD)).toBe(false);
+    expect(loadSave().bestArcade).toBe(0);
+  });
+});
+
+describe('소리·번쩍임 설정 정규화', () => {
+  it('옛 저장(키 없음)은 음악·효과음 켬, 번쩍임 기본(2)', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, settings: { sound: false } }));
+    const s = loadSave().settings;
+    expect(s.sound).toBe(false);
+    expect(s.bgm).toBe(true);
+    expect(s.sfx).toBe(true);
+    expect(s.flashLevel).toBe(2);
+  });
+
+  it('값이 있으면 보존하고, 이상한 값은 기본값', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, settings: { bgm: false, sfx: false, flashLevel: 0 } }));
+    const s = loadSave().settings;
+    expect([s.bgm, s.sfx, s.flashLevel]).toEqual([false, false, 0]);
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, settings: { bgm: 'x', sfx: 3, flashLevel: 9 } }));
+    const t = loadSave().settings;
+    expect([t.bgm, t.sfx, t.flashLevel]).toEqual([true, true, 2]);
+  });
+});
+
+describe('소유 목록 대조 (BL-13)', () => {
+  it('owned는 카탈로그 교집합 — 모르는 id·중복은 버린다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, owned: ['hammer', 'hammer', 'ghost', 42, 'rebar'] }));
+    expect(loadSave().owned.sort()).toEqual(['hammer', 'rebar']);
+  });
+
+  it('미소유 장착 칸은 기본값으로 되돌린다', () => {
+    store.set(SAVE_KEY, JSON.stringify({
+      v: 1, owned: ['hammer'],
+      loadout: { waza: 'tetsu', weapon: 'grinder', body: 'amber', blade: 'wire', letters: 'flyer' },
+    }));
+    const l = loadSave().loadout;
+    expect(l.waza).toBe('tenchi');
+    expect(l.weapon).toBe('sword');
+    expect(l.body).toBe('ink');
+  });
+
+  it('산 물건의 장착은 유지한다', () => {
+    store.set(SAVE_KEY, JSON.stringify({
+      v: 1, owned: ['grinder', 'amber'],
+      loadout: { weapon: 'grinder', body: 'amber' },
+    }));
+    const l = loadSave().loadout;
+    expect(l.weapon).toBe('grinder');
+    expect(l.body).toBe('amber');
+  });
+});
+
+describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무버전 추가 키', () => {
+  it('옛 세이브(키 없음)는 기본값으로 채운다 — 버전은 안 올린다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
+    const d = loadSave();
+    expect(d.v).toBe(1);
+    expect(d.guardTaught).toBe(false);
+    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.license).toBe(0);
+    expect(d.opsGrade).toEqual({});
+  });
+
+  it('왕복: 새 키가 그대로 돌아온다', () => {
+    saveSave({
+      ...structuredClone(DEFAULT_SAVE),
+      guardTaught: true, stats: { buildings: 321, runs: 7 }, license: 2, opsGrade: { glass: 'A', night: 'S' },
+    });
+    const d = loadSave();
+    expect(d.guardTaught).toBe(true);
+    expect(d.stats).toEqual({ buildings: 321, runs: 7 });
+    expect(d.license).toBe(2);
+    expect(d.opsGrade).toEqual({ glass: 'A', night: 'S' });
+  });
+
+  it('오염은 버리지 않고 고친다 — 음수·문자열·범위 밖 등급·모르는 작전 id·모르는 도장', () => {
+    store.set(SAVE_KEY, JSON.stringify({
+      v: 1, guardTaught: 'yes',
+      stats: { buildings: -4, runs: 'x' },
+      license: 99,
+      opsGrade: { glass: 'S', ice: 'Z', ghost: 'A', night: 5, orbit: 'B' },
+    }));
+    const d = loadSave();
+    expect(d.guardTaught).toBe(false);
+    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.license).toBe(3);
+    expect(d.opsGrade).toEqual({ glass: 'S', orbit: 'B' });
+  });
+
+  it('stats가 객체가 아니어도 죽지 않는다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, stats: 7, opsGrade: [1, 2] }));
+    const d = loadSave();
+    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.opsGrade).toEqual({});
   });
 });

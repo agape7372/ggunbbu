@@ -6,12 +6,15 @@
 import type { GameState, GimmickId } from '../core/types';
 import { makeState, advance, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
-import { ACT1, PALETTE, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, TEACH, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
 import type { TouchInput } from './touchLayer';
-import { armAudioUnlock, initAudio, playSfx, resumeIfNeeded, setSoundOn, startBgm, stopBgm, suspendAudio } from '../audio/audio';
+import {
+  armAudioUnlock, duckBgm, initAudio, playSfx, resumeIfNeeded, setBgmOn, setSfxOn, setSoundOn,
+  startBgm, stopBgm, suspendAudio,
+} from '../audio/audio';
 import { consumeAudio } from '../audio/consume';
 import type { BgmTrack } from '../audio/sfx';
 import {
@@ -19,21 +22,26 @@ import {
   SCREENS,
   butterChallengeEnd,
   butterEnterLines,
-  gameoverQuip,
+  hudModeLabel,
   phaseBanner,
+  pickQuip,
   ENDING_FULL_COMBO,
 } from '../content';
-import { OPERATIONS } from '../content/world';
+import { introFor } from '../content/story';
+import { OPERATIONS, WEAPON_COPY } from '../content/world';
 import { mountHud, ensureHudLayer } from './hud';
+import { createRunCaps, type RunCap, type RunCaps } from './runCaps';
 import {
-  mountOverlay, ensureOverlayLayer, titleViewFromSave, type OverlayApi,
+  mountOverlay, ensureOverlayLayer, titleViewFromSave, type GameOverView, type OpsEndView, type OverlayApi, type StoryOpts,
 } from './overlay';
-import { applySettingsPatch as patchSettings, applySettingsToRuntime } from './settings';
+import { applySettingsPatch as patchSettings, applySettingsToRuntime, type SettingsSinks } from './settings';
 import {
   applyMissionEvent, ensureDaily, grant, grantOrbit, initAchieveProgress,
   MAX_REVIVES_PER_RUN, ORBIT_PER_AD, ACHIEVES, DAILY_POOL, claim, defById,
   equip, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
   dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY,
+  claimableCount, nextDustGoal,
+  betterGrade, isOpId, licenseTitle, opGrade, opLimitTicks, opValue, takeExam, type OpId,
 } from '../meta';
 import { createAdsPort, type AdKind } from '../platform/ads';
 import { minimizeApp, onBackButton, onLifecycle } from '../platform/native';
@@ -47,7 +55,7 @@ import {
   DEBUG_TITLE_TAPS,
 } from './debugMenu';
 
-type SceneName = 'boot' | 'title' | 'play' | 'story' | 'ending' | 'gameover' | 'pause';
+type SceneName = 'boot' | 'title' | 'play' | 'story' | 'ending' | 'gameover' | 'opsend' | 'pause';
 type Chrome = 'boot' | 'title' | 'playing' | 'paused' | 'story' | 'gameover' | 'ending';
 
 const CHROME: readonly Chrome[] = ['boot', 'title', 'playing', 'paused', 'story', 'gameover', 'ending'];
@@ -84,6 +92,26 @@ export function createApp(
   // 오염시키지 않는다 — 재화(먼지·궤도) 지급만 유지. 부처버전 문법: 치트 런 = 기록 없음.
   let runExempt = false;
   let dustDirty = false; // 판 도중 재화 지급 발생 표시 — noteMissions 말미 저장 트리거
+  // 이번 판 결과 카드용 계수 — 부활·체크포인트 이어하기는 같은 판이라 계속 쌓는다
+  let runBuildings = 0;
+  let runDust = 0;
+  let butterRoundNo = 0; // 버터바 챌린지 회차(0 = 챌린지 아님). 종료 시점엔 s.bonus가 이미 null이라 따로 든다
+  let gameoverDelay = 0; // 결과 카드가 뜨기까지 남은 틱 — 그동안 캔버스만 그린다
+  let pendingOver: GameOverView | null = null;
+  let pendingOps: OpsEndView | null = null; // 작전 결과 카드 — 게임오버 카드와 같은 박자로 늦춘다
+  // 저장 밖 세션 기억 — 새로 열면 처음부터 (C10·C13)
+  let sessionArcadeRuns = 0; // 이번 세션에서 아케이드를 시작한 횟수 → 구역 인트로 사다리
+  let deathStreak = 0; // 같은 세션 연속 사망 (신기록·클리어에서 끊긴다) → 만담 사다리
+  let streakCounted = false; // 한 판에서 부활해 또 죽어도 연속 사망은 한 번만
+  let lastQuip = ''; // 직전에 보인 만담 — 반복 금지
+  let runHatBreaks = 0; // 이번 판에 안전모가 깨진 횟수
+  // 특별작전 한 판: 어느 작전인지 + 지금까지 부순 건물 수. null = 작전 아님
+  let opRun: { id: OpId; buildings: number } | null = null;
+  let runCaps: RunCaps = createRunCaps({ prevBest: 0, countsRecord: false });
+  // 가드 가르치기: 평생 첫 목숨 손실 때 판을 잠깐 세우고 가드 키를 맥동시킨다 (C1)
+  let teachFreeze = 0;
+  let teachPulse = 0;
+  let storyLock = 0; // 이야기 판에 들어선 직후 연타로 넘어가지 않게 잠그는 틱
   // 「한 판 더」는 방금 그 모드로 — 구역 작전·야근에서 죽었는데 아케이드로 튕기지 않게
   let lastRun: () => void = () => startArcade();
   let runLabel = '아케이드';
@@ -91,11 +119,14 @@ export function createApp(
   const ads = createAdsPort();
   const iap = createIapPort();
 
-  applySettingsToRuntime(save, {
+  const settingsSinks: SettingsSinks = {
     setSoundOn,
+    setBgmOn,
+    setSfxOn,
     setFeedbackOptions,
     setLeftHanded: (on) => { touch?.setLeftHanded(on); },
-  });
+  };
+  applySettingsToRuntime(save, settingsSinks);
   initRenderer();
   applyCosmetics(save.loadout); // 코스메틱 실반영 (08-30, P1-3)
   armAudioUnlock();
@@ -117,6 +148,7 @@ export function createApp(
     save.unlockedChapters = fresh.unlockedChapters;
     save.butterTierReached = fresh.butterTierReached;
     save.buddhaMode = fresh.buddhaMode;
+    save.daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters); // 「오늘 N/3」가 날짜 넘김에도 맞게
     return titleViewFromSave(save, menuIndex, debugOpen());
   }
 
@@ -125,10 +157,50 @@ export function createApp(
     s.weapon = save.loadout.weapon;
     s.gimmick = gimmick;
     revivesUsed = 0;
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    runBuildings = 0;
+    runDust = 0;
+    runHatBreaks = 0;
+    butterRoundNo = 0;
+    opRun = null;
+    streakCounted = false;
+    endTeach();
+    save.stats.runs += 1;
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     applyMissionEvent(daily, save.achieves, { kind: 'runStart' });
+    saveSave(save);
+  }
+
+  /** 판 시작 때 최고 기록을 한 번 들고 자막 추적을 새로 연다 — 판 도중 저장이 올려도 흔들리지 않게 */
+  function armCaps(kind: 'arcade' | 'tokoton' | 'butter' | 'op'): void {
+    const prevBest = kind === 'tokoton' ? save.bestTokoton
+      : kind === 'butter' ? (save.butterBest[butterRoundNo] ?? 0)
+        : save.bestArcade;
+    runCaps = createRunCaps({ prevBest, countsRecord: !runExempt && kind !== 'op' });
+  }
+
+  function showCaps(caps: readonly RunCap[]): void {
+    for (const c of caps) {
+      hud.note(c.text);
+      if (c.blip) playSfx('uiBlip');
+    }
+  }
+
+  function endTeach(): void {
+    teachFreeze = 0;
+    teachPulse = 0;
+    hud.teach(false);
+    touch?.setGuardHint(false);
+  }
+
+  function startTeach(): void {
+    save.guardTaught = true;
+    saveSave(save);
+    teachFreeze = TEACH.GUARD_FREEZE_TICKS;
+    teachPulse = TEACH.GUARD_PULSE_TICKS;
+    hud.teach(true);
+    touch?.setGuardHint(true);
   }
 
   function bgm(track: BgmTrack | null): void {
@@ -138,12 +210,20 @@ export function createApp(
   }
 
   function goPlay(): void {
+    gameoverDelay = 0;
+    pendingOver = null;
+    pendingOps = null;
     scene = 'play';
     overlay.hide();
     setChrome('playing');
   }
 
   function goTitle(): void {
+    gameoverDelay = 0;
+    pendingOver = null;
+    pendingOps = null;
+    opRun = null;
+    endTeach();
     state = null;
     scene = 'title';
     menuIndex = 0;
@@ -160,14 +240,18 @@ export function createApp(
     runExempt = debugOpen();
     save.buddhaMode = loadSave().buddhaMode;
     state = makeState({ seed: debugSeed(0x9e3779b9) });
+    const lifetimeFirst = save.stats.runs === 0; // applyRunMeta 가 판 수를 올리기 전에 본다
+    sessionArcadeRuns += 1;
     applyRunMeta(state);
     butterChallenge = false;
+    armCaps('arcade');
     if (save.buddhaMode && import.meta.env.DEV) {
       enterAct2Phase(state, 'cathedral');
       state.wazaGauge = 0;
       showOverlay(STORY.intro, 60 * 6);
     } else {
-      showOverlay(STORY.chapters[0], 60 * 3);
+      const intro = introFor(sessionArcadeRuns, lifetimeFirst);
+      showOverlay(intro.lines, intro.ticks);
     }
   }
 
@@ -180,18 +264,21 @@ export function createApp(
       unlockedChapters: debugOpen() ? 3 : save.unlockedChapters,
       allOpen: debugOpen(),
       act2Cleared: debugOpen() || save.act2Cleared,
+      grades: save.opsGrade,
     };
   }
 
   function openMissions(): void {
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     overlay.showMissions(daily, save.achieves, ads.ready());
   }
 
   function openShop(): void {
-    overlay.showShop({ dust: save.dust, orbit: save.orbit }, ownedSet(), {
+    overlay.showShop({
+      dust: save.dust, orbit: save.orbit, license: save.license, buildings: save.stats.buildings,
+    }, ownedSet(), {
       iap: iap.available(),
       ad: ads.ready(),
     });
@@ -222,9 +309,25 @@ export function createApp(
     if (op.gimmick === 'none' && op.themeIndex > 0) {
       state.p = ACT1.CHAPTER_BOUNDS[op.themeIndex - 1];
       state.score = Math.floor(ACT1.UNLOCK_SCORE * state.p);
+    } else if (isOpId(op.id)) {
+      // 특별작전: 시작 p 를 점수로 주입하고 목표를 따라 센다 (C3)
+      opRun = { id: op.id, buildings: 0 };
+      state.p = GIMMICK.START_P[op.id];
+      state.score = Math.floor(ACT1.UNLOCK_SCORE * state.p);
     }
     butterChallenge = false;
+    armCaps('op');
     goPlay();
+  }
+
+  /** 철거 자격 응시 — 조건과 응시료는 economy.ts 한 곳 */
+  function doExam(): void {
+    const to = licenseTitle(save.license + 1);
+    if (!takeExam(save)) { playSfx('uiDeny'); return; }
+    saveSave(save);
+    playSfx('stamp');
+    overlay.toast(SCREENS.license.passed(to));
+    openShop();
   }
 
   function applySku(id: SkuId): void {
@@ -246,7 +349,7 @@ export function createApp(
   async function claimMission(id: string, boost: boolean): Promise<void> {
     const def = defById(id) ?? DAILY_POOL.find((d) => d.id === id) ?? ACHIEVES.find((d) => d.id === id);
     if (!def) return;
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     const prog = daily.items.find((p) => p.id === id) ?? save.achieves.find((p) => p.id === id);
@@ -260,7 +363,7 @@ export function createApp(
     if (got.dust === 0 && got.orbit === 0) { playSfx('uiDeny'); return; }
     grant(save, got.dust, got.orbit);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast(gainText(got.dust, got.orbit));
     // 광고를 기다리는 동안 다른 탭으로 갔으면 끌고 오지 않는다
     if (overlay.getScreen() === 'missions') openMissions();
@@ -270,28 +373,30 @@ export function createApp(
   async function watchAd(kind: AdKind): Promise<boolean> {
     if (adBusy) return false;
     adBusy = true;
+    duckBgm('ad', true);
     overlay.toast('광고를 불러오는 중…');
     try {
       const r = await ads.showRewarded(kind);
       overlay.toast('');
       if (r === 'ok') return true;
-      overlay.toast(r === 'skip' ? '끝까지 봐야 받을 수 있습니다.' : '광고를 불러오지 못했습니다. 잠시 뒤 다시 해 주세요.');
+      overlay.toast(r === 'skip' ? '끝까지 봐야 받을 수 있습니다.' : '광고를 못 불러왔습니다. 다시 눌러 주세요.');
       playSfx('uiDeny');
       return false;
     } finally {
       adBusy = false;
+      duckBgm('ad', false);
     }
   }
 
   function gainText(dust: number, orbit: number): string {
     const parts = [dust > 0 ? `먼지 +${dust}` : '', orbit > 0 ? `궤도조각 +${orbit}` : ''].filter(Boolean);
-    return `받았습니다 · ${parts.join(' · ')}`;
+    return parts.join(' · ');
   }
 
   function doExchange(): void {
     if (!exchangeDust(save)) { playSfx('uiDeny'); return; }
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast(`먼지 ${DUST_EXCHANGE.dust} → 궤도조각 +${DUST_EXCHANGE.orbit}`);
     openShop();
   }
@@ -299,14 +404,10 @@ export function createApp(
   function resetData(): void {
     resetSave();
     save = loadSave();
-    applySettingsToRuntime(save, {
-      setSoundOn,
-      setFeedbackOptions,
-      setLeftHanded: (on) => { touch?.setLeftHanded(on); },
-    });
+    applySettingsToRuntime(save, settingsSinks);
     applyCosmetics(save.loadout);
     menuIndex = 0;
-    playSfx('uiBlip');
+    playSfx('uiBack');
     overlay.showTitle(titleView());
     overlay.toast('기록을 지웠습니다.');
   }
@@ -323,18 +424,18 @@ export function createApp(
     if (r !== 'ok') { playSfx('uiDeny'); return; }
     applySku(id as SkuId);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     openShop();
   }
 
   async function adOrbit(): Promise<void> {
     if (!(await watchAd('orbitPack'))) return;
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grantOrbit(save, ORBIT_PER_AD);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast(gainText(0, ORBIT_PER_AD));
     if (overlay.getScreen() === 'shop') openShop();
   }
@@ -345,7 +446,7 @@ export function createApp(
     if (!spendOrbit(save, cost)) { playSfx('uiDeny'); return; }
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast('열었습니다. 장비에서 고르세요.');
     openShop();
   }
@@ -355,7 +456,7 @@ export function createApp(
     if (cost == null || !spendDust(save, cost)) { playSfx('uiDeny'); return; }
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('coin');
     overlay.toast('샀습니다. 장비에서 고르세요.');
     openShop();
   }
@@ -364,7 +465,7 @@ export function createApp(
     save.loadout = equip(save.loadout, slot, id, ownedSet());
     applyCosmetics(save.loadout); // 즉시 반영 — 팔리는 물건은 실제로 바뀐다 (P1-3)
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('stamp');
     openCustom();
   }
 
@@ -376,6 +477,7 @@ export function createApp(
     state = makeState({ seed: debugSeed(0x51ed270b), mode: 'tokoton' });
     applyRunMeta(state);
     butterChallenge = false;
+    armCaps('tokoton');
     goPlay();
   }
 
@@ -390,6 +492,8 @@ export function createApp(
     state.wazaGauge = WAZA_GAUGE.MAX;
     enterBonus(state, round);
     butterChallenge = true;
+    butterRoundNo = round;
+    armCaps('butter');
     goPlay();
   }
 
@@ -410,26 +514,32 @@ export function createApp(
     if (!state || scene !== 'gameover') return;
     revivesUsed += 1;
     grantMercyLife(state);
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'revive' });
     if (usedAd) applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grant(save, 0, 0);
     saveSave(save);
-    playSfx('uiBlip');
+    playSfx('stamp');
     goPlay();
   }
 
-  function showOverlay(lines: readonly string[], ticks: number, after?: () => void): void {
+  const reduceMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+  function showOverlay(lines: readonly string[], ticks: number, after?: () => void, opts?: StoryOpts): void {
     overlayTicks = ticks;
     pendingAfterOverlay = after ?? null;
+    // 와이프가 도는 동안은 연타가 이야기를 건너뛰지 않게 잠근다. 동작 줄이기 설정이면 와이프 없이 바로 컷.
+    const wipeTicks = reduceMotion() ? 0 : opts?.wipeTicks ?? 0;
+    storyLock = wipeTicks;
     scene = 'story';
     setChrome('story');
-    overlay.showStory(lines);
+    overlay.showStory(lines, { ...opts, wipeTicks });
   }
 
   function skipStory(fromUser = false): void {
     if (scene !== 'story') return;
+    if (fromUser && storyLock > 0) return;
     if (fromUser) playSfx('uiBlip');
     const after = pendingAfterOverlay;
     pendingAfterOverlay = null;
@@ -443,9 +553,9 @@ export function createApp(
     if (!runExempt) {
       const sc = state.score;
       if (state.mode === 'tokoton') save.bestTokoton = Math.max(save.bestTokoton, sc);
-      else if (butterChallenge && state.bonus) {
-        const r = state.bonus.round;
-        save.butterBest[r] = Math.max(save.butterBest[r] ?? 0, sc);
+      else if (butterChallenge && butterRoundNo > 0) {
+        // 챌린지 종료 시점엔 state.bonus가 이미 null이다 — 회차는 시작 때 든 값을 쓴다
+        save.butterBest[butterRoundNo] = Math.max(save.butterBest[butterRoundNo] ?? 0, sc);
       } else save.bestArcade = Math.max(save.bestArcade, sc);
       save.maxCombo = Math.max(save.maxCombo, state.peakCombo);
       save.unlockedChapters = Math.max(save.unlockedChapters, state.chapter);
@@ -467,11 +577,7 @@ export function createApp(
   }
 
   function applySettingsPatch(p: Partial<SaveSettings>): void {
-    patchSettings(save, p, {
-      setSoundOn,
-      setFeedbackOptions,
-      setLeftHanded: (on) => { touch?.setLeftHanded(on); },
-    });
+    patchSettings(save, p, settingsSinks);
     overlay.showSettings(save.settings, settingsFrom === 'pause');
     playSfx('uiBlip');
   }
@@ -488,14 +594,15 @@ export function createApp(
     switch (scene) {
       case 'play': playSfx('uiBlip'); enterPause(); return;
       case 'pause':
-        playSfx('uiBlip');
+        playSfx(scr === 'settings' ? 'uiBack' : 'uiBlip');
         if (scr === 'settings') backFromSettings(); else resumePause();
         return;
       case 'story': skipStory(true); return;
       case 'gameover':
-      case 'ending': playSfx('uiBlip'); goTitle(); return;
+      case 'opsend':
+      case 'ending': playSfx('uiBack'); goTitle(); return;
       case 'title':
-        if (scr !== 'title') { playSfx('uiBlip'); overlay.showTitle(titleView()); return; }
+        if (scr !== 'title') { playSfx('uiBack'); overlay.showTitle(titleView()); return; }
         minimizeApp();
         return;
       default: minimizeApp();
@@ -503,7 +610,7 @@ export function createApp(
   }
 
   function enterTitleFromBoot(): void {
-    playSfx('uiBlip');
+    playSfx('uiOk');
     scene = 'title';
     setChrome('title');
     overlay.showTitle(titleView());
@@ -520,50 +627,54 @@ export function createApp(
   }
 
   function confirmTitle(): void {
-    if (menuIndex === 0) { playSfx('uiBlip'); startArcade(); }
+    if (menuIndex === 0) { playSfx('uiOk'); startArcade(); }
     else if (menuIndex === 1) {
       if (!save.act2Cleared && !debugOpen()) { playSfx('uiDeny'); return; }
-      playSfx('uiBlip');
+      playSfx('uiOk');
       startTokoton();
     } else if (menuIndex === 2) {
       if (save.butterTierReached <= 0 && !debugOpen()) { playSfx('uiDeny'); return; }
-      playSfx('uiBlip');
+      playSfx('uiOk');
       const tier = debugOpen() ? Math.max(3, save.butterTierReached) : save.butterTierReached;
       if (tier === 1) startButterChallenge(1);
       else overlay.showButterPick(tier);
-    } else { playSfx('uiBlip'); overlay.showOps(opsOpts()); }
+    } else { playSfx('uiOk'); overlay.showOps(opsOpts()); }
   }
 
   const hud = mountHud(ensureHudLayer(), { onPause: () => { playSfx('uiBlip'); enterPause(); } });
   overlay = mountOverlay(ensureOverlayLayer(), {
     onBoot: enterTitleFromBoot,
-    onArcade: () => { playSfx('uiBlip'); startArcade(); },
+    onArcade: () => { playSfx('uiOk'); startArcade(); },
     onTokoton: () => {
       if (!save.act2Cleared && !debugOpen()) { playSfx('uiDeny'); return; }
-      playSfx('uiBlip');
+      playSfx('uiOk');
       startTokoton();
     },
-    onButterRound: (round) => { playSfx('uiBlip'); startButterChallenge(round); },
-    onButterBack: () => { playSfx('uiBlip'); overlay.showTitle(titleView()); },
+    onButterRound: (round) => { playSfx('uiOk'); startButterChallenge(round); },
+    onButterBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
     onOpenSettings: () => { playSfx('uiBlip'); openSettings(); },
     onStorySkip: () => skipStory(true),
     onPauseResume: () => { playSfx('uiBlip'); resumePause(); },
-    onPauseQuit: () => { playSfx('uiBlip'); persist(); goTitle(); },
-    onSettingsBack: () => { playSfx('uiBlip'); backFromSettings(); },
+    onPauseQuit: () => { playSfx('uiBack'); persist(); goTitle(); },
+    onSettingsBack: () => { playSfx('uiBack'); backFromSettings(); },
     onSettingsPatch: applySettingsPatch,
     onGameOverContinue: () => {
       if (!state || scene !== 'gameover') return;
       if (state.mode === 'act2' && state.checkpoint > 0) {
-        playSfx('uiBlip');
+        playSfx('uiOk');
         continueFromCheckpoint(state);
         state.wazaGauge = 0;
         goPlay();
       }
     },
-    onGameOverRetry: () => { playSfx('uiBlip'); lastRun(); },
-    onGameOverTitle: () => { playSfx('uiBlip'); goTitle(); },
+    onGameOverRetry: () => { playSfx('uiOk'); lastRun(); },
+    onGameOverTitle: () => { playSfx('uiBack'); goTitle(); },
     onGameOverRevive: () => { void tryRevive(); },
-    onEndingDone: () => { playSfx('uiBlip'); goTitle(); },
+    onOpsEndList: () => { playSfx('uiBlip'); goTitle(); overlay.showOps(opsOpts()); },
+    onExam: doExam,
+    onEndingDone: () => { playSfx('uiBack'); goTitle(); },
+    onEndingRetry: () => { playSfx('uiOk'); lastRun(); },
+    missionBadge: () => claimableCount(save.daily, save.achieves),
     onLogoTap: () => {
       if (!import.meta.env.DEV) return;
       titleTaps += 1;
@@ -573,12 +684,12 @@ export function createApp(
         overlay.showTitle(titleView());
       }
     },
-    onOpsPick: (id) => { playSfx('uiBlip'); startOp(id); },
+    onOpsPick: (id) => { playSfx('uiOk'); startOp(id); },
     onOpenOps: () => { playSfx('uiBlip'); overlay.showOps(opsOpts()); },
     onOpenMissions: () => { playSfx('uiBlip'); openMissions(); },
     onOpenShop: () => { playSfx('uiBlip'); openShop(); },
     onOpenCustom: () => { playSfx('uiBlip'); openCustom(); },
-    onMetaBack: () => { playSfx('uiBlip'); overlay.showTitle(titleView()); },
+    onMetaBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
     onClaimMission: (id, boost) => { void claimMission(id, boost); },
     onBuySku: (id) => { void buySku(id); },
     onAdOrbit: () => { void adOrbit(); },
@@ -604,6 +715,10 @@ export function createApp(
   });
   onBackButton(handleBack);
 
+  // 웹에서 폰을 가로로 눕히면 「세로로 돌려 주세요」 판이 덮는다(style.css) — 그 뒤에서 판이 흘러가지 않게 멈춘다
+  window.matchMedia?.('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)')
+    .addEventListener?.('change', (e) => { if (e.matches) enterPause(); });
+
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
       e.preventDefault();
@@ -618,6 +733,7 @@ export function createApp(
 
   function update(): void {
     const f = input.sample();
+    duckBgm('menu', scene === 'pause' || overlay.getScreen() === 'settings');
 
     switch (scene) {
       case 'boot': {
@@ -659,6 +775,7 @@ export function createApp(
         break;
       }
       case 'story': {
+        if (storyLock > 0) storyLock -= 1;
         overlayTicks -= 1;
         if (overlayTicks <= 0) skipStory();
         else if (f.attack) skipStory(true);
@@ -666,13 +783,22 @@ export function createApp(
       }
       case 'play': {
         const s = state!;
+        if (teachFreeze > 0) {
+          // 평생 첫 목숨 손실 — 판을 잠깐 세워 가드를 가르친다. 캔버스는 그 장면 그대로 (C1)
+          teachFreeze -= 1;
+          if (teachFreeze === 0) hud.teach(false);
+          break;
+        }
+        if (teachPulse > 0) {
+          teachPulse -= 1;
+          if (f.guard || teachPulse === 0) { teachPulse = 0; touch?.setGuardHint(false); } // 눌러 봤으면 충분
+        }
         if (debug) tickDebug(s, f);
         const wasMode = s.mode;
         const wasPhase = s.act2Phase;
-        const wasPinned = s.player.pose === 'pinned';
         advance(s, f);
         if (debug) settleDebug(s);
-        noteMissions(s, { wasPinned });
+        noteMissions(s);
         consumeAudio(s);
         consumeEvents(s);
         handleTransitions(s, wasMode, wasPhase);
@@ -686,31 +812,55 @@ export function createApp(
         break;
       case 'ending': {
         bgm('ending');
-        overlayTicks -= 1;
-        if (overlayTicks <= 0 || f.attack) {
-          if (f.attack) playSfx('uiBlip');
-          goTitle();
-        }
+        // 버튼으로만 나간다(키보드: 공격 = 한 판 더, 필살 = 타이틀). 직전 연타가 새어 나오지 않게 잠깐 잠근다.
+        if (overlayTicks > 0) { overlayTicks -= 1; break; }
+        if (f.attack) { playSfx('uiOk'); lastRun(); }
+        else if (f.special) { playSfx('uiBack'); goTitle(); }
+        break;
+      }
+      case 'opsend': {
+        bgm(null);
+        // 작전 결과 카드: 한 판 더(공격) · 타이틀(필살). 직전 연타가 새어 나오지 않게 잠깐 잠근다.
+        if (overlayTicks > 0) { overlayTicks -= 1; break; }
+        if (f.attack) { playSfx('uiOk'); lastRun(); }
+        else if (f.special) { playSfx('uiBack'); goTitle(); }
         break;
       }
       case 'gameover': {
         bgm(null);
+        if (gameoverDelay > 0) {
+          gameoverDelay -= 1;
+          if (gameoverDelay === 0 && pendingOver) {
+            overlay.showGameOver(pendingOver);
+            pendingOver = null;
+            overlayTicks = UI_FLOW.GAMEOVER_LOCK;
+          } else if (gameoverDelay === 0 && pendingOps) {
+            overlay.showOpsEnd(pendingOps);
+            pendingOps = null;
+            scene = 'opsend';
+            overlayTicks = UI_FLOW.GAMEOVER_LOCK;
+          }
+          break;
+        }
         overlayTicks -= 1;
         if (overlayTicks > 0) break;
         if (f.attack) {
           if (revivesUsed < MAX_REVIVES_PER_RUN) {
             void tryRevive();
           } else {
-            playSfx('uiBlip');
             const s = state!;
             if (s.mode === 'act2' && s.checkpoint > 0) {
+              playSfx('uiOk');
               continueFromCheckpoint(s);
               s.wazaGauge = 0;
               goPlay();
-            } else goTitle();
+            } else {
+              playSfx('uiBack');
+              goTitle();
+            }
           }
         } else if (f.special) {
-          playSfx('uiBlip');
+          playSfx('uiBack');
           goTitle();
         }
         break;
@@ -729,18 +879,21 @@ export function createApp(
   }
 
   function noteKind(kind: string, extra?: { n?: number; combo?: number; zone?: string }): void {
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind, ...extra });
   }
 
-  function noteMissions(s: GameState, extra?: { wasPinned?: boolean }): void {
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+  function earnDust(n: number): void {
+    grant(save, n, 0);
+    runDust += n;
+    dustDirty = true;
+  }
+
+  function noteMissions(s: GameState): void {
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
-    if (extra?.wasPinned && s.player.pose !== 'pinned' && s.player.pose !== 'dead') {
-      applyMissionEvent(daily, save.achieves, { kind: 'pinEscape' });
-    }
     for (const e of s.events) {
       let kind = e.kind as string;
       if (kind === 'bonusPerfect') kind = 'butterPerfect';
@@ -753,26 +906,131 @@ export function createApp(
       if (e.kind === 'chapterUnlock' && (e.n ?? 0) >= 2) {
         applyMissionEvent(daily, save.achieves, { kind: 'zoneSurvive', zone: 'eastasia' });
       }
-      if (e.kind === 'stackDestroy') { grant(save, DUST_PER_BUILDING, 0); dustDirty = true; }
-      if (e.kind === 'special') { grant(save, DUST_PER_SPECIAL, 0); dustDirty = true; }
-      if (e.kind === 'supply' && e.item === 'dust') { grant(save, DUST_PER_SUPPLY, 0); dustDirty = true; }
+      if (e.kind === 'stackDestroy') {
+        earnDust(DUST_PER_BUILDING);
+        runBuildings += 1;
+        save.stats.buildings += 1; // 평생 누적 — 철거 자격 조건 (C4)
+        if (opRun) opRun.buildings += 1;
+      }
+      if (e.kind === 'special') earnDust(DUST_PER_SPECIAL);
+      if (e.kind === 'supply' && e.item === 'dust') earnDust(DUST_PER_SUPPLY);
+      if (e.kind === 'hatBreak') runHatBreaks += 1;
+      if (e.kind === 'lifeLost' && !s.over && !save.guardTaught) startTeach();
     }
+    showCaps(runCaps.observe({ combo: s.combo, score: s.score }));
     // 판 도중 이탈(탭 종료·데스크톱 강제 종료)에도 재화가 안 날아가게 — 틱마다가 아니라
     // 지급 발생 프레임에만 저장 (08-30, P1-2 잔여)
     if (dustDirty) { saveSave(save); dustDirty = false; }
   }
 
+  /** 판 도중 HUD 한 줄 — 작전이 아니면 '' */
+  function opHud(s: GameState): string {
+    if (!opRun) return '';
+    const remain = Math.max(0, Math.ceil((opLimitTicks(opRun.id) - s.tick) / 60));
+    return SCREENS.ops.hud(opRun.id, remain, opNow(s));
+  }
+
+  /** 특별작전 판의 값 — 건물 작전은 부순 채 수, 버티기 작전은 버틴 초 */
+  function opNow(s: GameState): number {
+    return opRun ? opValue(opRun.id, { buildings: opRun.buildings, ticks: s.tick }) : 0;
+  }
+
+  function gameoverView(s: GameState, prevBest: number): GameOverView {
+    const goal = nextDustGoal(save.owned, save.dust);
+    const goalName = goal ? WEAPON_COPY[goal.id as keyof typeof WEAPON_COPY]?.name : undefined;
+    const best = !runExempt && s.score > 0 && s.score > prevBest;
+    // 같은 세션 연속 사망 — 한 판에서 부활해 또 죽어도 한 번. 신기록이면 흐름이 끊긴 것으로 본다 (C10)
+    if (!streakCounted) { deathStreak += 1; streakCounted = true; }
+    const line = pickQuip({
+      score: s.score,
+      hatBroke: runHatBreaks > 0,
+      chapter: s.chapter,
+      mode: s.mode,
+      boss: s.act2Phase === 'moon',
+      streak: deathStreak,
+      seed: s.score + s.tick,
+    }, lastQuip);
+    lastQuip = line;
+    if (best) deathStreak = 0;
+    // 작전 판이면 다음 도장까지가 다음 목표다
+    const opGoal = opRun ? SCREENS.ops.progress(opRun.id, opNow(s)) : '';
+    return {
+      score: s.score,
+      combo: s.peakCombo,   // 현재 콤보는 죽는 히트가 이미 끊었다 — 결과화면은 이번 판 최고치를 쓴다
+      buildings: runBuildings,
+      dustGained: runDust,
+      zone: hudModeLabel(s.mode, s.chapter, s.act2Phase),
+      goal: opGoal || (goal && goalName ? SCREENS.gameover.nextGoal(goalName, goal.short) : ''),
+      canContinue: s.mode === 'act2' && s.checkpoint > 0,
+      canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
+      adRevive: ads.ready(),
+      reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
+      reviveMax: MAX_REVIVES_PER_RUN,
+      line,
+      best,
+      mode: runLabel,
+      rank: licenseTitle(save.license),
+    };
+  }
+
+  /**
+   * 특별작전이 끝나는 순간인가 — 한도 시간에 닿았거나, 도장을 딴 채 죽었다.
+   * 도장 없이 죽은 판은 보통 게임오버 카드로 간다(false). 맞으면 결과 카드를 예약하고 true.
+   */
+  function endOpIfDue(s: GameState): boolean {
+    if (!opRun) return false;
+    const timeUp = s.tick >= opLimitTicks(opRun.id);
+    const dead = s.over === 'gameover';
+    if (!timeUp && !dead) return false;
+    const id = opRun.id;
+    const value = opNow(s);
+    const grade = opGrade(id, value);
+    if (dead && !grade) return false;
+    const prev = save.opsGrade[id];
+    const best = betterGrade(prev, grade ?? undefined);
+    const improved = !!grade && best !== prev;
+    if (best) save.opsGrade[id] = best;
+    persist();
+    bgm(null);
+    playSfx(grade ? 'stamp' : 'runEnd', grade ? undefined : { delay: AUDIO.RUN_END_DELAY });
+    const seconds = OPERATION[id].metric === 'seconds';
+    pendingOps = {
+      name: runLabel,
+      grade,
+      improved,
+      best: best ?? null,
+      goal: SCREENS.ops.goal(id),
+      rows: [
+        seconds ? [SCREENS.ops.held, `${value}초`, true] : [SCREENS.ops.built, `${value}채`, true],
+        ['점수', s.score.toLocaleString('ko-KR')],
+      ],
+      progress: SCREENS.ops.progress(id, value),
+      rank: licenseTitle(save.license),
+    };
+    scene = 'gameover'; // 카드가 뜰 때까지의 박자는 게임오버와 같다. 카드가 뜨면 opsend
+    setChrome('gameover');
+    gameoverDelay = dead ? UI_FLOW.GAMEOVER_CARD_DELAY : 6;
+    overlayTicks = 0;
+    return true;
+  }
+
   function handleTransitions(s: GameState, wasMode: GameState['mode'], wasPhase: GameState['act2Phase']): void {
+    const wipe = { wipeTicks: UI_FLOW.WIPE_TICKS };
+    if (endOpIfDue(s)) return;
+    // 버터바를 지나 새 구역으로 돌아왔다 — 구역 이름을 한 번 자막으로 (C11)
+    if (wasMode === 'bonus' && s.mode === 'act1' && !butterChallenge && !opRun) {
+      showCaps(runCaps.observe({ combo: s.combo, score: s.score, zone: s.chapter }));
+    }
     if (wasMode !== 'act2' && s.mode === 'act2' && wasMode !== 'bonus') {
       persist();
       noteKind('act2Enter');
       bgm('act2a');
-      showOverlay(STORY.intro, 60 * 6);
+      showOverlay(STORY.intro, 60 * 6, undefined, { ...wipe, stamps: [SCREENS.stamps.act2] });
       return;
     }
     if (s.mode === 'bonus' && wasMode === 'tokoton') {
       bgm('butter');
-      showOverlay([SCREENS.butter.banner], 60 * 2);
+      showOverlay([SCREENS.butter.banner], 60 * 2, undefined, wipe);
       return;
     }
     if (s.mode === 'bonus' && wasMode === 'act1') {
@@ -781,60 +1039,62 @@ export function createApp(
       save.butterTierReached = Math.max(save.butterTierReached, s.bonus?.round ?? 0);
       saveSave(save);
       bgm('butter');
-      showOverlay(butterEnterLines(STORY.chapters[Math.min(ch, 3)]), 60 * 3);
+      showOverlay(butterEnterLines(STORY.chapters[Math.min(ch, 3)]), 60 * 3, undefined, {
+        ...wipe, stamps: [SCREENS.stamps.zone(Math.min(ch, 3) + 1)],
+      });
       return;
     }
     if (butterChallenge && wasMode === 'bonus' && s.mode === 'act1') {
+      const prevBest = save.butterBest[butterRoundNo] ?? 0;
+      const newBest = !runExempt && s.score > 0 && s.score > prevBest;
+      const perfect = s.events.some((e) => e.kind === 'bonusPerfect');
       persist();
       showOverlay(butterChallengeEnd(s.score), 60 * 3, () => {
         goTitle();
+      }, {
+        ...wipe,
+        stamps: [...(newBest ? [SCREENS.stamps.best] : []), ...(perfect ? [SCREENS.stamps.perfect] : [])],
       });
       return;
     }
     if (s.mode === 'act2' && wasPhase && s.act2Phase && wasPhase !== s.act2Phase && !s.over) {
-      showOverlay(phaseBanner(s.act2Phase), 60 * 3);
+      showOverlay(phaseBanner(s.act2Phase), 60 * 3, undefined, wipe);
       return;
     }
     if (s.over === 'cleared') {
+      const best = !runExempt && s.score > 0 && s.score > save.bestArcade;
       save.act2Cleared = true;
+      deathStreak = 0; // 클리어하면 연속 사망은 끝
       noteKind('moonClear');
       persist();
       bgm('ending');
       const lines = s.fullCombo ? [...STORY.ending, '', ENDING_FULL_COMBO] : STORY.ending;
       showOverlay(lines, 60 * 12, () => {
         scene = 'ending';
-        overlayTicks = 60 * 4;
         setChrome('ending');
         overlay.showEnding({
           score: s.score,
           maxCombo: save.maxCombo,
           fullCombo: s.fullCombo,
+          best,
         });
-      });
+        overlayTicks = UI_FLOW.GAMEOVER_LOCK;
+      }, { wipeTicks: UI_FLOW.WIPE_BOSS_TICKS });
       return;
     }
     if (s.over === 'gameover') {
       const prevBest = s.mode === 'tokoton' ? save.bestTokoton
-        : butterChallenge && s.bonus ? (save.butterBest[s.bonus.round] ?? 0)
+        : butterChallenge && butterRoundNo > 0 ? (save.butterBest[butterRoundNo] ?? 0)
           : save.bestArcade;
       persist();
       bgm(null);
+      playSfx('runEnd', { delay: AUDIO.RUN_END_DELAY }); // 목숨 소리(lifeLost)가 끝난 뒤 판 종료 신호
       scene = 'gameover';
-      overlayTicks = 45;
       setChrome('gameover');
-      overlay.showGameOver({
-        score: s.score,
-        combo: s.peakCombo,   // 현재 콤보는 죽는 히트가 이미 끊었다 — 결과화면은 이번 판 최고치를 쓴다
-
-        canContinue: s.mode === 'act2' && s.checkpoint > 0,
-        canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
-        adRevive: ads.ready(),
-        reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
-        reviveMax: MAX_REVIVES_PER_RUN,
-        line: gameoverQuip(s.score + s.tick),
-        best: !runExempt && s.score > 0 && s.score > prevBest,
-        mode: runLabel,
-      });
+      // 카드는 잠깐 뒤에 — 그동안 캔버스가 마지막 장면을 보여 준다
+      pendingOver = gameoverView(s, prevBest);
+      gameoverDelay = UI_FLOW.GAMEOVER_CARD_DELAY;
+      overlayTicks = 0;
       return;
     }
   }
@@ -843,9 +1103,9 @@ export function createApp(
     ctx.fillStyle = PALETTE.BG;
     ctx.fillRect(0, 0, VIEW.W, VIEW.H);
 
-    if (state && (scene === 'play' || scene === 'pause' || scene === 'story' || scene === 'gameover' || scene === 'ending')) {
+    if (state && (scene === 'play' || scene === 'pause' || scene === 'story' || scene === 'gameover' || scene === 'opsend' || scene === 'ending')) {
       drawGame(ctx, state);
-      if (scene === 'play' || scene === 'pause') hud.sync(state);
+      if (scene === 'play' || scene === 'pause') hud.sync(state, opHud(state));
     }
   }
 

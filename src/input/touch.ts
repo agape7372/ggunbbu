@@ -16,6 +16,8 @@ export interface TouchInput {
   clearPressed(): void;
   /** 깔림 상태 → 가드 버튼이 '탈출' 버튼으로 바뀐다 */
   setPinned(pinned: boolean): void;
+  /** 가드 가르치기 — 가드 키가 맥동한다(첫 목숨 손실 때 한 번) */
+  setGuardHint(on: boolean): void;
   /** 필살 게이지 충전 완료 → 필살 버튼만 노랑(노랑 = "지금 쓸 수 있다") */
   setSpecialReady(ready: boolean): void;
   /** 왼손잡이 모드 → #touch-layer.mirror 토글 */
@@ -210,6 +212,10 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
         btn.setAttribute('aria-label', label);
         btn.classList.toggle('pinned', pinned);
       }
+    },
+
+    setGuardHint(on: boolean) {
+      for (const btn of buttonsByAction.guard) btn.classList.toggle('teach', on);
     },
 
     setSpecialReady(next: boolean) {

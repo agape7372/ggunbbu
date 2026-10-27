@@ -2,17 +2,19 @@
 // 원작 UI 카피 미사용 — 건뿌 병맛 한국어만. 콘셉트 「철거 서류」(style.css 머리말).
 
 import type { SaveData, SaveSettings } from '../storage';
+import { TICK } from '../config';
 import { SCREENS, TAGLINE, TITLE } from '../content';
 import { fillGallery } from './gallery';
-import { SHAKE_LABEL } from './settings';
+import { FLASH_LABEL, SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
 import { nativeAppVersion } from '../platform/native';
-import { paintOps } from './opsView';
+import { paintOps, type OpsOpts } from './opsView';
 import { paintMissions } from './missionView';
-import { paintShop } from './shopView';
+import { paintShop, type ShopInv } from './shopView';
+import type { OpGrade } from '../meta/ops';
 import { paintCustom } from './customView';
 import { ICON } from './icons';
-import { ACHIEVES, DAILY_POOL } from '../meta';
+import { ACHIEVES, DAILY_POOL, dailyDone, licenseTitle } from '../meta';
 import { APP_VERSION } from '../version';
 import type { DailyState, Loadout, MissionProgress } from '../meta/types';
 import { escapeHtml } from './html';
@@ -26,6 +28,7 @@ export type OverlayScreen =
   | 'settings'
   | 'butter'
   | 'gameover'
+  | 'opsend'
   | 'ending'
   | 'ops'
   | 'missions'
@@ -42,11 +45,27 @@ export interface TitleView {
   unlockedChapters: number;
   buddhaMode: boolean;
   soundOn: boolean;
+  /** 지갑 칩 */
+  dust: number;
+  orbit: number;
+  /** 오늘 일일 미션 — total 0이면 줄을 숨긴다 */
+  todayDone: number;
+  todayTotal: number;
+  /** 회차별 최고 점수 (회차 선택 버튼 옆) */
+  butterBest: Readonly<Record<number, number>>;
+  /** 철거 자격 칭호 — 타이틀 머리줄 */
+  rank: string;
 }
 
 export interface GameOverView {
   score: number;
   combo: number;
+  /** 이번 판에 벤 건물 수 · 쌓은 먼지 · 도달 구역 이름 */
+  buildings: number;
+  dustGained: number;
+  zone: string;
+  /** 다음 목표 한 줄 — 없으면 '' */
+  goal: string;
   canContinue: boolean;
   canRevive: boolean;
   /** 광고 경로 실재 여부 — false(웹)면 광고 문구 없는 "일어나기" (08-30, P0-2) */
@@ -58,12 +77,41 @@ export interface GameOverView {
   best: boolean;
   /** 카드 머리에 찍는 모드 이름 */
   mode: string;
+  /** 철거 자격 칭호 — 보고서 머리줄 */
+  rank: string;
+}
+
+/** 특별작전 결과 카드 — 한도에 닿았거나 도장을 딴 채 끝난 판 */
+export interface OpsEndView {
+  /** 작전 이름 */
+  name: string;
+  /** 이번 판 도장. 없으면 null(시간 종료) */
+  grade: OpGrade | null;
+  /** 이번 도장이 이전 최고를 넘었나 */
+  improved: boolean;
+  /** 최고 도장 (이번 판 반영 후) */
+  best: OpGrade | null;
+  /** 목표 한 줄 */
+  goal: string;
+  /** 표 — [이름, 값, 크게?] */
+  rows: readonly [string, string, boolean?][];
+  /** 도장 없을 때 다음 도장까지 한 줄 */
+  progress: string;
+  rank: string;
 }
 
 export interface EndingView {
   score: number;
   maxCombo: number;
   fullCombo: boolean;
+  /** 이번 판이 최고 기록을 넘었나 */
+  best: boolean;
+}
+
+/** 이야기 판 진입 연출 — 테이프 와이프 길이(틱)와 도장 */
+export interface StoryOpts {
+  wipeTicks?: number;
+  stamps?: readonly string[];
 }
 
 export interface PauseView {
@@ -87,7 +135,13 @@ export interface OverlayHandlers {
   onGameOverRetry(): void;
   onGameOverTitle(): void;
   onGameOverRevive(): void;
+  onOpsEndList(): void;
+  /** 철거 자격 응시 */
+  onExam(): void;
   onEndingDone(): void;
+  onEndingRetry(): void;
+  /** 지금 받을 수 있는 미션 수 — 미션 탭 점 배지 */
+  missionBadge(): number;
   onLogoTap(): void;
   onOpsPick(id: string): void;
   onOpenOps(): void;
@@ -111,15 +165,16 @@ export interface OverlayApi {
   showBoot(): void;
   showTitle(v: TitleView): void;
   setTitleSelected(index: number): void;
-  showStory(lines: readonly string[]): void;
+  showStory(lines: readonly string[], opts?: StoryOpts): void;
   showPause(v: PauseView): void;
   showSettings(s: SaveSettings, fromPause: boolean): void;
   showButterPick(tier: number): void;
   showGameOver(v: GameOverView): void;
+  showOpsEnd(v: OpsEndView): void;
   showEnding(v: EndingView): void;
-  showOps(opts: { unlockedChapters: number; allOpen: boolean; act2Cleared: boolean }): void;
+  showOps(opts: OpsOpts): void;
   showMissions(daily: DailyState, achieves: MissionProgress[], adBoost: boolean): void;
-  showShop(inv: { dust: number; orbit: number }, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
+  showShop(inv: ShopInv, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
   showCustom(loadout: Loadout, owned: ReadonlySet<string>): void;
   /** 조작 안내 창. first = 첫 실행(닫으면 onHowtoDone) */
   showHowto(first: boolean): void;
@@ -184,7 +239,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
     <div class="ov-screen ov-title ov-has-tabs" data-screen="title" hidden>
       <header class="title-head">
-        <p class="doc-meta"><span>철거 허가 · 1인 작업</span><span>GUNBBU</span></p>
+        <p class="doc-meta"><span data-el="title-rank">철거 허가 · 견습</span><span>GUNBBU</span></p>
         ${logoHtml(' data-act="logo"')}
         <p class="title-tag">${TAGLINE}</p>
       </header>
@@ -200,6 +255,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         </div>
       </div>
       <section>
+        <p class="wallet-strip" data-el="wallet"></p>
         <dl class="records" data-el="records"></dl>
         <div class="zones" data-el="gallery"></div>
         <p class="ov-buddha" data-el="buddha" hidden>${SCREENS.title.buddha}</p>
@@ -207,7 +263,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     </div>
 
     <div class="ov-screen ov-story" data-screen="story" data-act="story-skip" hidden>
-      <div class="story-lines" data-el="story"></div>
+      <i class="wipe wipe-a" aria-hidden="true"></i><i class="wipe wipe-b" aria-hidden="true"></i>
+      <div class="story-body">
+        <div class="story-stamps" data-el="story-stamps"></div>
+        <div class="story-lines" data-el="story"></div>
+      </div>
       <p class="tap-hint">누르면 넘김</p>
     </div>
 
@@ -230,8 +290,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           <header class="sheet-head"><h2>설정</h2></header>
           <p class="sec-h">게임</p>
           <button type="button" class="set-row" data-act="set-sound"><span>소리</span><span class="sw" data-el="set-sound"></span></button>
+          <button type="button" class="set-row" data-act="set-bgm"><span>음악</span><span class="sw" data-el="set-bgm"></span></button>
+          <button type="button" class="set-row" data-act="set-sfx"><span>효과음</span><span class="sw" data-el="set-sfx"></span></button>
           <button type="button" class="set-row" data-act="set-vib"><span>진동</span><span class="sw" data-el="set-vib"></span></button>
           <button type="button" class="set-row" data-act="set-shake"><span>화면 흔들림</span><span class="set-val" data-el="set-shake"></span></button>
+          <button type="button" class="set-row" data-act="set-flash"><span>번쩍임</span><span class="set-val" data-el="set-flash"></span></button>
           <button type="button" class="set-row" data-act="set-hand"><span>왼손 조작</span><span class="sw" data-el="set-hand"></span></button>
           <p class="sec-h">도움말</p>
           <button type="button" class="set-row" data-act="howto"><span>조작 안내</span>${ICON.next}</button>
@@ -259,17 +322,35 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
     <div class="ov-screen ov-modal-bg" data-screen="gameover" hidden>
       <div class="card" role="dialog" aria-modal="true" aria-label="${SCREENS.gameover.title}">
-        <p class="card-meta"><span>철거 보고서</span><span data-el="over-mode"></span></p>
+        <p class="card-meta"><span data-el="over-rank">철거 보고서</span><span data-el="over-mode"></span></p>
         <h2 class="card-title">${SCREENS.gameover.title}</h2>
         <span class="stamp" aria-hidden="true">반려</span>
         <p class="card-reason">사유: <b data-el="over-line"></b></p>
         <dl class="stat-rows" data-el="over-stats"></dl>
-        <p class="best-tag" data-el="over-best" hidden>신기록</p>
+        <p class="next-goal" data-el="over-goal" hidden></p>
+        <p class="best-tag" data-el="over-best" hidden>${SCREENS.stamps.best}</p>
         <div class="card-actions">
           <button type="button" class="cta" data-act="go-revive" data-el="go-revive"></button>
           <button type="button" class="btn" data-act="go-continue" data-el="go-continue">${SCREENS.gameover.continue}</button>
           <button type="button" class="btn" data-act="go-retry" data-el="go-retry">한 판 더</button>
           <button type="button" class="btn btn-quiet" data-act="go-title">타이틀로</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ov-screen ov-modal-bg" data-screen="opsend" hidden>
+      <div class="card" role="dialog" aria-modal="true" aria-labelledby="opsend-title">
+        <p class="card-meta"><span data-el="opsend-rank">${SCREENS.ops.reportMeta}</span><span data-el="opsend-name"></span></p>
+        <h2 class="card-title" id="opsend-title" data-el="opsend-title"></h2>
+        <span class="stamp op-stamp" data-el="opsend-stamp" hidden></span>
+        <p class="card-reason">목표: <b data-el="opsend-goal"></b></p>
+        <dl class="stat-rows" data-el="opsend-stats"></dl>
+        <p class="next-goal" data-el="opsend-progress" hidden></p>
+        <p class="best-tag" data-el="opsend-new" hidden>${SCREENS.ops.stampNew}</p>
+        <div class="card-actions">
+          <button type="button" class="cta" data-act="ops-retry"><span class="cta-label">${SCREENS.ops.retry}</span></button>
+          <button type="button" class="btn" data-act="ops-list">${SCREENS.ops.list}</button>
+          <button type="button" class="btn btn-quiet" data-act="ops-title">${SCREENS.ops.title}</button>
         </div>
       </div>
     </div>
@@ -293,28 +374,32 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <div class="ov-sheet"><div data-el="custom-list"></div></div>
     </div>
 
-    <div class="ov-screen ov-ending" data-screen="ending" data-act="ending" hidden>
+    <div class="ov-screen ov-ending" data-screen="ending" hidden>
       <p class="doc-meta"><span>철거 보고서</span><span>최종</span></p>
       <span class="stamp">${SCREENS.result.success}</span>
       <p class="end-sub">${SCREENS.result.petals}</p>
       <dl class="stat-rows" data-el="end-stats"></dl>
+      <p class="best-tag" data-el="end-best" hidden>${SCREENS.stamps.best}</p>
       <p class="end-note" data-el="end-note"></p>
-      <p class="tap-hint">누르면 타이틀로</p>
+      <div class="card-actions end-actions">
+        <button type="button" class="cta" data-act="end-retry"><span class="cta-label">한 판 더</span></button>
+        <button type="button" class="btn" data-act="end-title">타이틀로</button>
+      </div>
     </div>
 
     <nav class="ov-tabs" data-el="tabs" hidden>
       <button type="button" class="ov-tab" data-act="tab-play" data-tab="title">${ICON.play}${SCREENS.tabs.play}</button>
-      <button type="button" class="ov-tab" data-act="tab-missions" data-tab="missions">${ICON.missions}${SCREENS.tabs.missions}</button>
+      <button type="button" class="ov-tab" data-act="tab-missions" data-tab="missions">${ICON.missions}${SCREENS.tabs.missions}<i class="tab-dot" aria-hidden="true"></i></button>
       <button type="button" class="ov-tab" data-act="tab-custom" data-tab="custom">${ICON.custom}${SCREENS.tabs.custom}</button>
       <button type="button" class="ov-tab" data-act="tab-shop" data-tab="shop">${ICON.shop}${SCREENS.tabs.shop}</button>
       <button type="button" class="ov-tab" data-act="tab-more" data-tab="settings">${ICON.settings}${SCREENS.tabs.more}</button>
     </nav>
 
     <div class="ov-modal" data-el="modal" hidden>
-      <div class="card" role="dialog" aria-modal="true">
+      <div class="card" role="dialog" aria-modal="true" aria-labelledby="modal-title-text" tabindex="-1" data-el="modal-card">
         <p class="card-meta"><span data-el="modal-meta"></span>
           <button type="button" class="icon-btn" data-act="modal-close" data-el="modal-x" aria-label="닫기">${ICON.close}</button></p>
-        <h2 class="card-title" data-el="modal-title"></h2>
+        <h2 class="card-title" id="modal-title-text" data-el="modal-title"></h2>
         <div class="modal-body" data-el="modal-body"></div>
         <div class="card-actions" data-el="modal-actions"></div>
       </div>
@@ -331,7 +416,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   let screen: OverlayScreen = 'none';
   let settings: SaveSettings | null = null;
   let titleView: TitleView | null = null;
-  let opsOpts = { unlockedChapters: 0, allOpen: false, act2Cleared: false };
+  let opsOpts: OpsOpts = { unlockedChapters: 0, allOpen: false, act2Cleared: false, grades: {} };
   let quitArmed = 0;
   let resetArmed = false;
   let howtoFirst = false;
@@ -351,6 +436,13 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       if (on) btn.setAttribute('aria-current', 'page');
       else btn.removeAttribute('aria-current');
     });
+    if (!tabs.hidden) {
+      const n = h.missionBadge();
+      const mt = tabs.querySelector('[data-tab="missions"]') as HTMLElement;
+      mt.classList.toggle('has-dot', n > 0);
+      if (n > 0) mt.setAttribute('aria-label', `${SCREENS.tabs.missions}, 받을 것 ${n}`);
+      else mt.removeAttribute('aria-label');
+    }
   }
 
   function show(name: OverlayScreen): void {
@@ -380,12 +472,18 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     setMode('tokoton', m.tokoton, v.tokotonOpen ? m.tokotonSub : m.tokotonLocked, v.tokotonOpen);
     setMode('butter', m.butter, v.butterTier > 0 ? m.butterSub(v.butterTier) : m.butterLocked, v.butterTier > 0);
     setMode('ops', m.ops, m.opsSub, true);
+    const today = v.todayTotal > 0
+      ? `<span class="today">${SCREENS.title.today(v.todayDone, v.todayTotal)}</span>` : '';
+    $('wallet').innerHTML =
+      `<span aria-label="${SCREENS.title.dust}">${ICON.dust}${v.dust.toLocaleString('ko-KR')}</span>`
+      + `<span aria-label="${SCREENS.title.orbit}">${ICON.orbit}${v.orbit.toLocaleString('ko-KR')}</span>${today}`;
     $('records').innerHTML = [
       [SCREENS.title.best, v.bestArcade.toLocaleString('ko-KR')],
       [SCREENS.title.tokotonBest, v.bestTokoton.toLocaleString('ko-KR')],
       [SCREENS.title.maxCombo, v.maxCombo.toLocaleString('ko-KR')],
     ].map(([k, n]) => `<div><dt>${k}</dt><dd>${n}</dd></div>`).join('');
     $('buddha').hidden = !v.buddhaMode;
+    $('title-rank').textContent = `철거 허가 · ${v.rank}`;
     fillGallery($('gallery'), v.unlockedChapters);
     setTitleSelected(v.selected);
   }
@@ -399,10 +497,13 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   function paintSettings(s: SaveSettings): void {
     settings = s;
     $('set-sound').classList.toggle('on', s.sound);
+    $('set-bgm').classList.toggle('on', s.bgm);
+    $('set-sfx').classList.toggle('on', s.sfx);
     $('set-vib').classList.toggle('on', s.vibration);
     $('set-hand').classList.toggle('on', s.leftHanded);
     $('set-shake').textContent = SHAKE_LABEL[s.shakeLevel];
-    for (const [act, on] of [['set-sound', s.sound], ['set-vib', s.vibration], ['set-hand', s.leftHanded]] as const) {
+    $('set-flash').textContent = FLASH_LABEL[s.flashLevel];
+    for (const [act, on] of [['set-sound', s.sound], ['set-bgm', s.bgm], ['set-sfx', s.sfx], ['set-vib', s.vibration], ['set-hand', s.leftHanded]] as const) {
       root.querySelector(`[data-act="${act}"]`)?.setAttribute('aria-pressed', String(on));
     }
   }
@@ -413,8 +514,10 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     for (let r = 1; r <= 3; r++) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'btn';
-      b.textContent = SCREENS.butter.rounds[r - 1];
+      b.className = 'btn btn-round';
+      b.innerHTML = `<span class="r-name">${escapeHtml(SCREENS.butter.rounds[r - 1])}</span>`;
+      const best = titleView?.butterBest[r] ?? 0;
+      if (r <= tier && best > 0) b.insertAdjacentHTML('beforeend', `<span class="r-best">${SCREENS.butter.best(best)}</span>`);
       if (r > tier) {
         b.disabled = true;
         b.insertAdjacentHTML('afterbegin', ICON.lock);
@@ -447,6 +550,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     }).join('');
     $('modal').hidden = false;
     root.classList.add('is-open'); // 플레이 중(오버레이 닫힘)에도 뜰 수 있게
+    $('modal-card').focus({ preventScroll: true }); // 화면 낭독·키보드가 창 안에서 시작하게
   }
 
   function closeModal(): void {
@@ -545,10 +649,15 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       }
       case 'set-back': h.onSettingsBack(); break;
       case 'set-sound': if (settings) h.onSettingsPatch({ sound: !settings.sound }); break;
+      case 'set-bgm': if (settings) h.onSettingsPatch({ bgm: !settings.bgm }); break;
+      case 'set-sfx': if (settings) h.onSettingsPatch({ sfx: !settings.sfx }); break;
       case 'set-vib': if (settings) h.onSettingsPatch({ vibration: !settings.vibration }); break;
       case 'set-hand': if (settings) h.onSettingsPatch({ leftHanded: !settings.leftHanded }); break;
       case 'set-shake':
         if (settings) h.onSettingsPatch({ shakeLevel: ((settings.shakeLevel + 1) % 3) as 0 | 1 | 2 });
+        break;
+      case 'set-flash':
+        if (settings) h.onSettingsPatch({ flashLevel: ((settings.flashLevel + 1) % 3) as 0 | 1 | 2 });
         break;
       case 'howto': showHowto(false); break;
       case 'privacy': openDoc('개인정보 처리방침', './privacy.html'); break;
@@ -570,7 +679,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'go-continue': h.onGameOverContinue(); break;
       case 'go-retry': h.onGameOverRetry(); break;
       case 'go-title': h.onGameOverTitle(); break;
-      case 'ending': h.onEndingDone(); break;
+      case 'ops-retry': h.onGameOverRetry(); break;
+      case 'ops-list': h.onOpsEndList(); break;
+      case 'ops-title': h.onGameOverTitle(); break;
+      case 'end-title': h.onEndingDone(); break;
+      case 'end-retry': h.onEndingRetry(); break;
       case 'tab-play': h.onMetaBack(); break;
       case 'tab-missions': h.onOpenMissions(); break;
       case 'tab-custom': h.onOpenCustom(); break;
@@ -591,10 +704,15 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     showBoot(): void { show('boot'); },
     showTitle(v: TitleView): void { paintTitle(v); show('title'); },
     setTitleSelected,
-    showStory(lines: readonly string[]): void {
+    showStory(lines: readonly string[], opts: StoryOpts = {}): void {
       $('story').innerHTML = lines.map((ln) =>
         ln ? `<p>${escapeHtml(ln)}</p>` : '<p class="ov-gap"></p>',
       ).join('');
+      $('story-stamps').innerHTML = (opts.stamps ?? []).map((t) => `<span class="stamp">${escapeHtml(t)}</span>`).join('');
+      const scr = root.querySelector('[data-screen="story"]') as HTMLElement;
+      const wipe = opts.wipeTicks ?? 0;
+      scr.classList.toggle('has-wipe', wipe > 0);
+      scr.style.setProperty('--wipe', `${Math.round(wipe * TICK * 1000)}ms`);
       show('story');
     },
     showPause(v: PauseView): void {
@@ -616,17 +734,26 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     showButterPick(tier: number): void { paintButter(tier); show('butter'); },
     showGameOver(v: GameOverView): void {
       $('over-mode').textContent = v.mode;
+      $('over-rank').textContent = `${SCREENS.license.report} · ${v.rank}`;
       $('over-line').textContent = v.line;
+      const g = SCREENS.gameover;
       $('over-stats').innerHTML = statRows([
         ['점수', v.score.toLocaleString('ko-KR'), true],
         ['최고 콤보', v.combo.toLocaleString('ko-KR')],
+        [g.buildings, g.buildingsUnit(v.buildings)],
+        [g.dust, `+${v.dustGained.toLocaleString('ko-KR')}`],
+        [g.zone, escapeHtml(v.zone)],
       ]);
+      const goal = $('over-goal');
+      goal.hidden = !v.goal;
+      goal.innerHTML = v.goal ? `<b>${g.nextTag}</b>${escapeHtml(v.goal)}` : '';
       $('over-best').hidden = !v.best;
       $('go-continue').hidden = !v.canContinue;
       const rev = $('go-revive');
       rev.hidden = !v.canRevive;
-      const label = (v.adRevive ? SCREENS.gameover.revive : SCREENS.gameover.reviveFree)(v.reviveLeft, v.reviveMax);
-      rev.innerHTML = `<span class="cta-label">${v.adRevive ? ICON.ad : ''}${escapeHtml(label)}</span>`;
+      const label = v.adRevive ? g.revive : g.reviveFree;
+      rev.innerHTML = `<span class="cta-label">${v.adRevive ? ICON.ad : ''}${label}</span>`
+        + `<span class="cta-sub">${g.reviveLeft(v.reviveLeft)}</span>`;
       // 노랑은 하나 — 일어날 수 있으면 일어나기가, 아니면 한 판 더가 노랑이다
       const retry = $('go-retry');
       if (v.canRevive) {
@@ -637,6 +764,25 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         retry.innerHTML = '<span class="cta-label">한 판 더</span>';
       }
       show('gameover');
+    },
+    showOpsEnd(v: OpsEndView): void {
+      const o = SCREENS.ops;
+      $('opsend-rank').textContent = `${o.reportMeta} · ${v.rank}`;
+      $('opsend-name').textContent = v.name;
+      $('opsend-title').textContent = v.grade ? o.doneTitle : o.timeUpTitle;
+      const stamp = $('opsend-stamp');
+      stamp.hidden = !v.grade;
+      stamp.textContent = v.grade ?? '';
+      $('opsend-goal').textContent = v.goal;
+      $('opsend-stats').innerHTML = statRows([
+        ...v.rows.map(([k, val, big]) => [k, escapeHtml(val), big] as [string, string, boolean?]),
+        [o.bestStamp, v.best ?? o.noStamp],
+      ]);
+      const prog = $('opsend-progress');
+      prog.hidden = !v.progress;
+      prog.innerHTML = v.progress ? `<b>${SCREENS.gameover.nextTag}</b>${escapeHtml(v.progress)}` : '';
+      $('opsend-new').hidden = !v.improved;
+      show('opsend');
     },
     showOps(opts): void {
       opsOpts = opts;
@@ -667,6 +813,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           onOrbit: (id) => h.onUnlockOrbit(id),
           onDust: (id) => h.onUnlockDust(id),
           onExchange: () => h.onExchangeDust(),
+          onExam: () => h.onExam(),
         },
       );
       show('shop');
@@ -680,6 +827,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         ['점수', v.score.toLocaleString('ko-KR'), true],
         ['최고 콤보', v.maxCombo.toLocaleString('ko-KR')],
       ]);
+      $('end-best').hidden = !v.best;
       $('end-note').textContent = v.fullCombo
         ? SCREENS.result.fullComboNote
         : SCREENS.result.tokotonUnlock;
@@ -692,6 +840,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       window.clearTimeout(toastTimer);
       if (!text) { toastEl.classList.remove('on'); return; }
       toastEl.textContent = text;
+      toastEl.classList.toggle('above-tabs', !$('tabs').hidden);
       toastEl.classList.add('on');
       toastTimer = window.setTimeout(() => toastEl.classList.remove('on'), TOAST_MS);
     },
@@ -704,6 +853,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
 export function titleViewFromSave(save: SaveData, selected: number, debugOpen = false): TitleView {
   const unlocked = debugOpen || isDevUnlocked();
+  const today = dailyDone(save.daily);
   return {
     selected,
     tokotonOpen: unlocked || save.act2Cleared,
@@ -714,5 +864,11 @@ export function titleViewFromSave(save: SaveData, selected: number, debugOpen = 
     unlockedChapters: unlocked ? 3 : save.unlockedChapters,
     buddhaMode: save.buddhaMode && import.meta.env.DEV,
     soundOn: save.settings.sound,
+    dust: save.dust,
+    orbit: save.orbit,
+    todayDone: today.done,
+    todayTotal: today.total,
+    butterBest: save.butterBest,
+    rank: licenseTitle(save.license),
   };
 }

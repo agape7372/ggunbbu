@@ -193,6 +193,7 @@ function hasSpecialTarget(s: GameState): boolean {
 
 function triggerSpecial(s: GameState): void {
   const p = s.player;
+  const wasPinned = p.pose === 'pinned';
   s.wazaGauge -= WAZA_GAUGE.COST;
   p.pose = 'special';
   p.poseTick = 0;
@@ -200,6 +201,7 @@ function triggerSpecial(s: GameState): void {
   p.pinTick = 0;
   // 히트스톱은 'special' 이벤트를 advance 말미 JUICE 주입이 처리 — 이중 출처 금지 (08-30 검증)
   s.events.push({ kind: 'special', lane: p.lane });
+  if (wasPinned) s.events.push({ kind: 'pinEscape' }); // 필살은 깔림에서도 나간다 [정본]
 
   if (s.waza === 'tetsu') {
     applyTetsu(s);
@@ -358,7 +360,7 @@ function stepPinned(s: GameState, input: InputFrame): void {
     p.pose = 'idle';
     p.poseTick = 0;
     p.invulnTicks = PLAYER.PIN_ESCAPE_IFRAMES_LIFT;
-    s.events.push({ kind: 'guardBounce', y: 0 });
+    s.events.push({ kind: 'guardBounce', y: 0 }, { kind: 'pinEscape' });
     return;
   }
 
@@ -373,6 +375,7 @@ function stepPinned(s: GameState, input: InputFrame): void {
       else { stack.vy = STACK.PIN_ESCAPE_V; stack.resting = false; }
       p.pose = 'idle';
       p.invulnTicks = PLAYER.PIN_ESCAPE_IFRAMES_ATK;
+      s.events.push({ kind: 'pinEscape' });
     } else {
       loseLife(s);
       if (s.over) return;
@@ -393,13 +396,13 @@ function stepPinnedByRocks(s: GameState, input: InputFrame): void {
     p.pose = 'idle';
     p.poseTick = 0;
     p.invulnTicks = PLAYER.PIN_ESCAPE_IFRAMES_LIFT;
-    s.events.push({ kind: 'guardBounce', y: 0 });
+    s.events.push({ kind: 'guardBounce', y: 0 }, { kind: 'pinEscape' });
     return;
   }
   if (p.bufAttack > 0) {
     p.bufAttack = 0;
     s.groundRocks = Math.max(0, s.groundRocks - 1);
-    s.events.push({ kind: 'floorCollapse', y: 0 });
+    s.events.push({ kind: 'floorCollapse', y: 0 }, { kind: 'pinEscape' });
     addScore(s, SCORE.FLOOR_BONUS);
     p.pose = 'idle';
     p.poseTick = 0;

@@ -1,4 +1,4 @@
-// 건뿌 SFX/BGM 레시피 — 신스 프리셋(osc+gain 엔벨로프)과 16스텝 BGM 패턴 데이터.
+// 건뿌 SFX/BGM 레시피 — 신스 프리셋(osc+gain 엔벨로프)과 4마디(64스텝) BGM 패턴 데이터.
 // 사이드이펙트 없음: 노이즈 버퍼도 모듈 내부에서 lazy 생성.
 
 export type SfxName =
@@ -9,7 +9,8 @@ export type SfxName =
   | 'rockWhistle' | 'rockLand' | 'bossTele' | 'bossPbTele'
   | 'zap' | 'zap2' | 'zap3'
   | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect'
-  | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak';
+  | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak'
+  | 'hitLow' | 'hitTick' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd';
 
 export type BgmTrack = 'title' | 'act1' | 'act2a' | 'butter' | 'bolt' | 'boss' | 'ending';
 
@@ -147,9 +148,9 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
 
   // 망치 — hitStrong보다 저음·긴 '쿵'
   hitHammer: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'sine', 110, 0.18, 0.5, rate, { freqEnd: 45, attack: 0.002 });
-    playOsc(ctx, dest, t, 'square', 130, 0.07, 0.3, rate, { freqEnd: 70, attack: 0.002 });
-    playNoise(ctx, dest, t, 0.06, 0.2, { filterType: 'lowpass', freqStart: 700, freqEnd: 200 });
+    playOsc(ctx, dest, t, 'sine', 110, 0.18, 0.3, rate, { freqEnd: 45, attack: 0.002 });
+    playOsc(ctx, dest, t, 'square', 130, 0.07, 0.18, rate, { freqEnd: 70, attack: 0.002 });
+    playNoise(ctx, dest, t, 0.06, 0.12, { filterType: 'lowpass', freqStart: 700, freqEnd: 200 });
   },
 
   // 쇠막대 — 짧고 높은 금속성 '깡'
@@ -160,8 +161,8 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
 
   // 그라인더 — 밴드패스 노이즈 버즈 '지익'
   hitGrind: (ctx, dest, t, rate) => {
-    playNoise(ctx, dest, t, 0.09, 0.35, { filterType: 'bandpass', freqStart: 3500, freqEnd: 2200 });
-    playOsc(ctx, dest, t, 'sawtooth', 240, 0.08, 0.15, rate, { freqEnd: 200, attack: 0.002 });
+    playNoise(ctx, dest, t, 0.09, 0.7, { filterType: 'bandpass', freqStart: 3500, freqEnd: 2200 });
+    playOsc(ctx, dest, t, 'sawtooth', 240, 0.08, 0.3, rate, { freqEnd: 200, attack: 0.002 });
   },
 
   // 보급 상자 — '통' + 두 음 상승 차임
@@ -346,6 +347,69 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
     });
   },
 
+  // 타격 변형 — hit(중음)과 번갈아 돌려 10회/초 반복 피로를 던다. 저음 비중 / 노이즈 비중.
+  hitLow: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 100, 0.07, 0.3, rate, { freqEnd: 60, attack: 0.002 });
+    playOsc(ctx, dest, t, 'square', 170, 0.05, 0.16, rate, { freqEnd: 110, attack: 0.002 });
+  },
+
+  hitTick: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.035, 0.3, { filterType: 'bandpass', freqStart: 2500 });
+    playOsc(ctx, dest, t, 'square', 260, 0.045, 0.3, rate, { freqEnd: 170, attack: 0.001 });
+  },
+
+  // 확정 — 낮은 쿵 + 짧은 틱
+  uiOk: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 140, 0.08, 0.4, rate, { freqEnd: 70, attack: 0.002 });
+    playOsc(ctx, dest, t + 0.02, 'square', 1500, 0.025, 0.12, rate, { attack: 0.001 });
+  },
+
+  // 뒤로 — 하강 두 음
+  uiBack: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 900, 0.045, 0.3, rate, { attack: 0.002 });
+    playOsc(ctx, dest, t + 0.05, 'sine', 600, 0.06, 0.3, rate, { attack: 0.002 });
+  },
+
+  // 구매·보상 — 상승 두 음 + 짤랑
+  coin: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'square', 987.77, 0.06, 0.2, rate, { attack: 0.002 });
+    playOsc(ctx, dest, t + 0.06, 'square', 1318.5, 0.16, 0.2, rate, { attack: 0.002 });
+    playOsc(ctx, dest, t + 0.06, 'sine', 2637, 0.1, 0.1, rate, { attack: 0.002 });
+    playNoise(ctx, dest, t + 0.06, 0.1, 0.1, { filterType: 'highpass', freqStart: 6000 });
+  },
+
+  // 도장 — 쿵 + 틱 (확정·장착·장 해금)
+  stamp: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 130, 0.14, 0.5, rate, { freqEnd: 55, attack: 0.002 });
+    playNoise(ctx, dest, t, 0.05, 0.25, { filterType: 'lowpass', freqStart: 1800, freqEnd: 400 });
+    playOsc(ctx, dest, t + 0.035, 'square', 1900, 0.02, 0.12, rate, { attack: 0.001 });
+  },
+
+  // 콤보 이정표 — 쿵 + 4음 상승 + 반짝
+  milestone: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 110, 0.14, 0.45, rate, { freqEnd: 55, attack: 0.002 });
+    [659.25, 783.99, 987.77, 1318.5].forEach((f, i) => {
+      const d = t + i * 0.055;
+      playOsc(ctx, dest, d, 'triangle', f, 0.2, 0.3, rate, { attack: 0.004 });
+      playOsc(ctx, dest, d + 0.01, 'sine', f * 2, 0.12, 0.1, rate, { attack: 0.002 });
+    });
+    playNoise(ctx, dest, t + 0.17, 0.18, 0.12, { filterType: 'highpass', freqStart: 7000 });
+  },
+
+  // 2막 구역 도달 — 맑은 두 음 차임
+  checkpoint: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 880, 0.16, 0.3, rate, { attack: 0.004 });
+    playOsc(ctx, dest, t + 0.09, 'sine', 1318.5, 0.24, 0.3, rate, { attack: 0.004 });
+    playOsc(ctx, dest, t + 0.09, 'sine', 1760, 0.14, 0.1, rate, { attack: 0.002 });
+  },
+
+  // 판 종료 — 가라앉는 두 음 + 낮은 쿵 (목숨 소리 뒤에 얹는다)
+  runEnd: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'triangle', 261.63, 0.2, 0.3, rate, { attack: 0.005 });
+    playOsc(ctx, dest, t + 0.2, 'triangle', 196, 0.4, 0.3, rate, { attack: 0.005 });
+    playOsc(ctx, dest, t + 0.2, 'sine', 65, 0.3, 0.4, rate, { freqEnd: 40, attack: 0.004 });
+  },
+
   uiBlip: (ctx, dest, t, rate) => {
     playOsc(ctx, dest, t, 'sine', 1000, 0.05, 0.25, rate, { freqEnd: 1400, attack: 0.002 });
   },
@@ -364,111 +428,121 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
 };
 
 // ─── BGM 패턴 데이터 (전부 오리지널 창작 루프) ──────────────────
+// 4마디(64스텝) = A · A′ · B · A″. 마디마다 화성 하나(뿌리음이 마디 첫 베이스), 곡마다 서로 다른 화성 2~4개.
+// 신스는 그대로(square 멜로디 + triangle 베이스 + 킥/햇) — 두께만 audio.ts의 이중 발음이 더한다.
+
+export interface BgmStep { mel: number[] | null; bass: number | null; drum: 0 | 1 | 2 }
 
 export interface BgmPattern {
   bpm: number;
-  /** 16스텝 × 트랙 — 각 스텝: 주파수 Hz 배열(동시발음) 또는 null. [멜로디, 베이스, 노이즈퍼커션(1=킥,2=햇)] */
-  steps: Array<{ mel: number[] | null; bass: number | null; drum: 0 | 1 | 2 }>;
-  loop: boolean;
+  /** 64스텝 = 4마디 × 16스텝. 각 스텝: 멜로디 Hz 배열(동시발음) · 베이스 Hz · 퍼커션(1=킥, 2=햇). */
+  steps: BgmStep[];
+  /** 마디별 화성 이름('Am' · 'Bb' · 'F#m') — 콤보 아르페지오 층이 쓴다. */
+  chords: string[];
 }
 
-// 평균율 음이름 표(A4=440) — 각 트랙 멜로디/베이스에서 재사용
-const N = {
-  D2: 73.42, Bb2: 116.54,
-  C3: 130.81, D3: 146.83, Eb3: 155.56, E3: 164.81, F3: 174.61, G3: 196.0, Bb3: 233.08,
-  A3: 220.0,
-  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, Ab4: 415.3, A4: 440.0, Bb4: 466.16, B4: 493.88,
-  C5: 523.25, Db5: 554.37, D5: 587.33, Eb5: 622.25, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.0,
-  C6: 1046.5,
-} as const;
+const PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 
-type Step = { mel: number[] | null; bass: number | null; drum: 0 | 1 | 2 };
-function s(mel: number[] | null, bass: number | null, drum: 0 | 1 | 2): Step {
-  return { mel, bass, drum };
+/** 'C#5' · 'Bb3' → Hz (평균율, A4=440) */
+export function noteHz(name: string): number {
+  const m = /^([A-G])([#b]?)(\d)$/.exec(name);
+  if (!m) throw new Error(`음이름 오류: ${name}`);
+  const midi = (Number(m[3]) + 1) * 12 + PC[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function parseChord(chord: string): { pc: number; minor: boolean } {
+  const m = /^([A-G])([#b]?)(m?)$/.exec(chord);
+  if (!m) throw new Error(`화성 이름 오류: ${chord}`);
+  return { pc: (PC[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + 12) % 12, minor: m[3] === 'm' };
+}
+
+/** 화성 뿌리음의 음높이 클래스(C=0) */
+export function chordRootPc(chord: string): number {
+  return parseChord(chord).pc;
+}
+
+/** 화성의 아르페지오 음 4개(Hz) — 4옥타브 안에서 뿌리·3도·5도·옥타브 */
+export function chordArp(chord: string): number[] {
+  const { pc, minor } = parseChord(chord);
+  const root = 261.6256 * Math.pow(2, pc / 12);
+  return [0, minor ? 3 : 4, 7, 12].map((semi) => root * Math.pow(2, semi / 12));
+}
+
+/** 마디 하나: 멜로디 · 베이스(16토큰, '.'=쉼) · 퍼커션(16글자: k=킥 h=햇 .=없음) */
+type Bar = readonly [mel: string, bass: string, drum: string];
+
+function track(bpm: number, chords: string[], bars: Bar[]): BgmPattern {
+  const steps: BgmStep[] = [];
+  for (const [mel, bass, drum] of bars) {
+    const m = mel.split(' ');
+    const b = bass.split(' ');
+    if (m.length !== 16 || b.length !== 16 || drum.length !== 16) throw new Error(`마디 길이 오류: ${mel}`);
+    for (let i = 0; i < 16; i++) {
+      steps.push({
+        mel: m[i] === '.' ? null : [noteHz(m[i])],
+        bass: b[i] === '.' ? null : noteHz(b[i]),
+        drum: drum[i] === 'k' ? 1 : drum[i] === 'h' ? 2 : 0,
+      });
+    }
+  }
+  return { bpm, chords, steps };
 }
 
 export const BGM_TRACKS: Record<BgmTrack, BgmPattern> = {
-  // 100BPM — 밝은 뿅뿅 (타이틀, 통통 튀는 장조 펜타토닉)
-  title: {
-    bpm: 100,
-    loop: true,
-    steps: [
-      s([N.C5], N.C3, 1), s(null, null, 0), s([N.E5], null, 2), s(null, null, 0),
-      s([N.G5], N.G3, 1), s(null, null, 0), s([N.E5], null, 2), s([N.D5], null, 0),
-      s([N.C5], N.C3, 1), s(null, null, 0), s([N.D5], null, 2), s(null, null, 0),
-      s([N.E5], N.G3, 1), s([N.G5], null, 0), s([N.A5], null, 2), s(null, null, 0),
-    ],
-  },
+  // 100BPM — 밝은 뿅뿅 (타이틀, 통통 튀는 장조 펜타토닉) · C – Am – F – G
+  title: track(100, ['C', 'Am', 'F', 'G'], [
+    ['C5 . E5 . G5 . E5 D5 C5 . D5 . E5 G5 A5 .', 'C3 . . . G3 . . . C3 . . . G3 . . .', 'k.h.k.h.k.h.k.h.'],
+    ['A4 . C5 . E5 . C5 B4 A4 . B4 . C5 E5 G5 .', 'A2 . . . E3 . . . A2 . . . E3 . . .', 'k.h.k.h.k.h.k.h.'],
+    ['F5 . A5 . G5 . F5 E5 F5 . A5 . C6 . A5 .', 'F2 . . . C3 . . . F2 . . . C3 . . .', 'k.h.k.h.k.h.k.h.'],
+    ['G5 . D5 . B4 . D5 G5 A5 . G5 . E5 . D5 .', 'G2 . . . D3 . . . G2 . . . D3 . . .', 'k.h.k.h.k.hhk.hh'],
+  ]),
 
-  // 128BPM — 경쾌 단조 (1막, 달리는 8분음 단조 라인)
-  act1: {
-    bpm: 128,
-    loop: true,
-    steps: [
-      s([N.A4], N.A3, 1), s(null, null, 0), s([N.C5], null, 2), s([N.E5], null, 0),
-      s(null, N.D3, 1), s([N.D5], null, 0), s([N.F5], null, 2), s([N.E5], null, 0),
-      s([N.A4], N.A3, 1), s(null, null, 0), s([N.C5], null, 2), s([N.G5], null, 0),
-      s(null, N.E3, 1), s([N.F5], null, 0), s([N.E5], null, 2), s([N.C5], null, 0),
-    ],
-  },
+  // 128BPM — 경쾌 단조 (1막, 달리는 8분음 단조 라인) · Am – F – C – G
+  act1: track(128, ['Am', 'F', 'C', 'G'], [
+    ['A4 . C5 E5 . D5 F5 E5 A4 . C5 G5 . F5 E5 C5', 'A3 . . . D3 . . . A3 . . . E3 . . .', 'k.h.k.h.k.h.k.h.'],
+    ['F4 . A4 C5 . A4 C5 F5 E5 . C5 A4 . G4 A4 C5', 'F3 . . . C3 . . . F3 . . . C3 . . .', 'k.h.k.h.k.h.k.h.'],
+    ['E5 . G5 E5 . C5 E5 G5 A5 . G5 E5 . D5 C5 E5', 'C3 . . . G3 . . . C3 . . . E3 . . .', 'k.h.k.h.k.h.k.h.'],
+    ['D5 . B4 D5 . G5 F5 D5 E5 . D5 B4 . C5 B4 E5', 'G3 . . . D3 . . . G3 . . . E3 . . .', 'k.h.k.h.k.hhk.hh'],
+  ]),
 
-  // 96BPM — 저음 긴장 (2막, 드문드문 저역 배회 + 페달톤)
-  act2a: {
-    bpm: 96,
-    loop: true,
-    steps: [
-      s([N.D3], N.D2, 1), s(null, null, 0), s([N.C3], null, 0), s(null, null, 0),
-      s([N.Eb3], null, 0), s(null, null, 0), s([N.C3], null, 0), s(null, null, 0),
-      s([N.D3], N.D2, 1), s(null, null, 0), s([N.F3], null, 0), s(null, null, 0),
-      s([N.Eb3], null, 2), s(null, null, 0), s([N.D3], null, 0), s(null, null, 0),
-    ],
-  },
+  // 96BPM — 저음 긴장 (2막, 드문드문 저역 배회 + 페달톤) · Dm – Eb – Gm – Am
+  act2a: track(96, ['Dm', 'Eb', 'Gm', 'Am'], [
+    ['D3 . C3 . Eb3 . C3 . D3 . F3 . Eb3 . D3 .', 'D2 . . . . . . . D2 . . . . . . .', 'k.......k...h...'],
+    ['Eb3 . D3 . G3 . D3 . Eb3 . G3 . F3 . Eb3 .', 'Eb2 . . . . . . . Eb2 . . . . . . .', 'k.......k...h...'],
+    ['G3 . F3 . Bb3 . F3 . G3 . Bb3 . A3 . G3 .', 'G2 . . . . . . . G2 . . . . . . .', 'k.......k...h...'],
+    ['A3 . G3 . C4 . A3 . E3 . G3 . F3 . E3 .', 'A2 . . . . . . . E2 . . . . . . .', 'k.......k.h.k.h.'],
+  ]),
 
-  // 136BPM — 밝은 징글 (버터바 타임, 쉼표 없는 통통 튀는 아르페지오)
-  butter: {
-    bpm: 136,
-    loop: true,
-    steps: [
-      s([N.C5], N.C4, 1), s([N.E5], null, 2), s([N.G5], null, 0), s([N.E5], null, 2),
-      s([N.D5], N.G3, 0), s([N.G5], null, 2), s([N.A5], null, 0), s([N.G5], null, 2),
-      s([N.C5], N.C4, 1), s([N.E5], null, 2), s([N.G5], null, 0), s([N.C6], null, 2),
-      s([N.A5], N.G3, 0), s([N.G5], null, 2), s([N.E5], null, 0), s([N.C5], null, 2),
-    ],
-  },
+  // 136BPM — 밝은 징글 (버터바 타임, 쉼표 없는 통통 튀는 아르페지오) · C – Am – F – G
+  butter: track(136, ['C', 'Am', 'F', 'G'], [
+    ['C5 E5 G5 E5 D5 G5 A5 G5 C5 E5 G5 C6 A5 G5 E5 C5', 'C4 . . . G3 . . . C4 . . . G3 . . .', 'kh.h.h.hkh.h.h.h'],
+    ['A4 C5 E5 C5 B4 E5 G5 E5 A4 C5 E5 A5 G5 E5 C5 A4', 'A3 . . . E3 . . . A3 . . . E3 . . .', 'kh.h.h.hkh.h.h.h'],
+    ['F5 A5 C6 A5 G5 E5 G5 C6 A5 F5 A5 C6 A5 G5 F5 E5', 'F3 . . . C4 . . . F3 . . . C4 . . .', 'kh.h.h.hkh.h.h.h'],
+    ['D5 G5 B5 G5 F5 D5 B4 D5 G5 D5 B4 D5 G5 F5 E5 D5', 'G3 . . . D3 . . . G3 . . . D3 . . .', 'kh.h.h.hkh.h.hkh'],
+  ]),
 
-  // 120BPM (판정 클록 — 정확히 120) — 스타카토, 매 스텝 햇으로 정밀 펄스
-  bolt: {
-    bpm: 120,
-    loop: true,
-    steps: [
-      s([N.E4], N.E3, 1), s(null, null, 2), s([N.G4], null, 2), s(null, null, 2),
-      s([N.A4], null, 2), s(null, null, 2), s([N.G4], null, 2), s(null, null, 2),
-      s([N.E4], N.E3, 1), s(null, null, 2), s([N.B4], null, 2), s(null, null, 2),
-      s([N.A4], null, 2), s(null, null, 2), s([N.G4], null, 2), s(null, null, 2),
-    ],
-  },
+  // 120BPM (판정 클록 — 정확히 120) — 스타카토, 매 스텝 햇으로 정밀 펄스 · Em – C – D – Em
+  bolt: track(120, ['Em', 'C', 'D', 'Em'], [
+    ['E4 . G4 . A4 . G4 . E4 . B4 . A4 . G4 .', 'E3 . . . . . . . E3 . . . . . . .', 'khhhhhhhkhhhhhhh'],
+    ['G4 . C5 . E5 . C5 . G4 . E5 . D5 . C5 .', 'C3 . . . . . . . C3 . . . . . . .', 'khhhhhhhkhhhhhhh'],
+    ['A4 . D5 . F#5 . D5 . A4 . F#5 . E5 . D5 .', 'D3 . . . . . . . D3 . . . . . . .', 'khhhhhhhkhhhhhhh'],
+    ['G4 . B4 . E5 . B4 . A4 . G4 . F#4 . G4 .', 'E3 . . . . . . . B2 . . . . . . .', 'khhhhhhhkhhhhhhh'],
+  ]),
 
-  // 140BPM — 아르페지오 (보스, Dm → Bb 아르페지오 교차로 긴장 고조)
-  boss: {
-    bpm: 140,
-    loop: true,
-    steps: [
-      s([N.D4], N.D2, 1), s([N.F4], null, 0), s([N.A4], null, 2), s([N.D5], null, 0),
-      s([N.A4], null, 1), s([N.F4], null, 0), s([N.D4], null, 2), s([N.F4], null, 0),
-      s([N.Bb3], N.Bb2, 1), s([N.D4], null, 0), s([N.F4], null, 2), s([N.Bb4], null, 0),
-      s([N.F4], null, 1), s([N.D4], null, 0), s([N.Bb3], null, 2), s([N.D4], null, 0),
-    ],
-  },
+  // 140BPM — 아르페지오 (보스, Dm → Bb 아르페지오 교차로 긴장 고조) · Dm – Bb – Gm – A
+  boss: track(140, ['Dm', 'Bb', 'Gm', 'A'], [
+    ['D4 F4 A4 D5 A4 F4 D4 F4 Bb3 D4 F4 Bb4 F4 D4 Bb3 D4', 'D2 . . . . . . . Bb2 . . . . . . .', 'k.h.k.h.k.h.k.h.'],
+    ['Bb3 D4 F4 Bb4 F4 D4 Bb3 D4 Bb3 D4 F4 D5 Bb4 F4 D4 Bb3', 'Bb2 . . . . . . . F2 . . . . . . .', 'k.h.k.h.k.h.k.h.'],
+    ['G3 Bb3 D4 G4 D4 Bb3 G3 Bb3 G3 Bb3 D4 Bb4 G4 D4 Bb3 D4', 'G2 . . . . . . . D3 . . . . . . .', 'k.h.k.h.k.h.k.h.'],
+    ['A3 C#4 E4 A4 E4 C#4 A3 C#4 A3 C#4 E4 G4 E4 C#4 A3 C#4', 'A2 . . . . . . . E3 . . . . . . .', 'k.h.k.h.k.hhk.hh'],
+  ]),
 
-  // 104BPM — 트로트 풍 (엔딩, 반음 상위 이웃음으로 '꺾기' 흉내)
-  ending: {
-    bpm: 104,
-    loop: true,
-    steps: [
-      s([N.G4], N.G3, 1), s([N.C5], null, 0), s([N.B4], null, 2), s([N.Eb5], null, 0),
-      s([N.D5], N.D3, 2), s([N.Db5], null, 0), s([N.C5], null, 2), s([N.C5], null, 0),
-      s([N.B4], N.G3, 1), s([N.Bb4], null, 0), s([N.A4], null, 2), s([N.Ab4], null, 0),
-      s([N.G4], N.D3, 2), s([N.Eb5], null, 0), s([N.D5], null, 2), s(null, null, 0),
-    ],
-  },
+  // 104BPM — 트로트 풍 (엔딩, 반음 상위 이웃음으로 '꺾기' 흉내) · G – Cm – D – G
+  ending: track(104, ['G', 'Cm', 'D', 'G'], [
+    ['G4 C5 B4 Eb5 D5 Db5 C5 C5 B4 Bb4 A4 Ab4 G4 Eb5 D5 .', 'G3 . . . D3 . . . G3 . . . D3 . . .', 'k.h.h.h.k.h.h.h.'],
+    ['C5 Eb5 G5 F5 Eb5 D5 Eb5 C5 B4 C5 D5 Eb5 D5 C5 B4 .', 'C3 . . . G3 . . . C3 . . . G3 . . .', 'k.h.h.h.k.h.h.h.'],
+    ['A4 D5 F#5 D5 A4 D5 Eb5 D5 C5 B4 A4 Ab4 A4 B4 C5 D5', 'D3 . . . A3 . . . D3 . . . A3 . . .', 'k.h.h.h.k.h.h.h.'],
+    ['G4 B4 D5 G5 F#5 G5 D5 B4 G4 Ab4 A4 Bb4 B4 C5 D5 .', 'G3 . . . D3 . . . G3 . . . D3 . . .', 'k.h.h.h.k.h.h.hh'],
+  ]),
 };

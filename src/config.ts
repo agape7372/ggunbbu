@@ -280,6 +280,10 @@ export const GIMMICK = {
   ORBIT_SPAWN_VY: -120,
   DEFAULT_SPAWN_VY: -70,
   GLASS_EVERY: 2,         // 짝수 층 HP1
+  // 특별작전 시작 p [튜닝, B3 봇 실측]. 점수로 주입한다(p = 점수 / 해금 점수).
+  // 반드시 작전 배경 챕터 안(유리 0 · 빙결 1 · 야간 2 · 궤도 3)이어야 시작하자마자 버터바로 새지 않는다.
+  // 경계 바로 아래는 피한다 — 연타 위주 판은 분당 p가 0.05 가까이 올라 90~150초 창에서 경계를 넘는다.
+  START_P: { glass: 0.12, ice: 0.38, night: 0.5, orbit: 0.75 },
 } as const;
 
 // ── 점수 [산술 검증: 1,500타 ≈ 7~9분에 9,999,999] ──────────────
@@ -489,3 +493,85 @@ export const PALETTE = {
 
 // ── 저장 ────────────────────────────────────────────────────────
 export const SAVE_KEY = 'gunbbu.v1';
+
+// ── 소리 (B1) ───────────────────────────────────────────────────
+// 믹스: 마스터 컴프레서(리미터 겸용) + 버스 상향. 수치는 OfflineAudioContext 렌더로 잰 출발점.
+export const AUDIO = {
+  COMP: { THRESHOLD: -12, KNEE: 6, RATIO: 12, ATTACK: 0.003, RELEASE: 0.15 },
+  SFX_BUS: 0.9,
+  BGM_BUS: 0.5,
+  /** 스케줄러 — 룩어헤드 0.2초·인터벌 25ms. 이만큼 이상 밀리면 따라잡지 않고 건너뛴다. */
+  LOOKAHEAD_MS: 25,
+  SCHEDULE_AHEAD_S: 0.2,
+  LATE_SKIP_S: 0.05,
+  /** 켜고 끄는 페이드(클릭 팝 방지) · 음악 정지 페이드 */
+  FADE_TC: 0.02,
+  STOP_FADE_S: 0.12,
+  /** BGM 덕킹 — 메뉴(일시정지·설정·광고 대기)는 상시, 필살·보스 격파는 0.3초 */
+  DUCK_MENU: 0.3,
+  DUCK_PULSE: 0.35,
+  DUCK_PULSE_S: 0.3,
+  DUCK_TC: 0.05,
+  /** 콤보 층 — 햇 8분 / 아르페지오. 마디 경계에서만 켜고 끈다. */
+  COMBO_HAT: 50,
+  COMBO_ARP: 150,
+  /** 멜로디 이중 발음 detune(±cent) */
+  DETUNE_CENTS: 6,
+  /** BGM 음량 — MEL은 이중 발음 한 쪽 몫. 킥 스텝에선 멜로디를 KICK_MEL_MUL배로 눌러 피크를 낮춘다. */
+  LEVEL: { MEL: 0.14, BASS: 0.3, KICK: 0.4, HAT: 0.18, KICK_MEL_MUL: 0.7, LAYER_HAT: 0.1, LAYER_ARP: 0.08 },
+  /** 콤보 이정표 — 경계 통과 때 한 번 */
+  MILESTONES: [50, 100, 200, 500, 999],
+  /** 한 틱에 이만큼보다 크게 뛴 콤보는 타격이 아니다(이어하기) — 이정표로 세지 않는다 */
+  MILESTONE_MAX_JUMP: 5,
+  /** 타격음 피치 사다리 — 장조 펜타토닉, 상한 +7반음, 내려가지 않는다 */
+  PITCH_LADDER: [0, 2, 4, 7],
+  PITCH_STEP_COMBO: 10,
+  /** 판 종료 신호음 — 목숨 소리(lifeLost)가 끝난 뒤 */
+  RUN_END_DELAY: 0.5,
+} as const;
+
+// ── 화면 흐름 (B2) ──────────────────────────────────────────────
+// 틱 = 1/60초. 결과 카드·이야기 판이 뜨는 박자.
+export const UI_FLOW = {
+  /** 마지막 목숨을 잃고 결과 카드가 뜨기까지 — 그동안 캔버스는 계속 그린다 */
+  GAMEOVER_CARD_DELAY: 30,
+  /** 카드가 뜬 뒤 연타가 새 판으로 번지지 않게 입력을 잠그는 틱 */
+  GAMEOVER_LOCK: 24,
+  /** 이야기 판 진입 테이프 와이프 — 구역·막 전환 0.25초, 보스 격파 0.4초 */
+  WIPE_TICKS: 15,
+  WIPE_BOSS_TICKS: 24,
+} as const;
+
+// ── 작전 · 자격 · 첫 판 안내 (B3) ──────────────────────────────
+// 특별작전 등급 — 시작 p는 GIMMICK.START_P. 가드 봇 5시드 실측(tests/ops.test.ts)으로 맞췄다:
+// B는 5시드 중 4 이상, S는 1 이하. 건물 작전은 한도 안에 부순 채 수, 버티기 작전은 버틴 초가 값이다.
+export const OPERATION = {
+  glass: { limitSec: 90, metric: 'buildings', grade: { B: 14, A: 18, S: 23 } },
+  ice: { limitSec: 120, metric: 'buildings', grade: { B: 15, A: 20, S: 26 } },
+  night: { limitSec: 150, metric: 'buildings', grade: { B: 13, A: 17, S: 22 } },
+  orbit: { limitSec: 60, metric: 'seconds', grade: { B: 20, A: 35, S: 60 } },
+} as const;
+
+export const TEACH = {
+  /** 평생 첫 목숨 손실 때 판을 멈추는 틱 — 가드 가르치기 */
+  GUARD_FREEZE_TICKS: 90,
+  /** 가드 버튼 맥동을 유지하는 최대 틱 (가드를 누르면 바로 끝) */
+  GUARD_PULSE_TICKS: 360,
+} as const;
+
+/** 구역 인트로 사다리 — 같은 세션에서 아케이드를 시작한 횟수로 고른다 */
+export const INTRO = {
+  /** 첫 판: 석 줄 + 평생 첫 판에만 숨은 줄 */
+  FIRST_TICKS: 60 * 3,
+  /** 2~4판째: 한 줄 */
+  SHORT_TICKS: 60 * 2,
+  SHORT_UNTIL: 4,
+  /** 5판째부터: 머리말만 0.8초 */
+  HEAD_TICKS: 48,
+} as const;
+
+/** 판 도중 자막(콤보 이정표·기록 돌파·구역 도달) 지속 */
+export const CAPTION_MS = 1200;
+
+/** 게임오버 만담 — 같은 세션 연속 사망이 이 횟수부터 사다리 */
+export const QUIP_STREAK_FROM = 3;

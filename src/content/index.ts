@@ -31,6 +31,7 @@ import {
   butterEnterLines,
   GAMEOVER_QUIPS,
   gameoverQuip,
+  pickQuip,
   SCREENS,
 } from './screens';
 import { CAPTIONS, ONOMATO, onomatoFor } from './juice';
@@ -50,6 +51,7 @@ export {
   ENDING_LINES,
   GAMEOVER_QUIPS,
   gameoverQuip,
+  pickQuip,
   GIMMICK_ZONES,
   gimmickZoneOf,
   HERO,
@@ -80,11 +82,6 @@ export function phaseBanner(phase: Act2Phase): readonly string[] {
 
 export function phaseName(phase: Act2Phase): string {
   return ACT2_PHASES[phase].name;
-}
-
-/** 타이틀 도감 한 줄. unlockedChapters = 해금된 최대 챕터 인덱스. */
-export function galleryLine(unlockedChapters: number): string {
-  return REGIONS.map((r) => (r.index <= unlockedChapters ? r.name : SCREENS.title.galleryLocked)).join(' · ');
 }
 
 /** HUD 모드 한 줄. GameState.mode / chapter / act2Phase 훅. */

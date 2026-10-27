@@ -13,12 +13,19 @@ export {
   grant,
   grantDust,
   grantOrbit,
+  examStatus,
+  LICENSE_EXAMS,
+  LICENSE_TITLES,
+  licenseTitle,
+  nextExam,
+  takeExam,
   MAX_REVIVES_PER_RUN,
   MISSION_AD_MULT,
   ORBIT_COSTS,
   ORBIT_MISSION_BASE,
   ORBIT_NAME,
   ORBIT_PER_AD,
+  nextDustGoal,
   orbitCost,
   REVIVE_MAX,
   spendDust,
@@ -26,7 +33,19 @@ export {
   WAZA_ORBIT_COST,
   WEAPON_DUST_COST,
 } from './economy';
-export type { Wallet } from './economy';
+export type { ExamStatus, LicenseExam, Wallet } from './economy';
+export {
+  betterGrade,
+  isOpGrade,
+  isOpId,
+  OP_IDS,
+  opGrade,
+  opLimitTicks,
+  opNeed,
+  opShort,
+  opValue,
+} from './ops';
+export type { OpGrade, OpId } from './ops';
 
 export {
   DEFAULT_LOADOUT,
@@ -51,6 +70,8 @@ export {
   applyMissionEvent,
   applyMissionEvent as applyJuiceToMissions,
   claim,
+  claimableCount,
+  dailyDone,
   defById,
   DAILY_DEFS,
   DAILY_POOL,

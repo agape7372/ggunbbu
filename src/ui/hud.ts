@@ -2,12 +2,17 @@
 // renderer.ts에서 drawHud 호출을 빼는 패치를 권장(이 파일은 renderer를 건드리지 않음).
 
 import type { GameState } from '../core/types';
-import { ACT2, BOSS } from '../config';
+import { ACT2, BOSS, CAPTION_MS } from '../config';
 import { ACT2_PHASES, BOSS_NAME, CAPTIONS, hudModeLabel, SCREENS } from '../content';
 import { ICON } from './icons';
 
 export interface HudApi {
-  sync(s: GameState): void;
+  /** op = 특별작전 한 줄(남은 시간 · 다음 도장). 작전이 아니면 생략 */
+  sync(s: GameState, op?: string): void;
+  /** 판 도중 자막(콤보 이정표·기록 돌파·구역 도달) — CAPTION_MS 뒤 사라진다. 새 자막은 앞 것을 갈아치운다 */
+  note(text: string): void;
+  /** 가드 가르치기 한 줄 켜고 끄기 (평생 첫 목숨 손실 때) */
+  teach(on: boolean): void;
 }
 
 const pinHint = `${CAPTIONS.pinned}<small>가드: 빠져나오기 · 공격: 아래층 베기</small>`;
@@ -51,6 +56,7 @@ export function mountHud(
           </div>
         </div>
       </div>
+      <div class="hud-op" data-el="op" hidden></div>
       <div class="hud-boss" data-el="boss" hidden>
         <span class="hud-boss-label" data-el="boss-label">${BOSS_NAME}</span>
         <div class="bar bar-boss">
@@ -59,6 +65,8 @@ export function mountHud(
       </div>
       <div class="hud-bonus" data-el="bonus" hidden></div>
       <div class="hud-cap" data-el="cap" hidden>${CAPTIONS.combo999}</div>
+      <div class="hud-note" data-el="note" role="status" hidden></div>
+      <div class="hud-teach" data-el="teach" hidden>${SCREENS.teach.guard}<small>${SCREENS.teach.guardSub}</small></div>
       <div class="hud-pin" data-el="pin" hidden>${pinHint}</div>
       <div class="hud-waza-ready" data-el="ready" hidden></div>
     </div>
@@ -83,6 +91,13 @@ export function mountHud(
   const capEl = el('cap');
   const pinEl = el('pin');
   const readyEl = el('ready');
+  const opEl = el('op');
+  const noteEl = el('note');
+  const teachEl = el('teach');
+  let noteTimer = 0;
+  let noteAlt = false;
+  let lastOp = '';
+  let teaching = false;
 
   capEl.textContent = CAPTIONS.combo999;
   readyEl.textContent = CAPTIONS.specialReady;
@@ -152,7 +167,27 @@ export function mountHud(
   }
 
   return {
-    sync(s: GameState): void {
+    note(text: string): void {
+      window.clearTimeout(noteTimer);
+      noteEl.textContent = text;
+      noteEl.hidden = false;
+      // 클래스 2개를 번갈아 달아 같은 키프레임을 강제 리플로우 없이 재시작한다
+      noteAlt = !noteAlt;
+      noteEl.classList.toggle('in-a', noteAlt);
+      noteEl.classList.toggle('in-b', !noteAlt);
+      noteTimer = window.setTimeout(() => { noteEl.hidden = true; }, CAPTION_MS);
+    },
+    teach(on: boolean): void {
+      teaching = on;
+      teachEl.hidden = !on;
+      if (on) pinEl.hidden = true;
+    },
+    sync(s: GameState, op = ''): void {
+      if (op !== lastOp) {
+        lastOp = op;
+        opEl.hidden = !op;
+        opEl.textContent = op;
+      }
       if (s.score !== lastScore) {
         lastScore = s.score;
         // 앞자리 0은 흐리게(.z) — 실제 자릿수만 읽히게
@@ -261,7 +296,7 @@ export function mountHud(
         lastBonus = '';
       }
 
-      pinEl.hidden = s.player.pose !== 'pinned';
+      pinEl.hidden = s.player.pose !== 'pinned' || teaching; // 가르치는 동안은 가르치는 줄 하나만
     },
   };
 }
