@@ -170,3 +170,48 @@ describe('소유 목록 대조 (BL-13)', () => {
     expect(l.body).toBe('amber');
   });
 });
+
+describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무버전 추가 키', () => {
+  it('옛 세이브(키 없음)는 기본값으로 채운다 — 버전은 안 올린다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
+    const d = loadSave();
+    expect(d.v).toBe(1);
+    expect(d.guardTaught).toBe(false);
+    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.license).toBe(0);
+    expect(d.opsGrade).toEqual({});
+  });
+
+  it('왕복: 새 키가 그대로 돌아온다', () => {
+    saveSave({
+      ...structuredClone(DEFAULT_SAVE),
+      guardTaught: true, stats: { buildings: 321, runs: 7 }, license: 2, opsGrade: { glass: 'A', night: 'S' },
+    });
+    const d = loadSave();
+    expect(d.guardTaught).toBe(true);
+    expect(d.stats).toEqual({ buildings: 321, runs: 7 });
+    expect(d.license).toBe(2);
+    expect(d.opsGrade).toEqual({ glass: 'A', night: 'S' });
+  });
+
+  it('오염은 버리지 않고 고친다 — 음수·문자열·범위 밖 등급·모르는 작전 id·모르는 도장', () => {
+    store.set(SAVE_KEY, JSON.stringify({
+      v: 1, guardTaught: 'yes',
+      stats: { buildings: -4, runs: 'x' },
+      license: 99,
+      opsGrade: { glass: 'S', ice: 'Z', ghost: 'A', night: 5, orbit: 'B' },
+    }));
+    const d = loadSave();
+    expect(d.guardTaught).toBe(false);
+    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.license).toBe(3);
+    expect(d.opsGrade).toEqual({ glass: 'S', orbit: 'B' });
+  });
+
+  it('stats가 객체가 아니어도 죽지 않는다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, stats: 7, opsGrade: [1, 2] }));
+    const d = loadSave();
+    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.opsGrade).toEqual({});
+  });
+});

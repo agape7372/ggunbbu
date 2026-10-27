@@ -3,6 +3,8 @@ import {
   DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, enforceOwnedLoadout, sanitizeOwned, validateLoadout, type Loadout,
 } from './meta/loadout';
 import { initAchieveProgress, type DailyState, type MissionProgress } from './meta/missions';
+import { LICENSE_EXAMS } from './meta/economy';
+import { isOpGrade, isOpId, type OpGrade, type OpId } from './meta/ops';
 
 export interface SaveSettings {
   sound: boolean;
@@ -32,6 +34,10 @@ export interface SaveData {
   daily: DailyState | null;
   achieves: MissionProgress[];
   howtoSeen: boolean; // 첫 실행 조작 안내를 봤는지 (무버전 추가 키)
+  guardTaught: boolean; // 평생 첫 목숨 손실 때 가드를 가르쳤는지 (무버전 추가 키)
+  stats: { buildings: number; runs: number }; // 평생 누적 — 철거 자격 조건 · 첫 판 판별 (무버전 추가 키)
+  license: number; // 철거 자격 등급 0(견습)~3(1급) (무버전 추가 키)
+  opsGrade: Partial<Record<OpId, OpGrade>>; // 특별작전 최고 도장 (무버전 추가 키)
 }
 
 export const DEFAULT_SAVE: SaveData = {
@@ -60,6 +66,10 @@ export const DEFAULT_SAVE: SaveData = {
   daily: null,
   achieves: initAchieveProgress(),
   howtoSeen: false,
+  guardTaught: false,
+  stats: { buildings: 0, runs: 0 },
+  license: 0,
+  opsGrade: {},
 };
 
 const BAK_KEY = `${SAVE_KEY}.bak`;
@@ -123,7 +133,26 @@ function normalize(raw: Record<string, unknown>): SaveData {
     daily: isDailyState(data.daily) ? data.daily : null,
     achieves: Array.isArray(data.achieves) ? data.achieves.filter(isProgress) : initAchieveProgress(),
     howtoSeen: typeof data.howtoSeen === 'boolean' ? data.howtoSeen : DEFAULT_SAVE.howtoSeen,
+    guardTaught: data.guardTaught === true,
+    stats: validateStats(data.stats),
+    license: num(data.license, 0, LICENSE_EXAMS.length),
+    opsGrade: validateOpsGrade(data.opsGrade),
   };
+}
+
+function validateStats(v: unknown): SaveData['stats'] {
+  const o = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+  return { buildings: num(o.buildings, 0, 99_999_999), runs: num(o.runs, 0, 99_999_999) };
+}
+
+/** 알려진 작전 id × 알려진 도장만 살린다 — 나머지는 버린다 */
+function validateOpsGrade(v: unknown): SaveData['opsGrade'] {
+  const out: SaveData['opsGrade'] = {};
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return out;
+  for (const [id, g] of Object.entries(v as Record<string, unknown>)) {
+    if (isOpId(id) && isOpGrade(g)) out[id] = g;
+  }
+  return out;
 }
 
 /**

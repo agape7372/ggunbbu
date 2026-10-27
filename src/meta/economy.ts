@@ -39,6 +39,55 @@ export function nextDustGoal(
   return best && { ...best, short: Math.max(0, best.cost - dust) };
 }
 
+// ── 철거 자격 (C4) ─────────────────────────────────────────────
+// 먼지의 영구 소비처. 누적 철거 건물 수(stats.buildings)가 조건, 먼지가 응시료다.
+// 수치는 여기 한 곳에서만 만진다. 실측 수입(가드 봇, 먼지 ≈ 건물당 2.5)으로 맞췄다:
+//   3급 = 첫날 한 시간 안(500 먼지 ≈ 구역1 20분) · 1급 = 하루 20~30분 플레이로 열흘 안팎.
+export const LICENSE_TITLES = ['견습', '3급', '2급', '1급'] as const;
+
+export interface LicenseExam {
+  /** 응시 조건 — 누적 철거 건물 수 */
+  buildings: number;
+  /** 응시료(먼지) */
+  fee: number;
+}
+
+/** index i = 등급 i 에서 i+1 로 가는 시험 */
+export const LICENSE_EXAMS: readonly LicenseExam[] = [
+  { buildings: 100, fee: 500 },
+  { buildings: 500, fee: 1500 },
+  { buildings: 2000, fee: 4000 },
+];
+
+const clampRank = (rank: number): number => Math.max(0, Math.min(LICENSE_EXAMS.length, Math.trunc(rank) || 0));
+
+export function licenseTitle(rank: number): string {
+  return LICENSE_TITLES[clampRank(rank)];
+}
+
+/** 다음 시험. 1급이면 null */
+export function nextExam(rank: number): LicenseExam | null {
+  return LICENSE_EXAMS[clampRank(rank)] ?? null;
+}
+
+export type ExamStatus = 'ok' | 'buildings' | 'dust' | 'max';
+
+/** 지금 응시할 수 있나. 건물 조건이 먼저, 돈은 그다음 */
+export function examStatus(rank: number, buildings: number, dust: number): ExamStatus {
+  const exam = nextExam(rank);
+  if (!exam) return 'max';
+  if (buildings < exam.buildings) return 'buildings';
+  return dust < exam.fee ? 'dust' : 'ok';
+}
+
+/** 응시. 되면 응시료를 빼고 한 단계 올린다. 안 되면 false, 지갑 불변 */
+export function takeExam(inv: { license: number; dust: number; stats: { buildings: number } }): boolean {
+  if (examStatus(inv.license, inv.stats.buildings, inv.dust) !== 'ok') return false;
+  inv.dust -= nextExam(inv.license)!.fee;
+  inv.license = clampRank(inv.license) + 1;
+  return true;
+}
+
 /** 광고 1편당 궤도 */
 export const ORBIT_PER_AD = 8;
 

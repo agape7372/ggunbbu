@@ -8,12 +8,13 @@ import { fillGallery } from './gallery';
 import { FLASH_LABEL, SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
 import { nativeAppVersion } from '../platform/native';
-import { paintOps } from './opsView';
+import { paintOps, type OpsOpts } from './opsView';
 import { paintMissions } from './missionView';
-import { paintShop } from './shopView';
+import { paintShop, type ShopInv } from './shopView';
+import type { OpGrade } from '../meta/ops';
 import { paintCustom } from './customView';
 import { ICON } from './icons';
-import { ACHIEVES, DAILY_POOL, dailyDone } from '../meta';
+import { ACHIEVES, DAILY_POOL, dailyDone, licenseTitle } from '../meta';
 import { APP_VERSION } from '../version';
 import type { DailyState, Loadout, MissionProgress } from '../meta/types';
 import { escapeHtml } from './html';
@@ -27,6 +28,7 @@ export type OverlayScreen =
   | 'settings'
   | 'butter'
   | 'gameover'
+  | 'opsend'
   | 'ending'
   | 'ops'
   | 'missions'
@@ -51,6 +53,8 @@ export interface TitleView {
   todayTotal: number;
   /** 회차별 최고 점수 (회차 선택 버튼 옆) */
   butterBest: Readonly<Record<number, number>>;
+  /** 철거 자격 칭호 — 타이틀 머리줄 */
+  rank: string;
 }
 
 export interface GameOverView {
@@ -73,6 +77,27 @@ export interface GameOverView {
   best: boolean;
   /** 카드 머리에 찍는 모드 이름 */
   mode: string;
+  /** 철거 자격 칭호 — 보고서 머리줄 */
+  rank: string;
+}
+
+/** 특별작전 결과 카드 — 한도에 닿았거나 도장을 딴 채 끝난 판 */
+export interface OpsEndView {
+  /** 작전 이름 */
+  name: string;
+  /** 이번 판 도장. 없으면 null(시간 종료) */
+  grade: OpGrade | null;
+  /** 이번 도장이 이전 최고를 넘었나 */
+  improved: boolean;
+  /** 최고 도장 (이번 판 반영 후) */
+  best: OpGrade | null;
+  /** 목표 한 줄 */
+  goal: string;
+  /** 표 — [이름, 값, 크게?] */
+  rows: readonly [string, string, boolean?][];
+  /** 도장 없을 때 다음 도장까지 한 줄 */
+  progress: string;
+  rank: string;
 }
 
 export interface EndingView {
@@ -110,6 +135,9 @@ export interface OverlayHandlers {
   onGameOverRetry(): void;
   onGameOverTitle(): void;
   onGameOverRevive(): void;
+  onOpsEndList(): void;
+  /** 철거 자격 응시 */
+  onExam(): void;
   onEndingDone(): void;
   onEndingRetry(): void;
   /** 지금 받을 수 있는 미션 수 — 미션 탭 점 배지 */
@@ -142,10 +170,11 @@ export interface OverlayApi {
   showSettings(s: SaveSettings, fromPause: boolean): void;
   showButterPick(tier: number): void;
   showGameOver(v: GameOverView): void;
+  showOpsEnd(v: OpsEndView): void;
   showEnding(v: EndingView): void;
-  showOps(opts: { unlockedChapters: number; allOpen: boolean; act2Cleared: boolean }): void;
+  showOps(opts: OpsOpts): void;
   showMissions(daily: DailyState, achieves: MissionProgress[], adBoost: boolean): void;
-  showShop(inv: { dust: number; orbit: number }, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
+  showShop(inv: ShopInv, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
   showCustom(loadout: Loadout, owned: ReadonlySet<string>): void;
   /** 조작 안내 창. first = 첫 실행(닫으면 onHowtoDone) */
   showHowto(first: boolean): void;
@@ -210,7 +239,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
     <div class="ov-screen ov-title ov-has-tabs" data-screen="title" hidden>
       <header class="title-head">
-        <p class="doc-meta"><span>철거 허가 · 1인 작업</span><span>GUNBBU</span></p>
+        <p class="doc-meta"><span data-el="title-rank">철거 허가 · 견습</span><span>GUNBBU</span></p>
         ${logoHtml(' data-act="logo"')}
         <p class="title-tag">${TAGLINE}</p>
       </header>
@@ -293,7 +322,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
     <div class="ov-screen ov-modal-bg" data-screen="gameover" hidden>
       <div class="card" role="dialog" aria-modal="true" aria-label="${SCREENS.gameover.title}">
-        <p class="card-meta"><span>철거 보고서</span><span data-el="over-mode"></span></p>
+        <p class="card-meta"><span data-el="over-rank">철거 보고서</span><span data-el="over-mode"></span></p>
         <h2 class="card-title">${SCREENS.gameover.title}</h2>
         <span class="stamp" aria-hidden="true">반려</span>
         <p class="card-reason">사유: <b data-el="over-line"></b></p>
@@ -305,6 +334,23 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           <button type="button" class="btn" data-act="go-continue" data-el="go-continue">${SCREENS.gameover.continue}</button>
           <button type="button" class="btn" data-act="go-retry" data-el="go-retry">한 판 더</button>
           <button type="button" class="btn btn-quiet" data-act="go-title">타이틀로</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ov-screen ov-modal-bg" data-screen="opsend" hidden>
+      <div class="card" role="dialog" aria-modal="true" aria-labelledby="opsend-title">
+        <p class="card-meta"><span data-el="opsend-rank">${SCREENS.ops.reportMeta}</span><span data-el="opsend-name"></span></p>
+        <h2 class="card-title" id="opsend-title" data-el="opsend-title"></h2>
+        <span class="stamp op-stamp" data-el="opsend-stamp" hidden></span>
+        <p class="card-reason">목표: <b data-el="opsend-goal"></b></p>
+        <dl class="stat-rows" data-el="opsend-stats"></dl>
+        <p class="next-goal" data-el="opsend-progress" hidden></p>
+        <p class="best-tag" data-el="opsend-new" hidden>${SCREENS.ops.stampNew}</p>
+        <div class="card-actions">
+          <button type="button" class="cta" data-act="ops-retry"><span class="cta-label">${SCREENS.ops.retry}</span></button>
+          <button type="button" class="btn" data-act="ops-list">${SCREENS.ops.list}</button>
+          <button type="button" class="btn btn-quiet" data-act="ops-title">${SCREENS.ops.title}</button>
         </div>
       </div>
     </div>
@@ -370,7 +416,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   let screen: OverlayScreen = 'none';
   let settings: SaveSettings | null = null;
   let titleView: TitleView | null = null;
-  let opsOpts = { unlockedChapters: 0, allOpen: false, act2Cleared: false };
+  let opsOpts: OpsOpts = { unlockedChapters: 0, allOpen: false, act2Cleared: false, grades: {} };
   let quitArmed = 0;
   let resetArmed = false;
   let howtoFirst = false;
@@ -437,6 +483,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       [SCREENS.title.maxCombo, v.maxCombo.toLocaleString('ko-KR')],
     ].map(([k, n]) => `<div><dt>${k}</dt><dd>${n}</dd></div>`).join('');
     $('buddha').hidden = !v.buddhaMode;
+    $('title-rank').textContent = `철거 허가 · ${v.rank}`;
     fillGallery($('gallery'), v.unlockedChapters);
     setTitleSelected(v.selected);
   }
@@ -632,6 +679,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'go-continue': h.onGameOverContinue(); break;
       case 'go-retry': h.onGameOverRetry(); break;
       case 'go-title': h.onGameOverTitle(); break;
+      case 'ops-retry': h.onGameOverRetry(); break;
+      case 'ops-list': h.onOpsEndList(); break;
+      case 'ops-title': h.onGameOverTitle(); break;
       case 'end-title': h.onEndingDone(); break;
       case 'end-retry': h.onEndingRetry(); break;
       case 'tab-play': h.onMetaBack(); break;
@@ -684,6 +734,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     showButterPick(tier: number): void { paintButter(tier); show('butter'); },
     showGameOver(v: GameOverView): void {
       $('over-mode').textContent = v.mode;
+      $('over-rank').textContent = `${SCREENS.license.report} · ${v.rank}`;
       $('over-line').textContent = v.line;
       const g = SCREENS.gameover;
       $('over-stats').innerHTML = statRows([
@@ -714,6 +765,25 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       }
       show('gameover');
     },
+    showOpsEnd(v: OpsEndView): void {
+      const o = SCREENS.ops;
+      $('opsend-rank').textContent = `${o.reportMeta} · ${v.rank}`;
+      $('opsend-name').textContent = v.name;
+      $('opsend-title').textContent = v.grade ? o.doneTitle : o.timeUpTitle;
+      const stamp = $('opsend-stamp');
+      stamp.hidden = !v.grade;
+      stamp.textContent = v.grade ?? '';
+      $('opsend-goal').textContent = v.goal;
+      $('opsend-stats').innerHTML = statRows([
+        ...v.rows.map(([k, val, big]) => [k, escapeHtml(val), big] as [string, string, boolean?]),
+        [o.bestStamp, v.best ?? o.noStamp],
+      ]);
+      const prog = $('opsend-progress');
+      prog.hidden = !v.progress;
+      prog.innerHTML = v.progress ? `<b>${SCREENS.gameover.nextTag}</b>${escapeHtml(v.progress)}` : '';
+      $('opsend-new').hidden = !v.improved;
+      show('opsend');
+    },
     showOps(opts): void {
       opsOpts = opts;
       paintOps($('ops-list'), opsOpts, (id) => h.onOpsPick(id));
@@ -743,6 +813,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           onOrbit: (id) => h.onUnlockOrbit(id),
           onDust: (id) => h.onUnlockDust(id),
           onExchange: () => h.onExchangeDust(),
+          onExam: () => h.onExam(),
         },
       );
       show('shop');
@@ -798,5 +869,6 @@ export function titleViewFromSave(save: SaveData, selected: number, debugOpen = 
     todayDone: today.done,
     todayTotal: today.total,
     butterBest: save.butterBest,
+    rank: licenseTitle(save.license),
   };
 }

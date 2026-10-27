@@ -31,6 +31,7 @@ import {
   butterEnterLines,
   GAMEOVER_QUIPS,
   gameoverQuip,
+  pickQuip,
   SCREENS,
 } from './screens';
 import { CAPTIONS, ONOMATO, onomatoFor } from './juice';
@@ -50,6 +51,7 @@ export {
   ENDING_LINES,
   GAMEOVER_QUIPS,
   gameoverQuip,
+  pickQuip,
   GIMMICK_ZONES,
   gimmickZoneOf,
   HERO,

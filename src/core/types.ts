@@ -194,7 +194,7 @@ export type JuiceKind =
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
-  | 'supply' | 'hatBreak';
+  | 'supply' | 'hatBreak' | 'pinEscape';
 
 export interface JuiceEvent {
   kind: JuiceKind;

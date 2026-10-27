@@ -1,6 +1,7 @@
 // 내레이션 — 웅장한 다큐 톤 + 김새는 내용. 원작 텍스트 미사용.
 // 줄 길이는 360폭 캔버스(13px) 기준 대략 18자 이내.
 
+import { INTRO } from '../config';
 import { BOSS_NAME, HERO, REGIONS } from './world';
 
 /** 1막 챕터 전환 조각. 인덱스 = GameState.chapter (0~3). */
@@ -61,4 +62,29 @@ export const ENDING_FULL_COMBO = '기계가 더 못 셉니다.';
 
 export function chapterLines(chapter: number): readonly string[] {
   return CHAPTER_LINES[Math.max(0, Math.min(3, chapter | 0))];
+}
+
+/** 평생 첫 판에만 나오는 숨은 줄 */
+export const INTRO_HIDDEN_LINE = '※ 신입 환영. 보험은 없다.';
+
+export interface IntroPlan {
+  lines: readonly string[];
+  ticks: number;
+}
+
+/**
+ * 1구역 인트로 사다리. nth = 이번 세션에서 아케이드를 시작한 횟수(1부터, 저장 밖).
+ * 첫 판 3줄 → 2~4판째 한 줄 → 이후 머리말만 짧게. 뒤 칸일수록 짧고 첫 칸으로 안 돌아간다.
+ */
+export function introFor(nth: number, lifetimeFirst: boolean): IntroPlan {
+  const n = Math.floor(nth);
+  const head = REGIONS[0].headline;
+  if (!(n >= 2)) {
+    return {
+      lines: lifetimeFirst ? [...CHAPTER_LINES[0], INTRO_HIDDEN_LINE] : CHAPTER_LINES[0],
+      ticks: INTRO.FIRST_TICKS,
+    };
+  }
+  if (n <= INTRO.SHORT_UNTIL) return { lines: [`${head}. 또.`], ticks: INTRO.SHORT_TICKS };
+  return { lines: [`${head}.`], ticks: INTRO.HEAD_TICKS };
 }

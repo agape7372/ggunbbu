@@ -274,6 +274,10 @@ export const GIMMICK = {
   ORBIT_SPAWN_VY: -120,
   DEFAULT_SPAWN_VY: -70,
   GLASS_EVERY: 2,         // 짝수 층 HP1
+  // 특별작전 시작 p [튜닝, B3 봇 실측]. 점수로 주입한다(p = 점수 / 해금 점수).
+  // 반드시 작전 배경 챕터 안(유리 0 · 빙결 1 · 야간 2 · 궤도 3)이어야 시작하자마자 버터바로 새지 않는다.
+  // 경계 바로 아래는 피한다 — 연타 위주 판은 분당 p가 0.05 가까이 올라 90~150초 창에서 경계를 넘는다.
+  START_P: { glass: 0.12, ice: 0.38, night: 0.5, orbit: 0.75 },
 } as const;
 
 // ── 점수 [산술 검증: 1,500타 ≈ 7~9분에 9,999,999] ──────────────
@@ -490,3 +494,37 @@ export const UI_FLOW = {
   WIPE_TICKS: 15,
   WIPE_BOSS_TICKS: 24,
 } as const;
+
+// ── 작전 · 자격 · 첫 판 안내 (B3) ──────────────────────────────
+// 특별작전 등급 — 시작 p는 GIMMICK.START_P. 가드 봇 5시드 실측(tests/ops.test.ts)으로 맞췄다:
+// B는 5시드 중 4 이상, S는 1 이하. 건물 작전은 한도 안에 부순 채 수, 버티기 작전은 버틴 초가 값이다.
+export const OPERATION = {
+  glass: { limitSec: 90, metric: 'buildings', grade: { B: 14, A: 18, S: 23 } },
+  ice: { limitSec: 120, metric: 'buildings', grade: { B: 15, A: 20, S: 26 } },
+  night: { limitSec: 150, metric: 'buildings', grade: { B: 13, A: 17, S: 22 } },
+  orbit: { limitSec: 60, metric: 'seconds', grade: { B: 20, A: 35, S: 60 } },
+} as const;
+
+export const TEACH = {
+  /** 평생 첫 목숨 손실 때 판을 멈추는 틱 — 가드 가르치기 */
+  GUARD_FREEZE_TICKS: 90,
+  /** 가드 버튼 맥동을 유지하는 최대 틱 (가드를 누르면 바로 끝) */
+  GUARD_PULSE_TICKS: 360,
+} as const;
+
+/** 구역 인트로 사다리 — 같은 세션에서 아케이드를 시작한 횟수로 고른다 */
+export const INTRO = {
+  /** 첫 판: 석 줄 + 평생 첫 판에만 숨은 줄 */
+  FIRST_TICKS: 60 * 3,
+  /** 2~4판째: 한 줄 */
+  SHORT_TICKS: 60 * 2,
+  SHORT_UNTIL: 4,
+  /** 5판째부터: 머리말만 0.8초 */
+  HEAD_TICKS: 48,
+} as const;
+
+/** 판 도중 자막(콤보 이정표·기록 돌파·구역 도달) 지속 */
+export const CAPTION_MS = 1200;
+
+/** 게임오버 만담 — 같은 세션 연속 사망이 이 횟수부터 사다리 */
+export const QUIP_STREAK_FROM = 3;

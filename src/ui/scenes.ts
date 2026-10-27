@@ -6,7 +6,7 @@
 import type { GameState, GimmickId } from '../core/types';
 import { makeState, advance, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
-import { ACT1, AUDIO, PALETTE, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, TEACH, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
@@ -22,15 +22,17 @@ import {
   SCREENS,
   butterChallengeEnd,
   butterEnterLines,
-  gameoverQuip,
   hudModeLabel,
   phaseBanner,
+  pickQuip,
   ENDING_FULL_COMBO,
 } from '../content';
+import { introFor } from '../content/story';
 import { OPERATIONS, WEAPON_COPY } from '../content/world';
 import { mountHud, ensureHudLayer } from './hud';
+import { createRunCaps, type RunCap, type RunCaps } from './runCaps';
 import {
-  mountOverlay, ensureOverlayLayer, titleViewFromSave, type GameOverView, type OverlayApi, type StoryOpts,
+  mountOverlay, ensureOverlayLayer, titleViewFromSave, type GameOverView, type OpsEndView, type OverlayApi, type StoryOpts,
 } from './overlay';
 import { applySettingsPatch as patchSettings, applySettingsToRuntime, type SettingsSinks } from './settings';
 import {
@@ -39,6 +41,7 @@ import {
   equip, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
   dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY,
   claimableCount, nextDustGoal,
+  betterGrade, isOpId, licenseTitle, opGrade, opLimitTicks, opValue, takeExam, type OpId,
 } from '../meta';
 import { createAdsPort, type AdKind } from '../platform/ads';
 import { minimizeApp, onBackButton, onLifecycle } from '../platform/native';
@@ -52,7 +55,7 @@ import {
   DEBUG_TITLE_TAPS,
 } from './debugMenu';
 
-type SceneName = 'boot' | 'title' | 'play' | 'story' | 'ending' | 'gameover' | 'pause';
+type SceneName = 'boot' | 'title' | 'play' | 'story' | 'ending' | 'gameover' | 'opsend' | 'pause';
 type Chrome = 'boot' | 'title' | 'playing' | 'paused' | 'story' | 'gameover' | 'ending';
 
 const CHROME: readonly Chrome[] = ['boot', 'title', 'playing', 'paused', 'story', 'gameover', 'ending'];
@@ -95,6 +98,19 @@ export function createApp(
   let butterRoundNo = 0; // 버터바 챌린지 회차(0 = 챌린지 아님). 종료 시점엔 s.bonus가 이미 null이라 따로 든다
   let gameoverDelay = 0; // 결과 카드가 뜨기까지 남은 틱 — 그동안 캔버스만 그린다
   let pendingOver: GameOverView | null = null;
+  let pendingOps: OpsEndView | null = null; // 작전 결과 카드 — 게임오버 카드와 같은 박자로 늦춘다
+  // 저장 밖 세션 기억 — 새로 열면 처음부터 (C10·C13)
+  let sessionArcadeRuns = 0; // 이번 세션에서 아케이드를 시작한 횟수 → 구역 인트로 사다리
+  let deathStreak = 0; // 같은 세션 연속 사망 (신기록·클리어에서 끊긴다) → 만담 사다리
+  let streakCounted = false; // 한 판에서 부활해 또 죽어도 연속 사망은 한 번만
+  let lastQuip = ''; // 직전에 보인 만담 — 반복 금지
+  let runHatBreaks = 0; // 이번 판에 안전모가 깨진 횟수
+  // 특별작전 한 판: 어느 작전인지 + 지금까지 부순 건물 수. null = 작전 아님
+  let opRun: { id: OpId; buildings: number } | null = null;
+  let runCaps: RunCaps = createRunCaps({ prevBest: 0, countsRecord: false });
+  // 가드 가르치기: 평생 첫 목숨 손실 때 판을 잠깐 세우고 가드 키를 맥동시킨다 (C1)
+  let teachFreeze = 0;
+  let teachPulse = 0;
   let storyLock = 0; // 이야기 판에 들어선 직후 연타로 넘어가지 않게 잠그는 틱
   // 「한 판 더」는 방금 그 모드로 — 구역 작전·야근에서 죽었는데 아케이드로 튕기지 않게
   let lastRun: () => void = () => startArcade();
@@ -132,7 +148,7 @@ export function createApp(
     save.unlockedChapters = fresh.unlockedChapters;
     save.butterTierReached = fresh.butterTierReached;
     save.buddhaMode = fresh.buddhaMode;
-    save.daily = ensureDaily(save.daily, Date.now(), ads.ready()); // 「오늘 N/3」가 날짜 넘김에도 맞게
+    save.daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters); // 「오늘 N/3」가 날짜 넘김에도 맞게
     return titleViewFromSave(save, menuIndex, debugOpen());
   }
 
@@ -143,11 +159,48 @@ export function createApp(
     revivesUsed = 0;
     runBuildings = 0;
     runDust = 0;
+    runHatBreaks = 0;
     butterRoundNo = 0;
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    opRun = null;
+    streakCounted = false;
+    endTeach();
+    save.stats.runs += 1;
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     applyMissionEvent(daily, save.achieves, { kind: 'runStart' });
+    saveSave(save);
+  }
+
+  /** 판 시작 때 최고 기록을 한 번 들고 자막 추적을 새로 연다 — 판 도중 저장이 올려도 흔들리지 않게 */
+  function armCaps(kind: 'arcade' | 'tokoton' | 'butter' | 'op'): void {
+    const prevBest = kind === 'tokoton' ? save.bestTokoton
+      : kind === 'butter' ? (save.butterBest[butterRoundNo] ?? 0)
+        : save.bestArcade;
+    runCaps = createRunCaps({ prevBest, countsRecord: !runExempt && kind !== 'op' });
+  }
+
+  function showCaps(caps: readonly RunCap[]): void {
+    for (const c of caps) {
+      hud.note(c.text);
+      if (c.blip) playSfx('uiBlip');
+    }
+  }
+
+  function endTeach(): void {
+    teachFreeze = 0;
+    teachPulse = 0;
+    hud.teach(false);
+    touch?.setGuardHint(false);
+  }
+
+  function startTeach(): void {
+    save.guardTaught = true;
+    saveSave(save);
+    teachFreeze = TEACH.GUARD_FREEZE_TICKS;
+    teachPulse = TEACH.GUARD_PULSE_TICKS;
+    hud.teach(true);
+    touch?.setGuardHint(true);
   }
 
   function bgm(track: BgmTrack | null): void {
@@ -159,6 +212,7 @@ export function createApp(
   function goPlay(): void {
     gameoverDelay = 0;
     pendingOver = null;
+    pendingOps = null;
     scene = 'play';
     overlay.hide();
     setChrome('playing');
@@ -167,6 +221,9 @@ export function createApp(
   function goTitle(): void {
     gameoverDelay = 0;
     pendingOver = null;
+    pendingOps = null;
+    opRun = null;
+    endTeach();
     state = null;
     scene = 'title';
     menuIndex = 0;
@@ -183,14 +240,18 @@ export function createApp(
     runExempt = debugOpen();
     save.buddhaMode = loadSave().buddhaMode;
     state = makeState({ seed: debugSeed(0x9e3779b9) });
+    const lifetimeFirst = save.stats.runs === 0; // applyRunMeta 가 판 수를 올리기 전에 본다
+    sessionArcadeRuns += 1;
     applyRunMeta(state);
     butterChallenge = false;
+    armCaps('arcade');
     if (save.buddhaMode && import.meta.env.DEV) {
       enterAct2Phase(state, 'cathedral');
       state.wazaGauge = 0;
       showOverlay(STORY.intro, 60 * 6);
     } else {
-      showOverlay(STORY.chapters[0], 60 * 3);
+      const intro = introFor(sessionArcadeRuns, lifetimeFirst);
+      showOverlay(intro.lines, intro.ticks);
     }
   }
 
@@ -203,18 +264,21 @@ export function createApp(
       unlockedChapters: debugOpen() ? 3 : save.unlockedChapters,
       allOpen: debugOpen(),
       act2Cleared: debugOpen() || save.act2Cleared,
+      grades: save.opsGrade,
     };
   }
 
   function openMissions(): void {
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     overlay.showMissions(daily, save.achieves, ads.ready());
   }
 
   function openShop(): void {
-    overlay.showShop({ dust: save.dust, orbit: save.orbit }, ownedSet(), {
+    overlay.showShop({
+      dust: save.dust, orbit: save.orbit, license: save.license, buildings: save.stats.buildings,
+    }, ownedSet(), {
       iap: iap.available(),
       ad: ads.ready(),
     });
@@ -245,9 +309,25 @@ export function createApp(
     if (op.gimmick === 'none' && op.themeIndex > 0) {
       state.p = ACT1.CHAPTER_BOUNDS[op.themeIndex - 1];
       state.score = Math.floor(ACT1.UNLOCK_SCORE * state.p);
+    } else if (isOpId(op.id)) {
+      // 특별작전: 시작 p 를 점수로 주입하고 목표를 따라 센다 (C3)
+      opRun = { id: op.id, buildings: 0 };
+      state.p = GIMMICK.START_P[op.id];
+      state.score = Math.floor(ACT1.UNLOCK_SCORE * state.p);
     }
     butterChallenge = false;
+    armCaps('op');
     goPlay();
+  }
+
+  /** 철거 자격 응시 — 조건과 응시료는 economy.ts 한 곳 */
+  function doExam(): void {
+    const to = licenseTitle(save.license + 1);
+    if (!takeExam(save)) { playSfx('uiDeny'); return; }
+    saveSave(save);
+    playSfx('stamp');
+    overlay.toast(SCREENS.license.passed(to));
+    openShop();
   }
 
   function applySku(id: SkuId): void {
@@ -269,7 +349,7 @@ export function createApp(
   async function claimMission(id: string, boost: boolean): Promise<void> {
     const def = defById(id) ?? DAILY_POOL.find((d) => d.id === id) ?? ACHIEVES.find((d) => d.id === id);
     if (!def) return;
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
     const prog = daily.items.find((p) => p.id === id) ?? save.achieves.find((p) => p.id === id);
@@ -350,7 +430,7 @@ export function createApp(
 
   async function adOrbit(): Promise<void> {
     if (!(await watchAd('orbitPack'))) return;
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
     grantOrbit(save, ORBIT_PER_AD);
@@ -397,6 +477,7 @@ export function createApp(
     state = makeState({ seed: debugSeed(0x51ed270b), mode: 'tokoton' });
     applyRunMeta(state);
     butterChallenge = false;
+    armCaps('tokoton');
     goPlay();
   }
 
@@ -412,6 +493,7 @@ export function createApp(
     enterBonus(state, round);
     butterChallenge = true;
     butterRoundNo = round;
+    armCaps('butter');
     goPlay();
   }
 
@@ -432,7 +514,7 @@ export function createApp(
     if (!state || scene !== 'gameover') return;
     revivesUsed += 1;
     grantMercyLife(state);
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind: 'revive' });
     if (usedAd) applyMissionEvent(daily, save.achieves, { kind: 'adWatched' });
@@ -517,6 +599,7 @@ export function createApp(
         return;
       case 'story': skipStory(true); return;
       case 'gameover':
+      case 'opsend':
       case 'ending': playSfx('uiBack'); goTitle(); return;
       case 'title':
         if (scr !== 'title') { playSfx('uiBack'); overlay.showTitle(titleView()); return; }
@@ -587,6 +670,8 @@ export function createApp(
     onGameOverRetry: () => { playSfx('uiOk'); lastRun(); },
     onGameOverTitle: () => { playSfx('uiBack'); goTitle(); },
     onGameOverRevive: () => { void tryRevive(); },
+    onOpsEndList: () => { playSfx('uiBlip'); goTitle(); overlay.showOps(opsOpts()); },
+    onExam: doExam,
     onEndingDone: () => { playSfx('uiBack'); goTitle(); },
     onEndingRetry: () => { playSfx('uiOk'); lastRun(); },
     missionBadge: () => claimableCount(save.daily, save.achieves),
@@ -698,13 +783,22 @@ export function createApp(
       }
       case 'play': {
         const s = state!;
+        if (teachFreeze > 0) {
+          // 평생 첫 목숨 손실 — 판을 잠깐 세워 가드를 가르친다. 캔버스는 그 장면 그대로 (C1)
+          teachFreeze -= 1;
+          if (teachFreeze === 0) hud.teach(false);
+          break;
+        }
+        if (teachPulse > 0) {
+          teachPulse -= 1;
+          if (f.guard || teachPulse === 0) { teachPulse = 0; touch?.setGuardHint(false); } // 눌러 봤으면 충분
+        }
         if (debug) tickDebug(s, f);
         const wasMode = s.mode;
         const wasPhase = s.act2Phase;
-        const wasPinned = s.player.pose === 'pinned';
         advance(s, f);
         if (debug) settleDebug(s);
-        noteMissions(s, { wasPinned });
+        noteMissions(s);
         consumeAudio(s);
         consumeEvents(s);
         handleTransitions(s, wasMode, wasPhase);
@@ -724,6 +818,14 @@ export function createApp(
         else if (f.special) { playSfx('uiBack'); goTitle(); }
         break;
       }
+      case 'opsend': {
+        bgm(null);
+        // 작전 결과 카드: 한 판 더(공격) · 타이틀(필살). 직전 연타가 새어 나오지 않게 잠깐 잠근다.
+        if (overlayTicks > 0) { overlayTicks -= 1; break; }
+        if (f.attack) { playSfx('uiOk'); lastRun(); }
+        else if (f.special) { playSfx('uiBack'); goTitle(); }
+        break;
+      }
       case 'gameover': {
         bgm(null);
         if (gameoverDelay > 0) {
@@ -731,6 +833,11 @@ export function createApp(
           if (gameoverDelay === 0 && pendingOver) {
             overlay.showGameOver(pendingOver);
             pendingOver = null;
+            overlayTicks = UI_FLOW.GAMEOVER_LOCK;
+          } else if (gameoverDelay === 0 && pendingOps) {
+            overlay.showOpsEnd(pendingOps);
+            pendingOps = null;
+            scene = 'opsend';
             overlayTicks = UI_FLOW.GAMEOVER_LOCK;
           }
           break;
@@ -772,7 +879,7 @@ export function createApp(
   }
 
   function noteKind(kind: string, extra?: { n?: number; combo?: number; zone?: string }): void {
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     applyMissionEvent(daily, save.achieves, { kind, ...extra });
   }
@@ -783,13 +890,10 @@ export function createApp(
     dustDirty = true;
   }
 
-  function noteMissions(s: GameState, extra?: { wasPinned?: boolean }): void {
-    const daily = ensureDaily(save.daily, Date.now(), ads.ready());
+  function noteMissions(s: GameState): void {
+    const daily = ensureDaily(save.daily, Date.now(), ads.ready(), save.unlockedChapters);
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
-    if (extra?.wasPinned && s.player.pose !== 'pinned' && s.player.pose !== 'dead') {
-      applyMissionEvent(daily, save.achieves, { kind: 'pinEscape' });
-    }
     for (const e of s.events) {
       let kind = e.kind as string;
       if (kind === 'bonusPerfect') kind = 'butterPerfect';
@@ -802,38 +906,121 @@ export function createApp(
       if (e.kind === 'chapterUnlock' && (e.n ?? 0) >= 2) {
         applyMissionEvent(daily, save.achieves, { kind: 'zoneSurvive', zone: 'eastasia' });
       }
-      if (e.kind === 'stackDestroy') { earnDust(DUST_PER_BUILDING); runBuildings += 1; }
+      if (e.kind === 'stackDestroy') {
+        earnDust(DUST_PER_BUILDING);
+        runBuildings += 1;
+        save.stats.buildings += 1; // 평생 누적 — 철거 자격 조건 (C4)
+        if (opRun) opRun.buildings += 1;
+      }
       if (e.kind === 'special') earnDust(DUST_PER_SPECIAL);
       if (e.kind === 'supply' && e.item === 'dust') earnDust(DUST_PER_SUPPLY);
+      if (e.kind === 'hatBreak') runHatBreaks += 1;
+      if (e.kind === 'lifeLost' && !s.over && !save.guardTaught) startTeach();
     }
+    showCaps(runCaps.observe({ combo: s.combo, score: s.score }));
     // 판 도중 이탈(탭 종료·데스크톱 강제 종료)에도 재화가 안 날아가게 — 틱마다가 아니라
     // 지급 발생 프레임에만 저장 (08-30, P1-2 잔여)
     if (dustDirty) { saveSave(save); dustDirty = false; }
   }
 
+  /** 판 도중 HUD 한 줄 — 작전이 아니면 '' */
+  function opHud(s: GameState): string {
+    if (!opRun) return '';
+    const remain = Math.max(0, Math.ceil((opLimitTicks(opRun.id) - s.tick) / 60));
+    return SCREENS.ops.hud(opRun.id, remain, opNow(s));
+  }
+
+  /** 특별작전 판의 값 — 건물 작전은 부순 채 수, 버티기 작전은 버틴 초 */
+  function opNow(s: GameState): number {
+    return opRun ? opValue(opRun.id, { buildings: opRun.buildings, ticks: s.tick }) : 0;
+  }
+
   function gameoverView(s: GameState, prevBest: number): GameOverView {
     const goal = nextDustGoal(save.owned, save.dust);
     const goalName = goal ? WEAPON_COPY[goal.id as keyof typeof WEAPON_COPY]?.name : undefined;
+    const best = !runExempt && s.score > 0 && s.score > prevBest;
+    // 같은 세션 연속 사망 — 한 판에서 부활해 또 죽어도 한 번. 신기록이면 흐름이 끊긴 것으로 본다 (C10)
+    if (!streakCounted) { deathStreak += 1; streakCounted = true; }
+    const line = pickQuip({
+      score: s.score,
+      hatBroke: runHatBreaks > 0,
+      chapter: s.chapter,
+      mode: s.mode,
+      boss: s.act2Phase === 'moon',
+      streak: deathStreak,
+      seed: s.score + s.tick,
+    }, lastQuip);
+    lastQuip = line;
+    if (best) deathStreak = 0;
+    // 작전 판이면 다음 도장까지가 다음 목표다
+    const opGoal = opRun ? SCREENS.ops.progress(opRun.id, opNow(s)) : '';
     return {
       score: s.score,
       combo: s.peakCombo,   // 현재 콤보는 죽는 히트가 이미 끊었다 — 결과화면은 이번 판 최고치를 쓴다
       buildings: runBuildings,
       dustGained: runDust,
       zone: hudModeLabel(s.mode, s.chapter, s.act2Phase),
-      goal: goal && goalName ? SCREENS.gameover.nextGoal(goalName, goal.short) : '',
+      goal: opGoal || (goal && goalName ? SCREENS.gameover.nextGoal(goalName, goal.short) : ''),
       canContinue: s.mode === 'act2' && s.checkpoint > 0,
       canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
       adRevive: ads.ready(),
       reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
       reviveMax: MAX_REVIVES_PER_RUN,
-      line: gameoverQuip(s.score + s.tick),
-      best: !runExempt && s.score > 0 && s.score > prevBest,
+      line,
+      best,
       mode: runLabel,
+      rank: licenseTitle(save.license),
     };
+  }
+
+  /**
+   * 특별작전이 끝나는 순간인가 — 한도 시간에 닿았거나, 도장을 딴 채 죽었다.
+   * 도장 없이 죽은 판은 보통 게임오버 카드로 간다(false). 맞으면 결과 카드를 예약하고 true.
+   */
+  function endOpIfDue(s: GameState): boolean {
+    if (!opRun) return false;
+    const timeUp = s.tick >= opLimitTicks(opRun.id);
+    const dead = s.over === 'gameover';
+    if (!timeUp && !dead) return false;
+    const id = opRun.id;
+    const value = opNow(s);
+    const grade = opGrade(id, value);
+    if (dead && !grade) return false;
+    const prev = save.opsGrade[id];
+    const best = betterGrade(prev, grade ?? undefined);
+    const improved = !!grade && best !== prev;
+    if (best) save.opsGrade[id] = best;
+    persist();
+    bgm(null);
+    playSfx(grade ? 'stamp' : 'runEnd', grade ? undefined : { delay: AUDIO.RUN_END_DELAY });
+    const seconds = OPERATION[id].metric === 'seconds';
+    pendingOps = {
+      name: runLabel,
+      grade,
+      improved,
+      best: best ?? null,
+      goal: SCREENS.ops.goal(id),
+      rows: [
+        seconds ? [SCREENS.ops.held, `${value}초`, true] : [SCREENS.ops.built, `${value}채`, true],
+        ['점수', s.score.toLocaleString('ko-KR')],
+      ],
+      progress: SCREENS.ops.progress(id, value),
+      rank: licenseTitle(save.license),
+    };
+    scene = 'gameover'; // 카드가 뜰 때까지의 박자는 게임오버와 같다. 카드가 뜨면 opsend
+    setChrome('gameover');
+    gameoverDelay = dead ? UI_FLOW.GAMEOVER_CARD_DELAY : 6;
+    overlayTicks = 0;
+    return true;
   }
 
   function handleTransitions(s: GameState, wasMode: GameState['mode'], wasPhase: GameState['act2Phase']): void {
     const wipe = { wipeTicks: UI_FLOW.WIPE_TICKS };
+    if (endOpIfDue(s)) return;
+    // 버터바를 지나 새 구역으로 돌아왔다 — 구역 이름을 한 번 자막으로 (C11)
+    if (wasMode === 'bonus' && s.mode === 'act1' && !butterChallenge && !opRun) {
+      showCaps(runCaps.observe({ combo: s.combo, score: s.score, zone: s.chapter }));
+    }
     if (wasMode !== 'act2' && s.mode === 'act2' && wasMode !== 'bonus') {
       persist();
       noteKind('act2Enter');
@@ -877,6 +1064,7 @@ export function createApp(
     if (s.over === 'cleared') {
       const best = !runExempt && s.score > 0 && s.score > save.bestArcade;
       save.act2Cleared = true;
+      deathStreak = 0; // 클리어하면 연속 사망은 끝
       noteKind('moonClear');
       persist();
       bgm('ending');
@@ -915,9 +1103,9 @@ export function createApp(
     ctx.fillStyle = PALETTE.BG;
     ctx.fillRect(0, 0, VIEW.W, VIEW.H);
 
-    if (state && (scene === 'play' || scene === 'pause' || scene === 'story' || scene === 'gameover' || scene === 'ending')) {
+    if (state && (scene === 'play' || scene === 'pause' || scene === 'story' || scene === 'gameover' || scene === 'opsend' || scene === 'ending')) {
       drawGame(ctx, state);
-      if (scene === 'play' || scene === 'pause') hud.sync(state);
+      if (scene === 'play' || scene === 'pause') hud.sync(state, opHud(state));
     }
   }
 

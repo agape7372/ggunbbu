@@ -24,6 +24,8 @@ export interface MissionDef {
   goal: number;
   rewardDust: number;
   rewardOrbit: number;
+  /** 일일 추첨 조건 — 이 구역(0~3)에 닿은 사람에게만 뽑힌다 */
+  minChapter?: number;
 }
 
 export interface MissionProgress {

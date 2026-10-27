@@ -1,6 +1,11 @@
 // 타이틀 / 게임오버 / 결과 / 보너스 / 메뉴 — 플레이어가 읽는 화면 카피.
 
+import { OPERATION, QUIP_STREAK_FROM } from '../config';
+import { opNeed, opShort, type OpId } from '../meta/ops';
 import { BOSS_NAME, HERO } from './world';
+
+/** 버티기 작전(값 = 버틴 초)인가, 건물 작전(값 = 부순 채 수)인가 */
+const isSeconds = (id: OpId): boolean => OPERATION[id].metric === 'seconds';
 
 export const SCREENS = {
   title: {
@@ -81,6 +86,63 @@ export const SCREENS = {
   tokoton: {
     name: '야근',
   },
+
+  /** 특별작전 — 목표 한 줄 · 도장 · 결과 카드 (C3) */
+  ops: {
+    doneTitle: '작전 완료',
+    timeUpTitle: '시간 종료',
+    reportMeta: '철거 보고서',
+    built: '벤 건물',
+    held: '버틴 시간',
+    bestStamp: '최고 도장',
+    stampNew: '도장 갱신',
+    noStamp: '도장 없음',
+    retry: '한 판 더',
+    list: '작전 목록',
+    title: '타이틀로',
+    /** 목표 한 줄 (B 도장 기준) */
+    goal: (id: OpId): string => (isSeconds(id)
+      ? `${OPERATION[id].limitSec}초 버티기`
+      : `${OPERATION[id].limitSec}초 안에 건물 ${OPERATION[id].grade.B}채`),
+    /** 도장 문턱 한 줄 */
+    ladder: (id: OpId): string => {
+      const g = OPERATION[id].grade;
+      return `B ${g.B} · A ${g.A} · S ${g.S}`; // 단위는 목표 한 줄이 말한다
+    },
+    /** 판 도중 HUD 한 줄 — 남은 시간(건물 작전) · 다음 도장까지 */
+    hud: (id: OpId, remainSec: number, value: number): string => {
+      const next = opShort(id, value);
+      const u = isSeconds(id) ? '초' : '채';
+      const head = isSeconds(id) ? '' : `${remainSec}초 · `;
+      return next ? `${head}${value}/${opNeed(id, next.next)}${u} ${next.next}` : `${head}${value}${u} S`;
+    },
+    /** 도장 없이 끝났을 때 결과 카드의 다음 목표 줄 */
+    progress: (id: OpId, value: number): string => {
+      const next = opShort(id, value);
+      const u = isSeconds(id) ? '초' : '채';
+      return next ? `${next.next} 도장까지 ${next.short}${u}` : '';
+    },
+  },
+
+  /** 철거 자격 (C4) */
+  license: {
+    heading: '철거 자격',
+    lead: '건물을 부순 만큼 자격이 열린다.',
+    exam: '응시',
+    examRow: (from: string, to: string) => `${from} → ${to}`,
+    progress: (have: number, need: number) => `건물 ${have.toLocaleString('ko-KR')}/${need.toLocaleString('ko-KR')}채`,
+    needBuildings: (n: number) => `건물 ${n.toLocaleString('ko-KR')}채 더`,
+    maxTitle: '1급. 필기는 여전히 미응시',
+    maxTag: '합격',
+    passed: (t: string) => `${t} 합격`,
+    report: '철거 보고서',
+  },
+
+  /** 첫 목숨 손실 때 한 번 — 가드 가르치기 (C1) */
+  teach: {
+    guard: '가드로 건물을 튕겨 올려라',
+    guardSub: '건물이 닿는 순간에 누른다',
+  },
 } as const;
 
 /** 게임오버 만담. 톤 = 건조한 전단지. 점수·틱으로 고르면 된다. */
@@ -104,6 +166,107 @@ export const GAMEOVER_QUIPS: readonly string[] = [
 export function gameoverQuip(seed: number): string {
   const i = Math.abs(seed | 0) % GAMEOVER_QUIPS.length;
   return GAMEOVER_QUIPS[i]!;
+}
+
+// ── 조건 표 (C10) ────────────────────────────────────────────
+// 반응은 코드 분기가 아니라 데이터다. QUIP_RULES 는 구체적인 것부터 — 처음 맞는 규칙이 이긴다.
+// 직전 줄은 다시 안 쓴다. 연속 사망 사다리는 끝 칸에서 닫히고 첫 칸으로 돌아가지 않는다.
+export interface QuipCtx {
+  score: number;
+  /** 이번 판에 안전모가 깨졌나 */
+  hatBroke: boolean;
+  chapter: number;
+  mode: 'act1' | 'act2' | 'tokoton' | 'bonus';
+  /** 집행기 앞에서 죽었나 */
+  boss: boolean;
+  /** 같은 세션 연속 사망 횟수 (이번 판 포함) */
+  streak: number;
+  /** 줄 고르기 시드 — 점수 + 틱 */
+  seed: number;
+}
+
+export interface QuipRule {
+  id: string;
+  when(c: QuipCtx): boolean;
+  lines: readonly string[];
+}
+
+/** 연속 사망 사다리 — 뒤 칸일수록 짧다 */
+export const QUIP_LADDER: readonly string[] = [
+  '세 번째입니다. 서류가 쌓입니다',
+  '물 한 잔 하고 오세요',
+  '오늘은 여기까지',
+];
+
+export const QUIP_RULES: readonly QuipRule[] = [
+  {
+    id: 'boss',
+    when: (c) => c.boss,
+    lines: [
+      `${BOSS_NAME}가 퇴근을 허락하지 않았습니다`,
+      `${BOSS_NAME} 앞에서 서류가 반려됐습니다`,
+      '집게가 한 번 더 집었습니다',
+    ],
+  },
+  {
+    id: 'zero',
+    when: (c) => c.score <= 0,
+    lines: [
+      '한 대도 안 쳤습니다. 착수금은 환불 불가',
+      '칼은 뽑았습니다. 휘두르진 않았습니다',
+      '출근만 했습니다. 철거는 내일입니다',
+    ],
+  },
+  {
+    id: 'hat',
+    when: (c) => c.hatBroke,
+    lines: [
+      '안전모는 제 몫을 했습니다. 딱 한 번',
+      '안전모가 깨졌습니다. 이번 달 지급분입니다',
+      '모자는 대신 죽었습니다',
+    ],
+  },
+  {
+    id: 'tokoton',
+    when: (c) => c.mode === 'tokoton',
+    lines: ['야근 수당은 없습니다', '야근 중 사망은 산재가 아닙니다', '하늘은 밤새 던집니다'],
+  },
+  {
+    id: 'act2',
+    when: (c) => c.mode === 'act2',
+    lines: ['하늘에서 집게가 내려왔습니다', '최종 국면은 신입을 안 봐줍니다', '서류에 없던 구간입니다'],
+  },
+  {
+    id: 'deep',
+    when: (c) => c.mode === 'act1' && c.chapter >= 2,
+    lines: ['여기까지 온 것이 용합니다', '높은 구역은 보험이 안 됩니다', '구역이 높을수록 서류가 많습니다'],
+  },
+];
+
+/**
+ * 게임오버 만담 한 줄. 사다리(연속 사망) → 구체적인 규칙 → 기본 14줄 순.
+ * `last`(직전에 보인 줄)와 같은 줄은 건너뛴다 — 같은 규칙에서 다른 줄을, 줄이 없으면 다음 규칙으로.
+ */
+export function pickQuip(c: QuipCtx, last: string): string {
+  if (c.streak >= QUIP_STREAK_FROM) {
+    const rung = QUIP_LADDER[Math.min(c.streak - QUIP_STREAK_FROM, QUIP_LADDER.length - 1)]!;
+    if (rung !== last) return rung;
+  }
+  const from = (lines: readonly string[]): string | null => {
+    const n = lines.length;
+    for (let k = 0; k < n; k++) {
+      const line = lines[(Math.abs(c.seed | 0) + k) % n]!;
+      if (line !== last) return line;
+    }
+    return null;
+  };
+  for (const r of QUIP_RULES) {
+    if (r.when(c)) {
+      const line = from(r.lines);
+      if (line) return line;
+    }
+  }
+  return from(GAMEOVER_QUIPS) ?? GAMEOVER_QUIPS[0]!;
 }
 
 export function butterChallengeEnd(score: number): readonly string[] {

@@ -1922,3 +1922,116 @@ button {
     animation: none;
   }
 }
+
+/* ── B3: 작전 HUD · 판 도중 자막 · 가드 가르치기 · 작전 도장 ──────────────
+   노랑은 #btn-special.ready 하나뿐 — 새 요소는 전부 잉크·아이보리다. */
+.hud-op {
+  margin-top: var(--sp-2);
+  text-align: center;
+  font: 700 var(--fs-1)/1.3 var(--font-mono);
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.hud-note,
+.hud-teach {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  text-shadow:
+    0 2px 0 var(--ivory), 0 -2px 0 var(--ivory),
+    2px 0 0 var(--ivory), -2px 0 0 var(--ivory),
+    2px 2px 0 var(--ivory), -2px 2px 0 var(--ivory),
+    2px -2px 0 var(--ivory), -2px -2px 0 var(--ivory),
+    0 0 6px var(--ivory);
+}
+
+.hud-note {
+  top: 150px;
+  max-width: 300px;
+  padding: var(--sp-2) var(--sp-5);
+  font: 26px/1.2 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* 두 키프레임은 같은 모양 — 번갈아 달아 강제 리플로우 없이 재시작한다 */
+.hud-note.in-a { animation: note-in-a 1200ms var(--ease-out) both; }
+.hud-note.in-b { animation: note-in-b 1200ms var(--ease-out) both; }
+
+.hud-teach {
+  top: 250px;
+  width: 292px;
+  font: 24px/1.25 var(--font-display);
+}
+
+.hud-teach small {
+  display: block;
+  margin-top: var(--sp-2);
+  font: 700 var(--fs-3)/1.4 var(--font-ui);
+}
+
+/* 가드 키 맥동 — 잉크 겹테두리가 커졌다 줄어든다 */
+#btn-guard.teach { animation: teach-pulse 720ms ease-in-out infinite; }
+#btn-guard.teach.active { animation: none; }
+
+@keyframes note-in-a {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.5); }
+  14% { opacity: 1; transform: translateX(-50%) scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes note-in-b {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.5); }
+  14% { opacity: 1; transform: translateX(-50%) scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes teach-pulse {
+  0%, 100% { box-shadow: 0 4px 0 var(--ink); }
+  50% { box-shadow: 0 4px 0 var(--ink), 0 0 0 4px var(--ivory), 0 0 0 6px var(--ink); }
+}
+
+/* 작전 카드 — 목표 한 줄 · 도장 문턱 · 최고 도장 */
+.op { position: relative; }
+.op small.op-goal { color: var(--ink); font-weight: 700; }
+.op small.op-ladder { font-family: var(--font-mono); letter-spacing: -0.02em; }
+
+.op-grade {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 26px;
+  padding: 2px 6px 1px;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  font: 18px/1 var(--font-display);
+  text-align: center;
+  transform: rotate(-8deg);
+}
+
+.op-grade[data-g="S"] { background: var(--ink); color: var(--ivory); }
+
+/* 작전 결과 카드 — 성공은 잉크 도장(빨강 = 실패 전용) */
+.stamp.op-stamp {
+  color: var(--ink);
+  font-size: 40px;
+  padding: 8px 16px;
+}
+
+.op-note {
+  font: 600 var(--fs-3)/1.5 var(--font-ui);
+  color: var(--dust);
+}
+
+/* 철거 자격 줄 — 상점 */
+.shop-row.is-exam .lic-prog { font-family: var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-note.in-a,
+  .hud-note.in-b,
+  #btn-guard.teach { animation: none; box-shadow: 0 4px 0 var(--ink), 0 0 0 4px var(--ivory), 0 0 0 6px var(--ink); }
+}

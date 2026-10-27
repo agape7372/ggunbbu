@@ -62,11 +62,12 @@ export const DAILY_POOL: readonly MissionDef[] = [
   {
     id: 'survive_giwa',
     kind: 'daily',
-    title: '기와능선에서 생존',
-    desc: '제3구역 기와능선을 한 판 버틴다.',
+    title: '기와능선에 닿기',
+    desc: '제3구역에 닿는 순간 센다.',
     goal: 1,
     rewardDust: 25,
     rewardOrbit: ORBIT_MISSION_BASE,
+    minChapter: 2,
   },
   {
     id: 'watch_ad',
@@ -243,9 +244,10 @@ export function defById(id: string): MissionDef | undefined {
 }
 
 /** dateKey 해시로 풀에서 중복 없이 DAILY_PICK개를 고른다. */
-export function pickDailyIds(dateKey: string, allowAd = true): string[] {
+export function pickDailyIds(dateKey: string, allowAd = true, reached = 3): string[] {
   // 08-30: 광고 경로가 없는 환경(웹)에선 'ad' 트랙 미션이 영구 미달성이 된다 — 풀에서 제외
-  const pool = allowAd ? DAILY_POOL : DAILY_POOL.filter((d) => TRACK_BY_ID[d.id] !== 'ad');
+  // C6: 구역 조건 미션은 그 구역에 닿은 사람에게만 — 신규 플레이어가 못 깨는 항목을 안 낸다
+  const pool = DAILY_POOL.filter((d) => (allowAd || TRACK_BY_ID[d.id] !== 'ad') && (d.minChapter ?? 0) <= reached);
   const n = Math.min(DAILY_PICK, pool.length);
   if (n <= 0) return [];
   const ids = pool.map((d) => d.id);
@@ -261,7 +263,7 @@ export function pickDailyIds(dateKey: string, allowAd = true): string[] {
 }
 
 /** 날짜가 같으면 동일 참조. 다르거나 null이면 해시로 3개를 새로 뽑는다. */
-export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = true): DailyState {
+export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = true, reached = 3): DailyState {
   const dateKey = kstDateKey(nowMs);
   if (state && state.dateKey === dateKey) {
     // 광고 경로가 사라진 환경에서 이미 뽑힌 광고 미션은 그날 안에 영구 미달성 — 그 항목만 걷어낸다
@@ -272,7 +274,7 @@ export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = t
   }
   return {
     dateKey,
-    items: pickDailyIds(dateKey, allowAd).map(blankProgress),
+    items: pickDailyIds(dateKey, allowAd, reached).map(blankProgress),
   };
 }
 
