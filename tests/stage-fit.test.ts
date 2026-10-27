@@ -36,6 +36,18 @@ describe('무대 맞춤', () => {
     expect(f.scale).toBeCloseTo(Math.min((800 - 60) / VIEW.W, 360 / VIEW.H), 6);
   });
 
+  it('넓은 화면에서 무대가 높이에 닿으면 메뉴층 폭(ox)이 안전 상자 가로를 꽉 채운다', () => {
+    // 사용자 실기기 캡처(1248×1972, dpr 3)와 같은 비율 — 고치기 전엔 메뉴가 화면 폭의 61%만 썼다
+    const f = fitStageBox(416, 657, { ...none, top: 37, bottom: 13 });
+    expect(f.scale).toBeCloseTo((657 - 37 - 13) / VIEW.H, 6);
+    expect((VIEW.W + 2 * f.ox) * f.scale).toBeCloseTo(416, 6);
+    // 폭이 먼저 닿는 길쭉한 화면은 무대가 이미 꽉 차 있다
+    expect(fitStageBox(360, 800, none).ox).toBe(0);
+    // 가로 인셋은 메뉴층 폭에서도 뺀다
+    const g = fitStageBox(800, 360, { ...none, left: 40, right: 20 });
+    expect((VIEW.W + 2 * g.ox) * g.scale).toBeCloseTo(800 - 60, 6);
+  });
+
   it('이상한 인셋(NaN·음수·화면 대부분)에도 무대가 사라지지 않는다', () => {
     const f = fitStageBox(400, 800, { top: Number.NaN, bottom: -30, left: 9999, right: 9999 });
     expect(f.scale).toBeGreaterThan(0);

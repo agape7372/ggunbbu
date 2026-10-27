@@ -3,7 +3,7 @@
 import { VIEW } from '../config';
 
 export interface Insets { top: number; right: number; bottom: number; left: number }
-export interface StageFit { scale: number; dx: number; dy: number }
+export interface StageFit { scale: number; dx: number; dy: number; ox: number }
 
 /** 인셋이 이상한 값(음수·NaN·화면 대부분)이어도 무대가 0 크기가 되지 않게 각 변을 25%로 자른다. */
 const clampInset = (v: number, span: number): number =>
@@ -12,6 +12,7 @@ const clampInset = (v: number, span: number): number =>
 /**
  * 창 크기 w×h와 인셋으로 무대의 배율과 이동량을 구한다.
  * #app이 무대를 창 한가운데에 놓으므로, 이동량은 "안전 상자 중심 − 창 중심"이다.
+ * ox = 무대가 높이에 먼저 닿아 좌우에 남는 안전 상자 폭(논리 px, 한쪽). 메뉴층은 이만큼 좌우로 더 편다.
  */
 export function fitStageBox(w: number, h: number, inset: Insets): StageFit {
   const t = clampInset(inset.top, h);
@@ -19,7 +20,8 @@ export function fitStageBox(w: number, h: number, inset: Insets): StageFit {
   const l = clampInset(inset.left, w);
   const r = clampInset(inset.right, w);
   const scale = Math.min((w - l - r) / VIEW.W, (h - t - b) / VIEW.H);
-  return { scale, dx: (l - r) / 2, dy: (t - b) / 2 };
+  const ox = scale > 0 ? Math.max(0, ((w - l - r) / scale - VIEW.W) / 2) : 0;
+  return { scale, dx: (l - r) / 2, dy: (t - b) / 2, ox };
 }
 
 export interface InsetProbe {

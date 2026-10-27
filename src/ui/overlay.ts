@@ -209,6 +209,24 @@ function logoHtml(extra = ''): string {
   return `<h1 class="logo" aria-label="${t}"${extra}><span class="cut-a" aria-hidden="true">${t}</span><span class="cut-b" aria-hidden="true">${t}</span></h1>`;
 }
 
+/** 세 단계 고르기 — 원하는 칸을 바로 누른다(한 칸씩 돌려 누르기 없음). 고른 칸은 paintLevel이 칠한다 */
+function levelRow(act: string, name: string, labels: readonly string[]): string {
+  const segs = labels.map((l, i) => `<button type="button" data-act="${act}" data-v="${i}">${l}</button>`).join('');
+  return `<div class="set-row set-level"><span>${name}</span><span class="seg" role="group" aria-label="${name}" data-el="${act}">${segs}</span></div>`;
+}
+
+function paintLevel(seg: HTMLElement, level: number): void {
+  seg.querySelectorAll('button').forEach((b, i) => {
+    b.classList.toggle('on', i === level);
+    b.setAttribute('aria-pressed', String(i === level));
+  });
+}
+
+function levelOf(el: HTMLElement): 0 | 1 | 2 {
+  const v = Number(el.getAttribute('data-v'));
+  return v === 0 || v === 1 ? v : 2;
+}
+
 function modeRow(act: string, no: string): string {
   return `<button type="button" class="mode-row" data-act="${act}" data-el="${act}">
     <span class="mode-no">${no}</span><span class="mode-name"></span><span class="mode-sub"></span>
@@ -293,15 +311,15 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           <button type="button" class="set-row" data-act="set-bgm"><span>음악</span><span class="sw" data-el="set-bgm"></span></button>
           <button type="button" class="set-row" data-act="set-sfx"><span>효과음</span><span class="sw" data-el="set-sfx"></span></button>
           <button type="button" class="set-row" data-act="set-vib"><span>진동</span><span class="sw" data-el="set-vib"></span></button>
-          <button type="button" class="set-row" data-act="set-shake"><span>화면 흔들림</span><span class="set-val" data-el="set-shake"></span></button>
-          <button type="button" class="set-row" data-act="set-flash"><span>번쩍임</span><span class="set-val" data-el="set-flash"></span></button>
+          ${levelRow('set-shake', '화면 흔들림', SHAKE_LABEL)}
+          ${levelRow('set-flash', '번쩍임', FLASH_LABEL)}
           <button type="button" class="set-row" data-act="set-hand"><span>왼손 조작</span><span class="sw" data-el="set-hand"></span></button>
           <p class="sec-h">도움말</p>
           <button type="button" class="set-row" data-act="howto"><span>조작 안내</span>${ICON.next}</button>
           <button type="button" class="set-row" data-act="privacy"><span>개인정보 처리방침</span>${ICON.next}</button>
           <button type="button" class="set-row" data-act="credits"><span>글꼴 저작권</span>${ICON.next}</button>
           <button type="button" class="set-row set-danger" data-act="reset" data-el="reset-row"><span>기록 지우기</span>${ICON.next}</button>
-          <p class="sheet-foot">GUNBBU <span data-el="ver">v${APP_VERSION}</span><br>키보드: 점프 ↑ · 가드 ↓ · 공격 Z · 필살 X · 멈춤 Esc</p>
+          <p class="sheet-foot">GUNBBU <span data-el="ver">v${APP_VERSION}</span><span class="kbd-hint"><br>키보드: 점프 ↑ · 가드 ↓ · 공격 Z · 필살 X · 멈춤 Esc</span></p>
         </div>
         <button type="button" class="btn" data-act="set-back" data-el="set-back">뒤로</button>
       </div>
@@ -446,6 +464,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   }
 
   function show(name: OverlayScreen): void {
+    // 다른 화면으로 옮기면 앞 화면의 알림은 거둔다 — 탭을 바꿔도 2.4초 남아 새 목록을 가렸다(10-28)
+    if (name !== screen) { window.clearTimeout(toastTimer); toastEl.classList.remove('on'); }
     screen = name;
     closeModal();
     root.classList.toggle('is-open', name !== 'none');
@@ -501,8 +521,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     $('set-sfx').classList.toggle('on', s.sfx);
     $('set-vib').classList.toggle('on', s.vibration);
     $('set-hand').classList.toggle('on', s.leftHanded);
-    $('set-shake').textContent = SHAKE_LABEL[s.shakeLevel];
-    $('set-flash').textContent = FLASH_LABEL[s.flashLevel];
+    paintLevel($('set-shake'), s.shakeLevel);
+    paintLevel($('set-flash'), s.flashLevel);
     for (const [act, on] of [['set-sound', s.sound], ['set-bgm', s.bgm], ['set-sfx', s.sfx], ['set-vib', s.vibration], ['set-hand', s.leftHanded]] as const) {
       root.querySelector(`[data-act="${act}"]`)?.setAttribute('aria-pressed', String(on));
     }
@@ -654,10 +674,10 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'set-vib': if (settings) h.onSettingsPatch({ vibration: !settings.vibration }); break;
       case 'set-hand': if (settings) h.onSettingsPatch({ leftHanded: !settings.leftHanded }); break;
       case 'set-shake':
-        if (settings) h.onSettingsPatch({ shakeLevel: ((settings.shakeLevel + 1) % 3) as 0 | 1 | 2 });
+        if (settings) h.onSettingsPatch({ shakeLevel: levelOf(t) });
         break;
       case 'set-flash':
-        if (settings) h.onSettingsPatch({ flashLevel: ((settings.flashLevel + 1) % 3) as 0 | 1 | 2 });
+        if (settings) h.onSettingsPatch({ flashLevel: levelOf(t) });
         break;
       case 'howto': showHowto(false); break;
       case 'privacy': openDoc('개인정보 처리방침', './privacy.html'); break;

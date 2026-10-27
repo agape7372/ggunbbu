@@ -217,7 +217,8 @@ const DEFS_BY_ID: ReadonlyMap<string, MissionDef> = new Map(
 );
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const ROLLOVER_HOUR = 5;
+/** 일일 미션이 바뀌는 KST 시각 — 미션 탭이 「05:00에 새 미션」으로 읽는다 */
+export const ROLLOVER_HOUR = 5;
 
 /** FNV-1a 32비트. 일일 추첨 시드. */
 export function hash32(s: string): number {

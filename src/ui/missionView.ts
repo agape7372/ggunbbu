@@ -1,6 +1,6 @@
 // 미션 탭 조각. 수령은 overlay가 claim 후 다시 paint.
 
-import { ACHIEVES, DAILY_POOL } from '../meta/missions';
+import { ACHIEVES, DAILY_POOL, ROLLOVER_HOUR } from '../meta/missions';
 import type { DailyState, MissionDef, MissionProgress } from '../meta/types';
 import { ICON } from './icons';
 import { escapeHtml } from './html';
@@ -19,7 +19,7 @@ export function paintMissions(
       <h2>미션</h2>
       ${adBoost ? '<p class="sheet-lead">광고를 보고 받으면 보상이 두 배.</p>' : ''}
     </header>
-    <p class="sec-h">오늘 <small>${escapeHtml(daily.dateKey ?? '')}</small></p>
+    <p class="sec-h">오늘 <small>${String(ROLLOVER_HOUR).padStart(2, '0')}:00에 새 미션</small></p>
     <div data-el="daily"></div>
     <p class="sec-h">업적</p>
     <div data-el="achieve"></div>`;
@@ -78,16 +78,16 @@ function missionRow(def: MissionDef, p: MissionProgress, adBoost: boolean, main:
   const isMain = ready && !main.taken;
   if (isMain) main.taken = true;
   const id = escapeHtml(def.id);
-  const actions = ready
-    ? `<button type="button" class="btn btn-sm claim${isMain ? ' claim-main' : ''}" data-claim-id="${id}" data-claim-boost="0">받기</button>`
+  // 광고 두 배는 받기 왼쪽 — 사이를 띄워(.m-actions) 받기를 누르려다 광고를 틀지 않게 한다
+  const boost = adBoost
+    ? `<button type="button" class="btn btn-sm m-boost" data-claim-id="${id}" data-claim-boost="1">${ICON.ad}광고 보고 2배</button>`
     : '';
-  // 광고 두 배는 받기 아래 줄로 — 받기를 누르려다 광고를 틀지 않게 간격을 둔다
-  const boost = ready && adBoost
-    ? `<div class="m-boost"><button type="button" class="btn btn-sm" data-claim-id="${id}" data-claim-boost="1">${ICON.ad}광고 보고 2배</button></div>`
-    : '';
+  let actions = '';
+  if (ready) actions = `${boost}<button type="button" class="btn btn-sm claim${isMain ? ' claim-main' : ''}" data-claim-id="${id}" data-claim-boost="0">받기</button>`;
+  else if (p.claimed) actions = '<span class="m-got">받음</span>';
 
   const wrap = document.createElement('div');
-  wrap.className = `m-row${ready ? ' is-ready' : ''}`;
+  wrap.className = `m-row${ready ? ' is-ready' : ''}${p.claimed ? ' is-claimed' : ''}`;
   wrap.innerHTML = `
     <div class="m-top">
       <p class="m-title">${escapeHtml(def.title)}</p>
@@ -98,7 +98,7 @@ function missionRow(def: MissionDef, p: MissionProgress, adBoost: boolean, main:
     <div class="m-foot">
       <p class="reward">${reward}</p>
       <div class="m-actions">${actions}</div>
-    </div>${boost}`;
+    </div>`;
   return wrap;
 }
 

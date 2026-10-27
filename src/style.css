@@ -47,6 +47,9 @@
   --tap: 58px;
   --tap-sm: 56px;
 
+  /* 메뉴 글 기둥 상한 — 넓은 화면(태블릿·폴드)에서 한 줄이 너무 길어지지 않게. 폰은 화면 폭을 다 쓴다 */
+  --col-max: 600px;
+
   --sp-1: 3px;
   --sp-2: 4px;
   --sp-3: 6px;
@@ -327,7 +330,14 @@ button {
 }
 
 #hud-layer { visibility: hidden; z-index: 2; }
-#overlay-layer { z-index: 10; visibility: hidden; }
+/* 메뉴층은 무대 좌우 여백까지 편다(--ov-x는 main이 주입). 무대가 높이에 맞춰 좁아지는 넓은 화면에서
+   메뉴가 360 기둥에 갇혀 화면 폭의 61%만 쓰던 것(10-28 실기기). 게임판(캔버스·HUD·조작 키)은 그대로 360 */
+#overlay-layer {
+  z-index: 10;
+  visibility: hidden;
+  left: calc(-1 * var(--ov-x, 0px));
+  right: calc(-1 * var(--ov-x, 0px));
+}
 
 #overlay-layer.is-open {
   visibility: visible;
@@ -801,7 +811,7 @@ button {
   overflow-y: auto;
 }
 
-.ov-title > * { width: 100%; max-width: 328px; }
+.ov-title > * { width: 100%; max-width: var(--col-max); }
 
 .title-head {
   display: flex;
@@ -1026,9 +1036,12 @@ button {
   background: rgba(244, 241, 232, 0.84);
 }
 
+/* 폭 = 메뉴층 폭(가장자리 24씩 뺀 것), 큰 화면은 420에서 멈춘다 — 312로 박혀 있을 땐
+   넓은 기기에서 화면 58%만 썼다(10-28 실기기). 무대 폭 360에선 예전 312 그대로다 */
 .card {
   position: relative;
-  width: 312px;
+  width: 100%;
+  max-width: 420px;
   max-height: 100%;
   display: flex;
   flex-direction: column;
@@ -1194,39 +1207,44 @@ button {
 }
 
 /* ── 시트(탭 화면·설정) ───────────────────────────────────── */
+/* 아래 60 = 탭 바 높이 — 목록은 탭 바의 잉크 윗줄에서 잘린다 */
 .ov-sheet-screen {
   background: var(--ivory);
-  padding: 18px 16px 72px;
+  padding: 18px 16px 60px;
 }
 
-.ov-sheet-screen.no-tabs { padding-bottom: 16px; }
+.ov-sheet-screen.no-tabs { padding-bottom: 4px; }
 
 .ov-sheet {
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
   width: 100%;
-  max-width: 328px;
+  max-width: var(--col-max);
   flex: 1 1 auto;
   min-height: 0;
   text-align: left;
 }
 
-/* 목록이 남는 높이를 먹고 스크롤한다. 머리는 붙어 있다. */
-.ov-sheet > [data-el] {
+/* 목록이 남는 높이를 먹고 스크롤한다. 머리는 붙어 있다.
+   스크롤바는 안 그린다 — 3px 잉크 막대가 오른쪽 끝 숫자·버튼에 붙어 굵은 세로줄로 보였다(10-28 실기기) */
+.ov-sheet > div[data-el] {
   flex: 1 1 auto;
   min-height: 0;
+  padding-bottom: var(--sp-6);
   overflow-y: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ink) transparent;
+  scrollbar-width: none;
 }
 
-.ov-sheet > [data-el]::-webkit-scrollbar { width: 3px; }
-.ov-sheet > [data-el]::-webkit-scrollbar-thumb { background: var(--ink); }
+.ov-sheet > div[data-el]::-webkit-scrollbar { display: none; }
 
-.ov-sheet > .btn { flex: 0 0 auto; min-height: var(--tap); } /* data-el 목록 규칙(min-height:0)에 눌려 줄어들던 「뒤로」 */
+/* 「뒤로」가 보이는 시트는 목록 끝에 잉크 줄 — 탭 바 윗줄처럼, 스크롤로 잘린 줄이 떠 보이지 않게.
+   숨은 「뒤로」(탭에서 연 설정)엔 안 긋는다 — 탭 바 윗줄과 겹줄이 된다 */
+.ov-sheet > div[data-el]:has(+ .btn:not([hidden])) { border-bottom: 2px solid var(--ink); }
+
+.ov-sheet > .btn { flex: 0 0 auto; margin-bottom: var(--sp-5); }
 
 .sheet-head {
   position: sticky;
@@ -1238,6 +1256,8 @@ button {
   padding-bottom: var(--sp-5);
   border-bottom: 2px solid var(--ink);
   background: var(--ivory);
+  /* 무대 축소 배율에선 붙은 머리 위로 1px 남짓 틈이 생겨 밑으로 지나가는 스위치가 줄처럼 비친다(10-28) — 바탕색으로 덮는다 */
+  box-shadow: 0 -4px 0 var(--ivory);
 }
 
 .sheet-head-row {
@@ -1327,6 +1347,7 @@ button {
 
 .m-foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: var(--sp-4);
@@ -1335,16 +1356,27 @@ button {
 /* 받을 수 있는 줄 — 표시는 큰 「받기」 하나(옆 막대 없음). 노랑은 처음 나오는 「받기」 하나만(.claim-main) */
 .m-row.is-ready .m-foot { min-height: var(--tap); }
 
-.claim { min-width: 88px; min-height: var(--tap); } /* btn-sm(56)은 360×640 배율 0.82에서 46dp — 다른 칸처럼 58 */
+/* btn-sm(56)은 360×640 배율 0.82에서 46dp — 받기·광고 두 배는 다른 칸처럼 58 */
+.claim, .m-boost { min-height: var(--tap); }
+.claim { min-width: 88px; }
 
 .claim-main { background: var(--yellow); }
 .claim-main:not(:disabled):active { background: var(--ink); color: var(--yellow); }
 
-/* 광고 두 배는 받기 아래 줄 — 오탭이 광고로 번지지 않게 간격을 둔다 */
-.m-boost {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--sp-4);
+/* 광고 두 배는 「받기」 왼쪽, 사이 12 — 아래 줄에 따로 두면 줄에서 떨어져 나간 버튼으로 읽혔다(10-28 실기기).
+   글자가 커져 한 줄에 안 들어가면 두 버튼이 같이 다음 줄 오른쪽으로 내려간다 */
+.m-actions { display: flex; gap: var(--sp-5); margin-left: auto; }
+
+/* 받은 일일 미션 — 흐리게 + 「받음」 꼬리표(상점 「보유」와 같은 모양) */
+.m-row.is-claimed .m-title,
+.m-row.is-claimed .reward { color: var(--dust); }
+.m-row.is-claimed .bar .fill { background: var(--dust-2); }
+
+.m-got {
+  padding: 2px 6px;
+  border: 1px solid var(--dust-2);
+  font: 700 var(--fs-1) var(--font-ui);
+  color: var(--dust);
 }
 
 .reward {
@@ -1355,8 +1387,6 @@ button {
 
 .reward .ic,
 .price .ic { width: 14px; height: 14px; }
-
-.m-actions { display: flex; gap: var(--sp-3); }
 
 .m-done {
   padding: var(--sp-5) 0;
@@ -1578,7 +1608,7 @@ button {
   gap: var(--sp-4);
   width: 100%;
   min-height: var(--tap);
-  padding: 0 2px;
+  padding: 0 6px 0 2px;
   border: none;
   border-bottom: 1px solid var(--rule);
   background: transparent;
@@ -1589,10 +1619,47 @@ button {
 }
 
 .set-row:active { background: var(--paper); }
-.set-row .ic { width: 18px; height: 18px; color: var(--dust); }
+.set-row .ic { width: 18px; height: 18px; margin-right: -6px; color: var(--dust); } /* 화살 끝을 스위치 오른쪽 끝에 맞춘다(그림 안 여백 6 — 줄 오른쪽 안쪽 여백 6이 받아 줘 목록이 옆으로 밀리지 않는다) */
 .set-danger { color: var(--red-ink); }
 
-.set-val { font: 700 var(--fs-3) var(--font-mono); }
+/* 세 단계 고르기 — 각진 잉크 칸 셋, 고른 칸만 잉크로 뒤집힌다(스위치와 같은 말투).
+   글자만 오른쪽 끝에 붙어 있던 「기본」은 눌러지는 줄로 안 읽혔다(10-28 실기기) */
+.set-level:active { background: transparent; }
+
+.seg {
+  display: flex;
+  flex: 0 0 auto;
+  border: 2px solid var(--ink);
+}
+
+.seg button {
+  position: relative;
+  min-width: 60px;
+  height: 22px;
+  padding: 0 var(--sp-4);
+  border: none;
+  border-left: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--dust);
+  font: 700 var(--fs-2)/1 var(--font-ui);
+}
+
+.seg button:first-child { border-left: none; }
+
+/* 보이는 칸은 스위치와 같은 26(테두리 포함), 누름 칸은 줄 높이(58)까지 */
+.seg button::after {
+  content: '';
+  position: absolute;
+  inset: -18px 0;
+}
+
+.seg button.on { background: var(--ink); color: var(--ivory); }
+.seg button:not(.on):active { background: var(--paper); color: var(--ink); }
+
+/* 키보드 안내는 키보드가 있는 기기에서만 */
+@media (hover: none) and (pointer: coarse) {
+  .kbd-hint { display: none; }
+}
 
 /* 스위치 — 각진 잉크 상자 */
 .sw {

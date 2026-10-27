@@ -38,8 +38,9 @@ const insetProbe = createInsetProbe();
 function fitStage(): void {
   const stage = document.getElementById('stage')!;
   stage.style.setProperty('--field-h', `${VIEW.FIELD_H}px`);
-  const { scale, dx, dy } = fitStageBox(window.innerWidth, window.innerHeight, insetProbe.read());
+  const { scale, dx, dy, ox } = fitStageBox(window.innerWidth, window.innerHeight, insetProbe.read());
   stage.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+  stage.style.setProperty('--ov-x', `${ox}px`); // 메뉴층이 좌우 여백까지 편다(style.css #overlay-layer)
 }
 
 setupCanvas();
