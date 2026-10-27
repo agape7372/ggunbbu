@@ -276,6 +276,20 @@ export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = t
   };
 }
 
+const isReady = (p: MissionProgress): boolean => p.count >= goalOf(p.id);
+
+/** 지금 받을 수 있는 미션 수(일일 + 업적) — 미션 탭의 점 배지 */
+export function claimableCount(daily: DailyState | null, achieves: readonly MissionProgress[]): number {
+  const all = [...(daily?.items ?? []), ...achieves];
+  return all.filter((p) => !p.claimed && isReady(p)).length;
+}
+
+/** 오늘 일일 미션 중 채운 수 / 전체 — 타이틀의 「오늘 N/3」. 받은 것도 채운 것이다. */
+export function dailyDone(daily: DailyState | null): { done: number; total: number } {
+  const items = daily?.items ?? [];
+  return { done: items.filter(isReady).length, total: items.length };
+}
+
 export function initAchieveProgress(): MissionProgress[] {
   return ACHIEVES.map((d) => blankProgress(d.id));
 }

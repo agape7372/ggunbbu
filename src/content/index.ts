@@ -82,11 +82,6 @@ export function phaseName(phase: Act2Phase): string {
   return ACT2_PHASES[phase].name;
 }
 
-/** 타이틀 도감 한 줄. unlockedChapters = 해금된 최대 챕터 인덱스. */
-export function galleryLine(unlockedChapters: number): string {
-  return REGIONS.map((r) => (r.index <= unlockedChapters ? r.name : SCREENS.title.galleryLocked)).join(' · ');
-}
-
 /** HUD 모드 한 줄. GameState.mode / chapter / act2Phase 훅. */
 export function hudModeLabel(
   mode: 'act1' | 'act2' | 'tokoton' | 'bonus',

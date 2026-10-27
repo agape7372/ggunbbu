@@ -39,10 +39,6 @@ let mounted = false;
 let statusEl: HTMLElement | null = null;
 let seedInput: HTMLInputElement | null = null;
 
-export function getDebugRuntime(): DebugRuntime {
-  return runtime;
-}
-
 /** makeState 시드. 고정이 없으면 Date.now() ⊕ xor. */
 export function debugSeed(xor: number): number {
   if (runtime.seedLock != null) return runtime.seedLock >>> 0;

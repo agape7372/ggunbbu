@@ -9,6 +9,9 @@ export const SCREENS = {
     best: '최고 점수',
     tokotonBest: '야근 최고',
     maxCombo: '최대 콤보',
+    today: (done: number, total: number) => `오늘 ${done}/${total}`,
+    dust: '먼지',
+    orbit: '궤도조각',
   },
 
   /** 타이틀 메뉴 — 이름표 + 한 줄 보조(잠김이면 여는 조건) */
@@ -45,15 +48,32 @@ export const SCREENS = {
   gameover: {
     title: '철거 실패',
     continue: '체크포인트에서 이어하기',
-    revive: (n: number, max: number) => `광고 보고 일어나기 ${n}/${max}`,
+    revive: '광고 보고 일어나기',
     /** 웹(광고 미배선) — 광고를 위장하지 않는다 (08-30, P0-2) */
-    reviveFree: (n: number, max: number) => `일어나기 ${n}/${max}`,
+    reviveFree: '일어나기',
+    reviveLeft: (n: number) => `${n}번 남음`,
+    buildings: '벤 건물',
+    buildingsUnit: (n: number) => `${n}채`,
+    dust: '먼지',
+    zone: '도달 구역',
+    /** 다음 목표 한 줄 — 가장 싼 미보유 먼지 구매품 */
+    nextGoal: (name: string, short: number) => (short > 0 ? `${name}까지 먼지 ${short}` : `${name}, 지금 살 수 있다`),
+    nextTag: '다음 목표',
+  },
+
+  /** 이야기 판 진입 직전 도장 */
+  stamps: {
+    best: '신기록',
+    perfect: 'PERFECT',
+    act2: '2막',
+    zone: (n: number) => `${n}구역`,
   },
 
   butter: {
     banner: '— 버터바 타임! —',
     bannerHud: '버터바 타임!',
     short: '버터바',
+    best: (n: number) => `최고 ${n.toLocaleString('ko-KR')}`,
     challengeEnd: '버터바 챌린지 끝!',
     rounds: ['1회차 · 얇은 겹', '2회차 · 세 겹', '3회차 · 100겹 타워'] as const,
   },

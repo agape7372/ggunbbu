@@ -54,7 +54,7 @@ export function paintShop(
   const earn = [
     `<button type="button" class="shop-row${canExchange ? '' : ' short'}" data-shop-exchange="1"${canExchange ? '' : ' disabled'}>
       <span class="shop-name">먼지 바꾸기<small>먼지 ${DUST_EXCHANGE.dust} → 궤도조각 ${DUST_EXCHANGE.orbit}</small></span>
-      <span class="price">${ICON.dust}${DUST_EXCHANGE.dust}</span>
+      ${priceCol(`${ICON.dust}${DUST_EXCHANGE.dust}`, canExchange ? 0 : DUST_EXCHANGE.dust - inv.dust)}
     </button>`,
     paths.ad
       ? `<button type="button" class="shop-row" data-shop-ad="1">
@@ -104,7 +104,7 @@ export function paintShop(
   };
 }
 
-/** 사는 줄 하나. 잔액 부족 = 조용한 무반응 금지 — 눌리지 않게 하고 값이 빨갛게 이유를 말한다 (08-30, B-2) */
+/** 사는 줄 하나. 잔액 부족 = 조용한 무반응 금지 — 눌리지 않게 하고 점선 칸 + 「N 모자람」이 이유를 말한다 (08-30, B-2) */
 function buyRowHtml(
   row: BuyRow,
   pay: 'dust' | 'orbit',
@@ -119,8 +119,13 @@ function buyRowHtml(
   const price = has ? '보유' : `${ICON[pay]}${fmt(row.cost)}`;
   return `<button type="button" class="shop-row${state}" data-${pay}-id="${row.id}"${has || short ? ' disabled' : ''}>
       <span class="shop-name">${escapeHtml(row.title)}<small>${escapeHtml(row.note)}</small></span>
-      <span class="price">${price}</span>
+      ${priceCol(price, short ? row.cost - inv[pay] : 0)}
     </button>`;
+}
+
+/** 가격 + 모자라면 얼마나 모자란지. 빨강은 안 쓴다 — 점선 칸과 이 글자가 말한다 */
+function priceCol(price: string, lack: number): string {
+  return `<span class="price-col"><span class="price">${price}</span>${lack > 0 ? `<small class="lack">${fmt(lack)} 모자람</small>` : ''}</span>`;
 }
 
 function hasItem(owned: ReadonlySet<string>, id: string): boolean {

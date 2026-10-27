@@ -26,9 +26,11 @@ export function paintMissions(
 
   const dailyBox = root.querySelector('[data-el="daily"]') as HTMLElement;
   const achieveBox = root.querySelector('[data-el="achieve"]') as HTMLElement;
+  // 화면 노랑은 한 곳 — 처음 나오는 「받기」만 노랑이다
+  const main = { taken: false };
   for (const p of daily.items) {
     const def = defs.find((d) => d.id === p.id) ?? DAILY_POOL.find((d) => d.id === p.id);
-    if (def) dailyBox.appendChild(missionRow(def, p, adBoost));
+    if (def) dailyBox.appendChild(missionRow(def, p, adBoost, main));
   }
 
   const list = achieveDefs.length ? achieveDefs : ACHIEVES;
@@ -45,7 +47,7 @@ export function paintMissions(
   const done: string[] = [];
   for (const x of paired) {
     if (x.p.claimed) done.push(x.def.title);
-    else achieveBox.appendChild(missionRow(x.def, x.p, adBoost));
+    else achieveBox.appendChild(missionRow(x.def, x.p, adBoost, main));
   }
   if (done.length > 0) {
     const line = document.createElement('p');
@@ -64,7 +66,7 @@ export function paintMissions(
   };
 }
 
-function missionRow(def: MissionDef, p: MissionProgress, adBoost: boolean): HTMLElement {
+function missionRow(def: MissionDef, p: MissionProgress, adBoost: boolean, main: { taken: boolean }): HTMLElement {
   const goal = goalOf(def);
   const count = Math.max(0, Math.min(p.count, goal));
   const ready = !p.claimed && count >= goal;
@@ -73,24 +75,30 @@ function missionRow(def: MissionDef, p: MissionProgress, adBoost: boolean): HTML
     def.rewardDust > 0 ? `<span aria-label="먼지">${ICON.dust}${def.rewardDust}</span>` : '',
     def.rewardOrbit > 0 ? `<span aria-label="궤도조각">${ICON.orbit}${def.rewardOrbit}</span>` : '',
   ].join('');
+  const isMain = ready && !main.taken;
+  if (isMain) main.taken = true;
+  const id = escapeHtml(def.id);
   const actions = ready
-    ? `<button type="button" class="btn btn-sm" data-claim-id="${escapeHtml(def.id)}" data-claim-boost="0">받기</button>`
-      + (adBoost ? `<button type="button" class="btn btn-sm" data-claim-id="${escapeHtml(def.id)}" data-claim-boost="1">${ICON.ad}2배</button>` : '')
+    ? `<button type="button" class="btn btn-sm claim${isMain ? ' claim-main' : ''}" data-claim-id="${id}" data-claim-boost="0">받기</button>`
+    : '';
+  // 광고 두 배는 받기 아래 줄로 — 받기를 누르려다 광고를 틀지 않게 간격을 둔다
+  const boost = ready && adBoost
+    ? `<div class="m-boost"><button type="button" class="btn btn-sm" data-claim-id="${id}" data-claim-boost="1">${ICON.ad}광고 보고 2배</button></div>`
     : '';
 
   const wrap = document.createElement('div');
-  wrap.className = 'm-row';
+  wrap.className = `m-row${ready ? ' is-ready' : ''}`;
   wrap.innerHTML = `
     <div class="m-top">
       <p class="m-title">${escapeHtml(def.title)}</p>
       <p class="m-count">${fmt(count)} / ${fmt(goal)}</p>
     </div>
     ${def.desc ? `<p class="m-desc">${escapeHtml(def.desc)}</p>` : ''}
-    <div class="bar"><span class="fill${ready ? ' is-ready' : ''}" style="width:${Math.round((count / goal) * 100)}%"></span></div>
+    <div class="bar"><span class="fill" style="width:${Math.round((count / goal) * 100)}%"></span></div>
     <div class="m-foot">
       <p class="reward">${reward}</p>
       <div class="m-actions">${actions}</div>
-    </div>`;
+    </div>${boost}`;
   return wrap;
 }
 

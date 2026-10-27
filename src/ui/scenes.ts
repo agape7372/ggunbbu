@@ -6,7 +6,7 @@
 import type { GameState, GimmickId } from '../core/types';
 import { makeState, advance, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
-import { ACT1, AUDIO, PALETTE, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, AUDIO, PALETTE, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
@@ -23,13 +23,14 @@ import {
   butterChallengeEnd,
   butterEnterLines,
   gameoverQuip,
+  hudModeLabel,
   phaseBanner,
   ENDING_FULL_COMBO,
 } from '../content';
-import { OPERATIONS } from '../content/world';
+import { OPERATIONS, WEAPON_COPY } from '../content/world';
 import { mountHud, ensureHudLayer } from './hud';
 import {
-  mountOverlay, ensureOverlayLayer, titleViewFromSave, type OverlayApi,
+  mountOverlay, ensureOverlayLayer, titleViewFromSave, type GameOverView, type OverlayApi, type StoryOpts,
 } from './overlay';
 import { applySettingsPatch as patchSettings, applySettingsToRuntime, type SettingsSinks } from './settings';
 import {
@@ -37,6 +38,7 @@ import {
   MAX_REVIVES_PER_RUN, ORBIT_PER_AD, ACHIEVES, DAILY_POOL, claim, defById,
   equip, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
   dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY,
+  claimableCount, nextDustGoal,
 } from '../meta';
 import { createAdsPort, type AdKind } from '../platform/ads';
 import { minimizeApp, onBackButton, onLifecycle } from '../platform/native';
@@ -87,6 +89,13 @@ export function createApp(
   // 오염시키지 않는다 — 재화(먼지·궤도) 지급만 유지. 부처버전 문법: 치트 런 = 기록 없음.
   let runExempt = false;
   let dustDirty = false; // 판 도중 재화 지급 발생 표시 — noteMissions 말미 저장 트리거
+  // 이번 판 결과 카드용 계수 — 부활·체크포인트 이어하기는 같은 판이라 계속 쌓는다
+  let runBuildings = 0;
+  let runDust = 0;
+  let butterRoundNo = 0; // 버터바 챌린지 회차(0 = 챌린지 아님). 종료 시점엔 s.bonus가 이미 null이라 따로 든다
+  let gameoverDelay = 0; // 결과 카드가 뜨기까지 남은 틱 — 그동안 캔버스만 그린다
+  let pendingOver: GameOverView | null = null;
+  let storyLock = 0; // 이야기 판에 들어선 직후 연타로 넘어가지 않게 잠그는 틱
   // 「한 판 더」는 방금 그 모드로 — 구역 작전·야근에서 죽었는데 아케이드로 튕기지 않게
   let lastRun: () => void = () => startArcade();
   let runLabel = '아케이드';
@@ -123,6 +132,7 @@ export function createApp(
     save.unlockedChapters = fresh.unlockedChapters;
     save.butterTierReached = fresh.butterTierReached;
     save.buddhaMode = fresh.buddhaMode;
+    save.daily = ensureDaily(save.daily, Date.now(), ads.ready()); // 「오늘 N/3」가 날짜 넘김에도 맞게
     return titleViewFromSave(save, menuIndex, debugOpen());
   }
 
@@ -131,6 +141,9 @@ export function createApp(
     s.weapon = save.loadout.weapon;
     s.gimmick = gimmick;
     revivesUsed = 0;
+    runBuildings = 0;
+    runDust = 0;
+    butterRoundNo = 0;
     const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
     if (!save.achieves.length) save.achieves = initAchieveProgress();
@@ -144,12 +157,16 @@ export function createApp(
   }
 
   function goPlay(): void {
+    gameoverDelay = 0;
+    pendingOver = null;
     scene = 'play';
     overlay.hide();
     setChrome('playing');
   }
 
   function goTitle(): void {
+    gameoverDelay = 0;
+    pendingOver = null;
     state = null;
     scene = 'title';
     menuIndex = 0;
@@ -282,7 +299,7 @@ export function createApp(
       const r = await ads.showRewarded(kind);
       overlay.toast('');
       if (r === 'ok') return true;
-      overlay.toast(r === 'skip' ? '끝까지 봐야 받을 수 있습니다.' : '광고를 불러오지 못했습니다. 잠시 뒤 다시 해 주세요.');
+      overlay.toast(r === 'skip' ? '끝까지 봐야 받을 수 있습니다.' : '광고를 못 불러왔습니다. 다시 눌러 주세요.');
       playSfx('uiDeny');
       return false;
     } finally {
@@ -293,7 +310,7 @@ export function createApp(
 
   function gainText(dust: number, orbit: number): string {
     const parts = [dust > 0 ? `먼지 +${dust}` : '', orbit > 0 ? `궤도조각 +${orbit}` : ''].filter(Boolean);
-    return `받았습니다 · ${parts.join(' · ')}`;
+    return parts.join(' · ');
   }
 
   function doExchange(): void {
@@ -394,6 +411,7 @@ export function createApp(
     state.wazaGauge = WAZA_GAUGE.MAX;
     enterBonus(state, round);
     butterChallenge = true;
+    butterRoundNo = round;
     goPlay();
   }
 
@@ -424,16 +442,22 @@ export function createApp(
     goPlay();
   }
 
-  function showOverlay(lines: readonly string[], ticks: number, after?: () => void): void {
+  const reduceMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+  function showOverlay(lines: readonly string[], ticks: number, after?: () => void, opts?: StoryOpts): void {
     overlayTicks = ticks;
     pendingAfterOverlay = after ?? null;
+    // 와이프가 도는 동안은 연타가 이야기를 건너뛰지 않게 잠근다. 동작 줄이기 설정이면 와이프 없이 바로 컷.
+    const wipeTicks = reduceMotion() ? 0 : opts?.wipeTicks ?? 0;
+    storyLock = wipeTicks;
     scene = 'story';
     setChrome('story');
-    overlay.showStory(lines);
+    overlay.showStory(lines, { ...opts, wipeTicks });
   }
 
   function skipStory(fromUser = false): void {
     if (scene !== 'story') return;
+    if (fromUser && storyLock > 0) return;
     if (fromUser) playSfx('uiBlip');
     const after = pendingAfterOverlay;
     pendingAfterOverlay = null;
@@ -447,9 +471,9 @@ export function createApp(
     if (!runExempt) {
       const sc = state.score;
       if (state.mode === 'tokoton') save.bestTokoton = Math.max(save.bestTokoton, sc);
-      else if (butterChallenge && state.bonus) {
-        const r = state.bonus.round;
-        save.butterBest[r] = Math.max(save.butterBest[r] ?? 0, sc);
+      else if (butterChallenge && butterRoundNo > 0) {
+        // 챌린지 종료 시점엔 state.bonus가 이미 null이다 — 회차는 시작 때 든 값을 쓴다
+        save.butterBest[butterRoundNo] = Math.max(save.butterBest[butterRoundNo] ?? 0, sc);
       } else save.bestArcade = Math.max(save.bestArcade, sc);
       save.maxCombo = Math.max(save.maxCombo, state.peakCombo);
       save.unlockedChapters = Math.max(save.unlockedChapters, state.chapter);
@@ -564,6 +588,8 @@ export function createApp(
     onGameOverTitle: () => { playSfx('uiBack'); goTitle(); },
     onGameOverRevive: () => { void tryRevive(); },
     onEndingDone: () => { playSfx('uiBack'); goTitle(); },
+    onEndingRetry: () => { playSfx('uiOk'); lastRun(); },
+    missionBadge: () => claimableCount(save.daily, save.achieves),
     onLogoTap: () => {
       if (!import.meta.env.DEV) return;
       titleTaps += 1;
@@ -603,6 +629,10 @@ export function createApp(
     saveSave(save);
   });
   onBackButton(handleBack);
+
+  // 웹에서 폰을 가로로 눕히면 「세로로 돌려 주세요」 판이 덮는다(style.css) — 그 뒤에서 판이 흘러가지 않게 멈춘다
+  window.matchMedia?.('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)')
+    .addEventListener?.('change', (e) => { if (e.matches) enterPause(); });
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
@@ -660,6 +690,7 @@ export function createApp(
         break;
       }
       case 'story': {
+        if (storyLock > 0) storyLock -= 1;
         overlayTicks -= 1;
         if (overlayTicks <= 0) skipStory();
         else if (f.attack) skipStory(true);
@@ -687,15 +718,23 @@ export function createApp(
         break;
       case 'ending': {
         bgm('ending');
-        overlayTicks -= 1;
-        if (overlayTicks <= 0 || f.attack) {
-          if (f.attack) playSfx('uiBack');
-          goTitle();
-        }
+        // 버튼으로만 나간다(키보드: 공격 = 한 판 더, 필살 = 타이틀). 직전 연타가 새어 나오지 않게 잠깐 잠근다.
+        if (overlayTicks > 0) { overlayTicks -= 1; break; }
+        if (f.attack) { playSfx('uiOk'); lastRun(); }
+        else if (f.special) { playSfx('uiBack'); goTitle(); }
         break;
       }
       case 'gameover': {
         bgm(null);
+        if (gameoverDelay > 0) {
+          gameoverDelay -= 1;
+          if (gameoverDelay === 0 && pendingOver) {
+            overlay.showGameOver(pendingOver);
+            pendingOver = null;
+            overlayTicks = UI_FLOW.GAMEOVER_LOCK;
+          }
+          break;
+        }
         overlayTicks -= 1;
         if (overlayTicks > 0) break;
         if (f.attack) {
@@ -738,6 +777,12 @@ export function createApp(
     applyMissionEvent(daily, save.achieves, { kind, ...extra });
   }
 
+  function earnDust(n: number): void {
+    grant(save, n, 0);
+    runDust += n;
+    dustDirty = true;
+  }
+
   function noteMissions(s: GameState, extra?: { wasPinned?: boolean }): void {
     const daily = ensureDaily(save.daily, Date.now(), ads.ready());
     save.daily = daily;
@@ -757,26 +802,48 @@ export function createApp(
       if (e.kind === 'chapterUnlock' && (e.n ?? 0) >= 2) {
         applyMissionEvent(daily, save.achieves, { kind: 'zoneSurvive', zone: 'eastasia' });
       }
-      if (e.kind === 'stackDestroy') { grant(save, DUST_PER_BUILDING, 0); dustDirty = true; }
-      if (e.kind === 'special') { grant(save, DUST_PER_SPECIAL, 0); dustDirty = true; }
-      if (e.kind === 'supply' && e.item === 'dust') { grant(save, DUST_PER_SUPPLY, 0); dustDirty = true; }
+      if (e.kind === 'stackDestroy') { earnDust(DUST_PER_BUILDING); runBuildings += 1; }
+      if (e.kind === 'special') earnDust(DUST_PER_SPECIAL);
+      if (e.kind === 'supply' && e.item === 'dust') earnDust(DUST_PER_SUPPLY);
     }
     // 판 도중 이탈(탭 종료·데스크톱 강제 종료)에도 재화가 안 날아가게 — 틱마다가 아니라
     // 지급 발생 프레임에만 저장 (08-30, P1-2 잔여)
     if (dustDirty) { saveSave(save); dustDirty = false; }
   }
 
+  function gameoverView(s: GameState, prevBest: number): GameOverView {
+    const goal = nextDustGoal(save.owned, save.dust);
+    const goalName = goal ? WEAPON_COPY[goal.id as keyof typeof WEAPON_COPY]?.name : undefined;
+    return {
+      score: s.score,
+      combo: s.peakCombo,   // 현재 콤보는 죽는 히트가 이미 끊었다 — 결과화면은 이번 판 최고치를 쓴다
+      buildings: runBuildings,
+      dustGained: runDust,
+      zone: hudModeLabel(s.mode, s.chapter, s.act2Phase),
+      goal: goal && goalName ? SCREENS.gameover.nextGoal(goalName, goal.short) : '',
+      canContinue: s.mode === 'act2' && s.checkpoint > 0,
+      canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
+      adRevive: ads.ready(),
+      reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
+      reviveMax: MAX_REVIVES_PER_RUN,
+      line: gameoverQuip(s.score + s.tick),
+      best: !runExempt && s.score > 0 && s.score > prevBest,
+      mode: runLabel,
+    };
+  }
+
   function handleTransitions(s: GameState, wasMode: GameState['mode'], wasPhase: GameState['act2Phase']): void {
+    const wipe = { wipeTicks: UI_FLOW.WIPE_TICKS };
     if (wasMode !== 'act2' && s.mode === 'act2' && wasMode !== 'bonus') {
       persist();
       noteKind('act2Enter');
       bgm('act2a');
-      showOverlay(STORY.intro, 60 * 6);
+      showOverlay(STORY.intro, 60 * 6, undefined, { ...wipe, stamps: [SCREENS.stamps.act2] });
       return;
     }
     if (s.mode === 'bonus' && wasMode === 'tokoton') {
       bgm('butter');
-      showOverlay([SCREENS.butter.banner], 60 * 2);
+      showOverlay([SCREENS.butter.banner], 60 * 2, undefined, wipe);
       return;
     }
     if (s.mode === 'bonus' && wasMode === 'act1') {
@@ -785,21 +852,30 @@ export function createApp(
       save.butterTierReached = Math.max(save.butterTierReached, s.bonus?.round ?? 0);
       saveSave(save);
       bgm('butter');
-      showOverlay(butterEnterLines(STORY.chapters[Math.min(ch, 3)]), 60 * 3);
+      showOverlay(butterEnterLines(STORY.chapters[Math.min(ch, 3)]), 60 * 3, undefined, {
+        ...wipe, stamps: [SCREENS.stamps.zone(Math.min(ch, 3) + 1)],
+      });
       return;
     }
     if (butterChallenge && wasMode === 'bonus' && s.mode === 'act1') {
+      const prevBest = save.butterBest[butterRoundNo] ?? 0;
+      const newBest = !runExempt && s.score > 0 && s.score > prevBest;
+      const perfect = s.events.some((e) => e.kind === 'bonusPerfect');
       persist();
       showOverlay(butterChallengeEnd(s.score), 60 * 3, () => {
         goTitle();
+      }, {
+        ...wipe,
+        stamps: [...(newBest ? [SCREENS.stamps.best] : []), ...(perfect ? [SCREENS.stamps.perfect] : [])],
       });
       return;
     }
     if (s.mode === 'act2' && wasPhase && s.act2Phase && wasPhase !== s.act2Phase && !s.over) {
-      showOverlay(phaseBanner(s.act2Phase), 60 * 3);
+      showOverlay(phaseBanner(s.act2Phase), 60 * 3, undefined, wipe);
       return;
     }
     if (s.over === 'cleared') {
+      const best = !runExempt && s.score > 0 && s.score > save.bestArcade;
       save.act2Cleared = true;
       noteKind('moonClear');
       persist();
@@ -807,39 +883,30 @@ export function createApp(
       const lines = s.fullCombo ? [...STORY.ending, '', ENDING_FULL_COMBO] : STORY.ending;
       showOverlay(lines, 60 * 12, () => {
         scene = 'ending';
-        overlayTicks = 60 * 4;
         setChrome('ending');
         overlay.showEnding({
           score: s.score,
           maxCombo: save.maxCombo,
           fullCombo: s.fullCombo,
+          best,
         });
-      });
+        overlayTicks = UI_FLOW.GAMEOVER_LOCK;
+      }, { wipeTicks: UI_FLOW.WIPE_BOSS_TICKS });
       return;
     }
     if (s.over === 'gameover') {
       const prevBest = s.mode === 'tokoton' ? save.bestTokoton
-        : butterChallenge && s.bonus ? (save.butterBest[s.bonus.round] ?? 0)
+        : butterChallenge && butterRoundNo > 0 ? (save.butterBest[butterRoundNo] ?? 0)
           : save.bestArcade;
       persist();
       bgm(null);
       playSfx('runEnd', { delay: AUDIO.RUN_END_DELAY }); // 목숨 소리(lifeLost)가 끝난 뒤 판 종료 신호
       scene = 'gameover';
-      overlayTicks = 45;
       setChrome('gameover');
-      overlay.showGameOver({
-        score: s.score,
-        combo: s.peakCombo,   // 현재 콤보는 죽는 히트가 이미 끊었다 — 결과화면은 이번 판 최고치를 쓴다
-
-        canContinue: s.mode === 'act2' && s.checkpoint > 0,
-        canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
-        adRevive: ads.ready(),
-        reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
-        reviveMax: MAX_REVIVES_PER_RUN,
-        line: gameoverQuip(s.score + s.tick),
-        best: !runExempt && s.score > 0 && s.score > prevBest,
-        mode: runLabel,
-      });
+      // 카드는 잠깐 뒤에 — 그동안 캔버스가 마지막 장면을 보여 준다
+      pendingOver = gameoverView(s, prevBest);
+      gameoverDelay = UI_FLOW.GAMEOVER_CARD_DELAY;
+      overlayTicks = 0;
       return;
     }
   }

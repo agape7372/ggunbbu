@@ -32,10 +32,6 @@ export function applySettingsPatch(
   return save.settings;
 }
 
-export function cycleShakeLevel(level: 0 | 1 | 2): 0 | 1 | 2 {
-  return ((level + 1) % 3) as 0 | 1 | 2;
-}
-
 function feedbackOf(s: SaveSettings): { shakeLevel: 0 | 1 | 2; vibration: boolean; flashLevel: 0 | 1 | 2 } {
   return { shakeLevel: s.shakeLevel, vibration: s.vibration, flashLevel: s.flashLevel };
 }

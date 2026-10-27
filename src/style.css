@@ -38,9 +38,14 @@
   --paper: #E8E3D5; /* 한 톤 낮은 종이 — 눌림·칸 바탕 */
   --yellow: #FFD200;
   --red: #E5302E;
-  --dust: #6E695F;
-  --dust-2: #8A857A;
+  --red-ink: #C8221F; /* 글자용 빨강(아이보리 위 5.0:1). 막대·도장 테두리는 --red */
+  --dust: #6E695F; /* 정보 글자(아이보리 위 4.8:1) — 해금 조건·보조 설명 */
+  --dust-2: #8A857A; /* 글자에는 쓰지 않는다 — 점선 테두리·꺼진 스위치 */
   --rule: rgba(26, 26, 32, 0.16);
+
+  /* 누름 칸 논리 높이. 짧은 화면(360×640)에서 스테이지가 0.82배로 줄어도 48dp 근처가 되게 */
+  --tap: 58px;
+  --tap-sm: 56px;
 
   --sp-1: 3px;
   --sp-2: 4px;
@@ -51,9 +56,9 @@
   --sp-7: 24px;
 
   /* 논리 360px 기준. 실기기에서 ×1.05~1.2로 커진다 */
-  --fs-1: 11px;
-  --fs-2: 12px;
-  --fs-3: 13px;
+  --fs-1: 12.5px;
+  --fs-2: 13px;
+  --fs-3: 14px;
   --fs-4: 14px;
   --fs-5: 15px;
   --fs-6: 17px;
@@ -87,7 +92,14 @@ html, body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-font-smoothing: antialiased;
+  /* 한글은 어절 단위로만 꺾는다 — 긴 토큰만 안전망으로 어디서든 꺾는다 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
+
+.card-title, .sheet-head h2, .cover-tag, .title-tag, .end-sub, .story-lines p, .cta-label { text-wrap: balance; }
+.sheet-lead, .m-desc, .shop-name small, .modal-body p, .pick-note, .card-reason, .end-note,
+.howto-row span, .next-goal { text-wrap: pretty; }
 
 /* hidden 속성이 display를 쓰는 클래스(.btn·.cta 등)에 지지 않게 */
 [hidden] { display: none !important; }
@@ -98,6 +110,14 @@ button {
   cursor: pointer;
   touch-action: manipulation;
 }
+
+/* 키보드로 다니는 사람을 위한 포커스 — 잉크 획. 손가락(터치)에는 안 뜬다 */
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.card:focus { outline: none; }
 
 .ic {
   display: block;
@@ -230,7 +250,7 @@ button {
 /* 깔림: 가드 키가 탈출 키로 바뀐다 — 지금 누를 단 하나라 뒤집어 보인다 */
 #btn-guard.pinned {
   background: var(--ink);
-  color: var(--yellow);
+  color: var(--ivory);
 }
 
 #btn-jump { border-radius: 18px; }
@@ -265,7 +285,7 @@ button {
   left: 228px;
   top: 106px;
   width: 122px;
-  height: 52px;
+  height: 58px;
   flex-direction: row;
   gap: 8px;
   font-size: var(--fs-5);
@@ -356,11 +376,11 @@ button {
 
 .hud-pause .ic { width: 16px; height: 16px; }
 
-/* 시각 36×30, 히트 44×44 */
+/* 시각 36×30, 히트 52×52 — 좌상단은 엄지에서 먼 자리라 눈에 보이는 크기는 그대로 두고 히트만 넓힌다 */
 .hud-pause::before {
   content: '';
   position: absolute;
-  inset: -7px -4px;
+  inset: -11px -8px;
 }
 
 .hud-pause:active {
@@ -387,7 +407,7 @@ button {
 }
 
 /* 점수 앞자리 0은 흐리게 — 실제 자릿수만 읽히게 */
-.hud-score .z { color: var(--dust-2); }
+.hud-score .z { color: var(--dust); }
 
 .hud-life-row {
   display: flex;
@@ -423,18 +443,17 @@ button {
   border-color: var(--red);
 }
 
+/* 글자가 커져 가운데 칸이 좁아지면 어절 단위로 줄을 바꾼다(말줄임·어절 중간 꺾임 없음) */
 .hud-mode {
   font: 700 var(--fs-2)/1.2 var(--font-ui);
   letter-spacing: 0.02em;
+  text-wrap: balance;
 }
 
 .hud-floor {
   font: 600 var(--fs-1)/1.3 var(--font-mono);
   color: var(--dust);
   margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .hud-combo {
@@ -449,19 +468,20 @@ button {
   margin-left: 3px;
 }
 
-.hud-combo.mid {
-  display: inline-block;
-  background: var(--yellow);
-  padding: 0 var(--sp-2);
-  text-shadow: none;
+/* 콤보 단계는 노랑·빨강이 아니라 잉크 밑줄로 — 100대는 한 줄, 500대는 겹줄. 노랑은 필살 키 하나만 쓴다 */
+.hud-combo.mid,
+.hud-combo.hot {
+  text-decoration: underline 3px var(--ink);
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
 }
-.hud-combo.hot { color: var(--red); }
+.hud-combo.hot { text-decoration-style: double; }
 .hud-combo.cap { animation: hud-rainbow 0.6s linear infinite; }
 /* punch/punch-b는 같은 키프레임 — 강제 리플로우 없이 재시작하려고 번갈아 단다(hud.ts) */
 .hud-combo.punch,
 .hud-combo.punch-b { animation: hud-punch 90ms var(--ease-pop); }
 .hud-combo.broke {
-  color: var(--dust-2);
+  color: var(--dust);
   transform: translateY(6px);
   opacity: 0.7;
 }
@@ -512,10 +532,10 @@ button {
 /* 고스트 추격은 JS가 감쇠값을 굴린다(hud.ts chaseGhost) — CSS 트랜지션은 매 프레임 재시작된다 */
 .bar .ghost { background: rgba(26, 26, 32, 0.2); }
 .bar .fill { transition: none; }
-/* 역할을 색으로 가른다: 가드=잉크, 필살=노랑(차면 빨강), 보스=빨강 */
+/* 가드=잉크 단색, 필살=잉크 빗금(차면 단색 잉크), 보스=빨강. 플레이 화면의 노랑은 #btn-special.ready 하나뿐이다 */
 .bar-guard .fill { background: var(--ink); }
-.bar-waza .fill { background: var(--yellow); }
-.bar-waza.full .fill { background: var(--red); }
+.bar-waza .fill { background: repeating-linear-gradient(-45deg, var(--ink) 0 3px, transparent 3px 6px); }
+.bar-waza.full .fill { background: var(--ink); }
 .bar-boss .fill { background: var(--red); }
 
 .hud-boss,
@@ -531,7 +551,7 @@ button {
 .hud-boss-label { font: 700 var(--fs-2) var(--font-ui); }
 .hud-bonus { font: 18px/1.2 var(--font-display); }
 .hud-bonus small { font: 700 var(--fs-2) var(--font-mono); margin-left: 6px; }
-.hud-cap { color: var(--red); }
+.hud-cap { color: var(--red-ink); }
 
 /* 깔림 안내 — 판 없이 굵은 헤일로 글자만(08-30) */
 .hud-pin {
@@ -580,8 +600,8 @@ button {
   width: 100%;
   padding-bottom: var(--sp-3);
   border-bottom: 1px solid var(--ink);
-  font: 700 10.5px/1.2 var(--font-mono);
-  letter-spacing: 0.08em;
+  font: 700 12.5px/1.2 var(--font-mono);
+  letter-spacing: 0.06em;
   color: var(--dust);
 }
 
@@ -612,6 +632,13 @@ button {
   clip-path: polygon(0 65%, 100% 37%, 100% 100%, 0 100%);
 }
 
+.btn-round { justify-content: space-between; }
+.btn-round .ic { margin-right: var(--sp-3); }
+.btn-round .r-name { margin-right: auto; }
+.r-best { font: 700 var(--fs-2) var(--font-mono); color: var(--dust); }
+
+.ov-story.has-wipe .tap-hint { animation: line-in 360ms var(--ease-out) both; animation-delay: var(--wd, 0ms); }
+
 .tap-hint {
   margin-top: auto;
   font: 700 var(--fs-2) var(--font-mono);
@@ -628,7 +655,7 @@ button {
   justify-content: center;
   gap: 2px;
   width: 100%;
-  min-height: 58px;
+  min-height: 62px;
   padding: var(--sp-4) var(--sp-6);
   border: 2px solid var(--ink);
   background: var(--yellow);
@@ -639,12 +666,13 @@ button {
 .cta-label {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-4);
   font: 22px/1.1 var(--font-display);
   letter-spacing: -0.01em;
 }
 
-.cta-label .ic { width: 20px; height: 20px; }
+.cta-label .ic { width: 20px; height: 20px; flex: none; }
 
 .cta-sub {
   font: 700 var(--fs-1)/1.2 var(--font-ui);
@@ -663,7 +691,7 @@ button {
   justify-content: center;
   gap: var(--sp-4);
   width: 100%;
-  min-height: 48px;
+  min-height: var(--tap);
   padding: var(--sp-4) var(--sp-6);
   border: 2px solid var(--ink);
   background: var(--ivory);
@@ -683,7 +711,7 @@ button {
   border-color: transparent;
   background: transparent;
   color: var(--dust);
-  min-height: 44px;
+  min-height: var(--tap);
 }
 
 .btn-quiet:not(:disabled):active {
@@ -694,12 +722,12 @@ button {
 /* 한 번 더 눌러야 하는 버튼 */
 .btn.confirm {
   border-color: var(--red);
-  color: var(--red);
+  color: var(--red-ink);
 }
 
 .btn-sm {
   width: auto;
-  min-height: 44px;
+  min-height: var(--tap-sm);
   padding: var(--sp-3) var(--sp-5);
   font-size: var(--fs-3);
 }
@@ -801,14 +829,17 @@ button {
   border: 2px solid var(--ink);
 }
 
+/* 번호 | 항목명 / 비고 — 두 줄로 쌓아 글자가 커져도 비고가 옆에서 꺾이지 않는다 */
 .mode-row {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
-  align-items: center;
-  gap: var(--sp-4);
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-areas: 'no name' 'no sub';
+  align-content: center;
+  column-gap: var(--sp-4);
+  row-gap: 1px;
   width: 100%;
-  min-height: 52px;
-  padding: 0 var(--sp-5) 0 var(--sp-5);
+  min-height: var(--tap);
+  padding: var(--sp-3) var(--sp-5);
   border: none;
   border-top: 1px solid var(--rule);
   background: var(--ivory);
@@ -820,17 +851,20 @@ button {
 .mode-row:first-child { border-top: none; }
 
 .mode-no {
+  grid-area: no;
+  align-self: center;
   font: 700 var(--fs-2) var(--font-mono);
   color: var(--dust);
 }
 
-.mode-name { font: 700 var(--fs-6)/1.2 var(--font-ui); }
+.mode-name { grid-area: name; font: 700 var(--fs-6)/1.2 var(--font-ui); }
 
 .mode-sub {
+  grid-area: sub;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  font: 600 var(--fs-1)/1.2 var(--font-ui);
+  font: 600 var(--fs-1)/1.25 var(--font-ui);
   color: var(--dust);
 }
 
@@ -842,12 +876,32 @@ button {
   cursor: default;
 }
 
-.mode-row:disabled .mode-name { color: var(--dust-2); }
+.mode-row:disabled .mode-name { color: var(--dust); }
+
+/* 지갑 · 오늘 미션 — 기록 표 위 한 줄 */
+.wallet-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding-bottom: var(--sp-4);
+  font: 700 var(--fs-3) var(--font-mono);
+}
+
+.wallet-strip span { display: inline-flex; align-items: center; gap: 3px; }
+.wallet-strip .ic { width: 16px; height: 16px; }
+
+.wallet-strip .today {
+  margin-left: auto;
+  padding: 1px var(--sp-3);
+  border: 1.5px solid var(--ink);
+  font: 700 var(--fs-2) var(--font-ui);
+}
 
 /* 기록 — 세 칸 표 */
 .records {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, auto);
+  justify-content: space-between;
   border-top: 2px solid var(--ink);
   border-bottom: 1px solid var(--ink);
 }
@@ -860,9 +914,12 @@ button {
 .records > div:first-child { border-left: none; }
 
 .records dt {
-  font: 600 10.5px/1.2 var(--font-ui);
+  font: 600 var(--fs-1)/1.2 var(--font-ui);
   color: var(--dust);
 }
+
+.records dt,
+.records dd { white-space: nowrap; }
 
 .records dd {
   margin-top: var(--sp-2);
@@ -883,11 +940,11 @@ button {
   gap: 2px;
   padding: var(--sp-3) var(--sp-3);
   border: 1.5px dashed var(--dust-2);
-  color: var(--dust-2);
-  font: 700 10.5px/1.25 var(--font-ui);
+  color: var(--dust);
+  font: 700 12.5px/1.25 var(--font-ui);
 }
 
-.zone b { font: 700 10px var(--font-mono); }
+.zone b { font: 700 12.5px var(--font-mono); }
 
 .zone.open {
   border: 1.5px solid var(--ink);
@@ -896,7 +953,7 @@ button {
 
 .ov-buddha {
   font: 700 var(--fs-1) var(--font-mono);
-  color: var(--red);
+  color: var(--red-ink);
   text-align: center;
 }
 
@@ -907,19 +964,60 @@ button {
   padding-bottom: 40px;
 }
 
+.story-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-6);
+  margin-top: auto;
+}
+
 .story-lines {
   width: 300px;
-  margin-top: auto;
   text-align: center;
   font: 700 var(--fs-6)/1.75 var(--font-ui);
 }
 
-.story-lines p { animation: line-in 360ms var(--ease-out) both; }
-.story-lines p:nth-child(2) { animation-delay: 80ms; }
-.story-lines p:nth-child(3) { animation-delay: 160ms; }
-.story-lines p:nth-child(4) { animation-delay: 240ms; }
-.story-lines p:nth-child(n + 5) { animation-delay: 320ms; }
+/* --wd = 테이프 와이프가 지나간 뒤에야 글이 나온다(와이프 없으면 0) */
+.ov-story.has-wipe { --wd: calc(var(--wipe) * 0.6); }
+
+.story-lines p { animation: line-in 360ms var(--ease-out) both; animation-delay: var(--wd, 0ms); }
+.story-lines p:nth-child(2) { animation-delay: calc(var(--wd, 0ms) + 80ms); }
+.story-lines p:nth-child(3) { animation-delay: calc(var(--wd, 0ms) + 160ms); }
+.story-lines p:nth-child(4) { animation-delay: calc(var(--wd, 0ms) + 240ms); }
+.story-lines p:nth-child(n + 5) { animation-delay: calc(var(--wd, 0ms) + 320ms); }
 .story-lines .ov-gap { height: 12px; }
+
+/* 이야기 판 진입 — 공사 테이프 두 줄이 엇갈려 스치고, 그 뒤로 종이 막이 덮인다. 와이프가 없으면 그대로 컷. */
+.wipe { display: none; }
+
+.ov-story.has-wipe { animation: veil-in 160ms linear calc(var(--wipe) * 0.6) both; }
+
+.ov-story.has-wipe .wipe {
+  display: block;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 40px;
+  border-block: 3px solid var(--ink);
+  background: repeating-linear-gradient(-45deg, var(--ink) 0 7px, var(--ivory) 7px 14px);
+  pointer-events: none;
+}
+
+.ov-story.has-wipe .wipe-a { top: 36%; animation: tape-l2r var(--wipe) linear both; }
+.ov-story.has-wipe .wipe-b { top: 52%; animation: tape-r2l var(--wipe) linear both; }
+
+/* 구역 번호 · 신기록 도장 — 와이프 직후에 쿵 */
+.story-stamps { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-5); }
+.story-stamps:empty { display: none; }
+
+.story-stamps .stamp {
+  position: relative;
+  top: auto;
+  right: auto;
+  color: var(--ink);
+  animation: stamp-in-soft 300ms var(--ease-pop) calc(var(--wd, 0ms) + 60ms) both;
+}
 
 /* ── 카드(일시정지·결과·확인 창) ──────────────────────────
    두 겹 테두리 = 서식 용지. 화면 가운데 뜬다. */
@@ -949,8 +1047,8 @@ button {
   min-height: 20px;
   padding-bottom: var(--sp-3);
   border-bottom: 1px solid var(--ink);
-  font: 700 10.5px/1.2 var(--font-mono);
-  letter-spacing: 0.08em;
+  font: 700 12.5px/1.2 var(--font-mono);
+  letter-spacing: 0.06em;
   color: var(--dust);
 }
 
@@ -988,6 +1086,21 @@ button {
 
 .stat-rows dd.big { font-size: 24px; }
 
+/* 다음 목표 한 줄 — 표 아래, 노랑 없이 */
+.next-goal {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  font: 700 var(--fs-3)/1.4 var(--font-ui);
+}
+
+.next-goal b {
+  flex: none;
+  padding: 1px var(--sp-3);
+  border: 1.5px solid var(--ink);
+  font: 700 var(--fs-1) var(--font-ui);
+}
+
 .best-tag {
   align-self: flex-start;
   padding: 3px var(--sp-3);
@@ -1003,20 +1116,21 @@ button {
   gap: var(--sp-4);
 }
 
+/* 눈에 보이는 X는 작게, 누름 칸은 58×58 — 음수 여백이 머리줄 높이를 지킨다 */
 .icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin: -8px -8px -8px 0;
+  width: 58px;
+  height: 58px;
+  margin: -19px -18px -19px 0;
   border: none;
   background: transparent;
   color: var(--ink);
   pointer-events: auto;
 }
 
-.icon-btn:active { background: var(--paper); }
+.icon-btn:active .ic { transform: scale(0.8); }
 
 /* 도장 — 찍히는 순간 커졌다가 내려앉는다 */
 .stamp {
@@ -1027,7 +1141,7 @@ button {
   border: 3px solid currentColor;
   border-radius: 6px;
   font: 28px/1 var(--font-display);
-  color: var(--red);
+  color: var(--red-ink);
   opacity: 0.9;
   transform: rotate(-12deg);
   mix-blend-mode: multiply;
@@ -1068,6 +1182,8 @@ button {
 .end-sub { font: 700 var(--fs-5)/1.5 var(--font-ui); text-align: center; }
 
 .ov-ending .stat-rows { width: 260px; }
+.ov-ending .best-tag { align-self: center; }
+.end-actions { width: 260px; }
 
 .end-note {
   font: 600 var(--fs-3)/1.5 var(--font-ui);
@@ -1108,7 +1224,7 @@ button {
 .ov-sheet > [data-el]::-webkit-scrollbar { width: 3px; }
 .ov-sheet > [data-el]::-webkit-scrollbar-thumb { background: var(--ink); }
 
-.ov-sheet > .btn { flex: 0 0 auto; }
+.ov-sheet > .btn { flex: 0 0 auto; min-height: var(--tap); } /* data-el 목록 규칙(min-height:0)에 눌려 줄어들던 「뒤로」 */
 
 .sheet-head {
   position: sticky;
@@ -1167,7 +1283,7 @@ button {
 }
 
 .sec-h:first-child { margin-top: var(--sp-4); }
-.sec-h small { font-weight: 600; letter-spacing: 0.02em; color: var(--dust); }
+.sec-h small { font-size: 1em; font-weight: 600; letter-spacing: 0.02em; color: var(--dust); }
 
 .list {
   display: flex;
@@ -1206,15 +1322,32 @@ button {
 
 .m-row .bar { width: 100%; height: 6px; }
 .m-row .bar .fill { background: var(--ink); }
-/* 수령 가능만 노랑 — 노랑 = 지금 할 수 있다 */
-.m-row .bar .fill.is-ready { background: var(--yellow); }
+
+/* 받을 수 있는 줄 — 색 대신 왼쪽 잉크 획과 큰 「받기」. 노랑은 처음 나오는 「받기」 하나만(.claim-main) */
+.m-row.is-ready {
+  padding-left: var(--sp-5);
+  border-left: 4px solid var(--ink);
+}
 
 .m-foot {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--sp-4);
-  min-height: 44px;
+}
+
+.m-row.is-ready .m-foot { min-height: var(--tap); }
+
+.claim { min-width: 88px; }
+
+.claim-main { background: var(--yellow); }
+.claim-main:not(:disabled):active { background: var(--ink); color: var(--yellow); }
+
+/* 광고 두 배는 받기 아래 줄 — 오탭이 광고로 번지지 않게 간격을 둔다 */
+.m-boost {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--sp-4);
 }
 
 .reward {
@@ -1241,7 +1374,7 @@ button {
   align-items: center;
   gap: var(--sp-4);
   width: 100%;
-  min-height: 52px;
+  min-height: var(--tap);
   padding: var(--sp-3) var(--sp-5);
   border: 2px solid var(--ink);
   background: var(--ivory);
@@ -1272,9 +1405,18 @@ button {
   border: 1px solid var(--dust-2);
 }
 
-/* 잔액 부족 — 흐리게 지우지 않고 값만 빨갛게(왜 못 사는지가 읽혀야 한다) */
-.shop-row.short { border-style: dashed; border-color: var(--dust-2); }
-.shop-row.short .price { color: var(--red); }
+/* 잔액 부족 — 빨강은 쓰지 않는다(빨강 = 경고·실패). 점선 칸 + 잉크 가격 + 「N 모자람」이 이유를 말한다 */
+.shop-row.short { border-style: dashed; border-color: var(--dust); }
+.shop-row.short .price { color: var(--ink); }
+
+.price-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.lack { font: 600 var(--fs-1)/1.2 var(--font-ui); color: var(--dust); }
 
 /* 꾸미기 */
 .pick-grid {
@@ -1300,7 +1442,7 @@ button {
 }
 
 .pick small {
-  font: 600 10px var(--font-mono);
+  font: 600 12.5px var(--font-mono);
   letter-spacing: 0.04em;
 }
 
@@ -1313,7 +1455,7 @@ button {
   border-style: dashed;
   border-color: var(--dust-2);
   background: transparent;
-  color: var(--dust-2);
+  color: var(--dust);
   cursor: default;
 }
 
@@ -1419,7 +1561,7 @@ button {
   border-style: dashed;
   border-color: var(--dust-2);
   background: transparent;
-  color: var(--dust-2);
+  color: var(--dust);
   cursor: default;
 }
 
@@ -1438,7 +1580,7 @@ button {
   justify-content: space-between;
   gap: var(--sp-4);
   width: 100%;
-  min-height: 52px;
+  min-height: var(--tap);
   padding: 0 2px;
   border: none;
   border-bottom: 1px solid var(--rule);
@@ -1451,7 +1593,7 @@ button {
 
 .set-row:active { background: var(--paper); }
 .set-row .ic { width: 18px; height: 18px; color: var(--dust); }
-.set-danger { color: var(--red); }
+.set-danger { color: var(--red-ink); }
 
 .set-val { font: 700 var(--fs-3) var(--font-mono); }
 
@@ -1485,7 +1627,7 @@ button {
 
 .sheet-foot {
   padding: var(--sp-6) 0 var(--sp-4);
-  font: 600 10.5px/1.7 var(--font-mono);
+  font: 600 12.5px/1.7 var(--font-mono);
   color: var(--dust);
 }
 
@@ -1516,10 +1658,25 @@ button {
   border: none;
   background: transparent;
   color: var(--dust);
-  font: 700 10.5px/1 var(--font-ui);
+  font: 700 12.5px/1 var(--font-ui);
 }
 
 .ov-tab .ic { width: 22px; height: 22px; }
+
+/* 받을 미션이 있으면 미션 탭 아이콘 모서리에 잉크 점 하나 */
+.tab-dot {
+  display: none;
+  position: absolute;
+  top: 9px;
+  left: calc(50% + 7px);
+  box-sizing: content-box;
+  width: 8px;
+  height: 8px;
+  background: var(--ink);
+  border: 2px solid var(--ivory);
+}
+
+.ov-tab.has-dot .tab-dot { display: block; }
 
 .ov-tab.on { color: var(--ink); }
 
@@ -1548,9 +1705,17 @@ button {
   align-items: center;
   justify-content: center;
   padding: var(--sp-6);
-  background: rgba(26, 26, 32, 0.42);
   pointer-events: auto;
   touch-action: manipulation;
+}
+
+/* 어둠막은 스테이지 밖 레터박스까지 덮는다(막 확장 — 그림자 아님). 가장자리 띠를 눌러도 창이 닫힌다 */
+.ov-modal::before {
+  content: '';
+  position: absolute;
+  inset: -200vmax;
+  z-index: -1;
+  background: rgba(26, 26, 32, 0.42);
 }
 
 .ov-modal[hidden] { display: none !important; }
@@ -1597,7 +1762,8 @@ button {
   box-shadow: 0 3px 0 var(--ink);
 }
 
-.howto-key.hot { background: var(--yellow); }
+/* 필살 키만 잉크 반전 — 이 창에서 노랑은 「시작」 하나 */
+.howto-key.hot { background: var(--ink); color: var(--ivory); }
 .howto-key .ic { width: 22px; height: 22px; }
 
 .howto-row b {
@@ -1614,9 +1780,10 @@ button {
 .toast {
   position: absolute;
   left: 50%;
-  bottom: 84px;
+  bottom: 24px;
   z-index: 30;
-  max-width: 300px;
+  width: max-content;
+  max-width: calc(100% - 32px);
   padding: 10px 14px;
   background: var(--ink);
   color: var(--ivory);
@@ -1631,6 +1798,49 @@ button {
 .toast.on {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+/* 탭 바가 있는 화면에서는 바로 위 — 목록의 마지막 줄을 가리지 않는다 */
+.toast.above-tabs { bottom: 74px; }
+
+/* ── 가로 웹: 「세로로 돌려 주세요」 ─────────────────────────
+   설치 앱은 세로 고정이라 안 보인다. 터치 기기가 가로로 눕고 높이가 짧을 때만 판 전체를 덮는다. */
+#rotate-hint { display: none; }
+
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #rotate-hint {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: var(--ivory);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    touch-action: none;
+  }
+
+  #rotate-hint .rotate-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-5);
+    padding: 0 var(--sp-6);
+    text-align: center;
+  }
+
+  #rotate-hint .rotate-ic { width: 40px; height: 40px; }
+
+  #rotate-hint .stamp {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: var(--sp-6) 0 var(--sp-5);
+    animation: none;
+  }
+
+  #rotate-hint p { font: 700 var(--fs-3) var(--font-ui); color: var(--dust); }
 }
 
 /* ── 움직임 ─────────────────────────────────────────────── */
@@ -1676,6 +1886,21 @@ button {
   to { opacity: 0.9; transform: rotate(-12deg) scale(1); }
 }
 
+@keyframes tape-l2r {
+  from { transform: translateX(-105%); }
+  to { transform: translateX(105%); }
+}
+
+@keyframes tape-r2l {
+  from { transform: translateX(105%); }
+  to { transform: translateX(-105%); }
+}
+
+@keyframes veil-in {
+  from { background-color: rgba(244, 241, 232, 0); }
+  to { background-color: rgba(244, 241, 232, 0.92); }
+}
+
 @keyframes stamp-in-soft {
   from { opacity: 0; transform: rotate(-6deg) scale(1.8); }
   to { opacity: 0.9; transform: rotate(-6deg) scale(1); }
@@ -1687,6 +1912,9 @@ button {
   .hud-combo.cap,
   .cover-cta .tap-hint,
   .story-lines p,
+  .ov-story.has-wipe,
+  .ov-story.has-wipe .wipe,
+  .story-stamps .stamp,
   .card,
   .stamp,
   #btn-special.ready,

@@ -478,3 +478,15 @@ export const AUDIO = {
   /** 판 종료 신호음 — 목숨 소리(lifeLost)가 끝난 뒤 */
   RUN_END_DELAY: 0.5,
 } as const;
+
+// ── 화면 흐름 (B2) ──────────────────────────────────────────────
+// 틱 = 1/60초. 결과 카드·이야기 판이 뜨는 박자.
+export const UI_FLOW = {
+  /** 마지막 목숨을 잃고 결과 카드가 뜨기까지 — 그동안 캔버스는 계속 그린다 */
+  GAMEOVER_CARD_DELAY: 30,
+  /** 카드가 뜬 뒤 연타가 새 판으로 번지지 않게 입력을 잠그는 틱 */
+  GAMEOVER_LOCK: 24,
+  /** 이야기 판 진입 테이프 와이프 — 구역·막 전환 0.25초, 보스 격파 0.4초 */
+  WIPE_TICKS: 15,
+  WIPE_BOSS_TICKS: 24,
+} as const;

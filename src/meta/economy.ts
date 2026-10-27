@@ -26,6 +26,19 @@ export function dustCost(id: string): number | undefined {
   return Object.prototype.hasOwnProperty.call(WEAPON_DUST_COST, id) ? WEAPON_DUST_COST[id] : undefined;
 }
 
+/** 결과 카드의 다음 목표 — 아직 안 가진 먼지 구매품 중 가장 싼 것. 모자란 먼지(0이면 지금 살 수 있다). 다 가졌으면 null */
+export function nextDustGoal(
+  owned: readonly string[],
+  dust: number,
+): { id: string; cost: number; short: number } | null {
+  let best: { id: string; cost: number } | null = null;
+  for (const [id, cost] of Object.entries(WEAPON_DUST_COST)) {
+    if (owned.includes(id)) continue;
+    if (!best || cost < best.cost) best = { id, cost };
+  }
+  return best && { ...best, short: Math.max(0, best.cost - dust) };
+}
+
 /** 광고 1편당 궤도 */
 export const ORBIT_PER_AD = 8;
 
