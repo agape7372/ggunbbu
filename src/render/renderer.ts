@@ -293,6 +293,33 @@ function slowFactor(s: GameState): number {
   return s.boss?.st === 'defeated' ? Math.min(k, defeatSlow(s.boss.stTick)) : k;
 }
 
+/** orbit: 건물이 궤도에서 풀려 새로 나타난 프레임 — 아이보리 번쩍 한 번(설정 번쩍임 0이면 안 보인다). */
+function watchOrbitDrop(s: GameState): void {
+  if (s.gimmick !== 'orbit' || !s.stack || lastStack || s.over) return;
+  fx.flash({ color: PALETTE.BG, a: JUICE_SYS.ORBIT_FLASH_A, ticks: JUICE_SYS.ORBIT_FLASH_TICKS });
+}
+
+/** orbit: 필드 맨 위에서 지면까지 1px 잉크 헤어라인(직하 낙하선) + 위쪽 가로 눈금. 월드 좌표 — 건물이 위에서 덮는다. */
+function drawOrbitBeam(ctx: CanvasRenderingContext2D, s: GameState, cam: number): void {
+  if (s.gimmick !== 'orbit' || !s.stack || s.stack.resting || s.over) return;
+  const top = VIEW.FIELD_TOP - cam;
+  ctx.save();
+  ctx.globalAlpha = JUICE_SYS.ORBIT_BEAM_A;
+  ctx.fillStyle = PALETTE.INK;
+  ctx.fillRect(VIEW.LANE_X[0] - 0.5, top, 1, VIEW.GROUND_Y - top);
+  ctx.fillRect(VIEW.LANE_X[0] - 6, top, 12, 1);
+  ctx.restore();
+}
+
+/** night: 필드 전체에 잉크 12% 워시 — 건물·보스까지 어둡게, 플레이어는 그 위에 그려 또렷하게 남긴다. */
+function drawNightWash(ctx: CanvasRenderingContext2D, cam: number): void {
+  ctx.save();
+  ctx.globalAlpha = JUICE_SYS.NIGHT_WASH_A;
+  ctx.fillStyle = PALETTE.INK;
+  ctx.fillRect(-16, VIEW.FIELD_TOP - cam, VIEW.W + 32, VIEW.FIELD_H - VIEW.FIELD_TOP);
+  ctx.restore();
+}
+
 export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   const slow = slowFactor(s);
   tickEffects(slow);
@@ -323,6 +350,8 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
   fx.drawGroundLine(ctx);
+  watchOrbitDrop(s);
+  drawOrbitBeam(ctx, s, cam);
 
   const g = VIEW.GROUND_Y;
   if (s.stack) { drawStackShadow(ctx, s.stack, g); drawStack(ctx, s.stack, g, s.gimmick); }
@@ -342,6 +371,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     drawEntity(ctx, e, g);
   }
   if (s.boss) drawBoss(ctx, s.boss, g);
+  if (s.gimmick === 'night') drawNightWash(ctx, cam);
 
   // ★08-30 계약 개정: 관통 시각화(반투명·스침 획·착지 위험 표시)는 전부 제거했다.
   // 밑면이 막고 누르는 세계에서는 "통과 중"이라는 상태 자체가 없다 — 없는 것을 그리면 거짓말이다.

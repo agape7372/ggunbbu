@@ -103,11 +103,11 @@
 | 구역 | 3줄 |
 |---|---|
 | 1 | `제1구역 — 서쪽 회랑.` / `땅이 먼저 죽었다.` / `하늘만 아직 던진다.` |
-| 2 | `제2구역 — 강턱 시장.` / `위성 「보름호」가 던진다.` / `건물이 먼저 떨어진다.` |
+| 2 | `제2구역 — 강턱 시장.` / `「집행기」가 던진다.` / `건물이 먼저 떨어진다.` |
 | 3 | `제3구역 — 기와능선.` / `무면허 철거는 뿌뿌.` / `자격증은 없다.` |
 | 4 | `제4구역 — 철근 해안.` / `허가 같은 건 없었다.` / `베면 된다.` |
 
-문구 변경 없음. 줄 길이 상한 18자(360폭 13px 기준)는 `story.ts:2` 계약.
+현행 문구 = 이 표(보스 이름은 `BOSS_NAME` "집행기" 단일 출처 — 옛 표기 「보름호」는 정정). 줄 길이 상한 18자(360폭 13px 기준)는 `story.ts:2` 계약.
 
 ---
 
@@ -178,6 +178,15 @@
 | night 야간 투척 | 완파 후 재스폰 ×0.45 (하한 12틱, 45→20) — `src/core/combat.ts:118-120` · `src/config.ts:236` | 필드 **잉크 워시 12%** + 스카이라인 창 잉크 채움 | `PALETTE.INK` 알파 0.12 |
 | orbit 궤도 직하 | 스폰 초속 −120 (기본 −70) — `src/core/spawner.ts:61` · `src/config.ts:237-238` | 상단 **헤어라인 빔 예고** + 백색 플래시 | `PALETTE.WHITE` `#F4F1E8` |
 
+**구현 상태 (A3, 2026-10-27)** — 시각 시그니처 4종 **렌더 구현 완료**(core 불변, `s.gimmick` 읽기만). 상수는 `JUICE_SYS`의 NIGHT_*·ORBIT_*·GLASS_*·ICE_*.
+
+| 작전 | 구현 | 위치 |
+|---|---|---|
+| glass | 층 붕괴·타격 때 잉크 외곽선 아이보리 유리 조각 + 파란 반짝 | `effects.ts glassBurst` |
+| ice | 지면 가드(`guardBounce`)에 파랑 스파크 + 링 — 공중 가드엔 안 얹음 | `effects.ts iceSparks` |
+| night | 필드 잉크 12% 워시(플레이어 아래) + 스카이라인 창 잉크 채움(굽는 순간 한 번 · 작게 닫힌 칸 면적 상한) | `renderer.ts drawNightWash` · `skylineWindows.ts` · `assets.ts` |
+| orbit | 필드 위→지면 1px 잉크 헤어라인(낙하선) + 건물이 새로 나타난 프레임의 아이보리 번쩍(설정 번쩍임 0이면 안 보임) | `renderer.ts drawOrbitBeam · watchOrbitDrop` |
+
 ### 3-1. 노랑 한 곳 규칙 · 명도 위계 확인
 
 - **노랑 0곳.** 4종 시그니처 어디에도 `PALETTE.YELLOW`를 쓰지 않는다. 노랑은 참격·필살·버터 전용으로 남긴다(`docs/ART_DIRECTION.md` §2 팔레트).
@@ -185,9 +194,9 @@
 - night 워시만 INK 계열이라 별도 계산이 필요하다. `#1A1A20` 알파 0.12를 배경 `#F4F1E8` 위에 합성하면 실효색은 **`#DAD7D0`** 이다. 현행 위계 `BG #F4F1E8 > RUBBLE #9A958C > TILE_EDGE #4A4740 > INK #1A1A20` 에서 워시는 BG 바로 아래에 들어가고 INK를 침범하지 않는다.
 - **레이어 순서**: 워시는 배경·건물 위, **플레이어 아래**에 깐다. 플레이어 위에 깔면 졸라맨 선이 12% 옅어져 위계가 뒤집힌다. 삽입 지점은 `drawGame`의 카메라 변환 안, `drawPlayer` 직전(`src/render/renderer.ts:171-190`).
 
-### 3-2. 테스트 계약 — 현재 기믹 4종 core 테스트 0건
+### 3-2. 테스트 계약 — 기믹 4종 core 테스트 **`tests/gimmick.test.ts` 신설로 닫힘**(A3)
 
-`tests/` 19파일 어디에도 `gimmick` 분기 단언이 없다. 구현 웨이브에 기믹당 최소 1건을 계약으로 건다.
+(구) `tests/` 19파일 어디에도 `gimmick` 분기 단언이 없었다. 기믹당 최소 1건 계약 — 아래 표가 `tests/gimmick.test.ts`에 들어 있다(ice는 지면·공중 각 1건, 시각 시그니처 파티클·창 채우기 포함).
 
 | 기믹 | core 단언 (최소 1건) |
 |---|---|
@@ -196,7 +205,7 @@
 | night | `gimmick='night'` 완파 후 `stackSpawnCd === 20` (= `floor(45 × 0.45)`) |
 | orbit | `gimmick='orbit'` 스폰 후 `stack.vy === -120`, 기본은 `-70` |
 
-넣을 파일: `tests/combat.test.ts`(ice·night) · `tests/building.test.ts` 또는 신규 `tests/gimmick.test.ts`(glass·orbit).
+넣은 파일: 신규 `tests/gimmick.test.ts` 하나(네 기믹 전부). 함께 `tests/act2flow.test.ts`(cp<40 · 바닥 더미 파밍 · grantMercyLife) · `tests/boss.test.ts`(대포 타격)의 빈칸을 메웠다.
 
 ---
 
@@ -212,7 +221,7 @@
 | 2 | `tower` | 로비 + 사무층 108 + 펜트하우스, 필살 면역 | 10 / 108×1 / 20 | 40 → 148 → 168 | `로비`(40) · `사무층`(148) · `펜트하우스`(168) |
 | 3 | `bolt` | 번개 12발 (전반 4발 90f, 후반 8발 30f, 큐 30f) | +12 | 180 | — |
 | 4 | `rock` | 화산탄 24발, 타임박스 2400틱 | 24 × HP2 = 48 | 228 | — |
-| 5 | `moon` | 보스 「보름호」, 티어 임계 50/150 | HP 230 | 230+ | — |
+| 5 | `moon` | 보스 「집행기」, 티어 임계 50/150 | HP 230 | 230+ | — |
 
 앵커: `src/config.ts:262-283` · `src/core/act2.ts:60-113` · 체크포인트 기록 `src/core/act2.ts:86-90` · 라벨 `src/content/world.ts:259-263` · 페이즈 배너 `src/content/world.ts:230-256`.
 
@@ -320,7 +329,7 @@
 
 코스메틱 방침과 무관하다 — 층 시트는 팔리는 물건이 아니라 필드 판독 자산이다(`COSMETIC_COLORS`는 body·blade·letters 3축뿐, `src/config.ts:375-379`).
 
-### W6 — 스테이지라인·기믹 렌더
+### W6 — 스테이지라인·기믹 렌더 (**구현 완료 — A3, §3 구현 상태 표**; 유리·서리 행 시트는 W3로 이미 배선)
 
 | 기믹 | 손댈 파일 |
 |---|---|
@@ -331,7 +340,7 @@
 
 추가 작업 2건:
 
-- **테스트 4건** — §3-2 계약표. `tests/combat.test.ts` · 신규 `tests/gimmick.test.ts`.
+- **테스트 4건** — **완료**(§3-2). `tests/gimmick.test.ts`.
 - **보스 티어1 풀** — `src/core/boss.ts:23`에 `pbCharge` 추가(§4-2 제안, 사용자 게이트 후).
 
 `GimmickId`는 이미 `GameState`에 실려 있다(`src/core/types.ts:176,273`). 렌더가 `s.gimmick`을 읽기만 하면 되고 core 시그니처 변경은 없다.

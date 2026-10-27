@@ -5,6 +5,8 @@
 
 import manifestJson from '../assets/manifest.json';
 import { drawHalo, haloFor } from './halo';
+import { JUICE_SYS, PALETTE } from '../config';
+import { fillSmallPaperPockets } from './skylineWindows';
 
 export interface AssetEntry {
   src: string;
@@ -211,22 +213,24 @@ export function drawAssetHalo(
 
 /**
  * 챕터 배경을 오프스크린 1장(논리 크기의 고정 2배)에 한 번 굽고 매 프레임 그 한 장만 복사한다.
- * 배경이 바뀔 때(키·이미지 객체·크기)만 다시 굽는다. 결과 그림은 drawBackdrop과 같다.
+ * 배경이 바뀔 때(키·이미지 객체·크기·야간 여부)만 다시 굽는다. 결과 그림은 drawBackdrop과 같다.
+ * night면 굽는 김에 스카이라인의 작게 닫힌 칸(창)을 잉크로 채운다 — 원본 PNG는 그대로다.
  */
 const BG_SS = 2;
-let bgCache: { key: string; image: LoadedImage; dw: number; dh: number; cv: HTMLCanvasElement } | null = null;
+let bgCache: { key: string; image: LoadedImage; dw: number; dh: number; night: boolean; cv: HTMLCanvasElement } | null = null;
 export function drawBackdropCached(
   ctx: CanvasRenderingContext2D,
   key: string,
   dx: number,
   dy: number,
   dw: number,
-  dh: number
+  dh: number,
+  night = false
 ): boolean {
   const image = loaded.get(key);
   if (!image || !manifest.images[key]) return false;
   if (typeof document === 'undefined') return drawBackdrop(ctx, key, dx, dy, dw, dh);
-  if (!bgCache || bgCache.key !== key || bgCache.image !== image || bgCache.dw !== dw || bgCache.dh !== dh) {
+  if (!bgCache || bgCache.key !== key || bgCache.image !== image || bgCache.dw !== dw || bgCache.dh !== dh || bgCache.night !== night) {
     const cv = document.createElement('canvas');
     cv.width = Math.round(dw * BG_SS);
     cv.height = Math.round(dh * BG_SS);
@@ -234,10 +238,20 @@ export function drawBackdropCached(
     if (!c) return drawBackdrop(ctx, key, dx, dy, dw, dh);
     c.scale(BG_SS, BG_SS);
     if (!drawBackdrop(c, key, 0, 0, dw, dh)) return false;
-    bgCache = { key, image, dw, dh, cv };
+    if (night) inkSkylineWindows(c, cv.width, cv.height);
+    bgCache = { key, image, dw, dh, night, cv };
   }
   ctx.drawImage(bgCache.cv, dx, dy, dw, dh);
   return true;
+}
+
+/** 야간: 굽힌 배경에서 창을 잉크로 채운다. 픽셀을 못 읽는 환경이면 조용히 건너뛴다(낮 배경 그대로). */
+function inkSkylineWindows(c: CanvasRenderingContext2D, w: number, h: number): void {
+  try {
+    const data = c.getImageData(0, 0, w, h);
+    const rgb = parseHex(PALETTE.INK);
+    if (rgb && fillSmallPaperPockets(data.data, w, h, JUICE_SYS.NIGHT_WINDOW_MAX_AREA, rgb) > 0) c.putImageData(data, 0, 0);
+  } catch { /* 낮 배경 그대로 */ }
 }
 
 /**

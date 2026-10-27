@@ -438,6 +438,13 @@ export const JUICE_SYS = {
   DEATH_FLASH_TICKS: 8, DEATH_SLOW: 0.3, DEATH_SLOW_TICKS: 24, DEATH_FRAME_TICKS: 18,
   // 공사 테이프 2줄(보스 포효) 지속 틱
   TAPE_TICKS: 16,
+  // 구역작전 시각 시그니처(렌더 전용 · 노랑 0) — core의 gimmick은 읽기만 한다
+  NIGHT_WASH_A: 0.12,          // night: 필드 잉크 워시 알파(배경 위 INK 12% = 실효 #DAD7D0)
+  NIGHT_WINDOW_MAX_AREA: 900,  // night: 이 면적(2배 굽기 픽셀) 이하로 닫힌 칸을 창으로 보고 잉크로 채운다
+  ORBIT_BEAM_A: 0.55,          // orbit: 직하 헤어라인(1px) 알파
+  ORBIT_FLASH_A: 0.3, ORBIT_FLASH_TICKS: 4, // orbit: 건물이 궤도에서 풀리는 순간 아이보리 번쩍
+  GLASS_CHIPS: 12, GLASS_CHIPS_HIT: 3,       // glass: 층 붕괴 / 타격 때 유리 조각 수
+  ICE_SPARKS: 12,               // ice: 지면 가드 차가운 스파크 수
 } as const;
 
 // ── 진동 패턴 (podoal feedback.ts 차용) ─────────────────────────

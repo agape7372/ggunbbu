@@ -1,9 +1,10 @@
 // 2막 흐름: 체크포인트 이어하기, 화산탄 착지 깔림, 번개 가드 불가, 페이즈 잔여 소거.
 import { describe, it, expect } from 'vitest';
-import { makeState, advance } from '../src/core/sim';
+import { makeState, advance, grantMercyLife } from '../src/core/sim';
 import { continueFromCheckpoint, enterAct2Phase } from '../src/core/act2';
+import { makeFloor, makeStack } from '../src/core/building';
 import { EMPTY_INPUT, type InputFrame } from '../src/core/types';
-import { ACT2, GUARD_GAUGE, PLAYER } from '../src/config';
+import { ACT2, GUARD_GAUGE, PLAYER, SCORE, STACK } from '../src/config';
 
 function inp(o: Partial<InputFrame> = {}): InputFrame {
   return { ...EMPTY_INPUT, ...o };
@@ -45,6 +46,23 @@ describe('체크포인트 이어하기', () => {
     expect(s.stack?.floors[0]?.mat).toBe('office');
     expect(s.stack?.floors.at(-1)?.mat).toBe('penthouse');
     expect(s.stack?.floors.length).toBe(ACT2.TOWER_OFFICE_FLOORS + 1);
+  });
+
+  it('40 미만: 대성당부터 처음부터, 콤보 0, 체크포인트는 그대로 낮은 값', () => {
+    const s = makeState();
+    enterAct2Phase(s, 'rock');
+    s.checkpoint = 30;
+    s.over = 'gameover';
+    s.lives = 0;
+    s.combo = 77;
+    continueFromCheckpoint(s);
+    expect(s.over).toBeNull();
+    expect(s.act2Phase).toBe('cathedral');
+    expect(s.combo).toBe(0);
+    expect(s.checkpoint).toBe(30);
+    expect(s.stack).toBeNull();
+    expect(s.stackSpawnCd).toBe(ACT2.INTERLUDE_TICKS);
+    expect(s.lives).toBe(PLAYER.LIVES);
   });
 
   it('168: 번개 페이즈, 콤보 168', () => {
@@ -165,5 +183,67 @@ describe('격파 잔해 [정본: 콤보만, 점수 없음]', () => {
     for (let i = 0; i < 12; i++) advance(s, inp({ attack: i === 0 }));
     expect(s.combo).toBeGreaterThan(combo0);
     expect(s.score).toBe(score0);
+  });
+});
+
+describe('바닥 화산탄 더미 파밍 [정본: 반복 점수, 콤보는 플래그 off]', () => {
+  it('더미를 치면 점수·게이지만 오르고 콤보는 그대로, 타격 이벤트는 틱당 하나', () => {
+    expect(SCORE.GROUND_ROCK_COMBO).toBe(false);
+    const s = makeState();
+    enterAct2Phase(s, 'rock');
+    s.stackSpawnCd = 9999;
+    s.groundRocks = 2;
+    s.combo = 5;
+    const score0 = s.score;
+    const gauge0 = s.wazaGauge;
+    let hits = 0;
+    for (let i = 0; i < 14; i++) {
+      advance(s, inp({ attack: i === 0 }));
+      hits += s.events.filter((e) => e.kind === 'hit').length;
+      s.events.length = 0;
+    }
+    expect(s.score).toBeGreaterThan(score0);
+    expect(s.wazaGauge).toBeGreaterThan(gauge0);
+    expect(s.combo).toBe(5);
+    expect(hits).toBe(1);
+  });
+});
+
+describe('광고 부활 grantMercyLife', () => {
+  it('라이프 1·무적 틱 부여, 콤보·점수 유지, 한 틱 지나면 무적이 한 칸 줄고 피격은 막힌다', () => {
+    const s = makeState();
+    enterAct2Phase(s, 'rock');
+    s.stackSpawnCd = 9999;
+    s.over = 'gameover';
+    s.lives = 0;
+    s.combo = 33;
+    s.score = 123456;
+    s.player.pose = 'dead';
+    grantMercyLife(s);
+    expect(s.over).toBeNull();
+    expect(s.lives).toBe(1);
+    expect(s.combo).toBe(33);
+    expect(s.score).toBe(123456);
+    expect(s.player.pose).toBe('idle');
+    expect(s.player.invulnTicks).toBe(PLAYER.HIT_IFRAMES);
+    advance(s, EMPTY_INPUT);
+    expect(s.player.invulnTicks).toBe(PLAYER.HIT_IFRAMES - 1);
+    s.entities.push({ kind: 'bolt', lane: 0, y: 6, vy: 0, cueTicks: 0 });
+    advance(s, EMPTY_INPUT);
+    expect(s.lives).toBe(1);          // 무적이라 번개가 닿아도 라이프를 안 먹는다
+  });
+
+  it('깔려 죽은 판이면 눌려 있던 건물이 풀려 위로 뜬다', () => {
+    const s = makeState();
+    enterAct2Phase(s, 'cathedral');
+    s.stackSpawnCd = 9999;
+    s.stack = makeStack({ variant: 'cathedral', theme: 'modern', floors: [makeFloor('cathedral')], y: 0, vy: 0 });
+    s.stack.resting = true;
+    s.over = 'gameover';
+    s.lives = 0;
+    grantMercyLife(s);
+    expect(s.stack.resting).toBe(false);
+    expect(s.stack.vy).toBeGreaterThanOrEqual(STACK.PIN_ESCAPE_V);
+    expect(s.stack.y).toBeGreaterThan(0);
   });
 });

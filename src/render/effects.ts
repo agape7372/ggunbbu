@@ -599,6 +599,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   if (e.kind === 'hit' || e.kind === 'floorCollapse') {
     const footY = VIEW.GROUND_Y - s.player.y;
     weaponBurst(s.weapon, e.kind, x, y, footY, JUICE[e.kind]?.particles ?? 0, e.mat);
+    if (s.gimmick === 'glass') glassBurst(x, y, e.kind === 'floorCollapse' ? JUICE_SYS.GLASS_CHIPS : JUICE_SYS.GLASS_CHIPS_HIT);
     return;
   }
   if (e.kind === 'supply') {
@@ -622,7 +623,31 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     spawnFixed = false;
     return;
   }
+  if (e.kind === 'guardBounce' && s.gimmick === 'ice') iceSparks(x, y, JUICE_SYS.ICE_SPARKS);
   spawnHitParticles(e.kind, x, y, JUICE[e.kind]?.particles ?? 0, e.mat);
+}
+
+/** glass 구역: 잉크 외곽선 두른 아이보리 유리 조각 + 파란 가는 반짝. PALETTE만 — 노랑 0. */
+function glassBurst(x: number, y: number, n: number): void {
+  for (let i = 0; i < n; i++) {
+    if (i % 3 === 2) {
+      fill('spark', x + signed() * 10, y + signed() * 6, signed() * 140, -90 - n01() * 160, 600,
+        0.22 + n01() * 0.16, 10 + n01() * 6, PALETTE.BLUE);
+    } else {
+      fill('chip', x + signed() * 14, y + signed() * 8, signed() * 150, -80 - n01() * 190, 980,
+        0.45 + n01() * 0.35, 7 + n01() * 7, PALETTE.WHITE, { rot: signed() * Math.PI, spin: signed() * 10 });
+    }
+  }
+}
+
+/** ice 구역: 지면 가드 때 땅을 따라 번지는 차가운(파랑) 스파크 + 작은 링. 노랑 0. */
+function iceSparks(x: number, y: number, n: number): void {
+  for (let i = 0; i < n; i++) {
+    const dir = i % 2 === 0 ? 1 : -1;
+    fill('spark', x + dir * (6 + n01() * 20), y, dir * (90 + n01() * 140), -30 - n01() * 120, 500,
+      0.22 + n01() * 0.14, 9 + n01() * 7, i % 3 === 0 ? PALETTE.INK : PALETTE.BLUE);
+  }
+  fill('ring', x, y, 0, 0, 70, 0.3, 12, PALETTE.BLUE);
 }
 
 /** 완파 — 층수(n)가 클수록 파편·링이 커진다. 층수 3 이상이면 노랑 링 한 줄이 더 붙는다. */

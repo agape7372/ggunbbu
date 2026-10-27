@@ -156,6 +156,34 @@ describe('집행기 보스', () => {
     expect(b.y).toBe(64);
   });
 
+  it('대포 타격: HP가 줄고 콤보만 오르며 본체 HP는 그대로, 마지막 한 방이면 사라지고 격파 이벤트가 하나 난다', () => {
+    const s = bossState(); const b = s.boss!;
+    s.entities.push({ kind: 'cannon', lane: 0, x: 180, hp: BOSS.CANNON.HP, fireTicks: 999 });
+    const lo = BOSS.CANNON.MUZZLE_Y - 10;
+    const hi = BOSS.CANNON.MUZZLE_Y + 10;
+    expect(tryHitBoss(s, lo, hi)).toBe(true);
+    const cannon = s.entities[0];
+    expect(cannon.kind === 'cannon' && cannon.hp).toBe(BOSS.CANNON.HP - 1);
+    expect(s.combo).toBe(1);
+    expect(b.hp).toBe(BOSS.HP);                       // 대포는 본체 HP 미산입 [정본]
+    expect(s.events.filter((e) => e.kind === 'bossHit')).toEqual([{ kind: 'bossHit', y: BOSS.CANNON.MUZZLE_Y }]);
+
+    s.events.length = 0;
+    expect(tryHitBoss(s, lo, hi)).toBe(true);          // HP 1 → 0
+    expect(s.entities.some((e) => e.kind === 'cannon')).toBe(false);
+    expect(s.combo).toBe(2);
+    expect(s.events.filter((e) => e.kind === 'bossHit')).toHaveLength(1);
+    expect(b.hp).toBe(BOSS.HP);
+  });
+
+  it('포구 높이를 벗어난 타격은 대포에 안 닿는다', () => {
+    const s = bossState();
+    s.entities.push({ kind: 'cannon', lane: 0, x: 180, hp: BOSS.CANNON.HP, fireTicks: 999 });
+    expect(tryHitBoss(s, 0, BOSS.CANNON.MUZZLE_Y - 11)).toBe(false);
+    const cannon = s.entities[0];
+    expect(cannon.kind === 'cannon' && cannon.hp).toBe(BOSS.CANNON.HP);
+  });
+
   it('시드 결정론: 같은 시드 → 같은 패턴 선택', () => {
     const a = bossState();
     const b = bossState();

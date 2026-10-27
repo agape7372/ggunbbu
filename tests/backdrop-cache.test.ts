@@ -79,3 +79,28 @@ it('drawChapterBackdrop은 챕터 배경을 캐시 경로로 그린다', async (
   expect(drawChapterBackdrop(ctx, { mode: 'act1', chapter: 0, act2Phase: null })).toBe(true);
   expect(draws).toHaveLength(1);
 });
+
+it('야간 배경은 낮 배경과 따로 굽고(창 채움), 낮으로 돌아오면 다시 굽는다', async () => {
+  await preloadAssets();
+  const reads: number[] = [];
+  vi.stubGlobal('document', {
+    createElement: () => {
+      canvases++;
+      const target: Record<string, unknown> = {
+        getImageData: (_x: number, _y: number, w: number, h: number) => { reads.push(w * h); return { data: new Uint8ClampedArray(w * h * 4) }; },
+      };
+      return { width: 8, height: 8, getContext: () => new Proxy(target, { get: (t, k: string) => t[k] ?? (() => undefined), set: () => true }) };
+    },
+  });
+  const { ctx } = fakeCtx();
+  const day = { mode: 'act1', chapter: 0, act2Phase: null } as const;
+  drawChapterBackdrop(ctx, day);
+  expect(reads).toHaveLength(0);                       // 낮에는 픽셀을 안 읽는다
+  drawChapterBackdrop(ctx, { ...day, gimmick: 'night' });
+  expect(reads).toHaveLength(1);                       // 야간은 한 번 굽는다
+  drawChapterBackdrop(ctx, { ...day, gimmick: 'night' });
+  expect(reads).toHaveLength(1);                       // 프레임마다 다시 안 굽는다
+  expect(canvases).toBe(2);
+  drawChapterBackdrop(ctx, day);
+  expect(canvases).toBe(3);                            // 낮으로 돌아오면 낮 배경을 다시 굽는다
+});
