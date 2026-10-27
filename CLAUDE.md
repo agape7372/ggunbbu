@@ -33,10 +33,17 @@
      되돌리지 마라. `translate(0, cam)` 구조상 **지면 소실은 산술적으로 못 피한다** — "소실 0%"는
      계약이 아니고, MAX 상한 + 짧아진 체공 + 지면 인디케이터 셋으로 관리한다.
      가드: `tests/camera.test.ts`.
+8. **특별작전(기믹 판)은 시간제다** — 구역 경계·2막 문턱을 넘어도 그 구역에 머물고 난이도만 p를 따라 오른다
+   (`sim.ts` stepAct1의 `s.gimmick === 'none'` 조건). 가드: `tests/gimmick.test.ts`.
 
 ## 검증
 
-- `npm test` — 187 테스트(2026-10-25 무기·보급 상자 뒤 기준), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 411 테스트(2026-10-28 총체적 업그레이드 뒤 기준), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
+  `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
+  (원본 TTF 5개는 `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).
+- 디버그 APK: `npm --prefix shell run web:build` → `npm --prefix shell run sync` → `npm --prefix shell run apk`.
+  릴리스 빌드는 `shell/android/key.properties`가 없거나 광고 ID가 테스트 값이면 gradle이 멈춘다(`docs/RELEASE.md`).
 - 브라우저 확인: `.claude/launch.json` → 프리뷰(포트 5173), 모바일 뷰포트 375×812.
 - `npx tsc --noEmit` 상시 클린.
 
