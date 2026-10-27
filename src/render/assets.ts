@@ -4,6 +4,7 @@
 // img()/drawAsset()에서 null/false로 드러나고, 호출부는 그걸 보고 기존 코드 스프라이트로 폴백한다.
 
 import manifestJson from '../assets/manifest.json';
+import { drawHalo, haloFor } from './halo';
 
 export interface AssetEntry {
   src: string;
@@ -179,6 +180,63 @@ export function drawAsset(
     return false;
   }
   ctx.imageSmoothingEnabled = prevSmooth;
+  return true;
+}
+
+/**
+ * drawAsset과 같은 자리에 아이보리 후광만 깐다(종이 오려내기) — 그 위에 drawAsset을 그리면 된다.
+ * 후광은 (이미지 객체, 프레임)마다 한 번 굽고 재사용한다. 이미지가 없으면 false.
+ */
+export function drawAssetHalo(
+  ctx: CanvasRenderingContext2D,
+  key: string,
+  x: number,
+  y: number,
+  frame = 0
+): boolean {
+  const image = loaded.get(key);
+  const entry = manifest.images[key];
+  if (!image || !entry) return false;
+  const src = imageSize(image);
+  if (src.w < 1 || src.h < 1) return false;
+  const frames = entry.frames && entry.frames > 0 ? entry.frames : 1;
+  const f = Math.abs(frame) % frames;
+  const fw = src.w / frames;
+  const halo = haloFor(image, String(f), f * fw, 0, fw, src.h, entry.w, entry.h);
+  if (!halo) return false;
+  const { dx, dy } = destOrigin(entry, x, y);
+  drawHalo(ctx, halo, dx, dy);
+  return true;
+}
+
+/**
+ * 챕터 배경을 오프스크린 1장(논리 크기의 고정 2배)에 한 번 굽고 매 프레임 그 한 장만 복사한다.
+ * 배경이 바뀔 때(키·이미지 객체·크기)만 다시 굽는다. 결과 그림은 drawBackdrop과 같다.
+ */
+const BG_SS = 2;
+let bgCache: { key: string; image: LoadedImage; dw: number; dh: number; cv: HTMLCanvasElement } | null = null;
+export function drawBackdropCached(
+  ctx: CanvasRenderingContext2D,
+  key: string,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number
+): boolean {
+  const image = loaded.get(key);
+  if (!image || !manifest.images[key]) return false;
+  if (typeof document === 'undefined') return drawBackdrop(ctx, key, dx, dy, dw, dh);
+  if (!bgCache || bgCache.key !== key || bgCache.image !== image || bgCache.dw !== dw || bgCache.dh !== dh) {
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(dw * BG_SS);
+    cv.height = Math.round(dh * BG_SS);
+    const c = cv.getContext('2d');
+    if (!c) return drawBackdrop(ctx, key, dx, dy, dw, dh);
+    c.scale(BG_SS, BG_SS);
+    if (!drawBackdrop(c, key, 0, 0, dw, dh)) return false;
+    bgCache = { key, image, dw, dh, cv };
+  }
+  ctx.drawImage(bgCache.cv, dx, dy, dw, dh);
   return true;
 }
 

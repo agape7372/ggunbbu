@@ -44,19 +44,50 @@ export function notifyAppReady(): void {
   void plugin('CapacitorUpdater')?.notifyAppReady?.().catch(() => undefined);
 }
 
+/** 진동 한 번(세그먼트). at = 패턴 시작부터 몇 ms 뒤에 쏘는가, ms = 얼마나 울리는가. */
+export interface VibeStep { at: number; ms: number }
+
+/** 한 번에 울릴 수 있는 상한 — 긴 한 방이 기기를 오래 잡지 않게. */
+const VIBE_MAX_MS = 400;
+
+/**
+ * 웹 Vibration 패턴([진동, 휴지, 진동, …])을 세그먼트로 푼다. 짝수 칸 = 진동, 홀수 칸 = 휴지.
+ * 숫자 하나는 진동 한 번. 0 이하는 건너뛴다. 순수 함수 — 시험이 직접 부른다.
+ */
+export function vibrationSteps(pattern: number | readonly number[]): VibeStep[] {
+  if (typeof pattern === 'number') return pattern > 0 ? [{ at: 0, ms: Math.min(pattern, VIBE_MAX_MS) }] : [];
+  const steps: VibeStep[] = [];
+  let at = 0;
+  pattern.forEach((v, i) => {
+    if (i % 2 === 0 && v > 0) steps.push({ at, ms: Math.min(v, VIBE_MAX_MS) });
+    at += v;
+  });
+  return steps;
+}
+
+let vibeChain: ReturnType<typeof setTimeout>[] = [];
+function cancelVibeChain(): void {
+  for (const t of vibeChain) clearTimeout(t);
+  vibeChain = [];
+}
+
 /**
  * 진동 — 네이티브면 Haptics, 아니면 navigator.vibrate. 어느 쪽도 throw 하지 않는다.
+ * 네이티브 Haptics.vibrate는 길이 하나만 받으므로 패턴을 세그먼트로 풀어 setTimeout 체인으로 순서대로 쏜다.
+ * 새 패턴이 오면 이전 체인은 끊는다(웹 navigator.vibrate가 패턴을 갈아끼우는 것과 같다).
  * 설정 게이트는 호출부(renderer)가 이미 진다.
  */
 export function vibrate(pattern: number | readonly number[]): void {
+  cancelVibeChain();
   const h = plugin('Haptics');
   if (h?.vibrate) {
-    // 웹 Vibration 패턴의 홀수 인덱스는 휴지(pause) — 합산에서 제외해야 리듬 총량이 보존된다
-    // (08-30 검증: [100,50,200]이 350ms 연속 진동이 되던 평탄화 수정. 세그먼트 재생은 후속.)
-    const total = typeof pattern === 'number'
-      ? pattern
-      : pattern.reduce((a, b, i) => (i % 2 === 0 ? a + b : a), 0);
-    void h.vibrate({ duration: Math.min(total, 400) }).catch(() => undefined);
+    for (const { at, ms } of vibrationSteps(pattern)) {
+      const fire = (): void => {
+        try { void h.vibrate!({ duration: ms }).catch(() => undefined); } catch { /* 동기 throw도 삼킨다 */ }
+      };
+      if (at <= 0) fire();
+      else vibeChain.push(setTimeout(fire, at));
+    }
     return;
   }
   try {

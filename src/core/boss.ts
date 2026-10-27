@@ -283,7 +283,7 @@ function stepCannons(s: GameState, b: BossState): void {
       // 수직 전기탄 [정본: 가드 불가]
       s.entities.push({
         kind: 'shot', lane: e.lane,
-        x: e.x, y: 260,
+        x: e.x, y: BOSS.CANNON.MUZZLE_Y,
         vx: 0, vy: -BOSS.CANNON.SHOT_V,
         guardable: false, cancellable: false,
       });
@@ -326,11 +326,11 @@ export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
       return true;
     }
     // 참격 가로 리치 = 건물 폭 절반 → 벌려 놓은 대포도 전부 벨 수 있다
-    if (e.kind === 'cannon' && Math.abs(e.x - px) <= VIEW.LANE_W / 2 && 260 >= lo && 260 <= hi) {
+    if (e.kind === 'cannon' && Math.abs(e.x - px) <= VIEW.LANE_W / 2 && BOSS.CANNON.MUZZLE_Y >= lo && BOSS.CANNON.MUZZLE_Y <= hi) {
       e.hp -= 1;
       if (e.hp <= 0) s.entities.splice(i, 1);
       registerHit(s);
-      s.events.push({ kind: 'bossHit', y: 260 });
+      s.events.push({ kind: 'bossHit', y: BOSS.CANNON.MUZZLE_Y });
       return true;
     }
   }

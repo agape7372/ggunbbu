@@ -413,6 +413,9 @@ function loseLife(s: GameState): void {
   if (s.lives <= 0) {
     s.player.pose = 'dead';
     s.over = 'gameover';
+    // 호출부는 사망이면 곧장 return 해서 자기 hurt를 못 낸다 — 방치·깔림 시간초과 사망에도 피격 연출
+    // (흔들림·적색·진동·피격음)이 따라가도록 여기서 한 번 낸다. 생존 경로의 hurt는 각 호출부가 그대로 낸다.
+    s.events.push({ kind: 'hurt', y: 0 });
   }
 }
 

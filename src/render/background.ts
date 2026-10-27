@@ -2,7 +2,7 @@
 
 import type { Act2Phase, Mode } from '../core/types';
 import { ACT1, VIEW } from '../config';
-import { drawBackdrop } from './assets';
+import { drawBackdropCached } from './assets';
 
 export interface BackdropInput {
   mode: Mode;
@@ -17,7 +17,10 @@ export function backdropKey(s: BackdropInput): string {
   return `bg-${theme}`;
 }
 
-/** 필드(지면 위)에 챕터 배경 PNG를 그린다. 실패 시 false — 단색 폴백이 그대로 보인다. */
+/**
+ * 필드(지면 위)에 챕터 배경 PNG를 그린다. 실패 시 false — 단색 폴백이 그대로 보인다.
+ * 배경은 정적이라 오프스크린 1장에 구워 두고 재사용한다(테마·막이 바뀔 때만 다시 굽는다).
+ */
 export function drawChapterBackdrop(ctx: CanvasRenderingContext2D, s: BackdropInput): boolean {
-  return drawBackdrop(ctx, backdropKey(s), 0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
+  return drawBackdropCached(ctx, backdropKey(s), 0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
 }

@@ -345,3 +345,52 @@ describe('헛스윙', () => {
     }
   });
 });
+describe('사망에도 피격 연출 이벤트가 따라간다', () => {
+  /** 마지막 틱의 이벤트 종류(lifeLost는 :남은 라이프). 사망 직전까지 한 틱씩 돌리며 매번 비운다 */
+  function runToDeath(s: GameState, maxTicks = 1500): string[] {
+    let last: string[] = [];
+    for (let t = 0; t < maxTicks && !s.over; t++) {
+      s.events.length = 0;
+      advance(s, EMPTY_INPUT);
+      last = s.events.map((e) => (e.kind === 'lifeLost' ? `lifeLost:${e.n}` : e.kind));
+    }
+    return last;
+  }
+
+  it('마지막 라이프를 깔림으로 잃는 틱 — hurt 1 + lifeLost(남은 0) 1', () => {
+    const s = makeState();
+    s.lives = 1;
+    withStack(s, 50, 'hard');
+    s.stack!.vy = -600;
+    const last = runToDeath(s);
+    expect(s.over).toBe('gameover');
+    expect(last.filter((k) => k === 'hurt')).toHaveLength(1);
+    expect(last.filter((k) => k === 'lifeLost:0')).toHaveLength(1);
+  });
+
+  it('방치(PIN_REPEAT) 시간초과 사망 — 예전엔 hurt가 빠졌다. 이제 정확히 1개', () => {
+    const s = makeState();
+    withStack(s, 50, 'hard');
+    s.stack!.vy = -600;
+    const last = runToDeath(s);
+    expect(s.over).toBe('gameover');
+    expect(s.tick).toBeGreaterThan(PLAYER.PIN_REPEAT_TICKS); // 즉사가 아니라 반복 손실 끝에 죽었다
+    expect(last.filter((k) => k === 'hurt')).toHaveLength(1);
+    expect(last.filter((k) => k === 'lifeLost:0')).toHaveLength(1);
+  });
+
+  it('살아남는 손실은 그대로 — hurt 1(호출부) + lifeLost 1, 중복 없음', () => {
+    const s = makeState();
+    withStack(s, 50, 'hard');
+    s.stack!.vy = -600;
+    const seen: string[] = [];
+    while (s.lives === PLAYER.LIVES && s.tick < 300) {
+      s.events.length = 0;
+      advance(s, EMPTY_INPUT);
+      seen.push(...s.events.map((e) => e.kind));
+    }
+    expect(seen.filter((k) => k === 'hurt')).toHaveLength(1);
+    expect(seen.filter((k) => k === 'lifeLost')).toHaveLength(1);
+    expect(s.over).toBeNull();
+  });
+});

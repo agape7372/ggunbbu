@@ -1,8 +1,12 @@
-// 드로우 오케스트레이션 + 이벤트 소비(셰이크/플래시/진동/의성어).
+// 드로우 오케스트레이션 + 이벤트 소비(흔들림/번쩍/진동/의성어/필살·보스·사망 연출).
 // core는 events만 발행 — 오디오는 src/audio/consume.ts, 클리어는 씬.
+// 이벤트 → 손맛 숫자는 feel.ts(순수), 파티클은 effects.ts, 화면 단위(번쩍·테이프·링)는 screenfx.ts.
+//
+// ★박자: consumeEvents는 시뮬 틱마다, drawGame은 틱이 돈 프레임마다 한 번(main.ts) — draw마다 줄어드는 값은
+// 틱마다 줄어드는 값으로 읽는다.
 
-import type { GameState } from '../core/types';
-import { CAMERA, COSMETIC_COLORS, JUICE, JUICE_SYS, HAPTIC, PALETTE, PLAYER, STACK, VIEW, WEAPON } from '../config';
+import type { FallingStack, GameState, JuiceEvent } from '../core/types';
+import { BOSS, CAMERA, COSMETIC_COLORS, JUICE, JUICE_SYS, PALETTE, PLAYER, STACK, VIEW, WEAPON } from '../config';
 import { onomatoFor, CAPTIONS, ITEM_COPY } from '../content';
 import {
   initSprites, drawPlayer, drawHat, drawStack, drawBoss, drawEntity,
@@ -11,21 +15,38 @@ import {
 import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
 import { vibrate } from '../platform/native';
-import { drawEffects, resetEffects, setFxCamY, setSlashColor, spawnFromEvent, tickEffects } from './effects';
+import { drawEffects, resetEffects, setSlashColor, spawnBossBreak, spawnFromEvent, spawnStackShatter, tickEffects } from './effects';
+import { bossBodyHit, introFloorTop, resetBossFx, stepBossFx } from './executor';
+import { defeatSlow, pickHaptic, shakePx, stackScale, type HapticCounters } from './feel';
+import * as fx from './screenfx';
 
+/** 흔들림 진폭(px). 이벤트가 최대값으로 올리고 반감기 SHAKE_HALF_LIFE_F로 줄어든다. */
 let trauma = 0;
 /**
  * 카메라 보간 상태 (08-30 4차). cameraFollowY는 순수 목표값만 내고, 프레임간 추격은 여기서 한다 —
  * 목표값을 그대로 쓰면 데드존 진입 순간 화면이 툭 튄다. drawGame이 매 프레임 한 번 전진시킨다.
  */
 let smoothCam = 0;
-let flashTicks = 0;
-let flashColor = '#1A1A20';
 let shakeSeed = 0;
-let hitHapticCount = 0;
+const haptic: HapticCounters = { hit: 0, bossHit: 0 };
 let shakeLevel: 0 | 1 | 2 = 2;
 let vibrationOn = true;
 
+// 몸 반응 타이머(틱) — 착지는 세로로 눌리고, 점프는 가로로 좁아진다(발 기준)
+let landT = 0;
+let jumpT = 0;
+/** 방금 그린 건물 — 필살로 사라진 건물을 예비동작 동안 유령으로 다시 그리려고 쥔다 */
+let lastStack: FallingStack | null = null;
+/** 보스 상태 표식(`상태:틱`) — 히트스톱 동안 같은 틱이 반복돼도 한 번만 반응하려고 */
+let bossMark = '';
+/** 마지막으로 본 시뮬 틱 — 틱이 되감기면 새 런이다(미룬 필살 연출이 다음 판에 터지지 않게) */
+let lastTick = -1;
+
+/** 필살 예비동작 — 히트스톱 동안 링이 수축하고, 끝나는 틱에 쥐고 있던 이벤트를 한꺼번에 푼다. */
+interface Prelude { left: number; total: number; x: number; y: number; ghost: FallingStack | null; held: JuiceEvent[] }
+let prelude: Prelude | null = null;
+
+// 팝업은 월드 좌표로 저장하고 그릴 때 카메라를 한 번 적용한다(BL-09)
 interface Popup { text: string; x: number; y: number; ticks: number; scale: number }
 const popups: Popup[] = [];
 
@@ -50,14 +71,31 @@ function comboColor(n: number): string {
   return lettersColor;
 }
 
-export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: boolean }): void {
+export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: boolean; flashLevel?: 0 | 1 | 2 }): void {
   if (o.shakeLevel !== undefined) shakeLevel = o.shakeLevel;
   if (o.vibration !== undefined) vibrationOn = o.vibration;
+  if (o.flashLevel !== undefined) fx.setFlashLevel(o.flashLevel);
+}
+
+/** 런 하나가 쓰는 연출 상태를 전부 비운다 — 새 런·이어하기로 틱이 되감기면 consumeEvents가 부른다. */
+function resetRunState(): void {
+  resetEffects();
+  fx.resetScreenFx();
+  resetBossFx();
+  trauma = 0;
+  landT = 0;
+  jumpT = 0;
+  lastStack = null;
+  bossMark = '';
+  prelude = null;
+  lastTick = -1;
+  popups.length = 0;
+  numPopups.length = 0;
 }
 
 export function initRenderer(): void {
   initSprites();
-  resetEffects();
+  resetRunState();
   smoothCam = 0;
 }
 
@@ -70,93 +108,201 @@ export function applyCosmetics(loadout: { body: string; blade: string; letters: 
   setSlashColor(blade);
 }
 
-/** 이벤트 소비: 셰이크/플래시/의성어/진동. 사운드는 audio/consume. 소비 후 clear는 호출자가. */
-export function consumeEvents(s: GameState): void {
-  // 이펙트 좌표는 drawGame과 같은 카메라를 봐야 한다 — 목표값이 아니라 보간된 현재값.
-  const cam = smoothCam;
-  setFxCamY(cam);
-  for (const e of s.events) {
-    const spec = JUICE[e.kind];
-    if (spec) {
-      // 무기 손맛 — 타격·층붕괴 흔들림만 무기 배율을 탄다 (오함마 묵직, 그라인더 가볍게)
-      const weaponShake = e.kind === 'hit' || e.kind === 'floorCollapse' ? WEAPON[s.weapon].shake : 1;
-      trauma = Math.min(1, Math.max(trauma, (spec.shake * weaponShake) / JUICE_SYS.SHAKE_MAX_AMP));
-      if (spec.flash > 0 && e.kind !== 'hit') { flashTicks = spec.flash; flashColor = e.kind === 'hurt' ? '#E5302E' : '#1A1A20'; }
-      // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
-    }
-    spawnFromEvent(s, e);
-    // 콤보 숫자 팝업 (타격마다 1개, 상한까지 누적)
-    if (e.kind === 'hit' || e.kind === 'bossHit') {
-      const n = e.combo ?? s.combo;
-      if (n > 0) {
-        if (numPopups.length >= JUICE_SYS.COMBO_POPUP_MAX) numPopups.shift();
-        numPopups.push({
-          n,
-          x: VIEW.LANE_X[0] + scatter() * 22,
-          y: VIEW.GROUND_Y - (e.y ?? 100) - 12 + scatter() * 10 + cam,
-          vx: scatter() * 0.9,
-          vy: -1.4 - Math.abs(scatter()) * 0.8,
-          ticks: JUICE_SYS.COMBO_POPUP_LIFE_F,
-          scale: 1 + Math.min(n / 400, 1.1),
-          color: comboColor(n),
-        });
+/** 사망 — 붉은 번쩍·틀·잠깐 느린 파편. 화면 전환은 B(씬)가 늦춘 만큼 이 연출이 캔버스를 채운다. */
+function onDeath(): void {
+  fx.flash({ color: PALETTE.RED, a: 0.42, ticks: JUICE_SYS.DEATH_FLASH_TICKS });
+  fx.startDeath();
+  fx.markDeathSlow();
+}
+
+/** 번쩍 — 이벤트마다 색·단. 플레이 화면에서 큰 순간일수록 단이 많다. */
+function reactFlash(e: JuiceEvent): void {
+  const spec = JUICE[e.kind];
+  switch (e.kind) {
+    case 'hurt':
+      fx.flash({ color: PALETTE.RED, a: 0.3, ticks: spec.flash });
+      return;
+    case 'lifeLost':
+      if ((e.n ?? 1) <= 0) onDeath();
+      return;
+    case 'special': // 2단 — 종이가 하얗게 날아갔다가 잉크로 눌린다
+      fx.flash({ color: PALETTE.BG, a: 0.6, ticks: 3 }, { color: PALETTE.INK, a: 0.35, ticks: spec.flash });
+      return;
+    case 'bossDefeat': // 아이보리 12틱 감쇠
+      fx.flash({ color: PALETTE.BG, a: 0.85, ticks: 12 });
+      return;
+    case 'boltStrike': // 가볍게 — 같은 틱의 피격(붉은 0.3)을 덮지 않는다(약한 새 번쩍은 무시된다)
+      fx.flash({ color: PALETTE.BG, a: 0.25, ticks: spec.flash });
+      return;
+    case 'phaseClear': // 티어 포효 — 아이보리 → 잉크 + 공사 테이프 두 줄
+      if ((e.n ?? 0) >= 100) {
+        fx.flash({ color: PALETTE.BG, a: 0.5, ticks: 3 }, { color: PALETTE.INK, a: 0.3, ticks: 4 });
+        fx.startTape();
       }
-    }
-    // 의성어 (동시 3개 상한)
-    const combo = e.combo ?? s.combo;
-    let word = onomatoFor(e.kind, combo);
-    if (e.kind === 'special') {
-      word = onomatoFor(s.waza === 'ageba' ? 'specialAgeba' : s.waza === 'tetsu' ? 'specialTetsu' : 'special', combo);
-    }
-    if (word && combo >= 999) word = CAPTIONS.combo999;
-    // 상자는 뭘 받았는지가 정보다 — 콤보 자막보다 앞선다
-    const supply = e.kind === 'supply';
-    if (supply && e.item) word = ITEM_COPY[e.item].pop;
-    if (word) {
-      if (popups.length >= JUICE_SYS.ONOMATOPOEIA_MAX) popups.shift();
-      let scale = 1 + Math.min(combo / 500, 0.8);
-      if (e.kind === 'special' || e.kind === 'bossDefeat') scale = 2.4;
-      else if (supply || e.kind === 'hatBreak') scale = 1.3;
-      popups.push({
-        text: word,
-        x: VIEW.LANE_X[0] + ((combo * 13) % 30) - 15,
-        y: VIEW.GROUND_Y - (e.y ?? 100) - 30 + cam,
-        ticks: e.kind === 'special' || supply ? 40 : 24,
-        scale,
-      });
-    }
-    // 진동 (연타 스로틀)
-    if (vibrationOn) {
-      const pat = (HAPTIC as unknown as Record<string, number | readonly number[] | undefined>)[e.kind];
-      if (pat !== undefined) {
-        if (e.kind === 'hit') {
-          hitHapticCount += 1;
-          if (hitHapticCount % HAPTIC.HIT_THROTTLE !== 0) continue;
-        }
-        vibrate(pat as number | readonly number[]); // 네이티브=Haptics, 웹=navigator.vibrate (throw 없음)
-      }
-    }
+      return;
+    case 'hit': // 연타 장면이 번쩍이면 눈이 아프다 — 층붕괴부터
+      return;
+    default:
+      if (spec && spec.flash > 0) fx.flash({ color: PALETTE.INK, a: Math.min(0.4, 0.1 * spec.flash), ticks: spec.flash });
   }
 }
 
+/** 몸·지면 반응(렌더 전용) — 눌림 타이머, 가드 지면선, 보스 본체 피격. */
+function reactBody(e: JuiceEvent): void {
+  switch (e.kind) {
+    case 'jump': jumpT = JUICE_SYS.SQUASH_TICKS; return;
+    case 'land': if (e.lane === undefined) landT = JUICE_SYS.SQUASH_TICKS; return;
+    case 'guardBounce':
+    case 'guardAirBounce': fx.startGroundLine(); return;
+    case 'bossHit':
+      // n = 본체 남은 HP(드론·대포 격파엔 없다). 10타마다 턱이 한 번 덜컥.
+      if (e.n !== undefined) bossBodyHit(e.n % 10 === 0);
+      return;
+    default:
+  }
+}
+
+/** 이벤트 하나가 화면에 일으키는 모든 것. 필살 예비동작이 끝난 뒤에는 쥐고 있던 묶음이 이 길로 들어온다. */
+function react(s: GameState, e: JuiceEvent): void {
+  const px = shakePx(e, WEAPON[s.weapon].shake);
+  if (px > 0) trauma = Math.max(trauma, px);
+  reactFlash(e);
+  reactBody(e);
+  // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
+  spawnFromEvent(s, e);
+  // 콤보 숫자 팝업 (타격마다 1개, 상한까지 누적)
+  if (e.kind === 'hit' || e.kind === 'bossHit') {
+    const n = e.combo ?? s.combo;
+    if (n > 0) {
+      if (numPopups.length >= JUICE_SYS.COMBO_POPUP_MAX) numPopups.shift();
+      numPopups.push({
+        n,
+        x: VIEW.LANE_X[0] + scatter() * 22,
+        y: VIEW.GROUND_Y - (e.y ?? 100) - 12 + scatter() * 10,
+        vx: scatter() * 0.9,
+        vy: -1.4 - Math.abs(scatter()) * 0.8,
+        ticks: JUICE_SYS.COMBO_POPUP_LIFE_F,
+        scale: 1 + Math.min(n / 400, 1.1),
+        color: comboColor(n),
+      });
+    }
+  }
+  // 의성어 (동시 3개 상한)
+  const combo = e.combo ?? s.combo;
+  let word = onomatoFor(e.kind, combo);
+  if (e.kind === 'special') {
+    word = onomatoFor(s.waza === 'ageba' ? 'specialAgeba' : s.waza === 'tetsu' ? 'specialTetsu' : 'special', combo);
+  }
+  if (word && combo >= 999) word = CAPTIONS.combo999;
+  // 상자는 뭘 받았는지가 정보다 — 콤보 자막보다 앞선다
+  const supply = e.kind === 'supply';
+  if (supply && e.item) word = ITEM_COPY[e.item].pop;
+  if (word) {
+    if (popups.length >= JUICE_SYS.ONOMATOPOEIA_MAX) popups.shift();
+    let scale = 1 + Math.min(combo / 500, 0.8);
+    if (e.kind === 'special' || e.kind === 'bossDefeat') scale = 2.4;
+    else if (supply || e.kind === 'hatBreak') scale = 1.3;
+    else if (e.kind === 'stackDestroy') scale *= stackScale(e.n); // 큰 건물은 글자도 크게
+    popups.push({
+      text: word,
+      x: VIEW.LANE_X[0] + ((combo * 13) % 30) - 15,
+      y: VIEW.GROUND_Y - (e.y ?? 100) - 30,
+      ticks: e.kind === 'special' || supply ? 40 : 24,
+      scale,
+    });
+  }
+}
+
+/** 한 틱의 이벤트 묶음을 풀고, 겹친 진동은 가장 긴 하나만 쏜다. */
+function playEvents(s: GameState, evs: readonly JuiceEvent[]): void {
+  for (const e of evs) react(s, e);
+  if (!vibrationOn) return;
+  const pat = pickHaptic(evs, haptic);
+  if (pat !== null) vibrate(pat); // 네이티브=Haptics(세그먼트 체인), 웹=navigator.vibrate (throw 없음)
+}
+
+/**
+ * 필살 예비동작 시작 — core는 입력 틱에 건물을 지우고 히트스톱 10틱을 건다(즉응성이 생명이라 그대로).
+ * 렌더는 그 정지 동안: ① 사라진 건물을 유령으로 다시 그리고 ② 링을 안으로 수축시키며 ③ 폭발·흔들림·번쩍을 미룬다.
+ * 끝나는 틱에 쥐고 있던 이벤트를 한꺼번에 푼다.
+ */
+function beginPrelude(s: GameState, evs: readonly JuiceEvent[]): void {
+  const total = JUICE.special.hitstop;
+  const gone = evs.find((e) => e.kind === 'stackDestroy');
+  // 이 묶음에서 건물이 통째로 사라졌고, 방금 그린 건물이 그것일 때만 유령을 쓴다(올려베기로 일부만 깎인 건물은 그대로 서 있다)
+  const ghost = gone && !s.stack && lastStack && lastStack.totalFloors === gone.n ? lastStack : null;
+  prelude = {
+    left: total, total,
+    x: VIEW.LANE_X[s.player.lane],
+    y: VIEW.GROUND_Y - s.player.y - PLAYER.H / 2,
+    ghost,
+    held: evs.slice(), // 씬이 소비 뒤 events를 비우므로 복사
+  };
+}
+
+function releasePrelude(s: GameState): void {
+  const p = prelude!;
+  prelude = null;
+  if (p.ghost) spawnStackShatter(p.ghost);
+  playEvents(s, p.held);
+}
+
+/** 보스 상태 읽기만으로 일어나는 연출 — 입장 BREAK 틱(물고 온 층이 부서진다) · 격파 몸체 갈라짐 시작. */
+function watchBoss(s: GameState): void {
+  const b = s.boss;
+  if (!b) { bossMark = ''; return; }
+  const mark = `${b.st}:${b.stTick}`;
+  if (mark === bossMark) return;
+  bossMark = mark;
+  if (b.st === 'enter' && b.stTick === BOSS.INTRO.BREAK) {
+    trauma = Math.max(trauma, JUICE.bossBreak.shake);
+    spawnBossBreak(VIEW.W / 2, introFloorTop(b, VIEW.GROUND_Y) + VIEW.FLOOR_H / 2);
+  } else if (b.st === 'defeated' && b.stTick === BOSS.DEFEAT_SPLIT_TICK) {
+    trauma = Math.max(trauma, JUICE.bossSplit.shake);
+  }
+}
+
+/** 이벤트 소비: 흔들림/번쩍/의성어/진동/보스·필살 연출. 사운드는 audio/consume. 소비 후 clear는 호출자가. */
+export function consumeEvents(s: GameState): void {
+  if (s.tick < lastTick) resetRunState();
+  lastTick = s.tick;
+  watchBoss(s);
+  if (prelude) {
+    prelude.left -= 1;
+    if (prelude.left <= 0) releasePrelude(s);
+  }
+  const evs = s.events;
+  if (evs.length === 0) return;
+  if (!prelude && evs.some((e) => e.kind === 'special')) beginPrelude(s, evs);
+  else playEvents(s, evs);
+}
+
+/** 이번 draw의 흔들림 오프셋. 첫 프레임이 곧 진폭이고, 그리고 나서 줄어든다. */
 function shakeOffset(): [number, number] {
-  if (trauma <= 0 || shakeLevel === 0) return [0, 0];
-  const amp = trauma * trauma * JUICE_SYS.SHAKE_MAX_AMP * (shakeLevel === 1 ? 0.5 : 1);
+  if (trauma <= 0.02 || shakeLevel === 0) return [0, 0];
+  const amp = trauma * (shakeLevel === 1 ? 0.5 : 1);
   shakeSeed += 1;
-  return [Math.sin(shakeSeed * 1.3) * amp, Math.cos(shakeSeed * 1.7) * amp * 0.7];
+  // 황금각으로 방향을 돌린다 — 크기는 amp를 넘지 않고(0.7~1.0배), 같은 방향이 이어서 나오지 않는다
+  const a = shakeSeed * 2.399;
+  return [Math.cos(a) * amp, Math.sin(a) * amp * 0.7];
+}
+
+/** 파티클·카메라 배속 — 사망 직후와 보스 격파 뒤에만 1 미만(core 틱은 그대로). */
+function slowFactor(s: GameState): number {
+  const k = fx.deathSlow();
+  return s.boss?.st === 'defeated' ? Math.min(k, defeatSlow(s.boss.stTick)) : k;
 }
 
 export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
-  trauma = Math.max(0, trauma - 0.693 / JUICE_SYS.SHAKE_HALF_LIFE_F * trauma);
-  if (flashTicks > 0) flashTicks -= 1;
-  tickEffects();
+  const slow = slowFactor(s);
+  tickEffects(slow);
 
   const camTarget = cameraFollowY(s);
-  smoothCam += (camTarget - smoothCam) * CAMERA.LERP;
+  smoothCam += (camTarget - smoothCam) * CAMERA.LERP * slow;
   if (Math.abs(camTarget - smoothCam) < 0.5) smoothCam = camTarget;
   const cam = smoothCam;
-  setFxCamY(cam);
   const [sx, sy] = shakeOffset();
+  trauma -= 0.693 / JUICE_SYS.SHAKE_HALF_LIFE_F * trauma;
   ctx.save();
   ctx.translate(sx, sy);
 
@@ -176,15 +322,23 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.translate(0, cam);
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
+  fx.drawGroundLine(ctx);
 
   const g = VIEW.GROUND_Y;
   if (s.stack) { drawStackShadow(ctx, s.stack, g); drawStack(ctx, s.stack, g, s.gimmick); }
+  if (prelude?.ghost) {
+    // 사라진 건물의 유령 — 정지된 동안 점점 옅어진다
+    ctx.save();
+    ctx.globalAlpha = JUICE_SYS.PRELUDE_GHOST_ALPHA * (0.55 + 0.45 * (prelude.left / prelude.total));
+    drawStack(ctx, prelude.ghost, g, s.gimmick);
+    ctx.restore();
+  }
   drawDebris(ctx, s, g);
   drawGroundRocks(ctx, s.groundRocks, g);
   for (const e of s.entities) {
     if (e.kind === 'stack') continue;
-    // 예고 마커(대포·번개 큐)는 대응 신호 — 카메라와 무관하게 화면 고정으로 아래 별도 패스 (08-30, P0-4)
-    if (e.kind === 'cannon' || (e.kind === 'bolt' && e.cueTicks > 0)) continue;
+    // 번개 예고 마커는 대응 신호 — 카메라와 무관하게 화면 고정으로 아래 별도 패스 (08-30, P0-4)
+    if (e.kind === 'bolt' && e.cueTicks > 0) continue;
     drawEntity(ctx, e, g);
   }
   if (s.boss) drawBoss(ctx, s.boss, g);
@@ -198,9 +352,22 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
     const px = VIEW.LANE_X[s.player.lane];
     const footY = g - s.player.y;
+    // 몸 반응 — 착지 3틱은 납작하게(y 0.9), 점프 3틱은 홀쭉하게(x 0.92). 발 기준이라 발은 안 뜬다.
+    const flat = s.player.pose === 'pinned' || s.player.pose === 'dead';
+    const sqX = !flat && jumpT > 0 ? JUICE_SYS.SQUASH_JUMP_X : 1;
+    const sqY = !flat && landT > 0 ? JUICE_SYS.SQUASH_LAND_Y : 1;
+    const squash = sqX !== 1 || sqY !== 1;
+    if (squash) {
+      ctx.save();
+      ctx.translate(px, footY);
+      ctx.scale(sqX, sqY);
+      ctx.translate(-px, -footY);
+    }
     drawPlayer(ctx, s.player.pose, s.player.poseTick, px, footY);
     if (s.hat) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY);
+    if (squash) ctx.restore();
   }
+  if (prelude) fx.drawPrelude(ctx, 1 - prelude.left / prelude.total, prelude.x, prelude.y);
   ctx.restore();
 
   // 필드 클립 재적용 — 파티클·팝업·마커가 조작 존(하단 170px)을 침범하지 않게 (08-30, P1-5)
@@ -210,12 +377,15 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.clip();
   // 화면 고정 예고 마커 — 카메라 변환 밖 (공중에서도 절대 안 사라진다)
   for (const e of s.entities) {
-    if (e.kind === 'cannon' || (e.kind === 'bolt' && e.cueTicks > 0)) drawEntity(ctx, e, g);
+    if (e.kind === 'bolt' && e.cueTicks > 0) drawEntity(ctx, e, g);
   }
   drawSpawnCue(ctx, s);
-  drawEffects(ctx);
+  drawEffects(ctx, cam);
+  ctx.save();
+  ctx.translate(0, cam);
   drawNumPopups(ctx);
   drawPopups(ctx);
+  ctx.restore();
   ctx.restore();
   ctx.restore();
 
@@ -238,12 +408,15 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     ctx.restore();
   }
 
-  if (flashTicks > 0) {
-    ctx.globalAlpha = 0.35 * (flashTicks / 4);
-    ctx.fillStyle = flashColor;
-    ctx.fillRect(0, 0, VIEW.W, VIEW.H);
-    ctx.globalAlpha = 1;
-  }
+  // 화면 위에 얹는 것들(흔들리지 않는다): 공사 테이프 · 사망 틀 · 번쩍
+  fx.drawScreenOverlay(ctx);
+
+  // 틱 단위 타이머를 한 칸 흘린다 — 그린 다음에 줄여야 이벤트가 켠 값이 한 번은 보인다
+  fx.stepScreenFx();
+  stepBossFx();
+  if (landT > 0) landT -= 1;
+  if (jumpT > 0) jumpT -= 1;
+  lastStack = s.stack;
 }
 
 function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number): void {
@@ -272,7 +445,7 @@ function bgColor(s: GameState): string {
 
 /**
  * 다음 건물 예고. 완파 후 스폰까지의 공백이 아무 신호 없는 빈 화면이었다(08-30 7차).
- * 번개·대포 큐와 같은 규칙을 따른다 — 카메라 변환 **밖**, 필드 상단 고정, 잉크 실루엣.
+ * 번개 큐와 같은 규칙을 따른다 — 카메라 변환 **밖**, 필드 상단 고정, 잉크 실루엣.
  * 렌더 전용이라 시뮬은 안 건드린다: 읽는 값은 `stackSpawnCd` 하나뿐이다.
  */
 function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
@@ -323,7 +496,7 @@ function drawNumPopups(ctx: CanvasRenderingContext2D): void {
     ctx.save();
     ctx.globalAlpha = Math.min(1, t * 2.2);
     ctx.translate(p.x, p.y);
-    ctx.font = `${Math.round(13 * p.scale * pop)}px "Black Han Sans", sans-serif`;
+    ctx.font = `${Math.round(JUICE_SYS.COMBO_POPUP_PX * p.scale * pop)}px "Black Han Sans", sans-serif`;
     ctx.textAlign = 'center';
     // ★08-30 7차 이중 외곽선: 아이보리 헤일로 하나만 두면 **배경색과 같은 색**이라
     // 밝은 건물 면 위에서 통째로 사라진다(사용자 영상 판정). 잉크 링을 바깥에 하나 더 둘러

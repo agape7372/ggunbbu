@@ -70,8 +70,11 @@ function frame(now: number): void {
   if (paused) { last = now; return; }
   acc += Math.min((now - last) / 1000, 0.25);
   last = now;
-  while (acc >= TICK) { app.update(TICK); acc -= TICK; }
-  app.draw();
+  let ticked = false;
+  while (acc >= TICK) { app.update(TICK); acc -= TICK; ticked = true; }
+  // 시뮬 틱이 한 번이라도 돈 프레임에만 그린다 — 고주사율 폰에서도 draw당 줄어드는 값(흔들림·번쩍·타이머)이
+  // 프레임 수가 아니라 틱마다 줄어든다. 캔버스는 안 지우면 마지막 그림이 그대로 남는다.
+  if (ticked) app.draw();
 }
 requestAnimationFrame(frame);
 

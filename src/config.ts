@@ -343,9 +343,12 @@ export const BOSS = {
   RABBIT: { COUNT: 5, ENTER_GAP: 30, FIRE_DELAY: 20, LEAVE: 30, HP: 1, SHOT_V: 480 },
   CANNON: {
     COUNT: 3, AIM_GAP: 40, AIM_TELE: 30, SHOT_V: 700, SPARK_V: 300, SPARK_H: 24, HP: 2,
+    MUZZLE_Y: 260,               // 포구 높이(px) — 전기탄이 생기는 곳이자 대포의 타격 높이. 렌더도 이 높이에 그린다
     X: [80, 180, 280] as const,  // 좌/중/우 설치 x — 가운데만 직격, 양옆은 스파크 위협
   },
+  // 격파 뒤 파티클·카메라만 DEFEAT_SLOW배속으로 시작해 DEFEAT_SLOW_S초에 걸쳐 1배로 돌아온다(렌더 전용 — core 틱 불변).
   DEFEAT_SLOW: 0.2, DEFEAT_SLOW_S: 3,
+  DEFEAT_SPLIT_TICK: 20,  // 격파 몸체가 갈라지기 시작하는 틱 — 흔들림 한 번 더 (렌더 전용)
   /** 격파 연출 낙하 잔해 수 (타격=콤보만, 점수 없음). [검증요] — 잔해 규칙만 계획서에
    *  있고 개수 4는 레포 어디에도 근거가 없다. 누가 정했는지 불명. */
   DEFEAT_REMNANT: 4,
@@ -376,28 +379,38 @@ export const TOKOTON = {
 // ── 타격감 (JUICE 매트릭스 — 계획 §타격감) ──────────────────────
 export interface JuiceSpec {
   hitstop: number;      // f
-  shake: number;        // px (trauma 가산량은 shake/MAX_AMP)
+  shake: number;        // px — 흔들림 첫 프레임 진폭(실측 0.7~1.0배). 곡선은 선형, 반감기는 SHAKE_HALF_LIFE_F
   flash: number;        // f (0=없음)
   particles: number;
 }
+// ⚠ 이 표의 키가 core 이벤트 이름과 같으면 core(sim advance 말미)가 hitstop을 주입한다.
+//   아래 `보스 연출 · 렌더 전용` 키(bossBreak·bossRoar·bossSplit)는 이벤트가 아니라 렌더가 상태를 읽어 쓰는 값이다.
 export const JUICE: Record<string, JuiceSpec> = {
   slash:          { hitstop: 0, shake: 0, flash: 0, particles: 0 },
   hit:            { hitstop: 2, shake: 1, flash: 2, particles: 5 },
-  floorCollapse:  { hitstop: 3, shake: 3, flash: 2, particles: 10 },
-  stackDestroy:   { hitstop: 6, shake: 6, flash: 0, particles: 24 },
+  floorCollapse:  { hitstop: 3, shake: 2.5, flash: 2, particles: 10 },
+  // 완파는 층수(e.n)로 키운다 — JUICE_SYS.STACK_K_*. 이 값은 k=1(2층) 기준.
+  stackDestroy:   { hitstop: 6, shake: 5, flash: 0, particles: 24 },
   butterCollapse: { hitstop: 2, shake: 2, flash: 2, particles: 8 },
-  special:        { hitstop: 10, shake: 14, flash: 4, particles: 32 },
-  hurt:           { hitstop: 4, shake: 8, flash: 3, particles: 4 },
+  special:        { hitstop: 10, shake: 12, flash: 4, particles: 32 },
+  hurt:           { hitstop: 4, shake: 5, flash: 3, particles: 4 },
   // 밑면 충돌 — 막혔다는 걸 손에 알리되 타격보다 약하게(적을 친 게 아니다)
   headBonk:       { hitstop: 1, shake: 2, flash: 0, particles: 4 },
   guardBounce:    { hitstop: 1, shake: 2, flash: 2, particles: 3 },
   guardAirBounce: { hitstop: 2, shake: 3, flash: 3, particles: 5 },
-  bossHit:        { hitstop: 2, shake: 1, flash: 2, particles: 4 },
+  // 보스전은 몸체 반응(지터·아이보리)이 번쩍을 대신한다 — 1막용 잉크 전체 번쩍은 뺀다(flash 0).
+  bossHit:        { hitstop: 2, shake: 1, flash: 0, particles: 4 },
   bossDefeat:     { hitstop: 30, shake: 12, flash: 4, particles: 64 },
   // ⚠ 히트스톱 0 고정: 게이지 없이 필살을 연타하면 매번 나오는 이벤트라 멈춤이 붙으면 시뮬이 선다(B-10).
-  guardDenied:    { hitstop: 0, shake: 2, flash: 0, particles: 0 },
+  guardDenied:    { hitstop: 0, shake: 1, flash: 0, particles: 0 },
   supply:         { hitstop: 0, shake: 0, flash: 0, particles: 8 },
   hatBreak:       { hitstop: 3, shake: 4, flash: 0, particles: 10 },
+  // 번개 착탄(hurt가 따로 붙는다) — 땅에 꽂히는 순간 불꽃·먼지
+  boltStrike:     { hitstop: 0, shake: 5, flash: 2, particles: 10 },
+  // ── 보스 연출 · 렌더 전용 ──
+  bossBreak:      { hitstop: 0, shake: 7, flash: 0, particles: 12 },  // 입장 BREAK 틱: 물고 온 층이 부서진다
+  bossRoar:       { hitstop: 0, shake: 8, flash: 0, particles: 0 },   // 티어 포효 시작(phaseClear n>=100)
+  bossSplit:      { hitstop: 0, shake: 6, flash: 0, particles: 0 },   // 격파 몸체가 갈라지기 시작
 };
 export const JUICE_SYS = {
   SHAKE_MAX_AMP: 12,
@@ -406,17 +419,38 @@ export const JUICE_SYS = {
   ONOMATOPOEIA_MAX: 3,    // 동시 의성어 팝업 상한
   COMBO_POPUP_MAX: 16,    // 동시 콤보 숫자 팝업 상한 (원작: 타격마다 숫자가 흩뿌려짐)
   COMBO_POPUP_LIFE_F: 26, // 숫자 팝업 수명(프레임)
+  COMBO_POPUP_PX: 15,     // 숫자 팝업 기본 글자 크기(px) — 13에서 키웠다
   PITCH_JITTER: 0.06,     // SFX 피치 ±6%
   PITCH_STEP_PER_10_COMBO: 1, // 반음
+  // 완파 규모 k = clamp(BASE + 층수 × PER_FLOOR, BASE, MAX) — 흔들림·파편·링·팝업을 k배
+  STACK_K_BASE: 0.8, STACK_K_PER_FLOOR: 0.1, STACK_K_MAX: 1.8,
+  STACK_RING_FLOORS: 3,   // 이 층수 이상이면 노랑 링 한 줄 추가
+  // 번쩍 강도(설정 flashLevel 0 끔 · 1 약 · 2 기본) — 알파에 곱한다
+  FLASH_LEVEL_MUL: [0, 0.5, 1] as const,
+  // 몸 반응(발 기준 눌림) — 착지는 세로, 점프는 가로
+  SQUASH_TICKS: 3, SQUASH_LAND_Y: 0.9, SQUASH_JUMP_X: 0.92,
+  LAND_DUST: 4,
+  // 종이 오려내기 후광 — 오프스크린 캐시는 캔버스 DPR과 무관하게 고정 HALO_SS배
+  HALO_PX: 1.75, HALO_SS: 2,
+  // 필살 예비동작 — 유령 알파·링 수축 시작 반지름 (길이는 JUICE.special.hitstop)
+  PRELUDE_GHOST_ALPHA: 0.5, PRELUDE_RING_R: 150,
+  // 사망 — 붉은 번쩍 틱·파티클 배속·틀 지속
+  DEATH_FLASH_TICKS: 8, DEATH_SLOW: 0.3, DEATH_SLOW_TICKS: 24, DEATH_FRAME_TICKS: 18,
+  // 공사 테이프 2줄(보스 포효) 지속 틱
+  TAPE_TICKS: 16,
 } as const;
 
 // ── 진동 패턴 (podoal feedback.ts 차용) ─────────────────────────
+// 숫자 = ms 한 번, 배열 = [진동, 휴지, 진동, …] (웹 Vibration API와 같은 문법 — 네이티브도 세그먼트로 풀어 쏜다).
+// 한 틱에 여러 개가 겹치면 총 길이가 가장 긴 패턴 하나만 쏜다(renderer pickHaptic).
 export const HAPTIC = {
-  hit: 8, floorCollapse: 20, stackDestroy: [30, 20, 30],
+  hit: 14, floorCollapse: 20, stackDestroy: [30, 20, 30],
   butterCollapse: 10, special: [100, 50, 200], hurt: 60,
   guardBounce: 15, headBonk: 12, bossDefeat: [100, 50, 100, 50, 200],
   supply: 10, hatBreak: [30, 20, 30],
-  HIT_THROTTLE: 3,        // 연타 시 3회당 1회
+  bossHit: 14, lifeLost: [60, 40, 90], gaugeFull: [12, 30, 12], guardDenied: 10,
+  boltStrike: 25, bonusPerfect: [20, 30, 20, 30, 40], phaseClear: [20, 30, 40],
+  HIT_THROTTLE: 3,        // 연타 시 3회당 1회 (hit·bossHit는 카운터를 따로 쓴다)
 } as const;
 
 // ── 코스메틱 색 (P1-3 실구현 — 팔리는 물건은 실제로 바뀐다) ─────

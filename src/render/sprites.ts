@@ -7,8 +7,9 @@ import type {
   PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
   FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId,
 } from '../core/types';
-import { VIEW, PALETTE, PLAYER, ACT2, STACK } from '../config';
-import { drawAsset, hasAsset } from './assets';
+import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS } from '../config';
+import { drawAsset, drawAssetHalo, hasAsset } from './assets';
+import { drawHalo, haloFor } from './halo';
 import { drawExecutor } from './executor';
 import { floorImageKey, floorMaterialKey } from './floorSheets';
 import { floorSheetTile } from './floorSheetCache';
@@ -785,25 +786,6 @@ function buildBoltIcon(): HTMLCanvasElement {
   return cv;
 }
 
-function buildBoltCueIcon(): HTMLCanvasElement {
-  const { cv, c } = mkCanvas(12, 12);
-  c.fillStyle = '#29E0E6';
-  c.beginPath();
-  c.moveTo(7, 0);
-  c.lineTo(3, 7);
-  c.lineTo(6, 7);
-  c.lineTo(4, 12);
-  c.lineTo(9, 5);
-  c.lineTo(6, 5);
-  c.lineTo(8, 0);
-  c.closePath();
-  c.fill();
-  c.strokeStyle = OUTLINE;
-  c.lineWidth = 1;
-  c.stroke();
-  return cv;
-}
-
 function buildRockIcon(): HTMLCanvasElement {
   const { cv, c } = mkCanvas(24, 20);
   block(c, 2, 6, 20, 12, ROCK_BASE);
@@ -863,15 +845,95 @@ function buildCannonIcon(): HTMLCanvasElement {
   return cv;
 }
 
+/** 번개 예고 표지(공사 표지판) 위치 — 필드 클립 안. 예전 y=20~26은 FIELD_TOP(50) 위라 통째로 잘려 안 보였다. */
+const BOLT_CUE_Y = VIEW.FIELD_TOP + 36;
+
+/** 번쩍이는 벼락 글리프 — 단위 좌표(−1~1). */
+const BOLT_GLYPH: ReadonlyArray<readonly [number, number]> = [
+  [0.35, -1], [-0.6, 0.15], [-0.05, 0.15], [-0.4, 1], [0.6, -0.2], [0.05, -0.2], [0.45, -1],
+];
+
+/**
+ * 번개 낙하 예고 — **화면 고정 패스**(필드 클립 안, 카메라 밖)에서 부른다.
+ * 표지판이 점점 커지며 깜빡이고, 마커에서 지면까지 낙하 경로 점선이 흘러내린다(어디로 떨어지는가가 정보다).
+ */
+function drawBoltCue(ctx: CanvasRenderingContext2D, x: number, cueTicks: number): void {
+  const p = 1 - Math.min(1, cueTicks / ACT2.BOLT_CUE_TICKS); // 0 → 1
+  const blink = cueTicks <= 12 && cueTicks % 4 < 2 ? 0.35 : 1;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // 낙하 경로 — 점선이 아래로 흐른다
+  ctx.globalAlpha = (0.30 + 0.55 * p) * blink;
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 8]);
+  ctx.lineDashOffset = cueTicks * 2;
+  ctx.beginPath();
+  ctx.moveTo(x, BOLT_CUE_Y + 20);
+  ctx.lineTo(x, VIEW.FIELD_H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // 표지판 — 아이보리 삼각 + 잉크 외곽 + 벼락
+  const r = 14 + 8 * p;
+  ctx.globalAlpha = blink;
+  ctx.beginPath();
+  ctx.moveTo(x, BOLT_CUE_Y - r);
+  ctx.lineTo(x + r * 1.05, BOLT_CUE_Y + r * 0.8);
+  ctx.lineTo(x - r * 1.05, BOLT_CUE_Y + r * 0.8);
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.WHITE;
+  ctx.fill();
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.beginPath();
+  BOLT_GLYPH.forEach(([gx, gy], i) => {
+    const px = x + gx * r * 0.5;
+    const py = BOLT_CUE_Y + 2 + gy * r * 0.5;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.INK;
+  ctx.fill();
+  ctx.restore();
+}
+
+/** 낙하 중 번개 — 잉크로 굵게 그은 지그재그 꼬리(머리는 PNG). 가는 회색 헤어라인이 배경 지붕선에 묻혔다. */
+/** 번개 꼬리의 꺾임 — 정해진 순서(매 프레임 같은 모양)라 떨지 않는다. 마디 길이·좌우 폭이 불규칙해야 번개로 읽힌다. */
+const BOLT_ZIG: ReadonlyArray<readonly [number, number]> = [
+  [14, 7], [20, -6], [12, 8], [22, -5], [15, 6], [18, -8], [13, 5], [21, -6], [16, 7], [19, -5], [14, 6], [17, -7],
+];
+function drawBoltTrail(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'miter';
+  // 머리에서 꼬리로 갈수록 가늘어진다(굵은 잉크 선 + 아이보리 밑줄)
+  for (const [grow, color] of [[3, PALETTE.WHITE], [0, PALETTE.INK]] as const) {
+    let px = x, py = y;
+    BOLT_ZIG.forEach(([dy, dx], i) => {
+      const nx = x + dx, ny = py - dy;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1.4, 4 - i * 0.22) + grow;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(nx, ny);
+      ctx.stroke();
+      px = nx; py = ny;
+    });
+  }
+  ctx.restore();
+}
+
 function drawBoltEntity(ctx: CanvasRenderingContext2D, e: Bolt, groundY: number): void {
   const x = VIEW.LANE_X[e.lane];
   if (e.cueTicks > 0) {
-    if (!drawAsset(ctx, entityAssetKey('boltCue'), x, 26)) {
-      ctx.drawImage(entityCache!.get('boltCue')!, x - 6, 20); // 예고: ⚡만 표시
-    }
+    drawBoltCue(ctx, x, e.cueTicks);
     return;
   }
   const y = groundY - e.y;
+  drawBoltTrail(ctx, x, y);
+  drawAssetHalo(ctx, entityAssetKey('bolt'), x, y);
   if (!drawAsset(ctx, entityAssetKey('bolt'), x, y)) {
     ctx.drawImage(entityCache!.get('bolt')!, x - 6, y - 20);
   }
@@ -887,10 +949,42 @@ function drawRockEntity(ctx: CanvasRenderingContext2D, e: Rock, groundY: number)
 
 function drawShotEntity(ctx: CanvasRenderingContext2D, e: Shot, groundY: number): void {
   const y = groundY - e.y;
+  const sp = Math.hypot(e.vx, e.vy);
+  if (sp > 1) {
+    // 꼬리 — 속도 반대 방향 잉크 획. 어디서 어디로 얼마나 빨리 오는지가 읽힌다(화면 y는 물리 y의 반대)
+    const len = Math.min(26, 8 + sp * 0.025);
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = PALETTE.INK;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(e.x, y);
+    ctx.lineTo(e.x - (e.vx / sp) * len, y + (e.vy / sp) * len);
+    ctx.stroke();
+    ctx.restore();
+  }
   const pngKey = entityAssetKey(e.cancellable ? 'shotOk' : 'shotNo');
+  drawAssetHalo(ctx, pngKey, e.x, y);
   if (!drawAsset(ctx, pngKey, e.x, y)) {
     const key = e.cancellable ? 'shotOk' : 'shotCancel';
     ctx.drawImage(entityCache!.get(key)!, e.x - 8, y - 5);
+  }
+  if (!e.cancellable) {
+    // 벨 수 없는 탄 — 잉크 가위표 한 획(아이보리 밑줄로 어두운 배경에서도 산다). 고리 탄과 실루엣부터 다르다
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const [w, color] of [[3.6, PALETTE.WHITE], [1.5, PALETTE.INK]] as const) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(e.x - 6, y - 6);
+      ctx.lineTo(e.x + 6, y + 6);
+      ctx.moveTo(e.x + 6, y - 6);
+      ctx.lineTo(e.x - 6, y + 6);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 }
 
@@ -902,17 +996,40 @@ function drawRabbitEntity(ctx: CanvasRenderingContext2D, e: Rabbit, groundY: num
   if (e.side === -1) {
     ctx.translate(e.x, 0);
     ctx.scale(-1, 1);
+    drawAssetHalo(ctx, entityAssetKey('rabbit'), 0, cy);
     if (!drawAsset(ctx, entityAssetKey('rabbit'), 0, cy)) ctx.drawImage(cv, -14, y);
-  } else if (!drawAsset(ctx, entityAssetKey('rabbit'), e.x, cy)) {
-    ctx.drawImage(cv, e.x - 14, y);
+  } else {
+    drawAssetHalo(ctx, entityAssetKey('rabbit'), e.x, cy);
+    if (!drawAsset(ctx, entityAssetKey('rabbit'), e.x, cy)) ctx.drawImage(cv, e.x - 14, y);
   }
   ctx.restore();
 }
 
-function drawCannonEntity(ctx: CanvasRenderingContext2D, e: Cannon, _groundY: number): void {
+/**
+ * 대포 — **월드 패스**에서 그린다. 포구 높이 = 전기탄이 생기는 높이(BOSS.CANNON.MUZZLE_Y)라
+ * 탄이 대포에서 나와 떨어지는 것으로 읽힌다. 예전엔 y=20(화면 위 클립 밖)이라 대포가 통째로 안 보였다.
+ * 조준 점선: 평소엔 흐리게, 발사 AIM_TELE틱 전부터 진하게 깜빡인다.
+ */
+function drawCannonEntity(ctx: CanvasRenderingContext2D, e: Cannon, groundY: number): void {
+  const y = groundY - BOSS.CANNON.MUZZLE_Y;
+  const tele = e.fireTicks > 0 && e.fireTicks <= BOSS.CANNON.AIM_TELE;
+  if (e.fireTicks > 0) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = tele ? (e.fireTicks % 6 < 3 ? 0.95 : 0.5) : 0.28;
+    ctx.strokeStyle = PALETTE.INK;
+    ctx.lineWidth = tele ? 2 : 1.2;
+    ctx.setLineDash([4, 7]);
+    ctx.lineDashOffset = e.fireTicks * 2;
+    ctx.beginPath();
+    ctx.moveTo(e.x, y + 16);
+    ctx.lineTo(e.x, groundY);
+    ctx.stroke();
+    ctx.restore();
+  }
   // 대포는 좌/중/우로 벌려 설치된다 — 레인이 아니라 e.x가 실제 위치(수직탄·스파크 발생점)
-  if (!drawAsset(ctx, entityAssetKey('cannon'), e.x, 20)) {
-    ctx.drawImage(entityCache!.get('cannon')!, e.x - 12, 6); // 화면 상단 고정(지면 변환 무관)
+  if (!drawAsset(ctx, entityAssetKey('cannon'), e.x, y)) {
+    ctx.drawImage(entityCache!.get('cannon')!, e.x - 12, y - 14);
   }
 }
 
@@ -945,7 +1062,6 @@ export function initSprites(): void {
 
   entityCache = new Map();
   entityCache.set('bolt', buildBoltIcon());
-  entityCache.set('boltCue', buildBoltCueIcon());
   entityCache.set('rock', buildRockIcon());
   entityCache.set('shotOk', buildShotIcon(true));
   entityCache.set('shotCancel', buildShotIcon(false));
@@ -979,10 +1095,16 @@ export function drawPlayer(
     ctx.scale(-1, 1);
     x = 0;
   }
-  if (!key || !drawAsset(ctx, key, x, footY, playerSheetFrame(pose, animTick))) {
+  const sheetFrame = playerSheetFrame(pose, animTick);
+  if (key) drawAssetHalo(ctx, key, x, footY, sheetFrame); // 종이 오려내기 후광 — 기와 배경에서도 졸라맨이 산다
+  if (!key || !drawAsset(ctx, key, x, footY, sheetFrame)) {
     const frame = pickPlayerFrame(pose, animTick);
     ctx.imageSmoothingEnabled = true; // 2배 프레임을 절반으로 — 이 save 안에서만
-    ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay, frame.cv.width / SS, frame.cv.height / SS);
+    const dw = frame.cv.width / SS;
+    const dh = frame.cv.height / SS;
+    const halo = haloFor(frame.cv, 'p', 0, 0, frame.cv.width, frame.cv.height, dw, dh);
+    if (halo) drawHalo(ctx, halo, x - frame.ax, footY - frame.ay);
+    ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay, dw, dh);
   }
   ctx.restore();
 }
@@ -1038,18 +1160,24 @@ export function drawEntity(ctx: CanvasRenderingContext2D, e: Entity, groundY: nu
   }
 }
 
+/**
+ * 바닥에 쌓인 화산탄 더미. 한 단의 높이 = 판정 높이(ACT2.ROCK_PILE_H) — 그림과 판정이 같은 크기다.
+ * (예전엔 12px 간격 소형이라 3단이 40px로 보이는데 판정은 120px까지 먹혔다.) 돌 그림 비율은 24:20 그대로.
+ */
 export function drawGroundRocks(ctx: CanvasRenderingContext2D, rocks: number, groundY: number): void {
   initSprites();
   const cv = entityCache!.get('rock')!;
   const count = Math.min(rocks, ACT2.ROCK_STACK_MAX);
   const cx = VIEW.LANE_X[0];
+  const h = ACT2.ROCK_PILE_H;
   for (let i = 0; i < count; i++) {
-    const w = 20, h = 16;
-    const y = groundY - 4 - i * 12;
-    const ox = cx + (i % 2 === 0 ? -4 : 4);
-    if (!drawAsset(ctx, entityAssetKey('rock'), ox, y - h / 2)) {
-      ctx.drawImage(cv, ox - w / 2, y - h, w, h);
-    }
+    const ox = cx + (i % 2 === 0 ? -5 : 5);
+    const cy = groundY - i * h - h / 2;
+    ctx.save();
+    ctx.translate(ox, cy);
+    ctx.scale(h / 20, h / 20); // 돌 그림(24×20)을 단 높이에 맞춘다
+    if (!drawAsset(ctx, entityAssetKey('rock'), 0, 0)) ctx.drawImage(cv, -12, -10, 24, 20);
+    ctx.restore();
   }
 }
 

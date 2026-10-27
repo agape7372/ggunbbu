@@ -15,6 +15,29 @@ export const EXECUTOR_PARTS = {
 const clamp = (n: number): number => Math.max(0, Math.min(1, n));
 const ease = (n: number): number => { const t = clamp(n); return t * t * (3 - 2 * t); };
 
+// ── 피격 반응(렌더 전용 타이머) ───────────────────────────────────
+// 230타 내내 몸이 무반응이던 것을 몸으로 받는다: 본체 지터 · 아이보리 얹기 · 10타마다 턱 덜컥 · 티어 균열선.
+// renderer가 bossHit 이벤트를 받아 bossBodyHit()을, 매 그리기 끝에 stepBossFx()를 부른다.
+const FX_HIT = 3;      // 지터 틱
+const FX_FLASH = 2;    // 아이보리 얹는 틱
+const FX_JAW = 6;      // 턱 덜컥 틱
+const bossFx = { hit: 0, flash: 0, jaw: 0 };
+
+/** 본체를 맞았다 — clunk면 이번 타에 턱이 한 번 덜컥 벌어진다(10타마다). */
+export function bossBodyHit(clunk: boolean): void {
+  bossFx.hit = FX_HIT;
+  bossFx.flash = FX_FLASH;
+  if (clunk) bossFx.jaw = FX_JAW;
+}
+export function stepBossFx(): void {
+  if (bossFx.hit > 0) bossFx.hit -= 1;
+  if (bossFx.flash > 0) bossFx.flash -= 1;
+  if (bossFx.jaw > 0) bossFx.jaw -= 1;
+}
+export function resetBossFx(): void {
+  bossFx.hit = 0; bossFx.flash = 0; bossFx.jaw = 0;
+}
+
 /** 준비 → 내려찍기 → 가드 반동을 같은 전투 시계로 그린다. 렌더 프레임 수와 무관. */
 export function executorPose(b: BossState): { lift: number; open: number; tilt: number; split: number } {
   const t = b.stTick;
@@ -63,6 +86,58 @@ function partCanvas(atlas: NonNullable<ReturnType<typeof img>>, key: PartKey, w:
   } catch { return null; }
 }
 
+// 부품 캔버스 → 아이보리 실루엣(맞은 순간 몸 위에 얹는다). 부품 캔버스가 새로 만들어지면(아틀라스 재로드) 자연히 새로 굽는다.
+const ivoryCache = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+function ivoryOf(cv: HTMLCanvasElement): HTMLCanvasElement | null {
+  const hit = ivoryCache.get(cv);
+  if (hit) return hit;
+  try {
+    const t = document.createElement('canvas');
+    t.width = cv.width; t.height = cv.height;
+    const c = t.getContext('2d');
+    if (!c) return null;
+    c.drawImage(cv, 0, 0);
+    c.globalCompositeOperation = 'source-in';
+    c.fillStyle = PALETTE.BG;
+    c.fillRect(0, 0, t.width, t.height);
+    ivoryCache.set(cv, t);
+    return t;
+  } catch { return null; }
+}
+
+/** 본체 위에 아이보리 반투명을 얹는다(이미지가 없을 땐 같은 사각형). */
+function drawBodyIvory(ctx: CanvasRenderingContext2D, bodyTop: number): void {
+  const atlas = img('boss');
+  const base = atlas ? partCanvas(atlas, 'body', BOSS.BODY_W, BOSS.BODY_H) : null;
+  const tint = base ? ivoryOf(base) : null;
+  ctx.save();
+  ctx.globalAlpha = 0.55 * (bossFx.flash / FX_FLASH);
+  if (tint) ctx.drawImage(tint, -BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H);
+  else { ctx.fillStyle = PALETTE.BG; ctx.fillRect(-BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H); }
+  ctx.restore();
+}
+
+/** 티어 경계를 넘을 때마다 본체에 균열선이 늘어난다(코드로 긋는 선 그림). */
+const CRACKS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
+  [[-52, 0], [-46, 11], [-55, 19], [-47, 31], [-51, 44]],
+  [[66, 0], [60, 9], [70, 20], [61, 30], [67, 44]],
+];
+const CRACK_BRANCH: ReadonlyArray<readonly [number, number]> = [[70, 20], [82, 26], [88, 24]];
+function drawCracks(ctx: CanvasRenderingContext2D, tier: number, bodyTop: number): void {
+  if (tier < 1) return;
+  ctx.save();
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.lineWidth = 1.3;
+  ctx.globalAlpha = 0.85;
+  for (let i = 0; i < Math.min(tier, CRACKS.length); i++) {
+    ctx.beginPath();
+    CRACKS[i].forEach(([x, y], k) => (k === 0 ? ctx.moveTo(x, bodyTop + y) : ctx.lineTo(x, bodyTop + y)));
+    if (i === 1) CRACK_BRANCH.forEach(([x, y], k) => (k === 0 ? ctx.moveTo(x, bodyTop + y) : ctx.lineTo(x, bodyTop + y)));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function part(ctx: CanvasRenderingContext2D, key: PartKey,
   x: number, y: number, w: number, h: number): void {
   const atlas = img('boss');
@@ -102,6 +177,12 @@ function drawJaw(ctx: CanvasRenderingContext2D, side: -1 | 1, open: number, dead
   ctx.restore();
 }
 
+/** 입장 연출에서 물고 온 층의 윗변 y(화면 좌표). 부서지는 틱의 파편 위치에도 쓴다. */
+export function introFloorTop(b: BossState, groundY: number): number {
+  const dt = Math.max(0, b.stTick - BOSS.INTRO.RELEASE);
+  return groundY - b.y + BOSS.BODY_BOTTOM + 8 + dt * dt * 0.12;
+}
+
 function drawIntroFloor(ctx: CanvasRenderingContext2D, b: BossState, cy: number): void {
   if (b.st !== 'enter' || b.stTick >= BOSS.INTRO.CLEAR) return;
   const t = b.stTick;
@@ -137,6 +218,10 @@ export function drawExecutor(ctx: CanvasRenderingContext2D, b: BossState, ground
   const bodyTop = BOSS.BODY_BOTTOM - BOSS.BODY_H;
   const dead = b.st === 'defeated';
   const cue = b.st === 'telegraph' || b.st === 'descend';
+  // 맞은 순간 몸이 가로로 떤다(2px, 3틱에 걸쳐 잦아든다). 케이블 끝도 같이 간다.
+  const jx = bossFx.hit > 0 ? (bossFx.hit % 2 === 1 ? 1 : -1) * 2 * (bossFx.hit / FX_HIT) : 0;
+  // 10타마다 턱이 덜컥 — 맞는 순간 확 벌어지고 6틱에 걸쳐 닫힌다
+  const clunk = bossFx.jaw > 0 ? 0.22 * (bossFx.jaw / FX_JAW) : 0;
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -145,7 +230,7 @@ export function drawExecutor(ctx: CanvasRenderingContext2D, b: BossState, ground
   for (const side of [-1, 1]) {
     const ax = side * (BOSS.CABLE_X + pose.split);
     const ay = bodyTop + (side === 1 ? pose.split * 0.6 : 0);
-    const attachmentX = x + ax * Math.cos(pose.tilt) - ay * Math.sin(pose.tilt);
+    const attachmentX = jx + x + ax * Math.cos(pose.tilt) - ay * Math.sin(pose.tilt);
     const attachmentY = cy + ax * Math.sin(pose.tilt) + ay * Math.cos(pose.tilt);
     ctx.beginPath(); ctx.moveTo(x + side * BOSS.CABLE_X, -VIEW.H);
     if (dead) ctx.quadraticCurveTo(x + side * (BOSS.CABLE_X + 14), attachmentY - 40,
@@ -154,9 +239,9 @@ export function drawExecutor(ctx: CanvasRenderingContext2D, b: BossState, ground
     ctx.stroke();
   }
   drawIntroFloor(ctx, b, cy);
-  ctx.translate(x, cy); ctx.rotate(pose.tilt);
-  drawJaw(ctx, -1, pose.open, dead, b.stTick);
-  drawJaw(ctx, 1, pose.open, dead, b.stTick);
+  ctx.translate(x + jx, cy); ctx.rotate(pose.tilt);
+  drawJaw(ctx, -1, pose.open + clunk, dead, b.stTick);
+  drawJaw(ctx, 1, pose.open + clunk, dead, b.stTick);
   if (dead) {
     // 원본을 좌우로 클리핑해 본체 이음새를 벌린다.
     for (const side of [-1, 1]) {
@@ -167,7 +252,11 @@ export function drawExecutor(ctx: CanvasRenderingContext2D, b: BossState, ground
         BOSS.BODY_H + 2); ctx.clip();
       part(ctx, 'body', -BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H); ctx.restore();
     }
-  } else part(ctx, 'body', -BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H);
+  } else {
+    part(ctx, 'body', -BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H);
+    if (bossFx.flash > 0) drawBodyIvory(ctx, bodyTop);
+    drawCracks(ctx, b.tier, bodyTop);
+  }
 
   // 원본의 빈 소켓 위에 실제 상태등. 격파 후에는 노랑이 전혀 없다.
   const lampY = bodyTop + BOSS.BODY_H / 2;

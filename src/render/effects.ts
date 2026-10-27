@@ -2,10 +2,15 @@
 // 고정 풀 JUICE_SYS.PARTICLE_POOL(256). 초과 시 링 커서로 오래된 슬롯 재활용.
 // core rngState와 무관한 렌더 LCG. DOM import 없음 — 에셋은 보급 상자 그림('crate') 하나만 시도한다.
 // 히트스톱 중에도 updateEffects는 호출되어야 한다(정지감 속 운동감).
+//
+// ★좌표 계약(BL-09): 파티클·상자는 **월드 좌표**(지면 y = VIEW.GROUND_Y 기준 화면 좌표, 카메라 미적용)로 저장하고
+// drawEffects(ctx, cam)가 그릴 때 한 번 cam을 더한다. 스폰 시점 카메라를 구워 넣으면 점프 정점에서 터진 파편이
+// 월드에 안 붙고 화면에 붙어 따라온다. 필살 중앙 폭발처럼 화면에 붙어야 하는 것만 `fixed`(화면 좌표).
 
-import type { GameState, ItemId, JuiceEvent, WeaponId } from '../core/types';
+import type { FallingStack, GameState, ItemId, JuiceEvent, WeaponId } from '../core/types';
 import { DEBRIS, JUICE, JUICE_SYS, PALETTE, TICK, VIEW } from '../config';
 import { drawAsset } from './assets';
+import { stackScale } from './feel';
 
 /** chip = 잉크 외곽선 두른 파편(안전모 조각) */
 type Style = 'spark' | 'shard' | 'chip' | 'dust' | 'cream' | 'ring' | 'pollen';
@@ -25,6 +30,8 @@ interface Particle {
   spin: number;
   color: string;
   bounce: number;
+  /** true면 화면 좌표(카메라를 안 탄다) */
+  fixed: boolean;
 }
 
 const POOL = JUICE_SYS.PARTICLE_POOL;
@@ -40,6 +47,7 @@ function blank(): Particle {
     size: 1, rot: 0, spin: 0,
     color: PALETTE.INK,
     bounce: 0,
+    fixed: false,
   };
 }
 
@@ -47,12 +55,8 @@ const pool: Particle[] = Array.from({ length: POOL }, blank);
 let allocAt = 0;
 let live = 0;
 let fxSeed = 1;
-/** 렌더 카메라. spawnFromEvent가 월드 좌표를 화면으로 바꿀 때 더한다. */
-let fxCamY = 0;
-
-export function setFxCamY(y: number): void {
-  fxCamY = y;
-}
+/** 지금 뿌리는 파티클이 화면 고정인가 — fill()이 읽는다. spawnScreen이 잠깐 켠다. */
+let spawnFixed = false;
 
 // 08-30(P1-3): blade 코스메틱 — 참격 스파크 색
 let slashColor: string = PALETTE.YELLOW;
@@ -113,6 +117,7 @@ function fill(
   p.spin = extra?.spin ?? 0;
   p.color = color;
   p.bounce = extra?.bounce ?? 0;
+  p.fixed = spawnFixed;
 }
 
 function sparks(x: number, y: number, n: number, color: string, spread: number, up: number): void {
@@ -207,7 +212,7 @@ function weaponBurst(w: WeaponId, kind: 'hit' | 'floorCollapse', x: number, y: n
   }
 }
 
-// ── 보급 상자 연출 — 파티클 풀과 별개(동시 2개). 좌표는 화면(스폰 순간 fxCamY 반영). ──
+// ── 보급 상자 연출 — 파티클 풀과 별개(동시 2개). 좌표는 월드(그릴 때 cam). ──
 interface Crate { item: ItemId; x: number; y0: number; y: number; vy: number; t: number; bounced: boolean; opened: boolean }
 const crates: Crate[] = [];
 const CRATE_MAX = 2;
@@ -471,11 +476,9 @@ function burst(kind: string, x: number, y: number, count: number, mat?: string):
       sparks(x, y, count, '#6E695F', 90, 220);
       return;
     case 'bossDefeat': {
-      const rings = count >= 8 ? 1 : 0;
+      // 링은 defeatRings가 셋을 따로 깐다
       const seeds = Math.floor(count * 0.55);
-      const bits = Math.max(0, count - rings - seeds);
-      if (rings) fill('ring', x, y, 0, 0, 0, 0.45, 22, PALETTE.YELLOW);
-      shards(x, y, bits, undefined, 2.1);
+      shards(x, y, count - seeds, undefined, 2.1);
       pollen(x, y, seeds);
       return;
     }
@@ -549,7 +552,26 @@ export function updateEffects(dt: number): void {
  */
 export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   const x = VIEW.LANE_X[e.lane ?? s.player.lane];
-  const y = VIEW.GROUND_Y - (e.y ?? s.player.y) + fxCamY;
+  const y = VIEW.GROUND_Y - (e.y ?? s.player.y); // 월드 좌표 — 카메라는 그릴 때 한 번(BL-09)
+  if (e.kind === 'land') {
+    // 플레이어 착지만(레인 없음) — 화산탄 착지(lane 있음)는 더미가 대신 보여 준다
+    if (e.lane === undefined) dust(x, y - 2, JUICE_SYS.LAND_DUST);
+    return;
+  }
+  if (e.kind === 'boltStrike') {
+    boltStrikeBurst(x, VIEW.GROUND_Y, JUICE.boltStrike.particles);
+    return;
+  }
+  if (e.kind === 'stackDestroy') {
+    stackBurst(x, y, e.n);
+    return;
+  }
+  if (e.kind === 'bossDefeat') {
+    const by = s.boss ? VIEW.GROUND_Y - s.boss.y : y;
+    spawnHitParticles('bossDefeat', VIEW.W / 2, by, JUICE.bossDefeat.particles);
+    defeatRings(VIEW.W / 2, by);
+    return;
+  }
   if (e.kind === 'slash') {
     switch (s.weapon) {
       case 'hammer': // 짧고 굵게 (size>16 → 굵은 획)
@@ -575,7 +597,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     }
   }
   if (e.kind === 'hit' || e.kind === 'floorCollapse') {
-    const footY = VIEW.GROUND_Y - s.player.y + fxCamY;
+    const footY = VIEW.GROUND_Y - s.player.y;
     weaponBurst(s.weapon, e.kind, x, y, footY, JUICE[e.kind]?.particles ?? 0, e.mat);
     return;
   }
@@ -595,33 +617,126 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   if (e.kind === 'special') {
     const n = JUICE.special?.particles ?? 0;
     spawnHitParticles('special', x, y, n, e.mat);
+    spawnFixed = true; // 화면 중앙 폭발은 카메라를 안 탄다
     spawnHitParticles('special', VIEW.W / 2, VIEW.FIELD_H / 2, n, e.mat);
+    spawnFixed = false;
     return;
   }
   spawnHitParticles(e.kind, x, y, JUICE[e.kind]?.particles ?? 0, e.mat);
+}
+
+/** 완파 — 층수(n)가 클수록 파편·링이 커진다. 층수 3 이상이면 노랑 링 한 줄이 더 붙는다. */
+function stackBurst(x: number, y: number, n?: number): void {
+  const k = stackScale(n);
+  const count = Math.min(48, Math.round(JUICE.stackDestroy.particles * k));
+  shards(x, y, count, undefined, 1.45 + 0.2 * k);
+  fill('ring', x, y, 0, 0, 60 * k, 0.30, 14 * k, PALETTE.INK);
+  if ((n ?? 0) >= JUICE_SYS.STACK_RING_FLOORS) fill('ring', x, y, 0, 0, 110 * k, 0.42, 26 * k, PALETTE.YELLOW);
+}
+
+/** 번개 착탄 — 땅에서 솟는 세로 불꽃(노랑·잉크) + 먼지 + 작은 링. */
+function boltStrikeBurst(x: number, groundY: number, n: number): void {
+  for (let i = 0; i < n; i++) {
+    fill(
+      'spark',
+      x + signed() * 10, groundY - 2,
+      signed() * 45, -420 - n01() * 320,
+      900,
+      0.18 + n01() * 0.14,
+      14 + n01() * 8,
+      i % 2 === 0 ? PALETTE.YELLOW : PALETTE.INK,
+    );
+  }
+  dust(x, groundY - 4, 6);
+  fill('ring', x, groundY - 2, 0, 0, 44, 0.25, 8, PALETTE.INK);
+}
+
+/** 보스 격파 — 한가운데서 번지는 링 셋(잉크·노랑·잉크, 크기·수명이 달라 겹겹이 읽힌다). */
+function defeatRings(x: number, y: number): void {
+  fill('ring', x, y, 0, 0, 90, 0.45, 24, PALETTE.INK);
+  fill('ring', x, y, 0, 0, 150, 0.62, 44, PALETTE.YELLOW);
+  fill('ring', x, y, 0, 0, 230, 0.85, 70, PALETTE.INK);
+}
+
+/** 보스 입장 — 물고 온 층이 부서지는 틱: 파편 + 먼지. y는 월드(화면) 좌표. */
+export function spawnBossBreak(x: number, y: number): void {
+  // 층이 세 조각으로 갈라지니 조각마다 한 덩이씩(좌·중·우)
+  const per = Math.ceil(JUICE.bossBreak.particles / 3);
+  for (const dx of [-90, 0, 90]) {
+    shards(x + dx, y, per, 'mid', 1.5);
+    dust(x + dx, y, 3);
+  }
+}
+
+/**
+ * 필살로 사라진 건물을 층 단위로 흩뿌린다 — 예비동작이 끝나는 프레임의 해체.
+ * 층마다 파편 셋, 여운으로 오래 남는 먼지 덩이 여덟. (높은 탑은 층을 솎아 상한을 지킨다)
+ */
+export function spawnStackShatter(stack: FallingStack): void {
+  const cx = VIEW.LANE_X[0];
+  const stepF = Math.max(1, Math.ceil(stack.floors.length / 12));
+  let cum = 0;
+  let total = 0;
+  for (const f of stack.floors) total += f.h;
+  stack.floors.forEach((f, i) => {
+    const mid = VIEW.GROUND_Y - stack.y - cum - f.h / 2;
+    cum += f.h;
+    if (i % stepF !== 0) return;
+    for (let j = 0; j < 3; j++) {
+      fill(
+        'shard',
+        cx + signed() * VIEW.LANE_W * 0.4, mid + signed() * f.h * 0.3,
+        signed() * 230, -120 - n01() * 260,
+        980,
+        0.5 + n01() * 0.5,
+        4 + n01() * 5,
+        matDust(f.mat),
+        { rot: signed() * Math.PI, spin: signed() * 10 },
+      );
+    }
+  });
+  // 여운 — 건물이 서 있던 자리에 먼지가 20틱 넘게 남는다
+  const top = VIEW.GROUND_Y - stack.y - total;
+  for (let i = 0; i < 8; i++) {
+    fill(
+      'dust',
+      cx + signed() * VIEW.LANE_W * 0.42, top + n01() * total,
+      signed() * 30, -20 - n01() * 30,
+      0,
+      0.85 + n01() * 0.4,
+      8 + n01() * 7,
+      DUST[i % 3],
+    );
+  }
 }
 
 /**
  * drawGame용 스텝. 히트스톱과 무관하게 매 드로우 호출할 것.
  * ★08-30(P1-5): rAF마다 고정 TICK을 적분하면 120Hz 기기에서 파티클이 2배속,
  * 프레임 드랍 시 슬로우가 된다 — 실경과 시간으로 적분한다.
+ * slow = 배속(1 = 실시간). 보스 격파·사망 직후 파티클만 느리게 흘릴 때 쓴다(core 틱은 그대로).
  */
 let fxLastNow = -1;
-export function tickEffects(): void {
+export function tickEffects(slow = 1): void {
   const now = typeof performance !== 'undefined' ? performance.now() : -1;
   if (now < 0 || fxLastNow < 0) {
     fxLastNow = now;
-    updateEffects(TICK);
+    updateEffects(TICK * slow);
     return;
   }
   const dt = Math.min((now - fxLastNow) / 1000, 0.05);
   fxLastNow = now;
-  updateEffects(dt > 0 ? dt : TICK);
+  updateEffects((dt > 0 ? dt : TICK) * slow);
 }
 
-/** shake transform이 적용된 ctx에 그린다. 월드(플레이어 다음) ~ HUD 전. */
-export function drawEffects(ctx: CanvasRenderingContext2D): void {
-  if (crates.length) drawCrates(ctx);
+/** shake transform이 적용된 ctx에 그린다. cam = 렌더 카메라(월드 좌표 → 화면). 월드(플레이어 다음) ~ HUD 전. */
+export function drawEffects(ctx: CanvasRenderingContext2D, cam = 0): void {
+  if (crates.length) {
+    ctx.save();
+    ctx.translate(0, cam);
+    drawCrates(ctx);
+    ctx.restore();
+  }
   if (live <= 0) return;
   ctx.save();
   ctx.lineCap = 'round';
@@ -630,6 +745,7 @@ export function drawEffects(ctx: CanvasRenderingContext2D): void {
     const p = pool[i];
     if (!p.alive) continue;
     const t = Math.max(0, p.life / p.maxLife);
+    const py = p.y + (p.fixed ? 0 : cam);
     ctx.globalAlpha = t;
     ctx.fillStyle = p.color;
     ctx.strokeStyle = p.color;
@@ -640,14 +756,14 @@ export function drawEffects(ctx: CanvasRenderingContext2D): void {
         const len = p.size + Math.hypot(p.vx, p.vy) * (slash ? 0.06 : 0.018);
         ctx.lineWidth = slash ? 2.6 : 1.4;
         ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x - Math.cos(ang) * len, p.y - Math.sin(ang) * len);
+        ctx.moveTo(p.x, py);
+        ctx.lineTo(p.x - Math.cos(ang) * len, py - Math.sin(ang) * len);
         ctx.stroke();
         break;
       }
       case 'shard': {
         ctx.save();
-        ctx.translate(p.x, p.y);
+        ctx.translate(p.x, py);
         ctx.rotate(p.rot);
         ctx.fillRect(-p.size * 0.5, -p.size * 0.28, p.size, p.size * 0.56);
         ctx.restore();
@@ -655,7 +771,7 @@ export function drawEffects(ctx: CanvasRenderingContext2D): void {
       }
       case 'chip': {
         ctx.save();
-        ctx.translate(p.x, p.y);
+        ctx.translate(p.x, py);
         ctx.rotate(p.rot);
         ctx.fillRect(-p.size * 0.5, -p.size * 0.35, p.size, p.size * 0.7);
         ctx.strokeStyle = PALETTE.INK;
@@ -667,13 +783,13 @@ export function drawEffects(ctx: CanvasRenderingContext2D): void {
       case 'dust': {
         ctx.globalAlpha = t * 0.5;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * (1.35 - 0.35 * t), 0, Math.PI * 2);
+        ctx.arc(p.x, py, p.size * (1.35 - 0.35 * t), 0, Math.PI * 2);
         ctx.fill();
         break;
       }
       case 'cream': {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.arc(p.x, py, p.size, 0, Math.PI * 2);
         ctx.fill();
         break;
       }
@@ -682,13 +798,13 @@ export function drawEffects(ctx: CanvasRenderingContext2D): void {
         ctx.globalAlpha = t;
         ctx.lineWidth = 2.4 * t;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size + k * (p.g > 0 ? p.g : 52), 0, Math.PI * 2);
+        ctx.arc(p.x, py, p.size + k * (p.g > 0 ? p.g : 52), 0, Math.PI * 2);
         ctx.stroke();
         break;
       }
       default: {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.arc(p.x, py, p.size, 0, Math.PI * 2);
         ctx.fill();
       }
     }
