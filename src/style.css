@@ -1325,12 +1325,6 @@ button {
 .m-row .bar { width: 100%; height: 6px; }
 .m-row .bar .fill { background: var(--ink); }
 
-/* 받을 수 있는 줄 — 색 대신 왼쪽 잉크 획과 큰 「받기」. 노랑은 처음 나오는 「받기」 하나만(.claim-main) */
-.m-row.is-ready {
-  padding-left: var(--sp-5);
-  border-left: 4px solid var(--ink);
-}
-
 .m-foot {
   display: flex;
   justify-content: space-between;
@@ -1338,6 +1332,7 @@ button {
   gap: var(--sp-4);
 }
 
+/* 받을 수 있는 줄 — 표시는 큰 「받기」 하나(옆 막대 없음). 노랑은 처음 나오는 「받기」 하나만(.claim-main) */
 .m-row.is-ready .m-foot { min-height: var(--tap); }
 
 .claim { min-width: 88px; min-height: var(--tap); } /* btn-sm(56)은 360×640 배율 0.82에서 46dp — 다른 칸처럼 58 */
