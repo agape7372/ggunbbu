@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const androidDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'android');
-const gradlew = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+// 절대 경로 + 따옴표 — cmd는 NoDefaultCurrentDirectoryInExePath가 켜진 환경에서 현재 폴더의 bat을 못 찾는다
+const gradlew = `"${join(androidDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew')}"`;
 const r = spawnSync(gradlew, ['assembleDebug', ...process.argv.slice(2)], { cwd: androidDir, stdio: 'inherit', shell: true });
 process.exit(r.status ?? 1);

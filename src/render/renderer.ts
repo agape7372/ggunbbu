@@ -446,7 +446,8 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   stepBossFx();
   if (landT > 0) landT -= 1;
   if (jumpT > 0) jumpT -= 1;
-  lastStack = s.stack;
+  // 층 배열은 복사해 둔다 — 올려베기는 층을 하나씩 splice한 뒤 건물을 지워서, 참조만 쥐면 유령이 빈 건물이 된다
+  lastStack = s.stack ? { ...s.stack, floors: s.stack.floors.slice() } : null;
 }
 
 function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number): void {

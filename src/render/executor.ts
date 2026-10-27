@@ -2,6 +2,7 @@
 import type { BossState } from '../core/types';
 import { BOSS, VIEW, PALETTE } from '../config';
 import { imageSize, img } from './assets';
+import { flashK } from './screenfx';
 
 // 생성 원본 1536×1024의 알파 실측 좌표. 파일은 이 원본을 축소해 내보낸 것(scripts/prepare-image-assets.mjs
 // ATLAS_SCALE)이라 읽을 때 파일 크기 / 원본 크기 비율을 적용한다.
@@ -111,7 +112,7 @@ function drawBodyIvory(ctx: CanvasRenderingContext2D, bodyTop: number): void {
   const base = atlas ? partCanvas(atlas, 'body', BOSS.BODY_W, BOSS.BODY_H) : null;
   const tint = base ? ivoryOf(base) : null;
   ctx.save();
-  ctx.globalAlpha = 0.55 * (bossFx.flash / FX_FLASH);
+  ctx.globalAlpha = 0.55 * flashK() * (bossFx.flash / FX_FLASH);
   if (tint) ctx.drawImage(tint, -BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H);
   else { ctx.fillStyle = PALETTE.BG; ctx.fillRect(-BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H); }
   ctx.restore();
@@ -254,7 +255,7 @@ export function drawExecutor(ctx: CanvasRenderingContext2D, b: BossState, ground
     }
   } else {
     part(ctx, 'body', -BOSS.BODY_W / 2, bodyTop, BOSS.BODY_W, BOSS.BODY_H);
-    if (bossFx.flash > 0) drawBodyIvory(ctx, bodyTop);
+    if (bossFx.flash > 0 && flashK() > 0) drawBodyIvory(ctx, bodyTop);
     drawCracks(ctx, b.tier, bodyTop);
   }
 

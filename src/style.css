@@ -1157,6 +1157,8 @@ button {
   border-radius: 3px;
 }
 
+.stamp.stamp-ok { color: var(--ink); } /* 신기록 판 「승인」 — 빨강은 실패·경고에만 */
+
 /* ── 엔딩 ───────────────────────────────────────────────── */
 .ov-ending {
   background: var(--ivory);
@@ -1338,7 +1340,7 @@ button {
 
 .m-row.is-ready .m-foot { min-height: var(--tap); }
 
-.claim { min-width: 88px; }
+.claim { min-width: 88px; min-height: var(--tap); } /* btn-sm(56)은 360×640 배율 0.82에서 46dp — 다른 칸처럼 58 */
 
 .claim-main { background: var(--yellow); }
 .claim-main:not(:disabled):active { background: var(--ink); color: var(--yellow); }

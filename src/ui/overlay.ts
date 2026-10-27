@@ -324,7 +324,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <div class="card" role="dialog" aria-modal="true" aria-label="${SCREENS.gameover.title}">
         <p class="card-meta"><span data-el="over-rank">철거 보고서</span><span data-el="over-mode"></span></p>
         <h2 class="card-title">${SCREENS.gameover.title}</h2>
-        <span class="stamp" aria-hidden="true">반려</span>
+        <span class="stamp" aria-hidden="true" data-el="over-stamp">${SCREENS.gameover.stamp}</span>
         <p class="card-reason">사유: <b data-el="over-line"></b></p>
         <dl class="stat-rows" data-el="over-stats"></dl>
         <p class="next-goal" data-el="over-goal" hidden></p>
@@ -748,6 +748,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       goal.hidden = !v.goal;
       goal.innerHTML = v.goal ? `<b>${g.nextTag}</b>${escapeHtml(v.goal)}` : '';
       $('over-best').hidden = !v.best;
+      const overStamp = $('over-stamp');
+      overStamp.textContent = v.best ? SCREENS.gameover.stampBest : SCREENS.gameover.stamp;
+      overStamp.classList.toggle('stamp-ok', !!v.best);
       $('go-continue').hidden = !v.canContinue;
       const rev = $('go-revive');
       rev.hidden = !v.canRevive;

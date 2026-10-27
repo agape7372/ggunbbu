@@ -132,8 +132,10 @@ export function armAudioUnlock(): void {
   window.addEventListener('keydown', go, { capture: true });
 }
 
+// 복귀 때 시계를 「앞으로만」 맞춘다 — 이미 예약해 둔 스텝 위에 다음 스텝을 겹쳐 예약하지 않게.
+// 시계가 그새 앞질렀으면 scheduler()의 lateSkipSteps가 건너뛴다.
 function snapSchedulerClock(): void {
-  if (ctx) nextStepTime = ctx.currentTime;
+  if (ctx) nextStepTime = Math.max(nextStepTime, ctx.currentTime);
 }
 
 /** 포그라운드 복귀 시 호출: running이 아니면(suspended · iOS interrupted) resume. */

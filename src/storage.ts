@@ -88,7 +88,10 @@ export function loadSave(): SaveData {
     const raw = localStorage.getItem(SAVE_KEY);
     const main = parseSlot(raw);
     if (main) return main;
-    if (raw) localStorage.setItem(BAD_KEY, raw); // 덮어쓰기 전에 깨진 원문 보존
+    if (raw) {
+      // 덮어쓰기 전에 깨진 원문 보존 — 덤이라, 용량이 모자라 던져도 .bak 복구는 이어간다
+      try { localStorage.setItem(BAD_KEY, raw); } catch { /* .bad 생략 */ }
+    }
     return parseSlot(localStorage.getItem(BAK_KEY)) ?? structuredClone(DEFAULT_SAVE);
   } catch {
     return structuredClone(DEFAULT_SAVE);
@@ -163,6 +166,11 @@ function validateOpsGrade(v: unknown): SaveData['opsGrade'] {
  * 알 수 없는 v(부재·미래)는 절대 초기화하지 않는다 — 그대로 통과시켜 필드 검증에 맡긴다.
  */
 function migrate(data: Record<string, unknown>): Record<string, unknown> {
+  // 무버전 추가 키(guardTaught·stats)가 없는 옛 저장에 플레이 흔적이 있으면 이미 해 본 사람이다 —
+  // 신입용 가드 가르치기·평생 첫 판 줄을 다시 띄우지 않는다(누적 건물 수는 되살릴 길이 없어 0부터)
+  const veteran = data.howtoSeen === true || (typeof data.bestArcade === 'number' && data.bestArcade > 0);
+  if (veteran && data.guardTaught === undefined) data.guardTaught = true;
+  if (veteran && data.stats === undefined) data.stats = { buildings: 0, runs: 1 };
   return data;
 }
 

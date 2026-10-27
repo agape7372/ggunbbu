@@ -15,6 +15,11 @@ export function setFlashLevel(level: number): void {
   flashLevel = level;
 }
 
+/** 번쩍임 설정 배율(0·0.5·1) — 화면 전체 번쩍 밖의 번쩍(보스 본체 아이보리)도 같은 설정을 탄다 */
+export function flashK(): number {
+  return flashMul(flashLevel);
+}
+
 function stageAlpha(): number {
   const st = stages[0];
   return st ? st.a * (1 - stageT / st.ticks) : 0;

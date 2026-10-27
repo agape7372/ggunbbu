@@ -108,6 +108,15 @@ describe('백업 사다리 (T7)', () => {
     expect(loadSave().maxCombo).toBe(321);
   });
 
+  it('.bad 쓰기가 용량 초과로 던져도 .bak 복구는 이어간다', () => {
+    saveSave({ ...structuredClone(DEFAULT_SAVE), bestArcade: 9999 });
+    store.set(SAVE_KEY, '{broken');
+    const ls = globalThis.localStorage as { setItem: (k: string, v: string) => void };
+    const setItem = ls.setItem;
+    ls.setItem = (k, v) => { if (k === BAD) throw new Error('QuotaExceededError'); setItem(k, v); };
+    expect(loadSave().bestArcade).toBe(9999);
+  });
+
   it('둘 다 깨지면 기본값', () => {
     store.set(SAVE_KEY, '{x');
     store.set(BAK, 'nope');
@@ -173,13 +182,25 @@ describe('소유 목록 대조 (BL-13)', () => {
 
 describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무버전 추가 키', () => {
   it('옛 세이브(키 없음)는 기본값으로 채운다 — 버전은 안 올린다', () => {
-    store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
+    store.set(SAVE_KEY, JSON.stringify({ v: 1 }));
     const d = loadSave();
     expect(d.v).toBe(1);
     expect(d.guardTaught).toBe(false);
     expect(d.stats).toEqual({ buildings: 0, runs: 0 });
     expect(d.license).toBe(0);
     expect(d.opsGrade).toEqual({});
+  });
+
+  it('플레이 흔적이 있는 옛 세이브는 이미 해 본 사람 — 가드 가르치기·평생 첫 판 줄을 건너뛴다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
+    expect(loadSave().guardTaught).toBe(true);
+    expect(loadSave().stats).toEqual({ buildings: 0, runs: 1 });
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true }));
+    expect(loadSave().guardTaught).toBe(true);
+    // 키가 있는 새 저장은 그대로 — 가르치기 전에 저장된 신입은 다음 실행에도 배운다
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true, guardTaught: false, stats: { buildings: 3, runs: 0 } }));
+    expect(loadSave().guardTaught).toBe(false);
+    expect(loadSave().stats).toEqual({ buildings: 3, runs: 0 });
   });
 
   it('왕복: 새 키가 그대로 돌아온다', () => {

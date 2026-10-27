@@ -23,12 +23,14 @@ notifyAppReady();
 // dpr ≤ dprCap(처음 2) 클램프 + 픽셀아트 설정. dprCap은 적응형 해상도가 내리기만 한다.
 let dprCap: number = VIEW.DPR_LADDER[0];
 let curDpr = 1;
+let canvasCleared = false; // 크기를 다시 잡으면 비트맵이 지워진다 — 다음 프레임은 틱이 없어도 그린다
 function setupCanvas(): void {
   curDpr = Math.min(window.devicePixelRatio || 1, dprCap);
   canvas.width = VIEW.W * curDpr;
   canvas.height = VIEW.H * curDpr;
   ctx.setTransform(curDpr, 0, 0, curDpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
+  canvasCleared = true;
 }
 
 // 레터박스 — 안전영역(상태바·제스처 바)을 뺀 상자 안에서 스케일하고 가운데로 앉힌다
@@ -81,14 +83,14 @@ function frame(now: number): void {
   last = now;
   let ticked = false;
   while (acc >= TICK) { app.update(TICK); acc -= TICK; ticked = true; }
-  // 프레임이 계속 늦으면 캔버스 배율을 한 단계 낮춘다. 배율을 다시 잡으면 캔버스가 비므로 이 프레임에 바로 다시 그린다.
+  // 프레임이 계속 늦으면 캔버스 배율을 한 단계 낮춘다.
   if (curDpr > VIEW.DPR_LADDER[VIEW.DPR_LADDER.length - 1]) {
     const lower = adaptiveDpr.sample(dtMs, curDpr);
-    if (lower !== null) { dprCap = lower; setupCanvas(); ticked = true; }
+    if (lower !== null) { dprCap = lower; setupCanvas(); }
   }
   // 시뮬 틱이 한 번이라도 돈 프레임에만 그린다 — 고주사율 폰에서도 draw당 줄어드는 값(흔들림·번쩍·타이머)이
-  // 프레임 수가 아니라 틱마다 줄어든다. 캔버스는 안 지우면 마지막 그림이 그대로 남는다.
-  if (ticked) app.draw();
+  // 프레임 수가 아니라 틱마다 줄어든다. 캔버스는 안 지우면 마지막 그림이 그대로 남는다(크기를 다시 잡은 때만 예외).
+  if (ticked || canvasCleared) { app.draw(); canvasCleared = false; }
 }
 requestAnimationFrame(frame);
 

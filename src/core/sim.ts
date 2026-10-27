@@ -379,6 +379,7 @@ function stepPinned(s: GameState, input: InputFrame): void {
     } else {
       loseLife(s);
       if (s.over) return;
+      s.events.push({ kind: 'hurt', y: 0 }); // 시간초과 분기와 같이 — lifeLost 단독은 JUICE 항목이 없다
       stack.vy = STACK.PIN_MERCY_V; // 자비 바운스
       stack.resting = false;
       p.pose = 'idle';
