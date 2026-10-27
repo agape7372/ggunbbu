@@ -167,8 +167,9 @@ function validateOpsGrade(v: unknown): SaveData['opsGrade'] {
  */
 function migrate(data: Record<string, unknown>): Record<string, unknown> {
   // 무버전 추가 키(guardTaught·stats)가 없는 옛 저장에 플레이 흔적이 있으면 이미 해 본 사람이다 —
-  // 신입용 가드 가르치기·평생 첫 판 줄을 다시 띄우지 않는다(누적 건물 수는 되살릴 길이 없어 0부터)
-  const veteran = data.howtoSeen === true || (typeof data.bestArcade === 'number' && data.bestArcade > 0);
+  // 신입용 가드 가르치기·평생 첫 판 줄을 다시 띄우지 않는다(누적 건물 수는 되살릴 길이 없어 0부터).
+  // howtoSeen 은 흔적이 아니다 — 안내만 닫고 한 판도 안 한 사람도 true 다
+  const veteran = num(data.bestArcade, 0) > 0 || num(data.dust, 0) > 0 || data.act2Cleared === true;
   if (veteran && data.guardTaught === undefined) data.guardTaught = true;
   if (veteran && data.stats === undefined) data.stats = { buildings: 0, runs: 1 };
   return data;

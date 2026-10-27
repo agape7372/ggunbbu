@@ -195,8 +195,12 @@ describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무�
     store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
     expect(loadSave().guardTaught).toBe(true);
     expect(loadSave().stats).toEqual({ buildings: 0, runs: 1 });
-    store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true }));
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, dust: 40 }));
     expect(loadSave().guardTaught).toBe(true);
+    // 안내만 닫고 한 판도 안 한 사람은 신입 그대로
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true }));
+    expect(loadSave().guardTaught).toBe(false);
+    expect(loadSave().stats).toEqual({ buildings: 0, runs: 0 });
     // 키가 있는 새 저장은 그대로 — 가르치기 전에 저장된 신입은 다음 실행에도 배운다
     store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true, guardTaught: false, stats: { buildings: 3, runs: 0 } }));
     expect(loadSave().guardTaught).toBe(false);

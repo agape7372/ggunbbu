@@ -107,6 +107,7 @@ export function createApp(
   let runHatBreaks = 0; // 이번 판에 안전모가 깨진 횟수
   // 특별작전 한 판: 어느 작전인지 + 지금까지 부순 건물 수. null = 작전 아님
   let opRun: { id: OpId; buildings: number } | null = null;
+  let scoreBase = 0; // 작전이 시작 진행으로 주입한 점수 — 카드·만담은 이 판에 번 점수만 본다
   let runCaps: RunCaps = createRunCaps({ prevBest: 0, countsRecord: false });
   // 가드 가르치기: 평생 첫 목숨 손실 때 판을 잠깐 세우고 가드 키를 맥동시킨다 (C1)
   let teachFreeze = 0;
@@ -162,6 +163,7 @@ export function createApp(
     runHatBreaks = 0;
     butterRoundNo = 0;
     opRun = null;
+    scoreBase = 0;
     streakCounted = false;
     endTeach();
     save.stats.runs += 1;
@@ -207,6 +209,11 @@ export function createApp(
     if (track === lastBgm) return;
     lastBgm = track;
     if (track) startBgm(track); else stopBgm();
+  }
+
+  /** 결과 카드 버튼 — 카드가 뜬 직후 잠금(overlayTicks) 동안은 터치도 키처럼 무시한다 */
+  function afterLock(fn: () => void): () => void {
+    return () => { if (overlayTicks <= 0) fn(); };
   }
 
   function goPlay(): void {
@@ -315,6 +322,7 @@ export function createApp(
       state.p = GIMMICK.START_P[op.id];
       state.score = Math.floor(ACT1.UNLOCK_SCORE * state.p);
     }
+    scoreBase = state.score;
     butterChallenge = false;
     armCaps('op');
     goPlay();
@@ -658,7 +666,7 @@ export function createApp(
     onPauseQuit: () => { playSfx('uiBack'); persist(); goTitle(); },
     onSettingsBack: () => { playSfx('uiBack'); backFromSettings(); },
     onSettingsPatch: applySettingsPatch,
-    onGameOverContinue: () => {
+    onGameOverContinue: afterLock(() => {
       if (!state || scene !== 'gameover') return;
       if (state.mode === 'act2' && state.checkpoint > 0) {
         playSfx('uiOk');
@@ -666,14 +674,14 @@ export function createApp(
         state.wazaGauge = 0;
         goPlay();
       }
-    },
-    onGameOverRetry: () => { playSfx('uiOk'); lastRun(); },
-    onGameOverTitle: () => { playSfx('uiBack'); goTitle(); },
-    onGameOverRevive: () => { void tryRevive(); },
-    onOpsEndList: () => { playSfx('uiBlip'); goTitle(); overlay.showOps(opsOpts()); },
+    }),
+    onGameOverRetry: afterLock(() => { playSfx('uiOk'); lastRun(); }),
+    onGameOverTitle: afterLock(() => { playSfx('uiBack'); goTitle(); }),
+    onGameOverRevive: afterLock(() => { void tryRevive(); }),
+    onOpsEndList: afterLock(() => { playSfx('uiBlip'); goTitle(); overlay.showOps(opsOpts()); }),
     onExam: doExam,
-    onEndingDone: () => { playSfx('uiBack'); goTitle(); },
-    onEndingRetry: () => { playSfx('uiOk'); lastRun(); },
+    onEndingDone: afterLock(() => { playSfx('uiBack'); goTitle(); }),
+    onEndingRetry: afterLock(() => { playSfx('uiOk'); lastRun(); }),
     missionBadge: () => claimableCount(save.daily, save.achieves),
     onLogoTap: () => {
       if (!import.meta.env.DEV) return;
@@ -805,7 +813,8 @@ export function createApp(
         s.events.length = 0;
         touch?.setPinned(s.player.pose === 'pinned');
         touch?.setSpecialReady(s.wazaGauge >= 100);
-        bgm(bgmFor(s));
+        // 장면을 바꾼 틱이면 곡은 전환이 정했다(엔딩·게임오버·작전 종료) — 덮어쓰지 않는다
+        if (scene === 'play') bgm(bgmFor(s));
         break;
       }
       case 'pause':
@@ -855,8 +864,9 @@ export function createApp(
               s.wazaGauge = 0;
               goPlay();
             } else {
-              playSfx('uiBack');
-              goTitle();
+              // 노랑(한 판 더)과 같은 동작 — 공격 키 = 지금 노랑인 버튼
+              playSfx('uiOk');
+              lastRun();
             }
           }
         } else if (f.special) {
@@ -942,9 +952,10 @@ export function createApp(
     // 같은 세션 연속 사망 — 한 판에서 부활해 또 죽어도 한 번. 신기록이면 흐름이 끊긴 것으로 본다 (C10)
     if (!streakCounted) { deathStreak += 1; streakCounted = true; }
     const line = pickQuip({
-      score: s.score,
+      score: s.score - scoreBase,
       hatBroke: runHatBreaks > 0,
-      chapter: s.chapter,
+      // 구역을 주입받아 시작한 판(작전)은 높은 구역까지 「온」 게 아니다 — deep 규칙을 안 태운다
+      chapter: scoreBase > 0 ? 0 : s.chapter,
       mode: s.mode,
       boss: s.act2Phase === 'moon',
       streak: deathStreak,
@@ -955,7 +966,7 @@ export function createApp(
     // 작전 판이면 다음 도장까지가 다음 목표다
     const opGoal = opRun ? SCREENS.ops.progress(opRun.id, opNow(s)) : '';
     return {
-      score: s.score,
+      score: s.score - scoreBase,
       combo: s.peakCombo,   // 현재 콤보는 죽는 히트가 이미 끊었다 — 결과화면은 이번 판 최고치를 쓴다
       buildings: runBuildings,
       dustGained: runDust,
@@ -992,7 +1003,8 @@ export function createApp(
     if (best) save.opsGrade[id] = best;
     persist();
     bgm(null);
-    playSfx(grade ? 'stamp' : 'runEnd', grade ? undefined : { delay: AUDIO.RUN_END_DELAY });
+    // 소리는 카드와 같이 — 죽은 판은 카드가 0.5초 뒤에 뜬다. 시간 종료 도장만 바로
+    playSfx(grade ? 'stamp' : 'runEnd', { delay: grade && !dead ? 0 : AUDIO.RUN_END_DELAY });
     const seconds = OPERATION[id].metric === 'seconds';
     pendingOps = {
       name: runLabel,
@@ -1000,9 +1012,9 @@ export function createApp(
       improved,
       best: best ?? null,
       goal: SCREENS.ops.goal(id),
+      // 점수엔 시작 진행 주입분이 들어 있어 작전 판에선 뜻이 없다 — 건물·초만
       rows: [
         seconds ? [SCREENS.ops.held, `${value}초`, true] : [SCREENS.ops.built, `${value}채`, true],
-        ['점수', s.score.toLocaleString('ko-KR')],
       ],
       progress: SCREENS.ops.progress(id, value),
       rank: licenseTitle(save.license),
@@ -1058,6 +1070,7 @@ export function createApp(
       return;
     }
     if (s.mode === 'act2' && wasPhase && s.act2Phase && wasPhase !== s.act2Phase && !s.over) {
+      bgm(bgmFor(s)); // 새 국면 곡은 배너와 같이 시작
       showOverlay(phaseBanner(s.act2Phase), 60 * 3, undefined, wipe);
       return;
     }

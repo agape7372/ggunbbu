@@ -128,7 +128,7 @@ describe('작전 문구 · 다음 도장', () => {
 
   it('목표 한 줄은 B 기준, 도장 문턱은 한 줄', () => {
     expect(SCREENS.ops.goal('glass')).toBe('90초 안에 건물 14채');
-    expect(SCREENS.ops.goal('orbit')).toBe('60초 버티기');
+    expect(SCREENS.ops.goal('orbit')).toBe('20초 버티기');
     expect(SCREENS.ops.ladder('glass')).toBe('B 14 · A 18 · S 23');
     expect(SCREENS.ops.ladder('orbit')).toBe('B 20 · A 35 · S 60');
   });

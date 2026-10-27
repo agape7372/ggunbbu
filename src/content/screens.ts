@@ -105,7 +105,7 @@ export const SCREENS = {
     title: '타이틀로',
     /** 목표 한 줄 (B 도장 기준) */
     goal: (id: OpId): string => (isSeconds(id)
-      ? `${OPERATION[id].limitSec}초 버티기`
+      ? `${OPERATION[id].grade.B}초 버티기`
       : `${OPERATION[id].limitSec}초 안에 건물 ${OPERATION[id].grade.B}채`),
     /** 도장 문턱 한 줄 */
     ladder: (id: OpId): string => {

@@ -757,15 +757,13 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       const label = v.adRevive ? g.revive : g.reviveFree;
       rev.innerHTML = `<span class="cta-label">${v.adRevive ? ICON.ad : ''}${label}</span>`
         + `<span class="cta-sub">${g.reviveLeft(v.reviveLeft)}</span>`;
-      // 노랑은 하나 — 일어날 수 있으면 일어나기가, 아니면 한 판 더가 노랑이다
-      const retry = $('go-retry');
-      if (v.canRevive) {
-        retry.className = 'btn';
-        retry.textContent = '한 판 더';
-      } else {
-        retry.className = 'cta';
-        retry.innerHTML = '<span class="cta-label">한 판 더</span>';
-      }
+      // 노랑은 하나 — 일어나기 → 이어하기 → 한 판 더 중 먼저 되는 것. 공격 키와 같은 순서
+      const paint = (el: HTMLElement, text: string, yellow: boolean): void => {
+        el.className = yellow ? 'cta' : 'btn';
+        el.innerHTML = yellow ? `<span class="cta-label">${escapeHtml(text)}</span>` : escapeHtml(text);
+      };
+      paint($('go-continue'), g.continue, v.canContinue && !v.canRevive);
+      paint($('go-retry'), '한 판 더', !v.canRevive && !v.canContinue);
       show('gameover');
     },
     showOpsEnd(v: OpsEndView): void {
