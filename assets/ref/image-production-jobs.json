@@ -20,8 +20,8 @@
     "id": "player",
     "source": "assets/ref/generated/player.png",
     "output": "public/img/char/player.png",
-    "width": 506,
-    "height": 60,
+    "width": 704,
+    "height": 76,
     "kind": "player",
     "originalSource": "C:\\Users\\agape\\.codex\\generated_images\\01a072a0-33a0-76c3-a102-b44e555f5d20\\exec-085a4d0f-fcee-4db5-b182-60245d3dec2e.png"
   },

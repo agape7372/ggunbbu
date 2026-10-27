@@ -121,6 +121,14 @@ export function img(key: string): LoadedImage | null {
   return loaded.get(key) ?? null;
 }
 
+/**
+ * 다 쓴 이미지를 놓는다. 층 시트처럼 조각 캔버스로 한 번 잘라 두면 원본이 더는 필요 없는 그림의
+ * 디코드 메모리(2배 시트 약 8MB)를 돌려받는 용도. 다시 쓰려면 preloadAssets()를 다시 부른다.
+ */
+export function releaseAsset(key: string): void {
+  loaded.delete(key);
+}
+
 export function hasAsset(key: string): boolean {
   return loaded.has(key);
 }

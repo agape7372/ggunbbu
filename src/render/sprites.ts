@@ -363,7 +363,7 @@ const WCX = 22;
 const FLAT_W = 48, FLAT_H = 28;
 
 // 신체 랜드마크 (STAND/WIDE 공통, CX=WCX=22 기준)
-const HEAD_R = 6;
+const HEAD_R = 5;         // PNG 머리와 같은 크기
 const HEAD_Y = 12;       // 머리 중심
 const SHOULDER_Y = 23;   // 팔이 갈라지는 지점
 const HIP_Y = 38;        // 다리가 갈라지는 지점
@@ -371,7 +371,7 @@ const FOOT_Y = 60;       // 바닥선 (= STAND_H = WIDE_H, 기존 프레임 발 
 
 // 08-30(P1-3): 코스메틱 실구현 — 상점이 파는 body(선 색)·blade(참격 색)가 실제 렌더를 바꾼다.
 let LINE = '#1A1A20';   // body 코스메틱
-const LINE_W = 2;
+const LINE_W = 1.4;      // PNG 졸라맨 선(약 1.2px)에 맞춤 — 무기를 바꿔도 선 굵기가 같아야 한다
 let ARC = '#FFD200';    // blade 코스메틱 (참격 궤적)
 
 const DEFAULT_LINE = '#1A1A20';
@@ -412,15 +412,15 @@ function playerBob(pose: PlayerPose, animTick: number): number {
 }
 
 // player.png 머리 중심 — 발 기준점(셀 가로 중앙·바닥) 대비 [dx, dy]. PLAYER_SHEET 순서.
-// 10-25 알파 실측(46×60 셀). pinned·dead는 눕거나 납작해 안전모를 그리지 않는다(null).
-const SHEET_HEAD: ReadonlyArray<readonly [number, number] | null> = [
-  [-1, -35], [13, -34.5], [-11.5, -30], [-2.5, -20.5], [0, -21.5],
-  [4, -33.5], [-3, -31.5], [-3, -32], [4, -22], null, null,
+// 2배 시트(칸 72×76 논리 px)의 머리 고리를 알파에서 찾아 실측. pinned·dead는 눕거나 납작해 안전모를 그리지 않는다(null).
+export const SHEET_HEAD: ReadonlyArray<readonly [number, number] | null> = [
+  [-0.5, -50.3], [19, -47.8], [-6, -43.5], [-2.5, -29.3], [0, -29.3],
+  [-2.5, -47.8], [-2.5, -45], [-4, -45.5], [6.5, -30.8], null, null,
 ];
-const SHEET_HEAD_R = 5;
+export const SHEET_HEAD_R = 5; // 실측 머리 반지름 4.8~5.3
 
 function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
-  const R = r + 1;
+  const R = r + 0.8;
   const base = cy - r * 0.2;
   ctx.save();
   ctx.beginPath();
@@ -432,7 +432,7 @@ function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numbe
   ctx.fillStyle = HAT_WHITE;
   ctx.fill();
   ctx.strokeStyle = PALETTE.INK;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.2; // PNG 졸라맨 선과 같다
   ctx.lineJoin = 'round';
   ctx.stroke();
   ctx.restore();
@@ -499,11 +499,11 @@ function weapon(c: CanvasRenderingContext2D, hx: number, hy: number, tx: number,
       c.translate(ex, ey);
       c.rotate(Math.atan2(uy, ux));
       c.fillStyle = IRON;
-      c.fillRect(-2.5, -7.5, 6, 15);
+      c.fillRect(-2, -5, 5, 10); // 머리 길이 = 자루의 약 40%
       c.strokeStyle = LINE;
       c.lineWidth = LINE_W;
       c.lineJoin = 'round';
-      c.strokeRect(-2.5, -7.5, 6, 15);
+      c.strokeRect(-2, -5, 5, 10);
       c.restore();
       break;
     }
@@ -523,15 +523,15 @@ function weapon(c: CanvasRenderingContext2D, hx: number, hy: number, tx: number,
       // 그라인더: 굵은 짧은 몸통 + 옆 손잡이 + 끝 원판
       const [ex, ey] = at(0.5);
       stroke(c, [at(0.18), at(0.18, -5)]);
-      c.lineWidth = 4.5;
+      c.lineWidth = LINE_W * 1.7; // 몸통은 졸라맨 선의 2배를 넘지 않는다
       c.beginPath();
       c.moveTo(hx, hy);
       c.lineTo(ex, ey);
       c.stroke();
-      circle(c, ex + ux * 2, ey + uy * 2, 4.5, DISC);
+      circle(c, ex + ux * 2, ey + uy * 2, 3.6, DISC);
       c.fillStyle = LINE;
       c.beginPath();
-      c.arc(ex + ux * 2, ey + uy * 2, 1.2, 0, Math.PI * 2);
+      c.arc(ex + ux * 2, ey + uy * 2, 1, 0, Math.PI * 2);
       c.fill();
       break;
     }
@@ -1053,21 +1053,23 @@ export function drawGroundRocks(ctx: CanvasRenderingContext2D, rocks: number, gr
   }
 }
 
-/** 낙하 스택 그림자 — 지면 타원, 높이에 따라 크기/농도 변화(낙하 위치 예측 보조) */
+/** 낙하 예고 — 건물이 내려앉을 폭의 양 끝에 잉크 대시 두 개. 가까울수록 진하고 안쪽으로 모인다(낙하 위치 예측 보조). 그림자 대신 획. */
 export function drawStackShadow(ctx: CanvasRenderingContext2D, stack: FallingStack, groundY: number): void {
   initSprites();
   const isButter = stack.variant === 'butterbar';
   const w = isButter ? VIEW.BUTTER_W : VIEW.LANE_W;
   const cx = VIEW.LANE_X[0];
   const heightFrac = Math.max(0, Math.min(1, stack.y / STACK.SPAWN_Y));
-  const scale = 1 - 0.4 * heightFrac;
-  const alpha = 0.35 * (1 - 0.6 * heightFrac);
-  const rw = Math.max(2, (w * 0.8 * scale) / 2);
-  const rh = Math.max(1, 8 * scale);
+  const half = Math.max(4, (w * 0.8 * (1 - 0.4 * heightFrac)) / 2);
+  const len = Math.min(18, half * 0.6);
+  const y = groundY - 2;
   ctx.save();
-  ctx.fillStyle = `rgba(10,10,20,${alpha.toFixed(3)})`;
+  ctx.globalAlpha = 0.9 - 0.55 * heightFrac;
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.ellipse(cx, groundY - 2, rw, rh, 0, 0, Math.PI * 2);
-  ctx.fill();
+  for (const side of [-1, 1]) { ctx.moveTo(cx + side * half, y); ctx.lineTo(cx + side * (half - len), y); }
+  ctx.stroke();
   ctx.restore();
 }

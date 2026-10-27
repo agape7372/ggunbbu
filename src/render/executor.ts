@@ -1,9 +1,11 @@
 // 집행기: imagegen 부품 아틀라스 + 케이블/관절 애니메이션. 시뮬 상태는 읽기 전용.
 import type { BossState } from '../core/types';
 import { BOSS, VIEW, PALETTE } from '../config';
-import { img } from './assets';
+import { imageSize, img } from './assets';
 
-// 생성 원본 1536×1024의 알파 실측. 파일은 원본 그대로 보존하고 drawImage로 분할한다.
+// 생성 원본 1536×1024의 알파 실측 좌표. 파일은 이 원본을 축소해 내보낸 것(scripts/prepare-image-assets.mjs
+// ATLAS_SCALE)이라 읽을 때 파일 크기 / 원본 크기 비율을 적용한다.
+const ATLAS_SRC = { w: 1536, h: 1024 } as const;
 export const EXECUTOR_PARTS = {
   body: [46, 149, 1444, 180],
   left: [333, 479, 214, 377],
@@ -34,12 +36,39 @@ export function executorPose(b: BossState): { lift: number; open: number; tilt: 
   }
 }
 
-function part(ctx: CanvasRenderingContext2D, key: keyof typeof EXECUTOR_PARTS,
+// 부품 캐시 — 아틀라스를 로드한 뒤 처음 그릴 때 부품마다 목적 크기의 2배로 한 번만 잘라 둔다.
+// 매 프레임 아틀라스 전체를 대축소하지 않고 2배 부품을 1/2로만 줄여 그린다(floorSheetCache와 같은 패턴).
+type PartKey = keyof typeof EXECUTOR_PARTS;
+const PART_SS = 2;
+const partCache = new Map<PartKey, HTMLCanvasElement>();
+let cachedAtlas: ReturnType<typeof img> = null;
+
+function partCanvas(atlas: NonNullable<ReturnType<typeof img>>, key: PartKey, w: number, h: number): HTMLCanvasElement | null {
+  if (cachedAtlas !== atlas) { partCache.clear(); cachedAtlas = atlas; } // 재로드하면 새 이미지로 다시 만든다
+  const hit = partCache.get(key);
+  if (hit) return hit; // 부품마다 목적 크기는 하나뿐이다
+  try {
+    const size = imageSize(atlas);
+    const kx = size.w / ATLAS_SRC.w, ky = size.h / ATLAS_SRC.h;
+    const [sx, sy, sw, sh] = EXECUTOR_PARTS[key];
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(w * PART_SS); cv.height = Math.round(h * PART_SS);
+    const c = cv.getContext('2d');
+    if (!c) return null;
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = 'high';
+    c.drawImage(atlas, sx * kx, sy * ky, sw * kx, sh * ky, 0, 0, cv.width, cv.height);
+    partCache.set(key, cv);
+    return cv;
+  } catch { return null; }
+}
+
+function part(ctx: CanvasRenderingContext2D, key: PartKey,
   x: number, y: number, w: number, h: number): void {
   const atlas = img('boss');
-  if (atlas) {
-    const [sx, sy, sw, sh] = EXECUTOR_PARTS[key];
-    ctx.drawImage(atlas, sx, sy, sw, sh, x, y, w, h);
+  const cv = atlas ? partCanvas(atlas, key, w, h) : null;
+  if (cv) {
+    ctx.drawImage(cv, x, y, w, h);
     return;
   }
   // 이미지가 없어도 같은 실루엣을 그린다.

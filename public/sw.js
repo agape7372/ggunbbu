@@ -1,5 +1,5 @@
 // 캐시 버전: 변경 시점마다 갱신해야 한다 (배포 시 사용자 캐시 무효화)
-const CACHE_VERSION = 'v8-redesign';
+const CACHE_VERSION = 'v9-hires'; // 2배 해상도 PNG — 같은 이름의 옛 1배 그림이 캐시에 남으면 새 매니페스트와 어긋난다
 const CACHE_PREFIX = 'gunbbu-';
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 // 빌드 플러그인이 실행 번들과 이미지 매니페스트에서 채운다.

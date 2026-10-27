@@ -17,8 +17,11 @@ const LIMITS = {
   distTotalMB: 12,
   // 이미지 한 장 — 현재 최대는 bg/act2.png 1.1MB.
   singleImageMB: 1.5,
-  // 원본 이미지 폴더 합계
+  // 원본 이미지 폴더 합계 — 캐릭터·층 시트를 2배로 내보낸 뒤에도 집행기 아틀라스를 줄여 오히려 줄었다.
   imgTotalMB: 8,
+  // 디코드 메모리 추정(RGBA 4바이트 x 가로 x 세로의 합) — 파일 용량이 작아도 픽셀이 크면 저사양 폰에서 터진다.
+  // 부팅 순간 전부 떠 있는 최대치 기준이다(층 시트는 조각으로 나눈 뒤 원본을 놓는다).
+  decodedMB: 24,
 };
 
 const MB = 1024 * 1024;
@@ -63,6 +66,19 @@ for (const f of images) {
   }
 }
 
+// 디코드 추정 — PNG 헤더의 가로·세로만 읽는다.
+const decoded = images.filter((f) => /\.png$/i.test(f.path)).map((f) => {
+  const b = readFileSync(f.path);
+  return { name: path.basename(f.path), bytes: b.readUInt32BE(16) * b.readUInt32BE(20) * 4 };
+});
+const decodedTotal = decoded.reduce((a, f) => a + f.bytes, 0);
+const biggest = decoded.sort((a, b) => b.bytes - a.bytes).slice(0, 3)
+  .map((f) => `${f.name} ${(f.bytes / MB).toFixed(1)}`).join(', ');
+notes.push(`디코드 추정(RGBA): ${(decodedTotal / MB).toFixed(1)}MB (상한 ${LIMITS.decodedMB}MB) — 큰 순 ${biggest}`);
+if (decodedTotal > LIMITS.decodedMB * MB) {
+  problems.push(`디코드 추정 ${(decodedTotal / MB).toFixed(1)}MB > 상한 ${LIMITS.decodedMB}MB`);
+}
+
 const byHash = new Map();
 for (const f of images) {
   const h = createHash('sha1').update(readFileSync(f.path)).digest('hex');
@@ -86,6 +102,14 @@ if (existsSync(manifestPath)) {
     notes.push(`매니페스트 슬롯 ${keys.length}개 중 ${keys.length - missing.length}개 충족, ${missing.length}개 미충족`);
     if (missing.length > 0) {
       notes.push(`  미충족: ${missing.map(([k]) => k).join(', ')}`);
+    }
+
+    // 역방향 — 파일만 넣고 매니페스트 키를 빼먹으면 조용히 폴백이 남는다(무기 시트·보급 상자).
+    for (const f of images) {
+      const name = path.basename(f.path).replace(/\.png$/i, '');
+      if (/^(player-.+|crate)$/.test(name) && !(name in (manifest.images ?? {}))) {
+        problems.push(`${path.relative(root, f.path)}에 맞는 매니페스트 키 "${name}"가 없다 — 파일만 있으면 그림이 안 쓰인다`);
+      }
     }
 
     // 소비자 없는 슬롯 — 키 문자열이 src/ 어디에도 안 나오면 그림을 넣어도 아무도 안 그린다.

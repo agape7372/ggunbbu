@@ -53,8 +53,8 @@
     },
     "player": {
       "src": "char/player.png",
-      "w": 46,
-      "h": 60,
+      "w": 72,
+      "h": 76,
       "anchor": "foot",
       "frames": 11
     },

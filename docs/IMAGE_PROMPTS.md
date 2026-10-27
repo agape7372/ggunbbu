@@ -58,8 +58,9 @@
 1. **생성** — `gen_size` 그대로. 배경·타이틀은 4배가 아니라 지정 배율(2배), 캐릭터·엔티티·층은 4배(또는 슬롯이 지정한 배율).
 2. **축소** — `final_size`로. **최근접(nearest) 금지**, 고품질 리샘플(Lanczos/bicubic)을 쓴다. 현재 CSS도 `image-rendering: auto`로 정리했다.
 3. **알파 정리** — 캐릭터·엔티티의 원본 알파를 보존하고 아이보리 매트가 남은 픽셀만 RGB 차이 합 48 미만 기준으로 투명화한다. 결과를 PNG에 저장하므로 매니페스트 chroma는 사용하지 않는다. 층 시트는 불투명 풀블리드다.
+3-1. **2배 내보내기 (10-27)** — 캐릭터(`char/`)·엔티티·층 시트(`floors/`)는 매니페스트 논리 크기(`w`·`h`)의 **정확히 2배 픽셀**로 내보낸다(`scripts/prepare-image-assets.mjs` `OUT_SCALE`). 매니페스트 `w`·`h`·`frames`는 논리 크기 그대로 두고 파일만 2배다 — `drawAsset`이 소스 크기를 보고 칸을 나누므로 코드는 그대로다. 배경은 1배. 집행기 아틀라스(`boss`)는 원본 1536×1024를 0.35배(538×358)로 줄인 부품 시트이고 `executor.ts`가 로드 뒤 한 번 부품별 2배 캔버스로 잘라 쓴다. 층 시트는 `floorSheetCache.ts`가 배율(파일 가로 / `w`)만큼 소스 좌표를 키워 자른 뒤 원본을 놓는다. 새 PNG를 넣고 나면 `node scripts/prepare-image-assets.mjs --sharp-module <sharp 폴더> --only <id,id>`로 원본 `assets/ref/generated/`에서 다시 내보낸다. `tests/image-assets.test.mjs`가 파일 크기를 이 규칙으로 검사한다.
 4. **배치** — `public/img/<filename>`. 스토어 에셋만 `assets/store/`(예산 게이트 밖).
-5. **예산** — `npm run check:budget`. 상한: dist 12MB · 이미지 한 장 1.5MB · `public/img` 합계 8MB. 바이트 동일 중복도 여기서 걸린다(`bg-bonus`는 파일 복사가 아니라 `src` 포인터 유지).
+5. **예산** — `npm run check:budget`. 상한: dist 12MB · 이미지 한 장 1.5MB · `public/img` 합계 8MB · **디코드 추정(RGBA 가로×세로×4 합계) 24MB**. `player-*.png`·`crate.png` 파일이 있는데 같은 이름의 매니페스트 키가 없으면 실패한다. 바이트 동일 중복도 여기서 걸린다(`bg-bonus`는 파일 복사가 아니라 `src` 포인터 유지).
 6. **검수** — 360×640으로 축소해 놓고 §3 체크리스트. 크게 보면 다 괜찮아 보인다.
 
 ### 생성 게이트 순서 (지키지 않으면 안 쓰는 그림이 쌓인다)
@@ -197,9 +198,9 @@
   "id": "player",
   "filename": "char/player.png",
   "consumer": "src/render/sprites.ts drawPlayer (playerPngKey → drawAsset(ctx,'player',…,sheet)) · drawHat (SHEET_HEAD 머리 좌표), 프레임 인덱스 = src/render/frames.ts playerSheetFrame",
-  "gen_size": "2024x240 (4배)",
-  "final_size": "506x60",
-  "cells": "가로 11칸, 셀 46x60, 기준점 = 발(anchor foot). 순서는 frames.ts PLAYER_SHEET 배열 그대로",
+  "gen_size": "원본 1254x1254 (4x3 격자, 11칸 사용) — assets/ref/generated/player.png",
+  "final_size": "1584x152 (논리 792x76 — 매니페스트 w72 h76 frames 11, 2배 내보내기)",
+  "cells": "가로 11칸, 셀 72x76(논리 px), 기준점 = 발(anchor foot). 순서는 frames.ts PLAYER_SHEET 배열 그대로. 모든 포즈 같은 배율 — 대기 포즈 키 55px(고정), 가장 넓은 포즈(타격 런지)도 셀 폭 안에 들어간다. 발은 셀 바닥에서 논리 1px 위",
   "chroma": null,
   "prompt": {
     "subject": "A character sprite sheet of a faceless stickman for a game engine — a literal frame strip, not a poster. Plain circle head with NO face at all: no eyes, no mouth, nothing. Single-line torso, single-line limbs with simple joint bends. A thin blade drawn as one straight line with a tiny circle for the grip. ELEVEN poses in this exact left-to-right order: 1 IDLE standing upright, feet slightly apart, blade hanging straight down at his side. 2 JUMP airborne, both knees tucked toward the torso, blade trailing behind at hip height. 3 ATTACK WIND-UP torso leaning back slightly, sword arm raised so the blade points up past his head, off-hand out for balance, no trail yet. 4 ATTACK HIT deep forward lunge, front knee bent, back leg fully extended, blade swept low and through at front-leg height, with a single sweeping yellow #FFD200 arc trailing from the blade tip. 5 ATTACK RECOVERY the same deep lunge held, blade fully lowered at the end of its swing, no trail, stillness. 6 GUARD GROUND standing planted, both arms spread outward and up so they do NOT cross the head circle, blade held perfectly horizontal above the head. 7 GUARD AIR airborne with knees tucked sharper and higher than the JUMP pose so the silhouette is visibly different, same horizontal-blade-overhead guard. 8 GUARD BREAK head and torso tipped backward off balance, one leg forward one back, both arms flung wide open, blade tipping loosely behind as if about to slip from his grip. 9 SPECIAL the deepest two-handed lunge of the set, both hands together low on the grip, blade swept far past his leg, with ONE large diagonal yellow #FFD200 slash crossing corner to corner of the cell — bigger than cell 4's arc but the exact same ink weight and hue. 10 PINNED squashed low, body compressed into a low horizontal line, limbs splayed sideways symmetrically, head compressed near the top of the flattened silhouette. 11 DEAD reclining diagonally on his back, head tilted to one side, limbs limp and asymmetric, a silhouette clearly different from PINNED even in solid black.",
@@ -215,7 +216,7 @@
     "pinned와 dead가 검은 실루엣만으로 구분된다",
     "노랑은 4번·9번 두 칸뿐"
   ],
-  "notes": "09-06 제작: 원본 알파와 아이보리 매트 추출을 파일에 반영해 런타임 chroma 없이 소비한다. ★셀 순서를 바꾸면 게임이 엉뚱한 포즈를 보여준다 — frames.ts:8-20 PLAYER_SHEET가 정본. 필살(9번)에 노랑을 넣는 건 sprites.ts buildSpecial()이 실제로 대각선 노란 참격을 그리기 때문이다. 비기본 코스메틱 장착 시엔 PNG 대신 프로시저럴이 이긴다(sprites.ts playerPngKey) — 이 시트는 기본 룩 + 철거칼 전용이다. ★10-25: 칼 그림이 박혀 있어 다른 무기는 아래 `player-<무기>` 시트가 맡는다. 안전모가 이 시트의 머리 좌표표(`SHEET_HEAD`, 알파 실측)를 쓰므로 다시 만들면 표도 다시 잰다."
+  "notes": "09-06 제작: 원본 알파와 아이보리 매트 추출을 파일에 반영해 런타임 chroma 없이 소비한다. ★셀 순서를 바꾸면 게임이 엉뚱한 포즈를 보여준다 — frames.ts:8-20 PLAYER_SHEET가 정본. 필살(9번)에 노랑을 넣는 건 sprites.ts buildSpecial()이 실제로 대각선 노란 참격을 그리기 때문이다. 비기본 코스메틱 장착 시엔 PNG 대신 프로시저럴이 이긴다(sprites.ts playerPngKey) — 이 시트는 기본 룩 + 철거칼 전용이다. ★10-25: 칼 그림이 박혀 있어 다른 무기는 아래 `player-<무기>` 시트가 맡는다. 안전모가 이 시트의 머리 좌표표(`SHEET_HEAD`, 알파 실측)를 쓰므로 다시 만들면 표도 다시 잰다. ★10-27: 셀을 46x60 → 72x76으로 넓히고 키를 38 → 55px로 키웠다(옛 공통 배율이 필살 같은 넓은 포즈에 끌려 대기 포즈가 작았다). 원본 격자에서 칼끝·발끝이 옆 칸으로 넘는 포즈 4개는 `PLAYER_SRC_X`로 가로 구간을 따로 잘랐다. `tests/player-sheet.test.mjs`가 대기 키 54~56 · 포즈별 셀 안쪽 · SHEET_HEAD 머리 고리를 검사한다."
 }
 ```
 
@@ -228,9 +229,9 @@
   "id": "player-<weapon>",
   "filename": "char/player-<weapon>.png",
   "consumer": "src/render/sprites.ts drawPlayer (playerPngKey = 'player-' + s.weapon) · drawHat (SHEET_HEAD를 player와 같이 쓴다)",
-  "gen_size": "2024x240 (4배)",
-  "final_size": "506x60",
-  "cells": "player와 같다 — 가로 11칸, 셀 46x60, 발 기준점, 순서 = frames.ts PLAYER_SHEET",
+  "gen_size": "player와 같다 (원본 4x3 격자)",
+  "final_size": "1584x152 (논리 792x76, 2배 내보내기)",
+  "cells": "player와 같다 — 가로 11칸, 셀 72x76(논리 px), 발 기준점, 순서 = frames.ts PLAYER_SHEET. ★대기 포즈 키 55px · 선 굵기 · 머리 반지름이 player.png와 같아야 무기를 바꿔도 졸라맨이 안 변한다. 파일을 만들면 prepare-image-assets.mjs에 같은 PLAYER_CELL·PLAYER_LIFT로 잡을 하나 더하고 매니페스트 키 `player-<무기>`(w72 h76 frames 11 anchor foot)를 같이 넣는다",
   "chroma": null,
   "prompt": "player 슬롯 prompt를 그대로 쓰고, subject의 블레이드 문장만 아래 무기 문장으로 바꾼다. 포즈·머리 위치·크기·지면선은 player.png와 같게.",
   "weapon": {
@@ -244,7 +245,7 @@
     "36px 높이로 줄여도 무기 넷이 실루엣만으로 갈린다",
     "노랑은 4번·9번 참격 두 칸뿐"
   ],
-  "notes": "10-25: 지금은 철거칼만 PNG라 무기를 바꾸면 졸라맨이 선 그림 폴백(선이 굵고 키가 큼)으로 바뀐다. 이 시트 셋이 들어오면 사라진다. 선 그림 무기 모양 = sprites.ts weapon()."
+  "notes": "10-25: 지금은 철거칼만 PNG라 무기를 바꾸면 졸라맨이 선 그림 폴백으로 바뀐다(10-27에 폴백도 키 53 · 선 1.4 · 머리 반지름 5로 맞춰 둬 차이가 줄었다). 이 시트 셋이 들어오면 사라진다. 선 그림 무기 모양 = sprites.ts weapon()."
 }
 ```
 
@@ -624,7 +625,7 @@
   "filename": "char/crate.png",
   "consumer": "src/render/effects.ts drawCrates — drawAsset(ctx,'crate',x,상자 중심 y). 실패하면 프로시저럴 상자(뚜껑이 젖혀지는 연출 포함)",
   "gen_size": "80x60 (4배)",
-  "final_size": "20x15",
+  "final_size": "40x30 (논리 20x15 — 매니페스트 w20 h15, 2배 내보내기)",
   "cells": "none",
   "anchor": "center",
   "chroma": null,
