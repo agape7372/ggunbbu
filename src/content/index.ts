@@ -34,7 +34,7 @@ import {
   pickQuip,
   SCREENS,
 } from './screens';
-import { CAPTIONS, ONOMATO, onomatoFor } from './juice';
+import { CAPTIONS, destroyedCaption, ONOMATO, onomatoFor } from './juice';
 
 export {
   ACT2_INTRO,
@@ -47,6 +47,7 @@ export {
   chapterLines,
   CHECKPOINT_LABEL,
   checkpointLabel,
+  destroyedCaption,
   ENDING_FULL_COMBO,
   ENDING_LINES,
   GAMEOVER_QUIPS,

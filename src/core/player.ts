@@ -44,7 +44,9 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   const p = s.player;
   if (p.invulnTicks > 0) p.invulnTicks -= 1;
   if (p.bufAttack > 0) p.bufAttack -= 1;
-  if (p.bufJump > 0) p.bufJump -= 1;
+  // ★10-28 검수: 지면 공격 중에 누른 점프는 그 공격이 끝날 때까지 남겨 둔다. 버퍼(실효 2틱)가
+  // 공격 6틱 안에서 사라져 연타 중 점프가 0% 나갔다(10/s·8.6/s 전 틱 실측). 공중 공격은 그대로 감쇠.
+  if (p.bufJump > 0 && !(p.pose === 'attack' && !p.attackFromAir)) p.bufJump -= 1;
   if (p.bufGuard > 0) p.bufGuard -= 1;
   if (p.pose === 'pinned' || p.pose === 'dead') return;
 
@@ -53,7 +55,8 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   // ── 상태별 진행 ──
   switch (p.pose) {
     case 'idle': {
-      if (p.bufAttack > 0) { startAttack(p, false); break; }
+      // 점프가 공격보다 먼저다 — 연타 중엔 공격 버퍼가 늘 차 있어 공격이 앞서면 점프가 끝내 안 나간다.
+      // 같이 눌렸으면 뛰고, 남은 공격 버퍼가 다음 틱 공중 공격이 된다.
       if (p.bufJump > 0 && p.y <= 0) {
         p.bufJump = 0;
         p.vy = PLAYER.JUMP_V0;
@@ -62,6 +65,7 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
         s.events.push({ kind: 'jump' });
         break;
       }
+      if (p.bufAttack > 0) { startAttack(p, false); break; }
       if (input.guard) tryEnterGuard(s, false);
       break;
     }
@@ -123,15 +127,17 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     p.vy -= PLAYER.GRAVITY * dt;
     p.y += p.vy * dt;
     contactWithStack(s, p);
-    if (p.y <= 0) {
-      p.y = 0;
-      p.vy = 0;
-      s.events.push({ kind: 'land' });
-      if (p.pose === 'jump') { p.pose = 'idle'; p.poseTick = 0; }
-      // [정본 재현] 공중 가드 유지 중 착지 → 지면 가드로 전이, 선딜 4f 재적용
-      else if (p.pose === 'guardA') { p.pose = 'guardG'; p.poseTick = 0; }
-    }
+    if (p.y <= 0) land(s, p);
   }
+}
+
+function land(s: GameState, p: PlayerState): void {
+  p.y = 0;
+  p.vy = 0;
+  s.events.push({ kind: 'land' });
+  if (p.pose === 'jump') { p.pose = 'idle'; p.poseTick = 0; }
+  // [정본 재현] 공중 가드 유지 중 착지 → 지면 가드로 전이, 선딜 4f 재적용
+  else if (p.pose === 'guardA') { p.pose = 'guardG'; p.poseTick = 0; }
 }
 
 function startAttack(p: PlayerState, fromAir: boolean): void {
@@ -160,20 +166,21 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
  * 점프가 13px 홉으로 소멸했다. 여기서는 **실제로 겹칠 때만** 개입하고, 밑면 아래에 설 자리가
  * 없으면(headroom ≤ 0) 좌표를 건드리지 않는다(그 구간은 깔림 판정 영역이다).
  * 필살 중에는 무적·전파괴라 개입하지 않는다.
+ *
+ * ③ 붙어 내려가기는 건물이 움직인 뒤 carryUnderStack이 맡는다(10-28) — ②만으로는 5차 중력이 건물보다
+ *   빨라 박고 7틱 만에 떨어져 나갔다.
  */
 function contactWithStack(s: GameState, p: PlayerState): void {
   const st = s.stack;
   if (!st || s.mode === 'bonus') return;
   if (p.pose === 'special' || p.pose === 'pinned' || p.pose === 'dead') return;
 
-  // [원작 이식] 포즈4 비대칭 (2026-08-30 사용자 확정): **공중 공격 중에는 밑면에 막히지 않는다 —
-  // 뚫으며 부순다.** 원작 `FUN_00405140` switch: 평범한 점프(3/0xe)=정지, 공중 공격(4)=파괴.
-  // 이 비대칭이 원작 게임감의 핵심 — 그냥 뛰면 머리를 박고, 뛰면서 베야 위로 길이 뚫린다.
-  // 파괴 자체는 기존 타격 파이프라인이 수행한다(무기 사거리 60~88 > 머리 높이 PLAYER.H 55라
-  // 접촉 시 밑층이 창 안 — tests/weapons.test.ts가 지킨다).
-  // 원작의 6프레임 선행 스윕은 터널링 방지용 — 리메이크는 틱당 상승 ≤ JUMP_V0/60 ≈ 23px < 층 68px라 불필요.
-  // 층이 살아남으면(고HP) 공격 종료 후 점프 포즈로 복귀하며 다시 막힘/눌림 — 원작과 동일 구조.
-  if (p.pose === 'attack' && p.attackFromAir) return;
+  // ★10-28 원작 대조 검수 · 사용자 결정: **공중 공격도 밑면에서 멈춘다.** 08-30에 넣은 「공중 공격 중엔
+  // 막히지 않는다(원작 포즈4 = 뚫으며 부순다)」를 거둔다. 원작은 닿은 층을 그 자리에서 부수지만,
+  // 여기선 층이 HP로 버티고 무너져도 위층이 그 자리로 내려앉아 밑면이 안 올라간다 — 접촉을 무시하면
+  // 몸이 건물 속 76px까지 들어갔다가 공격 끝 틱에 76px 아래로 순간이동했다(머리박음 동반).
+  // 비대칭은 남는다: 그냥 뛰면 박기만 하고, 뛰면서 베면 박는 자리에서 밑층이 깎인다(무기 사거리 60~88 >
+  // 머리 높이 PLAYER.H 55라 접촉 시 밑층이 창 안 — tests/weapons.test.ts가 지킨다).
 
   const headroom = st.y - PLAYER.H;
   if (p.y + PLAYER.H <= st.y) return; // 아직 안 닿았다
@@ -191,6 +198,33 @@ function contactWithStack(s: GameState, p: PlayerState): void {
     p.y = Math.max(0, headroom);
     if (st.vy < 0) p.vy = Math.min(p.vy, st.vy);
   }
+}
+
+/**
+ * ③ 밑면에 붙어 같이 내려가기 — 건물이 이번 틱 움직인 **뒤에** sim이 부른다.
+ *
+ * ★10-28 원작 대조 검수 · 사용자 결정: 원작 `FUN_00405140` 포즈3은 닿아 있는 동안 매 프레임 플레이어를
+ * 밑면에 다시 붙인다 — y가 물리가 아니라 건물 침하 속도를 따라간다(벤치마크 §5 세부 2). ②만으로는
+ * 5차 중력(1735)이 건물보다 빨라 박고 7틱 만에 떨어져 나가 먼저 착지했다(4차 204에선 74px까지 붙어 내려왔다).
+ * 그래서 닿아 있는 동안은 밑면에 맞추고 속도를 「건물 속도 + 한 틱 중력」으로 둔다 — 다음 틱 중력을
+ * 먹어도 건물보다 빨리 떨어지지 않아 계속 붙는다.
+ * - 실제로 닿아 있을 때만이다. 닿지도 않았는데 붙이던 cling(08-29, 아래)과 다르다.
+ * - 밑면이 멈추거나(resting) 올라가면(vy >= 0) 안 붙는다 — 따라 올라가지 않는다(wave0 비접착 가드).
+ * - 빠져나가는 길: 공중가드(건물 띄움 + 아래로 반동) · 공중 공격(밑층을 깎고 띄움) · 필살.
+ * - 건물이 움직인 뒤에 맞추는 건 그림 때문이다 — 앞에서 맞추면 그 틱에 내려온 만큼(4~16px) 머리가
+ *   밑면 위로 겹쳐 그려진다(플레이어를 건물보다 나중에 그린다).
+ */
+export function carryUnderStack(s: GameState, dt: number): void {
+  const p = s.player;
+  const st = s.stack;
+  if (!st || st.resting || st.vy >= 0 || s.mode === 'bonus' || p.y <= 0) return;
+  if (p.pose === 'special' || p.pose === 'pinned' || p.pose === 'dead') return;
+  // 0.5px = 붙어 내려가던 틱의 부동소수 오차만 받는다(튜닝값 아님)
+  if (p.y + PLAYER.H < st.y - 0.5) return;
+  if (p.vy > 0) s.events.push({ kind: 'headBonk' }); // 올라가다 이번 틱에 처음 닿았다
+  p.y = st.y - PLAYER.H;
+  p.vy = st.vy + PLAYER.GRAVITY * dt;
+  if (p.y <= 0) land(s, p);
 }
 
 // ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면

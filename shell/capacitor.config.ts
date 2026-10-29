@@ -10,6 +10,8 @@ const config: CapacitorConfig = {
   webDir: 'www',
   // 상태바 뒤 흰 띠 방지 — 앱 배경색과 일치 (levain 에뮬 실측)
   backgroundColor: '#F4F1E8',
+  // 시험판 껍데기 전용: CAP_SERVER_URL을 주고 sync하면 앱이 그 주소를 띄운다(껐다 켜면 새 판). 출시 빌드엔 주지 않는다.
+  ...(process.env.CAP_SERVER_URL ? { server: { url: process.env.CAP_SERVER_URL } } : {}),
   plugins: {
     // OTA — 자동 모드 금지. 확인·다운로드·적용 시점을 웹측 ota 포트가 직접 쥔다
     // (세션 중 화면 교체 금지·오프라인 우선). 정본: docs/RELEASE.md OTA 절.

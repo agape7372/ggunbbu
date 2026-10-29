@@ -11,6 +11,9 @@ function inp(o: Partial<InputFrame> = {}): InputFrame {
 // ★08-30 Wave 0 회귀 가드 — 구코드(8a9da28 cling·피어싱 착지·렌더 히트스톱)에서 빨갛다.
 // ★08-30 개정(사용자 지시 "통과 안 하고 막히는 거"): 밑면은 **막힌다**로 계약이 바뀌었다.
 // 바뀌지 않은 것 = cling이 죽인 것들: 접착·끌려 내려감·머리 위가 빈데도 점프가 소멸하는 것.
+// ★10-28(원작 대조 검수 · 사용자 결정): 「끌려 내려감」은 **닿아 있고 밑면이 내려오는 동안만** 돌아왔다
+// (원작 §5 세부 2 — player.ts carryUnderStack). 닿지 않았는데 붙는 것·위로 따라가는 것은 여전히 없다.
+// 같은 날 공중 공격 관통도 거뒀다 — 공중 공격도 밑면에서 멈추고 박는 자리에서 밑층을 깎는다.
 describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
   it('머리 위가 비면 점프는 그대로다 — 정점 250px 이상', () => {
     const s = makeState();
@@ -89,7 +92,7 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
     expect(s.player.y).toBeLessThanOrEqual(before + 0.01);
   });
 
-  it('[원작 이식] 공중 공격은 밑면에 막히지 않는다 — 뚫으며 부순다 (포즈4 비대칭)', () => {
+  it('공중 공격도 밑면에서 멈추고, 박는 자리에서 밑층을 깎는다 (10-28 — 관통 거둠)', () => {
     const s = makeState();
     s.stackSpawnCd = 100000;
     s.stack = makeStack({
@@ -102,19 +105,99 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
     s.stack.vy = 0;
     const floorsBefore = s.stack.floors.length;
     advance(s, inp({ jump: true }));
-    // 상승 중에 공중 공격 개시. ★08-30 5차: 점프가 23px/틱으로 빨라져 y≥70을 기다리면
-    // 같은 틱에 밑면(140−55=85)에 막혀 vy가 0이 된 뒤 공격이 시작된다 — 관통할 상승분이 없다.
+    // 상승 중에 공중 공격 개시(밑면 85에 닿기 전).
     for (let i = 0; i < 60 && s.player.y < 40; i++) advance(s, inp());
     advance(s, inp({ attack: true }));
     let maxY = 0;
     for (let i = 0; i < 25; i++) {
+      // 타격은 스택을 밀어올린다(HIT_LIFT_V) — 매 틱 제자리에 못 박아 막힘 상한을 상수로 둔다.
+      s.stack!.y = 140;
+      s.stack!.vy = 0;
+      s.stack!.resting = true;
       advance(s, inp());
       maxY = Math.max(maxY, s.player.y);
     }
-    // 평범한 점프의 막힘 상한(밑면140−키55=85)을 넘어 올라간다 = 관통
-    expect(maxY).toBeGreaterThan(85 + 1);
-    // 뚫기만 하는 게 아니라 부순다 — 밑층이 줄었다
+    // 평범한 점프와 같은 막힘 상한(밑면140−키55=85) — 몸이 건물 속으로 들어가지 않는다
+    expect(maxY).toBeLessThanOrEqual(85 + 0.01);
+    // 그래도 깎는다 — 그냥 뛰면 박기만 하고, 뛰면서 베면 밑층이 준다(비대칭은 남는다)
     expect(s.stack!.floors.length).toBeLessThan(floorsBefore);
+  });
+
+  it('공중 공격 연타로도 몸이 건물 속에 안 들어간다 — 76px 파고듦·순간이동 재발 가드 (10-28)', () => {
+    for (const mat of ['hard', 'weak'] as const) {
+      const s = makeState();
+      s.stackSpawnCd = 100000;
+      s.stack = makeStack({
+        variant: 'building',
+        theme: 'europe',
+        floors: [makeFloor(mat), makeFloor(mat), makeFloor(mat), makeFloor(mat), makeFloor(mat)],
+        y: 420,
+      });
+      advance(s, inp({ jump: true }));
+      let maxPen = 0;
+      for (let t = 0; t < 200 && s.player.pose !== 'pinned'; t++) {
+        advance(s, inp({ attack: t % 3 === 0 }));
+        if (s.stack && s.player.y > 0) maxPen = Math.max(maxPen, s.player.y + PLAYER.H - s.stack.y);
+      }
+      expect(maxPen, mat).toBeLessThanOrEqual(0.5); // 옛 관통: 76px
+    }
+  });
+
+  it('머리를 박은 뒤 내려오는 밑면에 붙어 지면까지 같이 내려간다 — 원작 §5 세부 2 (10-28)', () => {
+    // ★옛 코드: 박고 7틱 만에 떨어져 나가 건물보다 먼저 착지했다(5차 중력 1735 > 건물 낙하).
+    const s = makeState();
+    s.stackSpawnCd = 100000;
+    s.stack = makeStack({
+      variant: 'building',
+      theme: 'europe',
+      floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard'), makeFloor('hard')],
+      y: 260,
+    });
+    advance(s, inp({ jump: true }));
+    let bonked = false;
+    let carried = 0;
+    for (let i = 0; i < 300 && s.player.pose !== 'pinned'; i++) {
+      const before = s.events.length;
+      advance(s, inp());
+      if (s.events.slice(before).some((e) => e.kind === 'headBonk')) bonked = true;
+      if (bonked && s.player.y > 0) {
+        // 밑면에서 떨어져 나가지도, 밑면 위로 겹쳐 그려지지도 않는다
+        expect(Math.abs(s.stack!.y - (s.player.y + PLAYER.H))).toBeLessThan(0.5);
+        carried += 1;
+      }
+    }
+    expect(bonked).toBe(true);
+    expect(carried).toBeGreaterThan(10);
+    expect(s.player.pose).toBe('pinned'); // 못 부수고 버티기만 하면 깔린다
+  });
+
+  it('붙어 내려가다 공중 가드를 쥐면 건물을 띄우고 빠져나온다 (10-28)', () => {
+    const s = makeState();
+    s.stackSpawnCd = 100000;
+    s.stack = makeStack({
+      variant: 'building',
+      theme: 'europe',
+      floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard'), makeFloor('hard')],
+      y: 260,
+    });
+    advance(s, inp({ jump: true }));
+    let carried = 0;
+    for (let i = 0; i < 100 && carried < 5; i++) {
+      advance(s, inp());
+      if (s.player.y > 0 && Math.abs(s.stack!.y - (s.player.y + PLAYER.H)) < 0.5) carried += 1;
+    }
+    expect(carried).toBe(5); // 붙어 내려가는 중
+    let bounced = false;
+    for (let i = 0; i < 8 && !bounced; i++) {
+      const before = s.events.length;
+      advance(s, inp({ guard: true }));
+      bounced = s.events.slice(before).some((e) => e.kind === 'guardAirBounce');
+    }
+    expect(bounced).toBe(true);
+    for (let i = 0; i < 120 && s.player.y > 0; i++) advance(s, inp());
+    expect(s.player.y).toBe(0);
+    expect(s.player.pose).not.toBe('pinned');
+    expect(s.stack!.y).toBeGreaterThan(PLAYER.H); // 건물보다 먼저 내려와 섰다
   });
 
   it('정지 스택 아래에서도 점프는 즉시 발동한다 (13px 홉 소멸 방지)', () => {
@@ -142,8 +225,8 @@ describe('Wave 0/08-30: 밑면은 막히되 접착은 없다', () => {
 });
 
 // ★09-05(P2-1): 가드 브레이크가 공중에서 'idle'로 복귀하던 결함.
-// 'idle'은 지면 상태다 — 그 위에서 공격하면 attackFromAir가 죽어 밑면 관통이 무효가 되고,
-// 가드를 누르면 허공인데도 지면가드(guardG)가 성립한다.
+// 'idle'은 지면 상태다 — 그 위에서 공격하면 attackFromAir가 죽어 지면 공격으로 셈되고
+// (10-28부터 지면 공격 중엔 점프 버퍼가 묶인다), 가드를 누르면 허공인데도 지면가드(guardG)가 성립한다.
 describe('공중 가드 브레이크는 점프 상태로 복귀한다 (09-05 P2-1)', () => {
   /** 공중에서 게이지를 터뜨려 guardBreak 스턴이 끝난 직후 상태를 만든다. */
   function airGuardBreakDone(): GameState {
@@ -167,7 +250,7 @@ describe('공중 가드 브레이크는 점프 상태로 복귀한다 (09-05 P2-
     expect(s.player.pose).toBe('jump');
   });
 
-  it('이어지는 공격은 attackFromAir=true — 밑면을 관통하며 층을 깎는다', () => {
+  it('이어지는 공격은 attackFromAir=true — 밑면에서 멈추고 층을 깎는다', () => {
     const s = airGuardBreakDone();
     // 머리 위 24px에 밑면이 오도록 정지 스택을 놓는다. 평범한 점프의 상한 = ceil.
     const ceil = s.player.y + 24;
@@ -187,15 +270,14 @@ describe('공중 가드 브레이크는 점프 상태로 복귀한다 (09-05 P2-
 
     let maxY = 0;
     for (let i = 0; i < 20; i++) {
-      // 타격은 스택을 밀어올린다(HIT_LIFT_V) — 밑면이 도망가면 "관통했다"와 "천장이 비켰다"를
-      // 구분할 수 없다. 매 틱 제자리에 못 박아 ceil을 상수로 만든다.
+      // 타격은 스택을 밀어올린다(HIT_LIFT_V) — 매 틱 제자리에 못 박아 ceil을 상수로 만든다.
       s.stack!.y = stackY;
       s.stack!.vy = 0;
       s.stack!.resting = true;
       advance(s, EMPTY_INPUT);
       maxY = Math.max(maxY, s.player.y);
     }
-    expect(maxY).toBeGreaterThan(ceil + 1); // 막힘 상한을 넘었다 = 관통
+    expect(maxY).toBeLessThanOrEqual(ceil + 0.01); // 막힘 상한에서 멈춘다(10-28 관통 거둠)
     expect(s.stack!.floors.length).toBeLessThan(floorsBefore);
   });
 

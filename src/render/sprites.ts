@@ -5,7 +5,7 @@
 
 import type {
   PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
-  FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId,
+  FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId, GreatswordId,
 } from '../core/types';
 import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS } from '../config';
 import { drawAsset, drawAssetHalo, hasAsset } from './assets';
@@ -329,27 +329,44 @@ function drawTileInstance(
   drawCrackOverlay(ctx, x, y, w, h, seg.hp, seg.maxHp);
 }
 
+/** 층 그림 캔버스(PNG 조각 → 프로시저럴 폴백). 부서진 층의 조각이 그 층 무늬를 그대로 들고 날아가게 한다. */
+export function floorTile(mat: Material, theme: Theme, index: number, count: number,
+  gimmick: GimmickId = 'none'): HTMLCanvasElement | undefined {
+  initSprites();
+  const materialKey = floorMaterialKey(mat, theme);
+  return floorSheetTile(floorImageKey(mat, theme, index, count, gimmick)) ?? floorSheetTile(materialKey)
+    ?? tileCache!.get(materialKey);
+}
+
 // ══════════════════════════════════════════════════════════════
 // 플레이어 "뿌뿌" — 졸라맨 라인아트. 얼굴 없음(빈 원 머리), 선+원 조합만 사용.
 // 원작(대불·사무라이) 도상 금지 — 순수 창작 도안.
 // ══════════════════════════════════════════════════════════════
 /** ax/ay = 캔버스 안 발 기준점(논리 px), hx/hy = 기준점에서 본 머리 중심(안전모 자리). */
-interface PFrame { cv: HTMLCanvasElement; ax: number; ay: number; hx: number; hy: number; }
+/** blade = 대검의 손 → 칼끝(발 기준). 칼 기운(bladeFx)이 칼날을 따라 피어난다 */
+interface PFrame { cv: HTMLCanvasElement; ax: number; ay: number; hx: number; hy: number; blade: Seg | null }
+type Seg = readonly [number, number, number, number];
+/** 지금 굽는 프레임에 그린 대검 — weapon()이 적고 pframe()이 가져간다 */
+let bakedBlade: Seg | null = null;
 
 // 졸라맨 프레임만 2배로 굽고 절반으로 찍는다 — 칼 아닌 무기는 늘 프로시저럴이라 계단이 보인다.
 const SS = 2;
 // 쇠머리·갈고리·원판·참격 호가 캔버스 끝에서 잘리지 않게 사방 여백(논리 px).
-const PAD = 6;
+// 대검 참격 호가 가장 멀리 나간다 — 서리 얼음 조각이 넓은 프레임 오른쪽 +17, 위는 호 끝 −6
+const PAD = 20;
 
 function mkFrame(w: number, h: number): { cv: HTMLCanvasElement; c: CanvasRenderingContext2D } {
   const r = mkCanvas((w + PAD * 2) * SS, (h + PAD * 2) * SS);
   r.c.scale(SS, SS);
   r.c.translate(PAD, PAD);
+  bakedBlade = null;
   return r;
 }
 
 function pframe(cv: HTMLCanvasElement, ax: number, ay: number, headX: number, headY: number): PFrame {
-  return { cv, ax: ax + PAD, ay: ay + PAD, hx: headX - ax, hy: headY - ay };
+  const b = bakedBlade;
+  const blade: Seg | null = b && [b[0] - ax, b[1] - ay, b[2] - ax, b[3] - ay];
+  return { cv, ax: ax + PAD, ay: ay + PAD, hx: headX - ax, hy: headY - ay, blade };
 }
 type PlayerFrameKey =
   | 'idle' | 'jump' | 'attack0' | 'attack1' | 'attack2'
@@ -485,8 +502,268 @@ function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, 
   c.stroke();
 }
 
-/** 무기: 손(hx,hy)과 방향(→tx,ty)은 포즈 그대로, 길이·머리 모양만 장착 무기별로 바꾼다. */
-function weapon(c: CanvasRenderingContext2D, hx: number, hy: number, tx: number, ty: number): void {
+// ── 대검 ─────────────────────────────────────────────────────
+// 종마다 칼날 모양·색만 다르고 쥐는 자세는 하나(포즈마다 weapon()의 great 좌표). 칼은 졸라맨 키의 절반을 넘는다 —
+// 가는 선 졸라맨이 굵은 칼날을 든 대비가 대검의 맛. 테두리는 몸 색(LINE)이 아니라 잉크: 칼은 따로 선 물건이다.
+type GreatShape = 'plain' | 'saw' | 'stripe' | 'beam' | 'wave' | 'crystal' | 'jag' | 'royal';
+export interface GreatLook {
+  shape: GreatShape;
+  blade: string;  // 칼날
+  hi: string;     // 날 위 빛줄
+  guard: string;  // 코등이·자루 끝
+  w: number;      // 칼날 반폭(논리 px)
+  glow?: string;  // 칼날 뒤로 번지는 기운
+  edge?: string;  // 붉은 날 선(흑철) · 보석(황금)
+}
+const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
+  iron: { shape: 'plain', blade: '#B9B4A8', hi: '#EFECE3', guard: '#5C574E', w: 2.7 },
+  saw: { shape: 'saw', blade: '#98A3AB', hi: '#E3E9ED', guard: '#3E4549', w: 2.6 },
+  hazard: { shape: 'stripe', blade: PALETTE.YELLOW, hi: '#FFF0A0', guard: PALETTE.INK, w: 3 },
+  beam: { shape: 'beam', blade: '#C2552D', hi: '#EA9068', guard: '#5A2A18', w: 3.3 },
+  flame: { shape: 'wave', blade: '#E0401E', hi: '#FFB46B', guard: '#3A1A12', w: 2.8, glow: '#FF8A1F' },
+  frost: { shape: 'crystal', blade: '#BDE6F6', hi: '#FFFFFF', guard: '#3D6E8C', w: 2.9, glow: '#7FD3FF' },
+  onyx: { shape: 'jag', blade: '#2E2D34', hi: '#625F6D', guard: PALETTE.INK, w: 3, edge: '#D2332C' },
+  gold: { shape: 'royal', blade: '#E2B43A', hi: '#FFF1B8', guard: '#8A5A12', w: 3.2, edge: PALETTE.RED },
+};
+
+/** 대검이면 그 모양·색 — 베기 파편(effects)도 같은 색을 쓴다 */
+export function greatLook(w: WeaponId): GreatLook | undefined {
+  return (GREAT_LOOK as Partial<Record<WeaponId, GreatLook>>)[w];
+}
+
+function seg(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string, w: number): void {
+  c.strokeStyle = color;
+  c.lineWidth = w;
+  c.beginPath();
+  c.moveTo(x0, y0);
+  c.lineTo(x1, y1);
+  c.stroke();
+}
+
+/** 잉크 테두리 점 — 자루 끝·보석 */
+function knob(c: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string): void {
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.fillStyle = fill;
+  c.fill();
+  c.strokeStyle = PALETTE.INK;
+  c.lineWidth = 1;
+  c.stroke();
+}
+
+/** 칼날 윤곽 — 손 쪽 b에서 칼끝 L까지, 반폭 h. 눕힌 좌표(칼끝 = +x, 등 = −y) */
+function bladePath(c: CanvasRenderingContext2D, shape: GreatShape, b: number, L: number, h: number): void {
+  const t = L - h * 2.4; // 칼끝 비탈이 시작되는 곳
+  c.beginPath();
+  switch (shape) {
+    case 'saw': // 등이 톱니
+      c.moveTo(b, h);
+      c.lineTo(t, h);
+      c.lineTo(L, 0);
+      for (let x = t; x > b + 2; x -= 3) {
+        c.lineTo(x, -h);
+        c.lineTo(x - 1.4, -h - 1.8);
+      }
+      c.lineTo(b, -h);
+      break;
+    case 'stripe': // 공사 차단봉처럼 비스듬히 자른 끝
+      c.moveTo(b, -h);
+      c.lineTo(L - h * 1.6, -h);
+      c.lineTo(L, h);
+      c.lineTo(b, h);
+      break;
+    case 'beam': // H빔 토막 — 끝이 뭉툭
+      c.rect(b, -h, L - b, h * 2);
+      break;
+    case 'wave': // 물결날
+      c.moveTo(b, -h);
+      for (let x = b; x <= t; x += 1) c.lineTo(x, -h - 0.9 * Math.sin((x - b) / 2.2));
+      c.lineTo(L, 0);
+      for (let x = t; x >= b; x -= 1) c.lineTo(x, h + 0.9 * Math.sin((x - b) / 2.2));
+      break;
+    case 'crystal': { // 깎은 얼음
+      const s = (L - b) / 6;
+      c.moveTo(b, -h * 0.8);
+      c.lineTo(b + s, -h * 1.15);
+      c.lineTo(b + s * 2, -h * 0.75);
+      c.lineTo(b + s * 3, -h * 1.2);
+      c.lineTo(b + s * 4.4, -h * 0.8);
+      c.lineTo(L, 0);
+      c.lineTo(b + s * 4.6, h * 0.95);
+      c.lineTo(b + s * 3.4, h * 0.7);
+      c.lineTo(b + s * 2.2, h * 1.15);
+      c.lineTo(b + s, h * 0.75);
+      c.lineTo(b, h * 0.9);
+      break;
+    }
+    case 'jag': { // 아래 날에 미늘 셋
+      const s = (L - b) / 4;
+      c.moveTo(b, -h);
+      c.lineTo(L - h * 2.6, -h);
+      c.lineTo(L, -h * 0.3);
+      c.lineTo(L - h * 1.4, h * 0.7);
+      for (let k = 3; k >= 1; k--) {
+        const x = b + s * k;
+        c.lineTo(x, h);
+        c.lineTo(x - s * 0.3, h * 1.9);
+        c.lineTo(x - s * 0.5, h);
+      }
+      c.lineTo(b, h);
+      break;
+    }
+    case 'royal': // 넓은 날 + 긴 칼끝
+      c.moveTo(b, -h);
+      c.lineTo(t - h, -h * 1.05);
+      c.lineTo(L, 0);
+      c.lineTo(t - h, h * 1.05);
+      c.lineTo(b, h);
+      break;
+    default: // 곧은 양날
+      c.moveTo(b, -h);
+      c.lineTo(t, -h);
+      c.lineTo(L, 0);
+      c.lineTo(t, h);
+      c.lineTo(b, h);
+  }
+  c.closePath();
+}
+
+/** 칼날 위 무늬 — 채움 뒤, 테두리 앞 */
+function bladeMarks(c: CanvasRenderingContext2D, g: GreatLook, b: number, L: number, h: number): void {
+  switch (g.shape) {
+    case 'stripe': // 검정 사선 띠 — 칼날 안에서만
+      c.save();
+      bladePath(c, 'stripe', b, L, h);
+      c.clip();
+      c.strokeStyle = PALETTE.INK;
+      c.lineWidth = 2.2;
+      c.beginPath();
+      for (let x = b - h * 2; x < L; x += 5.5) {
+        c.moveTo(x, h + 1);
+        c.lineTo(x + h * 2 + 2, -h - 1);
+      }
+      c.stroke();
+      c.restore();
+      return;
+    case 'beam': { // 위아래 날개 금 + 볼트 줄, 위 날개에 빛줄
+      seg(c, b, -h * 0.42, L, -h * 0.42, g.guard, 0.8);
+      seg(c, b, h * 0.42, L, h * 0.42, g.guard, 0.8);
+      seg(c, b + 1, -h + 0.8, L - 1, -h + 0.8, g.hi, 0.8);
+      c.fillStyle = g.guard;
+      for (let x = b + 4; x < L - 2; x += 6) {
+        c.beginPath();
+        c.arc(x, 0, 0.75, 0, Math.PI * 2);
+        c.fill();
+      }
+      return;
+    }
+    case 'crystal': { // 깎인 면 — 흰 금
+      const s = (L - b) / 6;
+      c.strokeStyle = g.hi;
+      c.lineWidth = 0.8;
+      c.beginPath();
+      c.moveTo(b + s, -h * 1.15);
+      c.lineTo(b + s * 1.7, h * 0.3);
+      c.moveTo(b + s * 3, -h * 1.2);
+      c.lineTo(b + s * 3.6, h * 0.35);
+      c.moveTo(b + 1, -0.2);
+      c.lineTo(L - 3, -0.4);
+      c.stroke();
+      return;
+    }
+    case 'jag': { // 붉은 날 선 + 어두운 빛줄
+      const red = g.edge ?? PALETTE.RED;
+      seg(c, b + 1, -h + 0.75, L - h * 2.6, -h + 0.75, red, 1);
+      seg(c, L - h * 2.6, -h + 0.75, L - 1.2, -h * 0.3, red, 1);
+      seg(c, b + 2, h * 0.2, L - h * 3, h * 0.2, g.hi, 0.8);
+      return;
+    }
+    case 'royal': // 가운데 등줄 + 빛줄
+      seg(c, b + 1, 0, L - h * 1.5, 0, g.guard, 0.8);
+      seg(c, b + 2, -h * 0.5, L - h * 3, -h * 0.5, g.hi, 1);
+      return;
+    default: // 빛줄 하나 — 손 쪽에서 칼끝 비탈 앞까지
+      seg(c, b + 2, -h * 0.4, L - h * 2.8, -h * 0.4, g.hi, 1);
+  }
+}
+
+/** 코등이 — 칼날 바로 앞 가로대. 황금은 끝이 벌어지고 가운데 보석, 흑철은 가시 */
+function crossGuard(c: CanvasRenderingContext2D, g: GreatLook, h: number): void {
+  const e = h + 3; // 반길이
+  c.beginPath();
+  if (g.shape === 'royal') {
+    c.moveTo(-0.6, -e - 1.4);
+    c.lineTo(2.8, -e + 0.6);
+    c.lineTo(2.8, e - 0.6);
+    c.lineTo(-0.6, e + 1.4);
+    c.lineTo(0.8, 0);
+  } else if (g.shape === 'jag') {
+    c.moveTo(-1, -e - 1.6);
+    c.lineTo(2.6, -h);
+    c.lineTo(2.6, h);
+    c.lineTo(-1, e + 1.6);
+    c.lineTo(0.6, 0);
+  } else {
+    c.rect(0, -e, 2.4, e * 2);
+  }
+  c.closePath();
+  c.fillStyle = g.guard;
+  c.fill();
+  c.strokeStyle = PALETTE.INK;
+  c.lineWidth = 1;
+  c.stroke();
+  if (g.shape === 'royal') knob(c, 1.3, 0, 1.3, g.edge ?? PALETTE.RED);
+}
+
+/** 대검 — 손(hx,hy)에서 칼끝(tx,ty)까지가 칼날, 자루는 손 뒤로. 눕힌 좌표로 그린다 */
+function greatsword(c: CanvasRenderingContext2D, g: GreatLook, hx: number, hy: number, tx: number, ty: number): void {
+  const L = Math.hypot(tx - hx, ty - hy);
+  const h = g.w;
+  const b = 2.4; // 칼날은 코등이 바로 앞에서
+  c.save();
+  c.translate(hx, hy);
+  c.rotate(Math.atan2(ty - hy, tx - hx));
+  c.lineJoin = 'round';
+  c.lineCap = 'round';
+  seg(c, -6, 0, 0, 0, PALETTE.INK, 2.2); // 자루
+  knob(c, -7, 0, 1.5, g.shape === 'royal' ? g.edge ?? PALETTE.RED : g.guard);
+  if (g.glow) { // 칼날 뒤로 번지는 기운
+    c.globalAlpha = 0.35;
+    seg(c, b + 2, 0, L - 2, 0, g.glow, h * 2 + 5);
+    c.globalAlpha = 1;
+  }
+  bladePath(c, g.shape, b, L, h);
+  c.fillStyle = g.blade;
+  c.fill();
+  bladeMarks(c, g, b, L, h);
+  bladePath(c, g.shape, b, L, h);
+  c.strokeStyle = PALETTE.INK;
+  c.lineWidth = LINE_W;
+  c.stroke();
+  crossGuard(c, g, h);
+  c.restore();
+}
+
+/** 대검 하나만 — 상점 그림. 판 속 칼과 같은 그리기에 손·칼끝만 받는다. 대검이 아니면 false */
+export function drawGreatsword(c: CanvasRenderingContext2D, w: WeaponId, hx: number, hy: number, tx: number, ty: number): boolean {
+  const g = greatLook(w);
+  if (g) greatsword(c, g, hx, hy, tx, ty);
+  return g !== undefined;
+}
+
+/** 무기: 손(hx,hy)과 방향(→tx,ty)은 포즈 그대로, 길이·머리 모양만 장착 무기별로 바꾼다.
+ *  great = 대검일 때의 [손x, 손y, 칼끝x, 칼끝y] — 칼이 길어 바닥·머리를 뚫지 않게 포즈마다 따로 잡는다 */
+function weapon(
+  c: CanvasRenderingContext2D, hx: number, hy: number, tx: number, ty: number,
+  great?: readonly [number, number, number, number],
+): void {
+  const g = greatLook(playerWeapon);
+  if (g) {
+    const [gx, gy, gtx, gty] = great ?? [hx, hy, tx, ty];
+    greatsword(c, g, gx, gy, gtx, gty);
+    bakedBlade = [gx, gy, gtx, gty];
+    return;
+  }
   const L = Math.hypot(tx - hx, ty - hy) || 1;
   const ux = (tx - hx) / L, uy = (ty - hy) / L;
   const nx = -uy, ny = ux;
@@ -542,8 +819,198 @@ function weapon(c: CanvasRenderingContext2D, hx: number, hy: number, tx: number,
   }
 }
 
+// ── 대검 참격 호 ─────────────────────────────────────────────
+// 칼끝(발 +46,−4)에서 머리 위 뒤(+20,−66)까지 한 곡선 위에 칼마다 다른 띠를 그린다. t = 0이 칼끝 쪽(지금 칼이 있는 곳),
+// 1이 휘두르기 시작한 쪽 — 칼끝 쪽이 두껍고 꼬리로 가늘어진다. 띠 몸통은 칼빛(ARC)이라 상점 칼빛이 대검에서도 산다.
+const GA = [WCX + 46, 56, WCX + 62, 18, WCX + 20, -6] as const;
+
+/** 호 위의 점 — 볼록한 바깥 쪽 법선으로 off만큼(음수면 몸 쪽) */
+function arcAt(t: number, off: number): [number, number] {
+  const [x0, y0, x1, y1, x2, y2] = GA;
+  const u = 1 - t;
+  const dx = u * (x1 - x0) + t * (x2 - x1);
+  const dy = u * (y1 - y0) + t * (y2 - y1);
+  const d = Math.hypot(dx, dy) || 1;
+  return [u * u * x0 + 2 * u * t * x1 + t * t * x2 - (dy / d) * off, u * u * y0 + 2 * u * t * y1 + t * t * y2 + (dx / d) * off];
+}
+
+/** 참격 두께 0 → 1 → 0, 고점은 칼끝 쪽(t ≈ 0.33) */
+const smear = (t: number): number => Math.sin(Math.PI * t ** 0.65);
+
+/** 호를 따라 가는 선 — t0 → t1을 n칸으로 끊는다(cont = 앞 선에 이어 그림) */
+function arcPath(c: CanvasRenderingContext2D, off: (t: number, i: number) => number, n = 24, t0 = 0, t1 = 1, cont = false): void {
+  for (let i = 0; i <= n; i++) {
+    const t = t0 + ((t1 - t0) * i) / n;
+    const [x, y] = arcAt(t, off(t, i));
+    if (i === 0 && !cont) c.moveTo(x, y);
+    else c.lineTo(x, y);
+  }
+}
+
+/** 호를 따라 띠 — 바깥 두께 out, 몸 쪽 두께 inn. 칸이 적으면 각진다(서리) */
+function arcBand(
+  c: CanvasRenderingContext2D, out: (t: number, i: number) => number, inn: (t: number) => number, n = 24, t0 = 0, t1 = 1,
+): void {
+  c.beginPath();
+  arcPath(c, out, n, t0, t1);
+  arcPath(c, (t) => -inn(t), n, t1, t0, true);
+  c.closePath();
+}
+
+/** 네 갈래 반짝 별 — 황금 호·베기 파편. 잉크 테두리라 밝은 바탕에서도 보인다 */
+export function twinkleStar(c: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string): void {
+  c.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4 - Math.PI / 2;
+    const rr = k % 2 ? r * 0.32 : r;
+    c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  c.closePath();
+  c.fillStyle = fill;
+  c.fill();
+  c.strokeStyle = PALETTE.INK;
+  c.lineWidth = 0.7;
+  c.stroke();
+}
+
+/** 대검 참격 호 — 칼마다 모양·덧칠이 다르고 몸통은 칼빛 */
+function greatArc(c: CanvasRenderingContext2D, g: GreatLook): void {
+  const crescent = (T: number): void => arcBand(c, (t) => T * 0.3 * smear(t), (t) => T * 0.7 * smear(t));
+  const base = c.globalAlpha; // 잔상(drawGreatArc)은 옅게 그린다 — 덧칠 알파는 그 위에 곱한다
+  const paint = (color: string, a = 1): void => {
+    c.globalAlpha = base * a;
+    c.fillStyle = color;
+    c.fill();
+    c.globalAlpha = base;
+  };
+  const line = (color: string, w: number): void => {
+    c.strokeStyle = color;
+    c.lineWidth = w;
+    c.stroke();
+  };
+  c.save();
+  c.lineJoin = 'round';
+  c.lineCap = 'round';
+  switch (g.shape) {
+    case 'saw': // 바깥 날이 톱니
+      arcBand(c, (t, i) => (i % 2 ? 4.8 : 2.2) * smear(t), (t) => 5 * smear(t));
+      paint(ARC);
+      line(PALETTE.INK, 0.8);
+      break;
+    case 'stripe': // 차단봉 빗금 띠
+      crescent(9);
+      paint(ARC);
+      c.save();
+      c.clip();
+      c.beginPath();
+      for (let k = -70; k < 90; k += 6.5) {
+        c.moveTo(k, -20);
+        c.lineTo(k + 80, 60);
+      }
+      line(PALETTE.INK, 2.4);
+      c.restore();
+      crescent(9);
+      line(PALETTE.INK, 0.8);
+      break;
+    case 'beam': // 뭉툭하고 굵은 철골 토막 + 리벳 — 짧게 끊는다
+      arcBand(c, () => 7.5, () => 7.5, 16, 0, 0.8);
+      paint(ARC, 0.22);
+      arcBand(c, () => 4.5, () => 4.5, 16, 0.03, 0.7);
+      paint(ARC);
+      line(PALETTE.INK, 1);
+      c.fillStyle = PALETTE.INK;
+      for (const t of [0.13, 0.28, 0.43, 0.58]) {
+        const [x, y] = arcAt(t, 0);
+        c.beginPath();
+        c.arc(x, y, 1.1, 0, Math.PI * 2);
+        c.fill();
+      }
+      break;
+    case 'wave': // 바깥으로 날름이는 불혀(뾰족한 끝 = 1 − |sin|), 속은 칼빛
+      arcBand(c, (t) => (2.5 + 3.5 * (1 - Math.abs(Math.sin(t * 16)))) * smear(t), (t) => 6 * smear(t), 40);
+      paint(g.glow ?? g.blade, 0.9);
+      arcBand(c, (t) => 1.2 * smear(t), (t) => 4.4 * smear(t));
+      paint(ARC);
+      break;
+    case 'crystal': { // 각진 얼음 + 흰 결 + 떨어져 나간 조각 셋
+      const out = (t: number): number => 3 * smear(t);
+      const inn = (t: number): number => 5.5 * smear(t);
+      arcBand(c, out, inn, 7);
+      paint(ARC);
+      c.beginPath();
+      for (let i = 1; i < 7; i++) {
+        const [ax, ay] = arcAt(i / 7, out(i / 7));
+        const [bx, by] = arcAt((i + 1) / 7, -inn((i + 1) / 7));
+        c.moveTo(ax, ay);
+        c.lineTo(bx, by);
+      }
+      line(g.hi, 0.8);
+      arcBand(c, out, inn, 7);
+      line(PALETTE.INK, 0.8);
+      for (const [t, r] of [[0.18, 2.6], [0.4, 2.2], [0.62, 1.8]] as const) {
+        const [x, y] = arcAt(t, out(t) + 3.5 + r);
+        c.beginPath();
+        c.moveTo(x, y - r);
+        c.lineTo(x + r * 0.9, y + r * 0.7);
+        c.lineTo(x - r * 0.8, y + r * 0.5);
+        c.closePath();
+        paint(g.blade);
+        line(PALETTE.INK, 0.7);
+      }
+      break;
+    }
+    case 'jag': // 검은 기운에 싸인 초승달 — 바깥은 붉은 날, 몸 쪽으로 미늘
+      arcBand(c, (t) => 4.5 * smear(t), (t) => 8.5 * smear(t));
+      paint(PALETTE.INK, 0.9);
+      c.beginPath();
+      for (const t of [0.22, 0.42, 0.62]) {
+        const s = smear(t);
+        const [ax, ay] = arcAt(t - 0.05, -8 * s);
+        const [bx, by] = arcAt(t + 0.01, -11.5 * s);
+        const [cx, cy] = arcAt(t + 0.06, -8 * s);
+        c.moveTo(ax, ay);
+        c.lineTo(bx, by);
+        c.lineTo(cx, cy);
+      }
+      paint(PALETTE.INK, 0.9);
+      crescent(7);
+      paint(ARC);
+      c.beginPath();
+      arcPath(c, (t) => 4.5 * smear(t));
+      line(g.edge ?? PALETTE.RED, 1.4);
+      break;
+    case 'royal': // 금테 두른 초승달 + 반짝 별 셋
+      crescent(9);
+      paint(ARC);
+      c.beginPath();
+      arcPath(c, (t) => 2.7 * smear(t));
+      line(g.blade, 1.8);
+      crescent(9);
+      line(PALETTE.INK, 0.6);
+      for (const [t, r] of [[0.12, 4.2], [0.5, 3.2], [0.85, 2.4]] as const) {
+        const [x, y] = arcAt(t, 2.7 * smear(t));
+        twinkleStar(c, x, y, r, g.hi);
+      }
+      break;
+    default: // 무쇠 — 군더더기 없는 두꺼운 초승달 + 옅은 잔상, 바깥 날만 잉크
+      crescent(15);
+      paint(ARC, 0.25);
+      crescent(8);
+      paint(ARC);
+      c.beginPath();
+      arcPath(c, (t) => 2.4 * smear(t));
+      line(PALETTE.INK, 0.9);
+  }
+  c.restore();
+}
+
 /** attack 타격 프레임의 참격 호 — 무기별 모양, 호는 하나. */
 function slashArc(c: CanvasRenderingContext2D): void {
+  const g = greatLook(playerWeapon);
+  if (g) {
+    greatArc(c, g);
+    return;
+  }
   c.strokeStyle = ARC;
   c.lineCap = 'round';
   c.beginPath();
@@ -588,7 +1055,7 @@ function buildIdle(): PFrame {
   stroke(c, [[CX, HIP_Y], [CX + 7, FOOT_Y]]);                   // 오른다리(살짝 벌림)
   stroke(c, [[CX, SHOULDER_Y], [CX - 9, 34]]);                  // 왼팔 — 자연스럽게 늘어짐
   stroke(c, [[CX, SHOULDER_Y], [CX + 9, 30]]);                  // 오른팔 — 칼을 다리 바깥쪽으로
-  weapon(c, CX + 9, 30, CX + 13, 55);
+  weapon(c, CX + 9, 30, CX + 13, 55, [CX + 9, 30, CX + 25, 59]); // 대검은 칼끝을 앞 바닥에 댄다
   return pframe(cv, CX, FOOT_Y, CX, HEAD_Y);
 }
 
@@ -600,7 +1067,7 @@ function buildJump(): PFrame {
   stroke(c, [[CX, HIP_Y - 2], [CX + 8, HIP_Y + 4], [CX + 10, 52]]);
   stroke(c, [[CX, SHOULDER_Y - 1], [CX - 10, 30]]);
   stroke(c, [[CX, SHOULDER_Y - 1], [CX + 9, 30]]);
-  weapon(c, CX + 9, 30, CX + 16, 44);                              // 칼은 뒤로 흘림
+  weapon(c, CX + 9, 30, CX + 16, 44, [CX + 9, 30, CX + 24, 58]);    // 칼은 뒤로 흘림
   return pframe(cv, CX, FOOT_Y, CX, HEAD_Y - 1);
 }
 
@@ -609,13 +1076,14 @@ function buildAttack(stage: 0 | 1 | 2): PFrame {
   let head: [number, number]; // 안전모 자리 — 각 분기 circle()과 같은 값
   if (stage === 0) {
     // 예열 — 몸을 뒤로 살짝 젖히고 칼을 머리 위로. 궤적 없음.
+    // 칼을 몸보다 먼저 그린다 — 대검은 머리 뒤로 넘겨 멘다
+    weapon(c, WCX + 7, 9, WCX + 11, 1, [WCX + 7, 9, WCX - 18, -8]);
     circle(c, WCX - 3, HEAD_Y - 3, HEAD_R);
     stroke(c, [[WCX - 3, HEAD_Y - 3 + HEAD_R], [WCX, HIP_Y]]);
     stroke(c, [[WCX, HIP_Y], [WCX - 7, FOOT_Y]]);
     stroke(c, [[WCX, HIP_Y], [WCX + 7, FOOT_Y]]);
     stroke(c, [[WCX, SHOULDER_Y], [WCX - 9, 32]]);
     stroke(c, [[WCX, SHOULDER_Y], [WCX + 7, 9]]);
-    weapon(c, WCX + 7, 9, WCX + 11, 1);
     head = [WCX - 3, HEAD_Y - 3];
   } else if (stage === 1) {
     // 타격 — 깊은 런지, 앞무릎 굽힘·뒷다리 뻗음, 칼이 아래로. 여기에만 참격 궤적.
@@ -625,7 +1093,7 @@ function buildAttack(stage: 0 | 1 | 2): PFrame {
     stroke(c, [[WCX + 6, HIP_Y], [WCX - 4, 50], [WCX - 14, 58]]);      // 뒷다리(뻗음)
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX - 2, 18]]);                // 반대팔(균형)
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX + 22, 34]]);               // 칼 든 팔
-    weapon(c, WCX + 22, 34, WCX + 30, 50);
+    weapon(c, WCX + 22, 34, WCX + 30, 50, [WCX + 22, 34, WCX + 48, 54]);
     slashArc(c);
     head = [WCX + 14, HEAD_Y + 1];
   } else {
@@ -636,7 +1104,7 @@ function buildAttack(stage: 0 | 1 | 2): PFrame {
     stroke(c, [[WCX + 6, HIP_Y], [WCX - 4, 50], [WCX - 14, 58]]);
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX - 4, 20]]);
     stroke(c, [[WCX + 10, SHOULDER_Y], [WCX + 16, 44]]);
-    weapon(c, WCX + 16, 44, WCX + 10, 58);
+    weapon(c, WCX + 16, 44, WCX + 10, 58, [WCX + 16, 44, WCX + 44, 58]); // 대검은 앞 바닥까지 내려온다
     head = [WCX + 14, HEAD_Y + 3];
   }
   return pframe(cv, WCX, FOOT_Y, head[0], head[1]);
@@ -654,13 +1122,13 @@ function buildGuard(air: boolean): PFrame {
   if (air) {
     stroke(c, [[CX, SHOULDER_Y - 1], [CX - 10, HEAD_Y + 2]]);
     stroke(c, [[CX, SHOULDER_Y - 1], [CX + 10, HEAD_Y + 2]]);
-    stroke(c, [[CX - 14, HEAD_Y - 2], [CX, HEAD_Y - 2]]);
-    weapon(c, CX, HEAD_Y - 2, CX + 14, HEAD_Y - 2);
+    if (!greatLook(playerWeapon)) stroke(c, [[CX - 14, HEAD_Y - 2], [CX, HEAD_Y - 2]]);
+    weapon(c, CX, HEAD_Y - 2, CX + 14, HEAD_Y - 2, [CX - 12, HEAD_Y - 2, CX + 24, HEAD_Y - 2]);
   } else {
     // 지면가드: 팔이 머리 원을 관통하지 않게 바깥으로 벌리고 칼은 머리 위
     stroke(c, [[CX, SHOULDER_Y - 1], [CX - 16, HEAD_Y + 2], [CX - 14, 4]]);
     stroke(c, [[CX, SHOULDER_Y - 1], [CX + 16, HEAD_Y + 2], [CX + 14, 4]]);
-    weapon(c, CX - 10, 3, CX + 16, 3);
+    weapon(c, CX - 10, 3, CX + 16, 3, [CX - 12, 3, CX + 24, 3]);
   }
   return pframe(cv, CX, FOOT_Y, CX, HEAD_Y);
 }
@@ -673,7 +1141,7 @@ function buildGuardBreak(): PFrame {
   stroke(c, [[CX, HIP_Y], [CX + 6, FOOT_Y]]);
   stroke(c, [[CX, SHOULDER_Y], [CX - 16, 18]]);              // 팔이 벌어짐
   stroke(c, [[CX, SHOULDER_Y], [CX + 14, 28]]);
-  weapon(c, CX + 14, 28, CX + 22, 42);                       // 칼을 놓칠 듯 뒤로 젖혀짐
+  weapon(c, CX + 14, 28, CX + 22, 42, [CX + 14, 28, CX + 32, 54]); // 칼을 놓칠 듯 뒤로 젖혀짐
   return pframe(cv, CX, FOOT_Y, CX - 6, HEAD_Y + 3);
 }
 
@@ -686,7 +1154,7 @@ function buildSpecial(): PFrame {
   stroke(c, [[WCX + 2, HIP_Y + 4], [WCX - 8, 50], [WCX - 18, FOOT_Y - 4]]); // 뒷다리(뻗음)
   stroke(c, [[WCX + 6, SHOULDER_Y + 4], [WCX + 16, 38]]);               // 양손 칼자루
   stroke(c, [[WCX + 6, SHOULDER_Y + 4], [WCX + 20, 42]]);
-  weapon(c, WCX + 20, 42, 58, 55);
+  weapon(c, WCX + 20, 42, 58, 55, [WCX + 20, 42, 74, 56]);
   c.strokeStyle = ARC;
   c.lineWidth = 4;
   c.lineCap = 'round';
@@ -1106,6 +1574,36 @@ export function drawPlayer(
     if (halo) drawHalo(ctx, halo, x - frame.ax, footY - frame.ay);
     ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay, dw, dh);
   }
+  ctx.restore();
+}
+
+/** 대검 참격 호 위의 점(발 기준) — t 0 칼끝 쪽 · 1 휘두르기 시작한 쪽, off = 바깥으로 */
+export function greatArcPoint(t: number, off = 0): [number, number] {
+  const [x, y] = arcAt(t, off);
+  return [x - WCX, y - FOOT_Y];
+}
+
+/** 지금 프레임의 대검 칼날 — 발 기준 [손x, 손y, 칼끝x, 칼끝y](숨쉬기 포함). 대검이 아니거나 칼이 없는 포즈면 null */
+export function playerBlade(pose: PlayerPose, animTick: number): Seg | null {
+  if (!greatLook(playerWeapon)) return null;
+  const b = pickPlayerFrame(pose, animTick).blade;
+  const bob = playerBob(pose, animTick);
+  return b && [b[0], b[1] + bob, b[2], b[3] + bob];
+}
+
+/** 대검 참격 호를 발 자리에 다시 그린다(잔상) — 어깨를 축으로 turn만큼 더 돌고 grow배로 커진다 */
+export function drawGreatArc(
+  ctx: CanvasRenderingContext2D, w: WeaponId, footX: number, footY: number, alpha: number, turn = 0, grow = 1,
+): void {
+  const g = greatLook(w);
+  if (!g || alpha <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.translate(footX + 10, footY - (FOOT_Y - SHOULDER_Y));
+  ctx.rotate(turn);
+  ctx.scale(grow, grow);
+  ctx.translate(-(WCX + 10), -SHOULDER_Y);
+  greatArc(ctx, g);
   ctx.restore();
 }
 

@@ -36,6 +36,7 @@ export const ICON = {
   hammer: svg('<path d="M4 3h16v7H4z"/><path d="M12 10v11"/>'),
   crowbar: svg('<path d="M20 3 7 16l-3 5 5-3M20 3h-3M20 3v3"/>'),
   grinder: svg('<circle cx="9" cy="9" r="6"/><path d="M9 9h.01M13.5 13.5 21 21"/>'),
+  greatsword: svg('<path d="M17 3h4v4L11 17l-4-4z"/><path d="M5 11l8 8M8 16l-5 5"/>'),
   close: svg('<path d="m6 6 12 12M18 6 6 18"/>'),
   next: svg('<path d="m9 6 6 6-6 6"/>'),
 } as const;

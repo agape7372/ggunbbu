@@ -2,6 +2,7 @@
 // 캔버스는 쓰지 않는다(consumeEvents만) — 그리기 검증은 헤드리스 브라우저 캡처가 맡는다.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BOSS, HAPTIC, JUICE } from '../src/config';
+import { CAPTIONS } from '../src/content';
 import { initBoss } from '../src/core/boss';
 import { makeState } from '../src/core/sim';
 import type { GameState, JuiceEvent } from '../src/core/types';
@@ -15,9 +16,14 @@ vi.mock('../src/render/effects', async (orig) => ({
   spawnBossBreak: vi.fn(),
   spawnStackShatter: vi.fn(),
 }));
+vi.mock('../src/render/screenfx', async (orig) => ({
+  ...await orig<typeof import('../src/render/screenfx')>(),
+  startCaption: vi.fn(),
+}));
 
 const { vibrate } = await import('../src/platform/native');
 const fx = await import('../src/render/effects');
+const screen = await import('../src/render/screenfx');
 const { consumeEvents, setFeedbackOptions } = await import('../src/render/renderer');
 
 function state(events: JuiceEvent[] = []): GameState {
@@ -43,6 +49,27 @@ beforeEach(() => {
   const s = state();
   for (let i = 0; i < 12; i++) tick(s);
   vi.mocked(vibrate).mockClear();
+  vi.mocked(screen.startCaption).mockClear();
+});
+
+describe('콤보 고비 자막', () => {
+  it('100을 넘는 틱에 한 번', () => {
+    const s = state();
+    s.combo = 99;
+    tick(s);
+    s.combo = 100;
+    tick(s);
+    expect(screen.startCaption).toHaveBeenCalledTimes(1);
+    expect(screen.startCaption).toHaveBeenCalledWith(CAPTIONS.combo100, '100 콤보');
+  });
+
+  it('이어하기처럼 한 번에 뛴 콤보(0 → 148)는 친 게 아니다 — 자막 없음', () => {
+    const s = state();
+    tick(s);
+    s.combo = 148;
+    tick(s);
+    expect(screen.startCaption).not.toHaveBeenCalled();
+  });
 });
 
 describe('진동 — 타격 스로틀과 겹침 규칙', () => {

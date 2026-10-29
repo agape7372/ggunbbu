@@ -1,7 +1,7 @@
 // 필살·무기·코스메틱 로드아웃. 해금 집합은 호출측 owned가 정본.
 // tenchi / sword / ink / wire / flyer 는 항상 소유.
 
-import type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, WazaId, WeaponId } from './types';
+import type { BladeId, BodyId, CosmeticSlot, GreatswordId, LettersId, Loadout, WazaId, WeaponId } from './types';
 
 export type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, WazaId, WeaponId };
 export type EquipSlot = 'waza' | 'weapon' | CosmeticSlot;
@@ -15,7 +15,9 @@ export type StickSkinId = BodyId;
 export const WAZA_UNLOCK_DEFAULT: readonly WazaId[] = ['tenchi'];
 
 export const WAZA_IDS: readonly WazaId[] = ['tenchi', 'ageba', 'tetsu'];
-export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder'];
+/** 대검 — 상점은 이 순서(값 오름차순)로 판다 */
+export const GREATSWORD_IDS: readonly GreatswordId[] = ['iron', 'saw', 'hazard', 'beam', 'flame', 'frost', 'onyx', 'gold'];
+export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', ...GREATSWORD_IDS];
 export const BODY_IDS: readonly BodyId[] = ['ink', 'amber', 'slate'];
 export const BLADE_IDS: readonly BladeId[] = ['wire', 'rebar', 'crescent'];
 export const LETTERS_IDS: readonly LettersId[] = ['flyer', 'stamp', 'orbit'];

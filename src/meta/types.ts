@@ -1,8 +1,8 @@
 // 메타(미션·재화·로드아웃) 공용 타입. DOM/캔버스 없음.
 
 // 08-30 스윕: WazaId·GimmickId는 core/types가 정본 — 이중 정의 제거, 재수출만
-import type { WazaId, GimmickId, WeaponId } from '../core/types';
-export type { WazaId, GimmickId, WeaponId };
+import type { WazaId, GimmickId, GreatswordId, WeaponId } from '../core/types';
+export type { WazaId, GimmickId, GreatswordId, WeaponId };
 export type CosmeticSlot = 'body' | 'blade' | 'letters';
 export type BodyId = 'ink' | 'amber' | 'slate';
 export type BladeId = 'wire' | 'rebar' | 'crescent';

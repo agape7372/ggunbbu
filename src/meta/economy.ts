@@ -20,6 +20,15 @@ export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
   hammer: 300,
   crowbar: 300,
   grinder: 400,
+  // 대검 — 연장 셋을 다 사고 나서의 긴 목표. 맞교환이라 비쌀수록 세지는 않다(모양 값)
+  iron: 450,
+  saw: 600,
+  hazard: 750,
+  beam: 900,
+  flame: 1200,
+  frost: 1200,
+  onyx: 1600,
+  gold: 2400,
 };
 
 export function dustCost(id: string): number | undefined {

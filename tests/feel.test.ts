@@ -2,18 +2,20 @@
 // 그리는 쪽(renderer·effects)은 이 숫자를 읽기만 한다.
 import { describe, expect, it } from 'vitest';
 import { BOSS, HAPTIC, JUICE, JUICE_SYS, WEAPON } from '../src/config';
-import { defeatSlow, flashMul, hapticLength, pickHaptic, shakePx, stackScale } from '../src/render/feel';
+import {
+  addTrauma, defeatSlow, flashMul, hapticLength, kickPx, pickHaptic, shakePx, shakeSample, stackScale,
+} from '../src/render/feel';
 import type { JuiceEvent } from '../src/core/types';
 
 const ev = (kind: JuiceEvent['kind'], o: Partial<JuiceEvent> = {}): JuiceEvent => ({ kind, ...o });
 
 describe('흔들림 곡선 — 사다리', () => {
-  it('목표 진폭: 타격≈1 · 층붕괴≈2.5 · 피격≈5 · 필살·격파≈12', () => {
-    expect(shakePx(ev('hit'))).toBe(1);
-    expect(shakePx(ev('floorCollapse'))).toBe(2.5);
-    expect(shakePx(ev('hurt'))).toBe(5);
-    expect(shakePx(ev('special'))).toBe(12);
-    expect(shakePx(ev('bossDefeat'))).toBe(12);
+  it('목표 진폭(파괴 연출 2판): 타격 2 · 층붕괴 5 · 피격 8 · 필살 16 · 격파 18', () => {
+    expect(shakePx(ev('hit'))).toBe(2);
+    expect(shakePx(ev('floorCollapse'))).toBe(5);
+    expect(shakePx(ev('hurt'))).toBe(8);
+    expect(shakePx(ev('special'))).toBe(16);
+    expect(shakePx(ev('bossDefeat'))).toBe(18);
   });
 
   it('예전 제곱 곡선은 타격을 0.06px로 눌렀다 — 이제 1px 아래로 내려가지 않는다', () => {
@@ -31,9 +33,9 @@ describe('흔들림 곡선 — 사다리', () => {
   });
 
   it('무기 배율은 타격·층붕괴만 탄다(오함마 묵직, 그라인더 가볍게)', () => {
-    expect(shakePx(ev('hit'), WEAPON.hammer.shake)).toBeCloseTo(1.6);
-    expect(shakePx(ev('floorCollapse'), WEAPON.grinder.shake)).toBeCloseTo(2.5 * 0.8);
-    expect(shakePx(ev('hurt'), WEAPON.hammer.shake)).toBe(5);
+    expect(shakePx(ev('hit'), WEAPON.hammer.shake)).toBeCloseTo(2 * 1.6);
+    expect(shakePx(ev('floorCollapse'), WEAPON.grinder.shake)).toBeCloseTo(5 * 0.8);
+    expect(shakePx(ev('hurt'), WEAPON.hammer.shake)).toBe(8);
     expect(shakePx(ev('stackDestroy', { n: 3 }), WEAPON.hammer.shake)).toBe(shakePx(ev('stackDestroy', { n: 3 })));
   });
 
@@ -58,6 +60,61 @@ describe('흔들림 곡선 — 사다리', () => {
     for (const k of ['slash', 'jump', 'land', 'boltCue', 'gaugeFull', 'comboBreak', 'lifeLost'] as const) {
       expect(shakePx(ev(k))).toBe(0);
     }
+  });
+});
+
+describe('흔들림 누적 · 방향 킥 · 떨림 표본', () => {
+  it('누적: 큰 쪽 + 작은 쪽의 SHAKE_STACK배 — 순서와 무관하고 상한을 넘지 않는다', () => {
+    expect(addTrauma(0, 5)).toBe(5);
+    expect(addTrauma(5, 2)).toBeCloseTo(5 + JUICE_SYS.SHAKE_STACK * 2);
+    expect(addTrauma(2, 5)).toBeCloseTo(addTrauma(5, 2));
+    expect(addTrauma(5, 0)).toBe(5);
+    let t = 0;
+    for (let i = 0; i < 50; i++) t = addTrauma(t, 8);
+    expect(t).toBe(JUICE_SYS.SHAKE_MAX_AMP);
+  });
+
+  it('층붕괴 직후 완파가 예전(최댓값만 남김)보다 더 흔든다', () => {
+    const px = [shakePx(ev('floorCollapse')), shakePx(ev('stackDestroy', { n: 4 }))];
+    expect(addTrauma(px[0], px[1])).toBeGreaterThan(Math.max(px[0], px[1]));
+  });
+
+  it('킥: 타격·붕괴는 무기 배율, 완파는 층수(최대 1.4배), 킥 표에 없는 이벤트는 0', () => {
+    expect(kickPx(ev('hit'))).toBe(JUICE_SYS.KICK_PX.hit);
+    expect(kickPx(ev('floorCollapse'), WEAPON.hammer.shake)).toBeCloseTo(JUICE_SYS.KICK_PX.floorCollapse * 1.6);
+    expect(kickPx(ev('stackDestroy', { n: 2 }))).toBeCloseTo(JUICE_SYS.KICK_PX.stackDestroy);
+    expect(kickPx(ev('stackDestroy', { n: 99 }))).toBeCloseTo(JUICE_SYS.KICK_PX.stackDestroy * 1.4);
+    expect(kickPx(ev('hurt'))).toBe(0);
+    expect(kickPx(ev('jump'))).toBe(0);
+  });
+
+  it('떨림 표본: 진폭 안에 갇히고, 0이면 0, 회전은 큰 흔들림에만 붙는다', () => {
+    expect(shakeSample(0, 5)).toEqual([0, 0, 0]);
+    for (let t = 0; t < 300; t++) {
+      const [dx, dy, r] = shakeSample(10, t);
+      expect(Math.abs(dx)).toBeLessThanOrEqual(10 + 1e-9);
+      expect(Math.abs(dy)).toBeLessThanOrEqual(8 + 1e-9);
+      expect(Math.abs(r)).toBeLessThanOrEqual(JUICE_SYS.SHAKE_ROT_MAX + 1e-9);
+    }
+    const peakRot = (amp: number): number =>
+      Math.max(...Array.from({ length: 300 }, (_, t) => Math.abs(shakeSample(amp, t)[2])));
+    expect(peakRot(2)).toBeLessThan(peakRot(JUICE_SYS.SHAKE_MAX_AMP) * 0.05);
+  });
+
+  it('떨림이 예전 황금각 지터보다 부드럽다 — 이웃 프레임 사이 평균 이동이 작다', () => {
+    const amp = 10;
+    const old = (t: number): [number, number] => [Math.cos(t * 2.399) * amp, Math.sin(t * 2.399) * amp * 0.7];
+    let now = 0;
+    let before = 0;
+    for (let t = 0; t < 300; t++) {
+      const a = shakeSample(amp, t);
+      const b = shakeSample(amp, t + 1);
+      now += Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const c = old(t);
+      const d = old(t + 1);
+      before += Math.hypot(d[0] - c[0], d[1] - c[1]);
+    }
+    expect(now).toBeLessThan(before * 0.75);
   });
 });
 

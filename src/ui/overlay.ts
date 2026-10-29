@@ -835,6 +835,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           onDust: (id) => h.onUnlockDust(id),
           onExchange: () => h.onExchangeDust(),
           onExam: () => h.onExam(),
+          onEquip: (slot, id) => h.onEquip(slot, id),
         },
       );
       show('shop');

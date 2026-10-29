@@ -11,7 +11,7 @@
 
 import type { GameState, Lane } from './types';
 import { damageStack } from './building';
-import { GIMMICK, GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
+import { DEBRIS, GIMMICK, GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
 import { VIEW } from '../config';
 import { rand } from './rng';
 
@@ -106,7 +106,7 @@ function spawnFloorDebris(s: GameState, yHit: number): void {
       vy: 80 + rand(s) * 60,
       w: 28 + rand(s) * 18,
       h: 22 + rand(s) * 14,
-      life: 90,
+      life: DEBRIS.LIFE_F,
     });
   }
 }
@@ -156,7 +156,7 @@ export function tryGuardBounce(
       stack.vy = STACK.GUARD_AIR_V * (s.gimmick === 'ice' ? GIMMICK.ICE_BOUNCE_AIR : 1);
       stack.resting = false;
       // ★원작 이식(2026-08-30 사용자 확정): 공중가드 바운스는 플레이어를 아래로 튕긴다.
-      // 원작 vy=8.0px/f 아래로(FUN_00405490 포즈10) × 68/120. 위로 상승 중이었어도 하향 덮어쓰기.
+      // 원작 vy=8.0px/f 아래로(FUN_00405490 포즈10) — 초속 대비 비율로 옮긴다(config). 위로 상승 중이었어도 하향 덮어쓰기.
       s.player.vy = Math.min(s.player.vy, -STACK.GUARD_AIR_RECOIL_V);
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_AIR);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;

@@ -3,7 +3,7 @@
 // act2/보스 스테핑은 act2.ts/boss.ts (M4/M5)에서 이 파일에 연결된다.
 
 import type { GameState, InputFrame } from './types';
-import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive } from './player';
+import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carryUnderStack } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
@@ -123,6 +123,9 @@ export function advance(s: GameState, input: InputFrame): void {
       onStackGrounded(s);
     }
   }
+  // 밑면에 붙어 같이 내려가기 — 건물이 움직인 뒤라야 머리가 밑면에 딱 붙어 그려진다(player.ts).
+  // 가드 바운스·타격 판정보다 앞이라 둘 다 붙은 자리를 본다.
+  carryUnderStack(s, TICK);
 
   // ── 가드 바운스 (비접지 프레임) ──
   if (s.stack && !s.stack.resting) {

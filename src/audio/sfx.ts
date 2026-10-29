@@ -2,6 +2,7 @@
 // 사이드이펙트 없음: 노이즈 버퍼도 모듈 내부에서 lazy 생성.
 
 export type SfxName =
+  | 'hitFlame' | 'hitFrost' | 'hitOnyx' | 'hitGold'
   | 'hit' | 'hitStrong' | 'whiff' | 'floorCollapse' | 'destroy' | 'gorogoro' | 'butterPop'
   | 'guardGround' | 'guardAir' | 'guardBreak' | 'gaugeWarn' | 'comboDrop'
   | 'jump' | 'land' | 'gaugeFull' | 'special'
@@ -10,7 +11,7 @@ export type SfxName =
   | 'zap' | 'zap2' | 'zap3'
   | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect'
   | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak'
-  | 'hitLow' | 'hitTick' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd';
+  | 'hitLow' | 'hitTick' | 'incoming' | 'specialCharge' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd';
 
 export type BgmTrack = 'title' | 'act1' | 'act2a' | 'butter' | 'bolt' | 'boss' | 'ending';
 
@@ -65,6 +66,10 @@ interface NoiseOpts {
   filterType?: BiquadFilterType;
   freqStart?: number;
   freqEnd?: number;
+  q?: number;
+  attack?: number;
+  /** [지점(0..1), 그 지점의 세기 비율] — 꼬리가 긴 소리용 2단 감쇠 */
+  knee?: [number, number];
 }
 
 function playNoise(
@@ -77,11 +82,13 @@ function playNoise(
 ): void {
   const src = ctx.createBufferSource();
   src.buffer = getNoiseBuffer(ctx);
+  src.loop = true; // 1초보다 긴 꼬리도 같은 버퍼로
   const g = ctx.createGain();
   let node: AudioNode = src;
   if (opts?.filterType) {
     const filt = ctx.createBiquadFilter();
     filt.type = opts.filterType;
+    if (opts.q !== undefined) filt.Q.value = opts.q;
     filt.frequency.setValueAtTime(Math.max(opts.freqStart ?? 1000, 10), t);
     if (opts.freqEnd !== undefined) {
       filt.frequency.exponentialRampToValueAtTime(Math.max(opts.freqEnd, 10), t + dur);
@@ -91,11 +98,106 @@ function playNoise(
   }
   node.connect(g);
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.linearRampToValueAtTime(peak, t + 0.005);
+  g.gain.linearRampToValueAtTime(peak, t + (opts?.attack ?? 0.005));
+  if (opts?.knee) {
+    g.gain.exponentialRampToValueAtTime(Math.max(peak * opts.knee[1], 0.0001), t + dur * opts.knee[0]);
+  }
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   g.connect(dest);
-  src.start(t);
+  src.start(t, Math.random() * 0.5);
   src.stop(t + dur + 0.02);
+}
+
+/** 소리 하나의 총량 손잡이 — 게인 노드 하나를 끼워 재생 때마다 같은 비율로 줄인다 */
+function trim(ctx: AudioContext, dest: AudioNode, gain: number): AudioNode {
+  const n = ctx.createGain();
+  n.gain.value = gain;
+  n.connect(dest);
+  return n;
+}
+
+const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
+const jit = (x: number, pct = 0.1): number => x * (1 + (Math.random() * 2 - 1) * pct);
+
+interface Grain { at: number; dur: number; peak: number; freq: number; pan?: number }
+
+/**
+ * 노이즈 그레인 묶음 — 소스·필터·게인(·패너) 노드만으로 그레인이 몇 개든 울린다.
+ * 그레인은 시간순이고, 길이는 다음 그레인 직전에 잘린다. pan이 있으면 그레인마다 좌우를 옮긴다.
+ */
+function playGrains(
+  ctx: AudioContext, dest: AudioNode, t: number, grains: Grain[],
+  type: BiquadFilterType = 'bandpass', q = 1.2,
+): void {
+  const src = ctx.createBufferSource();
+  src.buffer = getNoiseBuffer(ctx);
+  src.loop = true;
+  const filt = ctx.createBiquadFilter();
+  filt.type = type;
+  filt.Q.value = q;
+  const g = ctx.createGain();
+  src.connect(filt);
+  filt.connect(g);
+  const pan = grains.some((x) => x.pan) ? ctx.createStereoPanner() : null;
+  if (pan) { g.connect(pan); pan.connect(dest); } else g.connect(dest);
+  g.gain.setValueAtTime(0.0001, t);
+  let end = t;
+  grains.forEach((x, i) => {
+    const s = t + x.at;
+    const next = i + 1 < grains.length ? t + grains[i + 1].at - 0.0005 : Infinity;
+    const e = Math.min(s + x.dur, next);
+    filt.frequency.setValueAtTime(Math.max(x.freq, 10), s);
+    pan?.pan.setValueAtTime(x.pan ?? 0, s);
+    g.gain.setValueAtTime(0.0001, s);
+    g.gain.linearRampToValueAtTime(x.peak, s + Math.min(0.0008, (e - s) / 2));
+    g.gain.exponentialRampToValueAtTime(0.0001, e);
+    end = Math.max(end, e);
+  });
+  src.start(t, Math.random() * 0.5);
+  src.stop(end + 0.02);
+}
+
+/** 잔해 흩뿌림 — from~to초 사이 n개, 시간·높이·좌우가 매번 다르다 */
+function debris(n: number, from: number, to: number, peak: number, fLo: number, fHi: number, spread: number): Grain[] {
+  const out: Grain[] = [];
+  let prev = from - 0.006;
+  const ts = Array.from({ length: n }, () => rnd(from, to)).sort((a, b) => a - b);
+  ts.forEach((raw, i) => {
+    const at = Math.max(raw, prev + 0.006);
+    prev = at;
+    out.push({ at, dur: rnd(0.02, 0.05), peak: peak * rnd(0.55, 1) * (1 - 0.45 * (i / n)), freq: rnd(fLo, fHi), pan: rnd(-spread, spread) });
+  });
+  return out;
+}
+
+interface OscSpec { type: OscillatorType; f0: number; f1: number; dur: number; peak: number }
+
+/**
+ * 겹층 타격 — ① 트랜지언트(클릭 그레인) ② 몸통(피치 하강 thump) ③ 으스러짐(밴드패스 그레인)
+ * ④ 꼬리(로우패스 노이즈). 노드 11개 안팎, 전체 120~200ms.
+ */
+interface HitSpec {
+  click: number; clickPeak: number;
+  body: OscSpec; snap?: OscSpec;
+  crunch: number[]; cPeak: number;
+  tail?: { f0: number; f1: number; dur: number; peak: number };
+}
+
+function hitLayers(ctx: AudioContext, out: AudioNode, t: number, rate: number, h: HitSpec): void {
+  const dest = trim(ctx, out, 0.6);
+  const grains: Grain[] = [{ at: 0, dur: 0.004, peak: h.clickPeak, freq: jit(h.click) * rate }];
+  let at = 0.004 + rnd(0, 0.002);
+  for (const c of h.crunch) {
+    grains.push({ at, dur: 0.03, peak: h.cPeak * rnd(0.8, 1), freq: jit(c) * rate });
+    at += rnd(0.007, 0.012);
+  }
+  playGrains(ctx, dest, t, grains);
+  for (const o of [h.body, h.snap]) {
+    if (o) playOsc(ctx, dest, t, o.type, o.f0, o.dur, o.peak, rate, { freqEnd: o.f1, attack: 0.001 });
+  }
+  if (h.tail) {
+    playNoise(ctx, dest, t + 0.006, h.tail.dur, h.tail.peak, { filterType: 'lowpass', freqStart: h.tail.f0 * rate, freqEnd: h.tail.f1 });
+  }
 }
 
 function playZap(
@@ -137,32 +239,57 @@ type SfxPreset = (ctx: AudioContext, dest: AudioNode, t: number, rate: number) =
 
 export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   hit: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'square', 220, 0.04, 0.35, rate, { freqEnd: 140, attack: 0.002 });
-    playOsc(ctx, dest, t + 0.04, 'square', 140, 0.048, 0.12, rate, { freqEnd: 90, attack: 0.001 });
+    hitLayers(ctx, dest, t, rate, {
+      click: 3500, clickPeak: 0.4,
+      body: { type: 'sine', f0: 200, f1: 90, dur: 0.09, peak: 0.5 },
+      snap: { type: 'square', f0: 220, f1: 140, dur: 0.04, peak: 0.14 },
+      crunch: [1900, 1300], cPeak: 0.3,
+      tail: { f0: 1400, f1: 300, dur: 0.1, peak: 0.1 },
+    });
   },
 
   hitStrong: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'square', 160, 0.06, 0.4, rate, { freqEnd: 90, attack: 0.002 });
-    playNoise(ctx, dest, t, 0.05, 0.25, { filterType: 'highpass', freqStart: 800 });
+    hitLayers(ctx, dest, t, rate, {
+      click: 4200, clickPeak: 0.55,
+      body: { type: 'sine', f0: 150, f1: 62, dur: 0.12, peak: 0.55 },
+      snap: { type: 'sawtooth', f0: 170, f1: 90, dur: 0.07, peak: 0.2 },
+      crunch: [2400, 1700, 1100], cPeak: 0.38,
+      tail: { f0: 1800, f1: 250, dur: 0.15, peak: 0.16 },
+    });
   },
 
   // 망치 — hitStrong보다 저음·긴 '쿵'
   hitHammer: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'sine', 110, 0.18, 0.3, rate, { freqEnd: 45, attack: 0.002 });
-    playOsc(ctx, dest, t, 'square', 130, 0.07, 0.18, rate, { freqEnd: 70, attack: 0.002 });
-    playNoise(ctx, dest, t, 0.06, 0.12, { filterType: 'lowpass', freqStart: 700, freqEnd: 200 });
+    hitLayers(ctx, dest, t, rate, {
+      click: 1500, clickPeak: 0.35,
+      body: { type: 'sine', f0: 110, f1: 42, dur: 0.2, peak: 0.6 },
+      snap: { type: 'square', f0: 130, f1: 70, dur: 0.07, peak: 0.14 },
+      crunch: [800, 520], cPeak: 0.32,
+      tail: { f0: 800, f1: 150, dur: 0.18, peak: 0.2 },
+    });
   },
 
   // 쇠막대 — 짧고 높은 금속성 '깡'
   hitBar: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'triangle', 1500, 0.1, 0.35, rate, { freqEnd: 1100, attack: 0.001 });
-    playOsc(ctx, dest, t, 'square', 2300, 0.05, 0.12, rate, { freqEnd: 1800, attack: 0.001 });
+    hitLayers(ctx, dest, t, rate, {
+      click: 5200, clickPeak: 0.4,
+      body: { type: 'triangle', f0: 1500, f1: 1100, dur: 0.1, peak: 0.3 },
+      snap: { type: 'square', f0: 2300, f1: 1800, dur: 0.05, peak: 0.1 },
+      crunch: [3200], cPeak: 0.2,
+    });
+    playOsc(ctx, dest, t, 'sine', 180, 0.05, 0.17, rate, { freqEnd: 100, attack: 0.001 });
   },
 
   // 그라인더 — 밴드패스 노이즈 버즈 '지익'
-  hitGrind: (ctx, dest, t, rate) => {
-    playNoise(ctx, dest, t, 0.09, 0.7, { filterType: 'bandpass', freqStart: 3500, freqEnd: 2200 });
-    playOsc(ctx, dest, t, 'sawtooth', 240, 0.08, 0.3, rate, { freqEnd: 200, attack: 0.002 });
+  hitGrind: (ctx, out, t, rate) => {
+    const dest = trim(ctx, out, 0.75);
+    playGrains(ctx, dest, t, [
+      { at: 0, dur: 0.004, peak: 0.4, freq: jit(3000) },
+      { at: 0.005, dur: 0.02, peak: 0.25, freq: jit(2400) },
+    ]);
+    playNoise(ctx, dest, t + 0.004, 0.09, 0.5, { filterType: 'bandpass', freqStart: 3500, freqEnd: 2200 });
+    playOsc(ctx, dest, t, 'sawtooth', 240, 0.08, 0.26, rate, { freqEnd: 200, attack: 0.002 });
+    playOsc(ctx, dest, t, 'sine', 120, 0.06, 0.25, rate, { freqEnd: 70, attack: 0.001 });
   },
 
   // 보급 상자 — '통' + 두 음 상승 차임
@@ -184,32 +311,50 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
     playOsc(ctx, dest, t, 'square', 520, 0.045, 0.16, rate, { freqEnd: 240, attack: 0.001 });
   },
 
-  floorCollapse: (ctx, dest, t, rate) => {
-    playNoise(ctx, dest, t, 0.15, 0.32, { filterType: 'lowpass', freqStart: 4000, freqEnd: 500 });
-    playOsc(ctx, dest, t, 'sawtooth', 80, 0.25, 0.4, rate, { freqEnd: 40 });
-  },
-
-  destroy: (ctx, dest, t, rate) => {
-    const chain = [
-      { freq: 260, freqEnd: 120, peak: 0.32, filterStart: 3200, filterEnd: 500 },
-      { freq: 220, freqEnd: 100, peak: 0.27, filterStart: 2600, filterEnd: 400 },
-      { freq: 180, freqEnd: 80, peak: 0.22, filterStart: 2000, filterEnd: 300 },
-    ];
-    chain.forEach((c, i) => {
-      const d = t + i * 0.09;
-      playNoise(ctx, dest, d, 0.12, c.peak, { filterType: 'lowpass', freqStart: c.filterStart, freqEnd: c.filterEnd });
-      playOsc(ctx, dest, d, 'sawtooth', c.freq, 0.1, c.peak * 0.9, rate, { freqEnd: c.freqEnd });
-    });
-    playOsc(ctx, dest, t, 'sine', 50, 0.2, 0.5, rate, { freqEnd: 30 });
-  },
-
-  gorogoro: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'sine', 42, 1.9, 0.18, rate, { freqEnd: 22, attack: 0.04 });
-    for (let i = 0; i < 9; i++) {
-      const d = t + i * 0.2;
-      const peak = 0.12 * (1 - i / 9);
-      playNoise(ctx, dest, d, 0.28, peak, { filterType: 'lowpass', freqStart: 900 - i * 70, freqEnd: 140 });
+  // 콘크리트가 우지끈 — 으스러짐 그레인 + 낮은 울림 + 300ms 잔해 흩뿌림(좌우로 퍼짐)
+  floorCollapse: (ctx, out, t, rate) => {
+    const dest = trim(ctx, out, 0.85);
+    const crunch: Grain[] = [{ at: 0, dur: 0.004, peak: 0.5, freq: jit(3000) * rate }];
+    let at = 0.005;
+    for (let i = 0; i < 5; i++) {
+      crunch.push({ at, dur: rnd(0.02, 0.035), peak: 0.4 * rnd(0.7, 1), freq: jit(2400 - i * 320) * rate });
+      at += rnd(0.012, 0.022);
     }
+    playGrains(ctx, dest, t, crunch);
+    playOsc(ctx, dest, t, 'sine', 95, 0.34, 0.55, rate, { freqEnd: 42, attack: 0.002 });
+    playNoise(ctx, dest, t + 0.004, 0.22, 0.26, { filterType: 'lowpass', freqStart: 1100, freqEnd: 180, knee: [0.35, 0.5] });
+    playGrains(ctx, dest, t, debris(3 + Math.floor(Math.random() * 4), 0.1, 0.42, 0.2, 1400, 4200, 0.8), 'bandpass', 2);
+  },
+
+  // 건물 한 채가 통째로 — 서브 하강 쾅 + 중역 깨짐 + 울림 꼬리 + 잔해(넓게)
+  destroy: (ctx, out, t, rate) => {
+    const dest = trim(ctx, out, 0.55);
+    const crack: Grain[] = [
+      { at: 0, dur: 0.005, peak: 0.6, freq: jit(3200) * rate },
+      { at: 0.006, dur: 0.07, peak: 0.55, freq: jit(380) * rate },
+    ];
+    let at = 0.08;
+    for (let i = 0; i < 3; i++) {
+      crack.push({ at, dur: rnd(0.03, 0.05), peak: 0.38 * rnd(0.7, 1), freq: jit(2300 - i * 600) * rate });
+      at += rnd(0.04, 0.06);
+    }
+    playGrains(ctx, dest, t, crack, 'bandpass', 1.4);
+    const f = Math.pow(rate, 0.5); // 서브는 콤보 피치를 반만 따른다
+    playOsc(ctx, dest, t, 'sine', 60 * f, 0.9, 0.75, 1, { freqEnd: 35 * f, attack: 0.004 });
+    playNoise(ctx, dest, t + 0.004, 1.1, 0.45, { filterType: 'lowpass', freqStart: 2200, freqEnd: 90, knee: [0.22, 0.3], attack: 0.003 });
+    playGrains(ctx, dest, t, debris(5 + Math.floor(Math.random() * 3), 0.18, 0.95, 0.24, 900, 3600, 0.9), 'bandpass', 1.6);
+  },
+
+  // 굴러 떨어지는 잔해 — destroy 꼬리 뒤(0.3초~)로 듬성듬성 웅웅, 저역은 로우패스 한 줄만
+  gorogoro: (ctx, dest, t) => {
+    const g: Grain[] = [];
+    let at = 0.3;
+    for (let i = 0; i < 7; i++) {
+      g.push({ at, dur: rnd(0.1, 0.16), peak: 0.4 * (1 - i / 8), freq: rnd(300, 520) - i * 25, pan: rnd(-0.6, 0.6) });
+      at += rnd(0.14, 0.24);
+    }
+    playGrains(ctx, dest, t, g, 'bandpass', 0.9);
+    playNoise(ctx, dest, t + 0.3, 1.4, 0.2, { filterType: 'lowpass', freqStart: 320, freqEnd: 80, attack: 0.25 });
   },
 
   butterPop: (ctx, dest, t, rate) => {
@@ -256,10 +401,30 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
     });
   },
 
-  special: (ctx, dest, t, rate) => {
-    const d = t + 0.03;
-    playNoise(ctx, dest, d, 0.4, 0.45, { filterType: 'lowpass', freqStart: 5000, freqEnd: 200 });
-    playOsc(ctx, dest, d, 'sawtooth', 90, 0.4, 0.4, rate, { freqEnd: 40 });
+  // 휘익 → 폭발. 폭발만 울린다(consumeAudio가 히트스톱만큼 늦추고, 휘익은 specialCharge가 먼저 낸다)
+  special: (ctx, out, t, rate) => {
+    const dest = trim(ctx, out, 0.6);
+    playGrains(ctx, dest, t, [
+      { at: 0, dur: 0.005, peak: 0.6, freq: jit(3500) * rate },
+      { at: 0.006, dur: 0.08, peak: 0.5, freq: jit(500) * rate },
+      { at: 0.09, dur: 0.04, peak: 0.3, freq: jit(1800) * rate },
+      { at: 0.13, dur: 0.05, peak: 0.25, freq: jit(1100) * rate },
+    ], 'bandpass', 1.2);
+    playOsc(ctx, dest, t, 'sine', 70, 0.55, 0.65, rate, { freqEnd: 30, attack: 0.003 });
+    playNoise(ctx, dest, t + 0.004, 0.7, 0.4, { filterType: 'lowpass', freqStart: 6000, freqEnd: 150, knee: [0.3, 0.3] });
+    playGrains(ctx, dest, t, debris(4, 0.2, 0.6, 0.16, 1200, 4000, 0.9), 'bandpass', 2);
+  },
+
+  // 필살을 모으는 휘익 — 오르는 노이즈·톤이 히트스톱 끝에서 끊긴다
+  specialCharge: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.17, 0.3, { filterType: 'bandpass', freqStart: 400, freqEnd: 3800, q: 3, attack: 0.15 });
+    playOsc(ctx, dest, t, 'sawtooth', 160, 0.17, 0.12, rate, { freqEnd: 900, attack: 0.15 });
+  },
+
+  // 다음 건물이 떨어지기 직전 — 작은 하강 휘파람
+  incoming: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 1150, 0.5, 0.13, rate, { freqEnd: 420, attack: 0.07 });
+    playNoise(ctx, dest, t, 0.5, 0.05, { filterType: 'bandpass', freqStart: 2200, freqEnd: 700, q: 4, attack: 0.08 });
   },
 
   pinned: (ctx, dest, t, rate) => {
@@ -349,13 +514,23 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
 
   // 타격 변형 — hit(중음)과 번갈아 돌려 10회/초 반복 피로를 던다. 저음 비중 / 노이즈 비중.
   hitLow: (ctx, dest, t, rate) => {
-    playOsc(ctx, dest, t, 'sine', 100, 0.07, 0.3, rate, { freqEnd: 60, attack: 0.002 });
-    playOsc(ctx, dest, t, 'square', 170, 0.05, 0.16, rate, { freqEnd: 110, attack: 0.002 });
+    hitLayers(ctx, dest, t, rate, {
+      click: 2200, clickPeak: 0.3,
+      body: { type: 'sine', f0: 120, f1: 55, dur: 0.1, peak: 0.55 },
+      snap: { type: 'square', f0: 170, f1: 110, dur: 0.05, peak: 0.12 },
+      crunch: [950, 640], cPeak: 0.28,
+      tail: { f0: 700, f1: 200, dur: 0.12, peak: 0.14 },
+    });
   },
 
   hitTick: (ctx, dest, t, rate) => {
-    playNoise(ctx, dest, t, 0.035, 0.3, { filterType: 'bandpass', freqStart: 2500 });
-    playOsc(ctx, dest, t, 'square', 260, 0.045, 0.3, rate, { freqEnd: 170, attack: 0.001 });
+    hitLayers(ctx, dest, t, rate, {
+      click: 4800, clickPeak: 0.5,
+      body: { type: 'sine', f0: 170, f1: 100, dur: 0.05, peak: 0.35 },
+      snap: { type: 'square', f0: 260, f1: 170, dur: 0.045, peak: 0.2 },
+      crunch: [3000, 2300], cPeak: 0.3,
+      tail: { f0: 2000, f1: 500, dur: 0.07, peak: 0.07 },
+    });
   },
 
   // 확정 — 낮은 쿵 + 짧은 틱
@@ -424,6 +599,41 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
       playOsc(ctx, dest, d, 'sine', f, 0.25, 0.35, rate, { attack: 0.005 });
       playOsc(ctx, dest, d + 0.02, 'sine', f * 2, 0.15, 0.1, rate, { attack: 0.002 });
     });
+  },
+
+  // ── 대검 넷(1200부터)의 제 소리 — 타격마다, 층 깨기·완파엔 붕괴음 위에 얹는다 ──
+  // 화염 — 낮은 퍽 + 위로 쓸리는 불길 + 타닥 불티 둘
+  hitFlame: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 140, 0.1, 0.35, rate, { freqEnd: 60, attack: 0.001 });
+    playNoise(ctx, dest, t, 0.18, 0.3, { filterType: 'bandpass', freqStart: 700 * rate, freqEnd: 2800 * rate });
+    playNoise(ctx, dest, t + 0.05, 0.03, 0.14, { filterType: 'highpass', freqStart: 4000 });
+    playNoise(ctx, dest, t + 0.11, 0.025, 0.1, { filterType: 'highpass', freqStart: 5000 });
+  },
+
+  // 서리 — 짧은 쿵 + 얼음 깨지는 높은 배음 둘 + 반짝 쉬익
+  hitFrost: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'square', 160, 0.05, 0.1, rate, { freqEnd: 90, attack: 0.001 });
+    playOsc(ctx, dest, t, 'sine', 130, 0.08, 0.24, rate, { freqEnd: 70, attack: 0.001 });
+    playOsc(ctx, dest, t, 'sine', 2637, 0.2, 0.1, rate, { attack: 0.001 });
+    playOsc(ctx, dest, t + 0.012, 'sine', 3520, 0.15, 0.07, rate, { attack: 0.001 });
+    playNoise(ctx, dest, t + 0.01, 0.14, 0.11, { filterType: 'highpass', freqStart: 5000 });
+  },
+
+  // 흑철 — 무거운 몸통 + 날카로운 크랙 + 전기 지직
+  hitOnyx: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 130, 0.14, 0.36, rate, { freqEnd: 48, attack: 0.001 });
+    playOsc(ctx, dest, t + 0.004, 'triangle', 2600, 0.03, 0.15, rate, { freqEnd: 1500, attack: 0.001 });
+    playNoise(ctx, dest, t, 0.06, 0.22, { filterType: 'highpass', freqStart: 3200 });
+    playZap(ctx, dest, t + 0.01, rate, 190, 70, 320, 0.11, 0.16);
+  },
+
+  // 황금 — 묵직한 퉁 + 맑은 종소리 겹(콤보 사다리를 탄다)
+  hitGold: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 150, 0.08, 0.27, rate, { freqEnd: 75, attack: 0.001 });
+    playOsc(ctx, dest, t, 'triangle', 1318.5, 0.26, 0.16, rate, { attack: 0.002 });
+    playOsc(ctx, dest, t + 0.004, 'sine', 2637, 0.2, 0.07, rate, { attack: 0.002 });
+    playOsc(ctx, dest, t + 0.05, 'sine', 1975.5, 0.18, 0.06, rate, { attack: 0.003 });
+    playNoise(ctx, dest, t, 0.05, 0.08, { filterType: 'highpass', freqStart: 6500 });
   },
 };
 

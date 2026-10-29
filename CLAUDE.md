@@ -38,7 +38,7 @@
 
 ## 검증
 
-- `npm test` — 412 테스트(2026-10-28 탭 화면 손질 뒤 기준), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 428 테스트(2026-10-28 대검 이펙트 뒤 기준), 특히 `act2run`(헤드리스 2막 완주) green 필수.
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
   (원본 TTF 5개는 `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).

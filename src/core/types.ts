@@ -182,7 +182,10 @@ export type WazaId = 'tenchi' | 'ageba' | 'tetsu';
  * 장착 무기. 대미지는 전부 1이다 — 2막 체크포인트가 층 HP 합(=타격 수)이라 대미지를 바꾸면
  * 산술이 깨진다. 무기는 사거리·띄우기·필살 게이지 배율만 바꾼다(config WEAPON).
  */
-export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder';
+export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder' | GreatswordId;
+
+/** 대검 — 칼날 모양·색(render/sprites)과 세 칸(config WEAPON)만 다르다. 쥐는 자세는 하나 */
+export type GreatswordId = 'iron' | 'saw' | 'hazard' | 'beam' | 'flame' | 'frost' | 'onyx' | 'gold';
 
 /** 보급 상자에서 나오는 것. 고정 순서로 돈다(config SUPPLY.ROTATION) — 확률 없음. */
 export type ItemId = 'gloves' | 'coffee' | 'hat' | 'dust';

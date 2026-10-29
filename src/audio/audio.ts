@@ -3,7 +3,7 @@
 // resume().then 후 재생(playSfx 참조).
 //
 // 그래프:  sfx ─────────────┐
-//          bgm → bgmEnv ────┴→ master → compressor → destination
+//          bgm → bgmEnv ────┴→ master → compressor → limiter → destination
 // bgm 버스 = 켬/끔·메뉴 덕킹, bgmEnv = 정지 페이드·필살/격파 순간 덕킹 (둘이 서로 덮어쓰지 않게 직렬로 둔다).
 import { SFX_PRESETS, BGM_TRACKS, chordArp } from './sfx';
 import type { SfxName, BgmTrack, BgmPattern } from './sfx';
@@ -24,7 +24,14 @@ export function createMix(c: BaseAudioContext): MixGraph {
   comp.ratio.value = AUDIO.COMP.RATIO;
   comp.attack.value = AUDIO.COMP.ATTACK;
   comp.release.value = AUDIO.COMP.RELEASE;
-  comp.connect(c.destination);
+  const lim = c.createDynamicsCompressor();
+  lim.threshold.value = AUDIO.LIMIT.THRESHOLD;
+  lim.knee.value = AUDIO.LIMIT.KNEE;
+  lim.ratio.value = AUDIO.LIMIT.RATIO;
+  lim.attack.value = AUDIO.LIMIT.ATTACK;
+  lim.release.value = AUDIO.LIMIT.RELEASE;
+  comp.connect(lim);
+  lim.connect(c.destination);
 
   const master = c.createGain();
   master.connect(comp);
@@ -183,20 +190,21 @@ export function duckBgm(reason: string, on: boolean): void {
   applyLevels();
 }
 
-/** 필살·보스 격파의 순간 덕킹 — 0.3초 낮췄다 돌아온다. 음악이 멈춰 있으면 건드리지 않는다. */
-export function pulseDuckBgm(): void {
+/** 필살·보스 격파(기본)와 건물 완파(가볍게)의 순간 덕킹 — 잠깐 낮췄다 돌아온다. 음악이 멈춰 있으면 건드리지 않는다. */
+export function pulseDuckBgm(level: number = AUDIO.DUCK_PULSE, holdS: number = AUDIO.DUCK_PULSE_S): void {
   if (!ctx || !mix || currentTrack === null) return;
   const now = ctx.currentTime;
-  ramp(mix.bgmEnv.gain, AUDIO.DUCK_PULSE, AUDIO.DUCK_TC, now);
-  mix.bgmEnv.gain.setTargetAtTime(1, now + AUDIO.DUCK_PULSE_S, AUDIO.DUCK_TC * 2);
+  ramp(mix.bgmEnv.gain, level, AUDIO.DUCK_TC, now);
+  mix.bgmEnv.gain.setTargetAtTime(1, now + holdS, AUDIO.DUCK_TC * 2);
 }
 
 // ─── SFX ───────────────────────────────────────────────────
 
-export function playSfx(name: SfxName, opts?: { pitchSemitones?: number; delay?: number }): void {
+export function playSfx(name: SfxName, opts?: { pitchSemitones?: number; delay?: number; pan?: number }): void {
   if (!ctx || !mix || !soundOn || !sfxOn) return;
   const c = ctx;
   const bus = mix.sfx;
+  const pan = opts?.pan ?? 0;
   const preset = SFX_PRESETS[name];
 
   const semis = opts?.pitchSemitones ?? 0;
@@ -205,7 +213,14 @@ export function playSfx(name: SfxName, opts?: { pitchSemitones?: number; delay?:
   const rate = Math.pow(2, semis / 12) * (1 + jitter);
 
   const fire = (): void => {
-    preset(c, bus, c.currentTime + delay, rate);
+    let dest: AudioNode = bus;
+    if (pan !== 0) { // 소리 하나 통째로 좌우로 — 패너는 소리가 끝나면 함께 풀린다
+      const p = c.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      p.connect(bus);
+      dest = p;
+    }
+    preset(c, dest, c.currentTime + delay, rate);
   };
 
   // 언락 관용구: running이 아니면 resume().then 후 재생. 대기 중 쌓인 호출은 최신 1건만 남는다.

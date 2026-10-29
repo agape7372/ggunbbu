@@ -7,7 +7,8 @@ import { makeFloor, makeStack } from '../src/core/building';
 import { attackRange, gaugePerHit } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type WeaponId } from '../src/core/types';
 import { PLAYER, STACK, WEAPON } from '../src/config';
-import { DEFAULT_LOADOUT, equip, isOwned, slotOf, validateLoadout, WEAPON_IDS } from '../src/meta/loadout';
+import { DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, slotOf, validateLoadout, WEAPON_IDS } from '../src/meta/loadout';
+import { WEAPON_DUST_COST } from '../src/meta/economy';
 
 const IDS = Object.keys(WEAPON) as WeaponId[];
 /** 연타 1주기 = 공격 6f(예열·타격·여운) + 다음 누름까지 1f */
@@ -154,5 +155,19 @@ describe('무기 장착·저장', () => {
     const { weapon: _weapon, ...old } = DEFAULT_LOADOUT;
     expect(validateLoadout(old).weapon).toBe('sword');
     expect(validateLoadout({ ...old, weapon: 'laser' }).weapon).toBe('sword');
+  });
+});
+
+describe('대검', () => {
+  it('모두 맞교환 — 철거칼보다 나은 칸과 못한 칸이 함께 있다(비쌀수록 세지는 칼이 아니다)', () => {
+    for (const id of GREATSWORD_IDS) {
+      const d = (['reach', 'lift', 'gauge'] as const).map((k) => Math.sign(WEAPON[id][k] - WEAPON.sword[k]));
+      expect(d, id).toContain(1);
+      expect(d, id).toContain(-1);
+    }
+  });
+
+  it('먼지 값이 붙어 상점에 오른다', () => {
+    for (const id of GREATSWORD_IDS) expect(WEAPON_DUST_COST[id], id).toBeGreaterThan(0);
   });
 });

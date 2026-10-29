@@ -1,10 +1,12 @@
 // BL-09 — 파티클은 월드 좌표로 저장하고 그릴 때 카메라를 한 번 더한다.
 // 스폰 시점 카메라를 구워 넣으면 점프 정점에서 터진 파편이 월드에 안 붙고 화면에 붙어 따라온다.
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VIEW } from '../src/config';
 import { makeState } from '../src/core/sim';
 import type { GameState } from '../src/core/types';
-import { drawEffects, resetEffects, spawnBossBreak, spawnFromEvent, tickEffects, updateEffects } from '../src/render/effects';
+import {
+  drawBackEffects, drawEffects, resetEffects, spawnBossBreak, spawnFloorShatter, spawnFromEvent, tickEffects, updateEffects,
+} from '../src/render/effects';
 
 /** 그린 점들의 y를 모으는 기록용 ctx — arc/moveTo/translate 좌표만 본다. */
 function recorder(): { ctx: CanvasRenderingContext2D; ys: number[]; shifts: number[] } {
@@ -117,5 +119,32 @@ describe('격파 배속(slow) — 파티클만 느리다', () => {
   it('tickEffects(slow)는 호출 형태만 검증 — 던지지 않는다', () => {
     expect(() => tickEffects(0.2)).not.toThrow();
     expect(() => tickEffects()).not.toThrow();
+  });
+});
+
+describe('층 조각 — 땅 판정', () => {
+  // 조각 경로는 캔버스가 있어야 탄다 — 아무 일도 안 하는 가짜 캔버스로 굽는다
+  const noop = (): CanvasRenderingContext2D =>
+    new Proxy({}, { get: () => () => undefined, set: () => true }) as unknown as CanvasRenderingContext2D;
+  const fakeCanvas = (): HTMLCanvasElement => ({ width: 0, height: 0, getContext: noop }) as unknown as HTMLCanvasElement;
+  /** 살아 있는 층 조각 수 = drawBackEffects가 부른 drawImage 수 */
+  const countFrags = (): number => {
+    let n = 0;
+    const ctx = new Proxy({}, {
+      get: (_t, k) => (k === 'drawImage' ? () => { n += 1; } : () => undefined),
+      set: () => true,
+    }) as unknown as CanvasRenderingContext2D;
+    drawBackEffects(ctx);
+    return n;
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('땅에 붙은 층(깔림 탈출)을 부숴도 위로 뜨는 조각은 바로 부서지지 않는다', () => {
+    vi.stubGlobal('document', { createElement: fakeCanvas });
+    spawnFloorShatter(fakeCanvas(), VIEW.LANE_X[0] - VIEW.LANE_W / 2, VIEW.GROUND_Y - VIEW.FLOOR_H, VIEW.LANE_W, VIEW.FLOOR_H);
+    const born = countFrags();
+    for (let i = 0; i < 15; i++) updateEffects(1 / 60); // 0.25초
+    expect(born).toBeGreaterThan(0);
+    expect(countFrags()).toBe(born);
   });
 });

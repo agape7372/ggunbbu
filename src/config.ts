@@ -143,7 +143,10 @@ export const STACK = {
   // 아래로 튕긴다**(원작 `FUN_00405490` 포즈10: vy=8.0px/f=480px/s 아래로, ×68/120 스케일).
   // 스택 띄우기(GUARD_AIR_V)는 별개로 유지 — "점프가드로 건물 띄워 버티기"는 계획 정본 루프고,
   // 원작의 건물 층 처리기는 공중가드 포즈를 아예 안 다룬다(대응물 없음, 벤치마크 §5).
-  GUARD_AIR_RECOIL_V: 272, // 플레이어 하향 반동 px/s [원작 이식] = 480 × 68/120
+  // ★10-28 원작 대조 검수: 272(= 480 × 68/120)는 4차 시간축 값이었다. 5차가 초속을 2.92배로 올릴 때
+  // 같이 안 올라 초속 대비 반동이 원작의 0.34배로 줄어 있었다. 반동/초속을 원작 비율(8.0/14.0 px/f,
+  // 벤치마크 §3·§5)로 묶어 시간축을 또 바꿔도 따라가게 한다 — 현행 793.
+  GUARD_AIR_RECOIL_V: Math.round(PLAYER.JUMP_V0 * 8 / 14), // 플레이어 하향 반동 px/s [원작 이식]
   PIN_ESCAPE_V: 850,      // 깔림 '하' 탈출 띄우기
   PIN_MERCY_V: 680,       // 깔림 Z 실패 자비 바운스
   GUARD_ZONE_GROUND: 66,  // building.y ≤ 66(플레이어 키 55 + 여유) 에서 지면 가드 판정
@@ -184,6 +187,15 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   hammer: { reach: 60, lift: 95, gauge: 1, shake: 1.6 },     // 띄우기 ↑ / 사거리 ↓
   crowbar: { reach: 88, lift: STACK.HIT_LIFT_V, gauge: 0.8, shake: 1 }, // 사거리 ↑ / 필살 ↓
   grinder: { reach: PLAYER.ATTACK_REACH, lift: 65, gauge: 1.4, shake: 0.8 }, // 필살 ↑ / 띄우기 ↓
+  // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 고르는 맛은 칼날 모양과 손맛
+  iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
+  saw: { reach: 72, lift: 70, gauge: 1.25, shake: 0.9 },                 // 필살 ↑ / 띄우기 ↓
+  hazard: { reach: 76, lift: 88, gauge: 0.85, shake: 1.2 },              // 사거리·띄우기 ↑ / 필살 ↓
+  beam: { reach: 64, lift: 98, gauge: 1, shake: 1.7 },                   // 띄우기 ↑↑ / 사거리 ↓
+  flame: { reach: 76, lift: 72, gauge: 1.2, shake: 1.1 },                // 사거리·필살 ↑ / 띄우기 ↓
+  frost: { reach: 86, lift: 74, gauge: 0.95, shake: 1 },                 // 사거리 ↑↑ / 띄우기 ↓
+  onyx: { reach: 92, lift: 92, gauge: 0.7, shake: 1.5 },                 // 사거리·띄우기 ↑↑ / 필살 ↓↓
+  gold: { reach: 74, lift: 76, gauge: 1.5, shake: 1.3 },                 // 필살 ↑↑ / 띄우기 ↓
 };
 
 // ── 보급 상자 [튜닝] ─────────────────────────────────────────────
@@ -204,6 +216,7 @@ export const DEBRIS = {
   GRAVITY: 1780,     // px/s²
   BOUNCE_VY: -0.25,  // 지면 반사 시 vy 감쇠 배수
   BOUNCE_VX: 0.7,    // 지면 반사 시 vx 감쇠 배수
+  LIFE_F: 90,        // 층 붕괴 잔해 수명(틱) — 렌더는 이 값 근처로 막 생긴 잔해를 알아본다
 } as const;
 
 // ── 재질 HP 테이블 [튜닝] (구조도 계획서 유래 — 원작 대조 없음) ──
@@ -397,35 +410,35 @@ export interface JuiceSpec {
 //   아래 `보스 연출 · 렌더 전용` 키(bossBreak·bossRoar·bossSplit)는 이벤트가 아니라 렌더가 상태를 읽어 쓰는 값이다.
 export const JUICE: Record<string, JuiceSpec> = {
   slash:          { hitstop: 0, shake: 0, flash: 0, particles: 0 },
-  hit:            { hitstop: 2, shake: 1, flash: 2, particles: 5 },
-  floorCollapse:  { hitstop: 3, shake: 2.5, flash: 2, particles: 10 },
+  hit:            { hitstop: 2, shake: 2, flash: 2, particles: 5 },
+  floorCollapse:  { hitstop: 3, shake: 5, flash: 2, particles: 10 },
   // 완파는 층수(e.n)로 키운다 — JUICE_SYS.STACK_K_*. 이 값은 k=1(2층) 기준.
-  stackDestroy:   { hitstop: 6, shake: 5, flash: 0, particles: 24 },
-  butterCollapse: { hitstop: 2, shake: 2, flash: 2, particles: 8 },
-  special:        { hitstop: 10, shake: 12, flash: 4, particles: 32 },
-  hurt:           { hitstop: 4, shake: 5, flash: 3, particles: 4 },
+  stackDestroy:   { hitstop: 6, shake: 8, flash: 0, particles: 24 },
+  butterCollapse: { hitstop: 2, shake: 3, flash: 2, particles: 8 },
+  special:        { hitstop: 10, shake: 16, flash: 4, particles: 32 },
+  hurt:           { hitstop: 4, shake: 8, flash: 3, particles: 4 },
   // 밑면 충돌 — 막혔다는 걸 손에 알리되 타격보다 약하게(적을 친 게 아니다)
   headBonk:       { hitstop: 1, shake: 2, flash: 0, particles: 4 },
-  guardBounce:    { hitstop: 1, shake: 2, flash: 2, particles: 3 },
-  guardAirBounce: { hitstop: 2, shake: 3, flash: 3, particles: 5 },
+  guardBounce:    { hitstop: 1, shake: 2.5, flash: 2, particles: 3 },
+  guardAirBounce: { hitstop: 2, shake: 3.5, flash: 3, particles: 5 },
   // 보스전은 몸체 반응(지터·아이보리)이 번쩍을 대신한다 — 1막용 잉크 전체 번쩍은 뺀다(flash 0).
-  bossHit:        { hitstop: 2, shake: 1, flash: 0, particles: 4 },
-  bossDefeat:     { hitstop: 30, shake: 12, flash: 4, particles: 64 },
+  bossHit:        { hitstop: 2, shake: 1.5, flash: 0, particles: 4 },
+  bossDefeat:     { hitstop: 30, shake: 18, flash: 4, particles: 64 },
   // ⚠ 히트스톱 0 고정: 게이지 없이 필살을 연타하면 매번 나오는 이벤트라 멈춤이 붙으면 시뮬이 선다(B-10).
   guardDenied:    { hitstop: 0, shake: 1, flash: 0, particles: 0 },
   supply:         { hitstop: 0, shake: 0, flash: 0, particles: 8 },
-  hatBreak:       { hitstop: 3, shake: 4, flash: 0, particles: 10 },
+  hatBreak:       { hitstop: 3, shake: 5, flash: 0, particles: 10 },
   // 번개 착탄(hurt가 따로 붙는다) — 땅에 꽂히는 순간 불꽃·먼지
-  boltStrike:     { hitstop: 0, shake: 5, flash: 2, particles: 10 },
+  boltStrike:     { hitstop: 0, shake: 6, flash: 2, particles: 10 },
   // ── 보스 연출 · 렌더 전용 ──
-  bossBreak:      { hitstop: 0, shake: 7, flash: 0, particles: 12 },  // 입장 BREAK 틱: 물고 온 층이 부서진다
-  bossRoar:       { hitstop: 0, shake: 8, flash: 0, particles: 0 },   // 티어 포효 시작(phaseClear n>=100)
-  bossSplit:      { hitstop: 0, shake: 6, flash: 0, particles: 0 },   // 격파 몸체가 갈라지기 시작
+  bossBreak:      { hitstop: 0, shake: 10, flash: 0, particles: 12 },  // 입장 BREAK 틱: 물고 온 층이 부서진다
+  bossRoar:       { hitstop: 0, shake: 10, flash: 0, particles: 0 },   // 티어 포효 시작(phaseClear n>=100)
+  bossSplit:      { hitstop: 0, shake: 8, flash: 0, particles: 0 },   // 격파 몸체가 갈라지기 시작
 };
 export const JUICE_SYS = {
-  SHAKE_MAX_AMP: 12,
-  SHAKE_HALF_LIFE_F: 6,
-  PARTICLE_POOL: 256,
+  SHAKE_MAX_AMP: 18,
+  SHAKE_HALF_LIFE_F: 8,
+  PARTICLE_POOL: 384,
   ONOMATOPOEIA_MAX: 3,    // 동시 의성어 팝업 상한
   COMBO_POPUP_MAX: 16,    // 동시 콤보 숫자 팝업 상한 (원작: 타격마다 숫자가 흩뿌려짐)
   COMBO_POPUP_LIFE_F: 26, // 숫자 팝업 수명(프레임)
@@ -455,6 +468,30 @@ export const JUICE_SYS = {
   ORBIT_FLASH_A: 0.3, ORBIT_FLASH_TICKS: 4, // orbit: 건물이 궤도에서 풀리는 순간 아이보리 번쩍
   GLASS_CHIPS: 12, GLASS_CHIPS_HIT: 3,       // glass: 층 붕괴 / 타격 때 유리 조각 수
   ICE_SPARKS: 12,               // ice: 지면 가드 차가운 스파크 수
+  // ── 파괴 연출 2판(10-28) — 전부 렌더 전용. 시뮬 타이밍(hitstop)은 위 표 그대로 ──
+  // 흔들림: 같은 크기가 겹치면 큰 쪽 + 작은 쪽의 STACK배만 더한다(연타가 끝없이 쌓이지 않게). 회전은 진폭 비율의 제곱.
+  SHAKE_STACK: 0.35, SHAKE_ROT_MAX: 0.035,
+  // 방향 킥(px) — 아래에서 위로 베니 화면이 위로 툭 튀었다 용수철로 돌아온다
+  KICK_PX: { hit: 3, floorCollapse: 5, stackDestroy: 7, butterCollapse: 3, bossHit: 2 } as Record<string, number>,
+  KICK_SPRING: 0.3, KICK_DAMP: 0.45,
+  // 맞은 층 하얗게 번쩍(틱 · 알파) — 화면 전체가 아니라 그 층만
+  HIT_FLASH_TICKS: 3, HIT_FLASH_A: 0.75,
+  // 층 조각: 층 그림을 가로 COLS × 세로 ROWS 칸으로 자르고 칸 일부는 대각선으로 한 번 더 자른다
+  FRAG_COLS: 3, FRAG_ROWS: 2, FRAG_LIFE: 1.05, FRAG_G: 1150,
+  // 만화 먼지 구름 수 — 층 붕괴 / 완파
+  PUFF_COLLAPSE: 3, PUFF_DESTROY: 8,
+  // 타격 별 반지름(px)
+  STAR_PX: { hit: 13, floorCollapse: 24, stackDestroy: 38, butterCollapse: 16 } as Record<string, number>,
+  // 집중선 · 색 반전(완파 IMPACT_FLOORS층 이상 · 필살 · 보스 격파). 반전은 COOLDOWN 틱에 한 번만
+  IMPACT_TICKS: 8, INVERT_TICKS: 2, IMPACT_FLOORS: 3, INVERT_COOLDOWN: 45,
+  // 콤보 열기 — 이 콤보부터 필드 양옆에 속도선이 선다(단계마다 진해진다)
+  HEAT_COMBO: [30, 60, 120, 250] as const,
+  // 의성어 글자 기본 크기(px) · 등장 튐 배율 · 등장 틱
+  ONOMATO_PX: 20, ONOMATO_POP: 1.8, ONOMATO_POP_TICKS: 5,
+  // 새 건물이 막 나타난 뒤 양옆에 남는 낙하 선(틱)
+  DROP_STREAK_TICKS: 22,
+  // 예능 자막(완파 층수 · 콤보 고비) 지속 틱 — 박혀 들어오기 6 · 빠지기 7 포함
+  CAPTION_TICKS: 50,
 } as const;
 
 // ── 진동 패턴 (podoal feedback.ts 차용) ─────────────────────────
@@ -487,6 +524,7 @@ export const PALETTE = {
   BG: '#F4F1E8',
   INK: '#1A1A20',
   RED: '#E5302E', YELLOW: '#FFD200', BLUE: '#1E62D0',
+  YELLOW_DEEP: '#E39E00', // 필드 위 글씨(의성어·콤보 숫자) 채움 — YELLOW는 너무 밝아 빨리 지나가면 안 보였다(10-28 사용자)
   WHITE: '#F4F1E8',
   RUBBLE: '#9A958C',     // 잔해 채움 [튜닝] — 구 #3A3A42 는 INK와 명도가 붙어 캐릭터를 삼켰다
 } as const;
@@ -495,9 +533,10 @@ export const PALETTE = {
 export const SAVE_KEY = 'gunbbu.v1';
 
 // ── 소리 (B1) ───────────────────────────────────────────────────
-// 믹스: 마스터 컴프레서(리미터 겸용) + 버스 상향. 수치는 OfflineAudioContext 렌더로 잰 출발점.
+// 믹스: 마스터 컴프레서(덜 누름) → 리미터(클리핑만 막음). 수치는 OfflineAudioContext 렌더로 잰 출발점.
 export const AUDIO = {
-  COMP: { THRESHOLD: -12, KNEE: 6, RATIO: 12, ATTACK: 0.003, RELEASE: 0.15 },
+  COMP: { THRESHOLD: -16, KNEE: 8, RATIO: 3.5, ATTACK: 0.004, RELEASE: 0.2 },
+  LIMIT: { THRESHOLD: -2, KNEE: 0, RATIO: 20, ATTACK: 0.001, RELEASE: 0.1 },
   SFX_BUS: 0.9,
   BGM_BUS: 0.5,
   /** 스케줄러 — 룩어헤드 0.2초·인터벌 25ms. 이만큼 이상 밀리면 따라잡지 않고 건너뛴다. */
@@ -512,6 +551,9 @@ export const AUDIO = {
   DUCK_PULSE: 0.35,
   DUCK_PULSE_S: 0.3,
   DUCK_TC: 0.05,
+  /** 건물 완파 덕킹 — 필살보다 가볍게 0.25초 */
+  DUCK_DESTROY: 0.55,
+  DUCK_DESTROY_S: 0.25,
   /** 콤보 층 — 햇 8분 / 아르페지오. 마디 경계에서만 켜고 끈다. */
   COMBO_HAT: 50,
   COMBO_ARP: 150,

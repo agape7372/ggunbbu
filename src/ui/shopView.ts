@@ -1,43 +1,71 @@
-// 상점 탭. 궤도조각으로 연다 + 먼지 교환 + 광고 조각. IAP SKU(≤₩1,900)는 결제가 붙을 때만 그린다(v1 제외).
+// 상점 탭 — 「자재 카탈로그」. 품목마다 판 속 졸라맨을 찍은 그림 + 아래 띠 하나(모자람 막대 / 사기 / 장착).
+// 먼지로 무기, 궤도조각으로 필살·꾸미기, 먼지로 철거 자격 응시. IAP SKU(≤₩1,900)는 결제가 붙을 때만 그린다(v1 제외).
 
+import { WEAPON } from '../config';
 import {
-  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, ORBIT_PER_AD, WAZA_ORBIT_COST, WEAPON_DUST_COST,
-  examStatus, licenseTitle, nextExam,
+  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, GREATSWORD_IDS, ORBIT_PER_AD, WAZA_ORBIT_COST, WEAPON_DUST_COST,
+  WEAPON_IDS, examStatus, licenseTitle, nextDustGoal, nextExam,
 } from '../meta';
-import type { WeaponId } from '../meta';
+import type { Loadout, WeaponId } from '../meta';
 import { WAZA_COPY, WEAPON_COPY } from '../content/world';
 import { SCREENS } from '../content/screens';
 import { SKUS, type Sku } from '../platform/iap';
 import { ICON } from './icons';
 import { escapeHtml } from './html';
+import { lettersArt, playerArt, restoreLook, swordArt, wazaArt } from './shopArt';
 
-interface BuyRow {
+type Pay = 'dust' | 'orbit';
+type Slot = keyof Loadout;
+
+interface Item {
   id: string;
-  title: string;
-  note: string;
+  slot: Slot;
+  name: string;
   cost: number;
+  pay: Pay;
+  /** 칸 위 작은 이름표 — 칸(2열)에만. 보유 도장·다음 목표가 이 줄 오른쪽에 앉아 긴 이름과 겹치지 않는다 */
+  kind?: string;
+  /** 그림만으로 안 보이는 것(필살)만 한 줄 */
+  desc?: string;
 }
 
-const ORBIT_ROWS: readonly BuyRow[] = [
-  { id: 'ageba', title: '필살 · 올려베기', note: WAZA_COPY.ageba.desc, cost: WAZA_ORBIT_COST },
-  { id: 'tetsu', title: '필살 · 철벽', note: WAZA_COPY.tetsu.desc, cost: WAZA_ORBIT_COST },
-  { id: 'amber', title: '졸라맨 · 호박', note: '몸 색', cost: COSMETIC_ORBIT_COST },
-  { id: 'slate', title: '졸라맨 · 석판', note: '몸 색', cost: COSMETIC_ORBIT_COST },
-  { id: 'rebar', title: '칼빛 · 철근', note: '참격 색', cost: COSMETIC_ORBIT_COST },
-  { id: 'crescent', title: '칼빛 · 초승달', note: '참격 색', cost: COSMETIC_ORBIT_COST },
-  { id: 'stamp', title: '효과글자 · 도장', note: '타격 글자', cost: COSMETIC_ORBIT_COST },
-  { id: 'orbit', title: '효과글자 · 궤도', note: '타격 글자', cost: COSMETIC_ORBIT_COST },
-];
+const weaponItem = (id: WeaponId, kind?: string, name = WEAPON_COPY[id].name): Item =>
+  ({ id, slot: 'weapon', kind, name, cost: WEAPON_DUST_COST[id], pay: 'dust' });
 
-/** 먼지로 사는 줄 — 무기. 가격은 economy WEAPON_DUST_COST */
-const DUST_ROWS: readonly BuyRow[] = (Object.keys(WEAPON_DUST_COST) as WeaponId[]).map((id) => ({
-  id,
-  title: `무기 · ${WEAPON_COPY[id].name}`,
-  note: WEAPON_COPY[id].desc,
-  cost: WEAPON_DUST_COST[id],
+/** 연장 셋 — 큰 카드 */
+const TOOL_ITEMS: readonly Item[] = (['hammer', 'crowbar', 'grinder'] as const).map((id) => weaponItem(id));
+/** 대검 — 칸. 이름표가 「대검」이라 이름은 앞말만 */
+const GREAT_ITEMS: readonly Item[] = GREATSWORD_IDS.map((id) => weaponItem(id, '대검', WEAPON_COPY[id].name.replace(/ 대검$/, '')));
+
+const WAZA_ITEMS: readonly Item[] = (['ageba', 'tetsu'] as const).map((id) => ({
+  id, slot: 'waza', kind: '필살', name: WAZA_COPY[id].name, desc: WAZA_COPY[id].desc, cost: WAZA_ORBIT_COST, pay: 'orbit',
 }));
 
-/** 상점이 읽는 지갑 + 철거 자격 현황 */
+const LOOK_ITEMS: readonly Item[] = ([
+  ['amber', 'body', '졸라맨', '호박'],
+  ['slate', 'body', '졸라맨', '석판'],
+  ['rebar', 'blade', '칼빛', '철근'],
+  ['crescent', 'blade', '칼빛', '초승달'],
+  ['stamp', 'letters', '효과글자', '도장'],
+  ['orbit', 'letters', '효과글자', '궤도'],
+] as const).map(([id, slot, kind, name]) => ({ id, slot, kind, name, cost: COSMETIC_ORBIT_COST, pay: 'orbit' }));
+
+/** 무기 막대 셋 — 장비 탭과 같은 값·같은 정규화(무기 전부 중 최댓값) */
+const STATS: readonly { key: 'reach' | 'lift' | 'gauge'; label: string }[] = [
+  { key: 'reach', label: '사거리' },
+  { key: 'lift', label: '띄우기' },
+  { key: 'gauge', label: '필살' },
+];
+
+export type CardState = 'owned' | 'ok' | 'short';
+
+/** 칸 상태 — 보유가 먼저, 그다음 지갑 */
+export function cardState(has: boolean, wallet: number, cost: number): CardState {
+  if (has) return 'owned';
+  return wallet >= cost ? 'ok' : 'short';
+}
+
+/** 상점이 읽는 지갑 + 철거 자격 현황 + 장착(그림 되돌리기·장착 띠) */
 export interface ShopInv {
   dust: number;
   orbit: number;
@@ -45,6 +73,7 @@ export interface ShopInv {
   license: number;
   /** 평생 누적 철거 건물 수 */
   buildings: number;
+  loadout: Loadout;
 }
 
 export interface ShopHandlers {
@@ -56,7 +85,12 @@ export interface ShopHandlers {
   /** 먼지로 사는 줄(무기) — economy WEAPON_DUST_COST */
   onDust(id: string): void;
   onExchange(): void;
+  /** 산 품목을 상점에서 바로 장착 */
+  onEquip(slot: string, id: string): void;
 }
+
+/** 방금 「사기」를 누른 품목 — 다음 그리기에서 보유로 바뀌었으면 도장을 쿵 찍는다 */
+let pendingBuy: string | null = null;
 
 export function paintShop(
   root: HTMLElement,
@@ -65,57 +99,91 @@ export function paintShop(
   paths: { iap: boolean; ad: boolean },
   h: ShopHandlers,
 ): void {
-  // 웹(결제·광고 미배선)에선 해당 줄을 아예 안 그린다 — 무료 지급 위장 금지 (08-30, P0-2)
-  const canExchange = inv.dust >= DUST_EXCHANGE.dust;
-  const earn = [
-    `<button type="button" class="shop-row${canExchange ? '' : ' short'}" data-shop-exchange="1"${canExchange ? '' : ' disabled'}>
-      <span class="shop-name">먼지 바꾸기<small>먼지 ${DUST_EXCHANGE.dust} → 궤도조각 ${DUST_EXCHANGE.orbit}</small></span>
-      ${priceCol(`${ICON.dust}${DUST_EXCHANGE.dust}`, canExchange ? 0 : DUST_EXCHANGE.dust - inv.dust)}
-    </button>`,
-    paths.ad
-      ? `<button type="button" class="shop-row" data-shop-ad="1">
-          <span class="shop-name">광고 보고 받기<small>한 편에 궤도조각 ${ORBIT_PER_AD}</small></span>
-          <span class="price">${ICON.ad}</span>
-        </button>`
-      : '',
-  ].join('');
+  const fresh = pendingBuy;
+  pendingBuy = null;
+  const goal = nextDustGoal([...owned], inv.dust);
+  // 노랑은 화면에 하나 — 그리는 순서로 처음 만나는 「사기」·「응시」
+  let mainLeft = true;
+  const takeMain = (ok: boolean): boolean => {
+    if (!ok || !mainLeft) return false;
+    mainLeft = false;
+    return true;
+  };
+  /** 품목 하나 — 무기 연장은 큰 카드(그림 옆에 막대), 나머지는 2열 칸 */
+  const card = (it: Item, art: string, more = ''): string => {
+    const st = cardState(hasItem(owned, it.id), inv[it.pay], it.cost);
+    const tag = goal && goal.id === it.id && st === 'short' ? '<span class="cat-goal">다음 목표</span>' : '';
+    const stamp = st === 'owned' ? `<span class="cat-stamp${fresh === it.id ? ' fresh' : ''}">보유</span>` : '';
+    const img = art ? `<img src="${art}" alt="" draggable="false">` : '';
+    const kind = it.kind ? `<p class="cat-kind">${escapeHtml(it.kind)}</p>` : '';
+    // 도장·꼬리표는 서류(이름) 쪽 — 그림을 가리지 않는다
+    return `<article class="${it.kind ? 'cat-tile' : 'cat-card'} is-${st}">
+      <div class="cat-art">${img}</div>
+      <div class="cat-body">${kind}<h3 class="cat-name">${escapeHtml(it.name)}</h3>${more}${tag}${stamp}</div>
+      ${footHtml(it, st, takeMain(st === 'ok'), inv)}
+    </article>`;
+  };
+  const tools = TOOL_ITEMS.map((it) => card(
+    it,
+    playerArt({ weapon: it.id as WeaponId, body: inv.loadout.body, blade: inv.loadout.blade, pose: 'attack' }),
+    statsHtml(it.id as WeaponId),
+  )).join('');
+  const greats = GREAT_ITEMS.map((it) => card(it, swordArt(it.id as WeaponId), statsHtml(it.id as WeaponId))).join('');
+  const waza = WAZA_ITEMS.map((it) => card(
+    it,
+    wazaArt(it.id, { weapon: inv.loadout.weapon, body: inv.loadout.body, blade: inv.loadout.blade }),
+    `<p class="cat-desc">${escapeHtml(it.desc ?? '')}</p>`,
+  )).join('');
+  const looks = LOOK_ITEMS.map((it) => card(it, lookArt(it, inv.loadout))).join('');
+  // 찍기가 바꾼 졸라맨 전역 상태를 장착대로 — 뒤 화면 졸라맨이 미리보기 색을 입고 남지 않게
+  restoreLook(inv.loadout);
+  const exam = examHtml(inv, takeMain);
 
-  const dustRows = DUST_ROWS.map((row) => buyRowHtml(row, 'dust', inv, owned)).join('');
-  const rows = ORBIT_ROWS.map((row) => buyRowHtml(row, 'orbit', inv, owned)).join('');
+  const canExchange = inv.dust >= DUST_EXCHANGE.dust;
+  // 웹(광고 미배선)에선 광고 칸을 아예 안 그린다 — 무료 지급 위장 금지 (08-30, P0-2)
+  const earn = `<div class="earn">
+      ${paths.ad ? `<button type="button" class="earn-btn" data-shop-ad="1">${ICON.ad}광고 <b>+${ORBIT_PER_AD}${ICON.orbit}</b></button>` : ''}
+      <button type="button" class="earn-btn" data-shop-exchange="1"${canExchange ? '' : ' disabled'}><b>${ICON.dust}${DUST_EXCHANGE.dust}</b>→<b>${ICON.orbit}${DUST_EXCHANGE.orbit}</b>바꾸기</button>
+    </div>`;
 
   root.innerHTML = `
     <header class="sheet-head">
       <div class="sheet-head-row">
         <h2>상점</h2>
-        <p class="wallet"><span aria-label="먼지">${ICON.dust}${fmt(inv.dust)}</span><span aria-label="궤도조각">${ICON.orbit}${fmt(inv.orbit)}</span></p>
+        <p class="wallet wallet-lg"><span aria-label="먼지 ${fmt(inv.dust)}">${ICON.dust}${fmt(inv.dust)}</span><span aria-label="궤도조각 ${fmt(inv.orbit)}">${ICON.orbit}${fmt(inv.orbit)}</span></p>
       </div>
-      <p class="sheet-lead">먼지는 건물을 부수면 쌓인다. 먼지로 무기를 사고, 궤도조각으로 연다.</p>
     </header>
-    <p class="sec-h">궤도조각 얻기</p>
-    <div class="list">${earn}</div>
+    <p class="sec-h">무기 <small class="cur">${ICON.dust}먼지</small></p>
+    <div class="cat-list">${tools}</div>
+    <p class="sec-h">대검 <small class="cur">${ICON.dust}먼지</small></p>
+    <div class="cat-grid">${greats}</div>
+    <p class="sec-h">필살 <small class="cur">${ICON.orbit}궤도조각</small></p>
+    ${earn}
+    <div class="cat-grid">${waza}</div>
+    <p class="sec-h">꾸미기 <small class="cur">${ICON.orbit}궤도조각</small></p>
+    <div class="cat-grid">${looks}</div>
     <p class="sec-h">${SCREENS.license.heading} <small>${escapeHtml(licenseTitle(inv.license))}</small></p>
-    <div class="list">${examRowHtml(inv)}</div>
-    <p class="sec-h">먼지로 사기</p>
-    <div class="list">${dustRows}</div>
-    <p class="sec-h">열기</p>
-    <div class="list">${rows}</div>
+    <div class="cat-list">${exam}</div>
     ${paths.iap ? `<p class="sec-h">결제 <small>부가세 포함</small></p><div class="list">${skuRowsHtml()}</div>` : ''}`;
 
   root.onclick = (e) => {
-    const t = (e.target as HTMLElement).closest('[data-shop-sku],[data-shop-ad],[data-orbit-id],[data-dust-id],[data-shop-exchange],[data-shop-exam]') as HTMLButtonElement | null;
+    const t = (e.target as HTMLElement).closest('[data-shop-sku],[data-shop-ad],[data-orbit-id],[data-dust-id],[data-shop-exchange],[data-shop-exam],[data-equip-id]') as HTMLButtonElement | null;
     if (!t || t.disabled) return;
     e.preventDefault();
     if (t.hasAttribute('data-shop-exam')) { h.onExam(); return; }
+    const eid = t.getAttribute('data-equip-id');
+    const slot = t.getAttribute('data-equip-slot');
+    if (eid && slot) { h.onEquip(slot, eid); return; }
     const did = t.getAttribute('data-dust-id');
     if (did) {
-      if (!hasItem(owned, did)) h.onDust(did);
+      if (!hasItem(owned, did)) { pendingBuy = did; h.onDust(did); }
       return;
     }
     if (t.hasAttribute('data-shop-exchange')) { h.onExchange(); return; }
     if (t.hasAttribute('data-shop-ad')) { h.onAdPack(); return; }
     const oid = t.getAttribute('data-orbit-id');
     if (oid) {
-      if (!hasItem(owned, oid)) h.onOrbit(oid);
+      if (!hasItem(owned, oid)) { pendingBuy = oid; h.onOrbit(oid); }
       return;
     }
     const id = t.getAttribute('data-shop-sku');
@@ -123,47 +191,66 @@ export function paintShop(
   };
 }
 
-/** 사는 줄 하나. 잔액 부족 = 조용한 무반응 금지 — 눌리지 않게 하고 점선 칸 + 「N 모자람」이 이유를 말한다 (08-30, B-2) */
-/** 철거 자격 시험 줄. 조건(건물)이 먼저, 돈은 그다음 — 모자란 쪽을 줄 오른쪽에 적는다 */
-function examRowHtml(inv: ShopInv): string {
+/** 꾸미기 그림 — 몸 색은 서 있는 졸라맨, 칼빛은 필살 참격(호가 가장 크다), 효과글자는 판 속 글자 */
+function lookArt(it: Item, l: Loadout): string {
+  if (it.slot === 'body') return playerArt({ weapon: l.weapon, body: it.id, blade: l.blade, pose: 'idle' });
+  if (it.slot === 'blade') return playerArt({ weapon: l.weapon, body: l.body, blade: it.id, pose: 'special' });
+  return lettersArt(it.id);
+}
+
+/** 옅은 칸 = 철거칼, 잉크 = 이 무기 */
+function statsHtml(id: WeaponId): string {
+  const rows = STATS.map(({ key, label }) => {
+    const max = Math.max(...WEAPON_IDS.map((w) => WEAPON[w][key]));
+    const pct = (w: WeaponId): number => Math.round((100 * WEAPON[w][key]) / max);
+    return `<div class="cat-stat"><span>${label}</span><span class="bar" role="img" aria-label="${label} ${pct(id)}%"><span class="ghost" style="width:${pct('sword')}%"></span><span class="fill" style="width:${pct(id)}%"></span></span></div>`;
+  }).join('');
+  return `<div class="cat-stats">${rows}</div>`;
+}
+
+/** 아래 띠 — 모자람 = 차오르는 막대 + 가진 것/값, 살 수 있음 = 「사기」, 보유 = 「장착」(장착 중이면 꺼짐) */
+function footHtml(it: Item, st: CardState, main: boolean, inv: ShopInv): string {
+  if (st === 'owned') {
+    const on = inv.loadout[it.slot] === it.id;
+    return `<button type="button" class="cat-foot cat-equip" data-equip-slot="${it.slot}" data-equip-id="${it.id}"${on ? ' disabled' : ''}>${on ? '장착 중' : '장착'}</button>`;
+  }
+  const icon = ICON[it.pay];
+  if (st === 'ok') {
+    return `<button type="button" class="cat-foot cat-buy${main ? ' is-main' : ''}" data-${it.pay}-id="${it.id}">사기<span class="price">${icon}${fmt(it.cost)}</span></button>`;
+  }
+  return progressFoot(icon, inv[it.pay], it.cost);
+}
+
+/** 모자란 띠 — 막대 + 「가진 것/필요」 */
+function progressFoot(icon: string, have: number, need: number): string {
+  const pct = Math.max(0, Math.min(100, Math.floor((100 * have) / need)));
+  return `<div class="cat-foot"><span class="bar" role="img" aria-label="${fmt(have)}/${fmt(need)}"><span class="fill" style="width:${pct}%"></span></span><span class="cat-have">${icon}${fmt(have)}<b>/${fmt(need)}</b></span></div>`;
+}
+
+/** 철거 자격 — 건물 조건이 먼저, 응시료는 그다음. 모자란 쪽을 막대로 보인다 */
+function examHtml(inv: ShopInv, takeMain: (ok: boolean) => boolean): string {
   const exam = nextExam(inv.license);
-  const status = examStatus(inv.license, inv.buildings, inv.dust);
+  const badge = (t: string): string => `<div class="cat-art cert-art"><span class="cert-badge">${escapeHtml(t)}</span></div>`;
   if (!exam) {
-    return `<div class="shop-row owned is-exam"><span class="shop-name">${escapeHtml(SCREENS.license.maxTitle)}<small>${escapeHtml(licenseTitle(inv.license))}</small></span>`
-      + `<span class="price-col"><span class="price">${SCREENS.license.maxTag}</span></span></div>`;
+    return `<article class="cat-card is-owned">${badge(licenseTitle(inv.license))}<div class="cat-body"><h3 class="cat-name">${escapeHtml(SCREENS.license.maxTitle)}</h3></div></article>`;
   }
   const to = licenseTitle(inv.license + 1);
-  let lack = '';
-  if (status === 'buildings') lack = SCREENS.license.needBuildings(exam.buildings - inv.buildings);
-  else if (status === 'dust') lack = `${fmt(exam.fee - inv.dust)} 모자람`;
-  const ok = status === 'ok';
-  return `<button type="button" class="shop-row is-exam${ok ? '' : ' short'}" data-shop-exam="1"${ok ? '' : ' disabled'}>
-      <span class="shop-name">${escapeHtml(SCREENS.license.exam)} · ${escapeHtml(to)}<small class="lic-prog">${escapeHtml(SCREENS.license.progress(Math.min(inv.buildings, exam.buildings), exam.buildings))}</small></span>
-      <span class="price-col"><span class="price">${ICON.dust}${fmt(exam.fee)}</span>${lack ? `<small class="lack">${escapeHtml(lack)}</small>` : ''}</span>
-    </button>`;
-}
-
-function buyRowHtml(
-  row: BuyRow,
-  pay: 'dust' | 'orbit',
-  inv: { dust: number; orbit: number },
-  owned: ReadonlySet<string>,
-): string {
-  const has = hasItem(owned, row.id);
-  const short = !has && inv[pay] < row.cost;
-  let state = '';
-  if (has) state = ' owned';
-  else if (short) state = ' short';
-  const price = has ? '보유' : `${ICON[pay]}${fmt(row.cost)}`;
-  return `<button type="button" class="shop-row${state}" data-${pay}-id="${row.id}"${has || short ? ' disabled' : ''}>
-      <span class="shop-name">${escapeHtml(row.title)}<small>${escapeHtml(row.note)}</small></span>
-      ${priceCol(price, short ? row.cost - inv[pay] : 0)}
-    </button>`;
-}
-
-/** 가격 + 모자라면 얼마나 모자란지. 빨강은 안 쓴다 — 점선 칸과 이 글자가 말한다 */
-function priceCol(price: string, lack: number): string {
-  return `<span class="price-col"><span class="price">${price}</span>${lack > 0 ? `<small class="lack">${fmt(lack)} 모자람</small>` : ''}</span>`;
+  const status = examStatus(inv.license, inv.buildings, inv.dust);
+  let foot: string;
+  if (status === 'ok') {
+    foot = `<button type="button" class="cat-foot cat-buy${takeMain(true) ? ' is-main' : ''}" data-shop-exam="1">${escapeHtml(SCREENS.license.exam)}<span class="price">${ICON.dust}${fmt(exam.fee)}</span></button>`;
+  } else if (status === 'dust') {
+    foot = progressFoot(ICON.dust, inv.dust, exam.fee);
+  } else {
+    foot = progressFoot(ICON.play, Math.min(inv.buildings, exam.buildings), exam.buildings);
+  }
+  // 응시료는 띠가 건물 막대일 때만 몸에 적는다 — 「응시」·먼지 막대는 띠가 이미 값을 보인다
+  const fee = status === 'buildings' ? `<p class="cat-desc cert-fee">${ICON.dust}${fmt(exam.fee)}</p>` : '';
+  return `<article class="cat-card is-${status === 'ok' ? 'ok' : 'short'}">
+      ${badge(to)}
+      <div class="cat-body"><h3 class="cat-name">${escapeHtml(to)} ${escapeHtml(SCREENS.license.exam)}</h3>${fee}</div>
+      ${foot}
+    </article>`;
 }
 
 function hasItem(owned: ReadonlySet<string>, id: string): boolean {
@@ -186,4 +273,3 @@ function skuRowsHtml(): string {
 function fmt(n: number): string {
   return Math.trunc(n).toLocaleString('ko-KR');
 }
-

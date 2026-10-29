@@ -1421,29 +1421,280 @@ button {
 
 .price { font: 700 var(--fs-4) var(--font-mono); }
 
-.shop-row.owned {
-  border-color: var(--rule);
+/* 상점 카탈로그 — 품목마다 그림판(판 속 졸라맨을 찍은 것) + 이름 + 아래 띠 하나.
+   띠는 셋 중 하나: 모자람 = 줄무늬 막대(필살 게이지처럼 차오름) / 살 수 있음 = 꽉 찬 「사기」 / 보유 = 「장착」.
+   칸 전체는 누름 칸이 아니다 — 스크롤하다 그림을 건드려 사지는 일이 없게 띠의 단추만 누른다. */
+.wallet-lg { font-size: var(--fs-6); }
+.wallet-lg .ic { width: 19px; height: 19px; }
+
+.sec-h .cur { display: inline-flex; align-items: center; gap: 3px; }
+.sec-h .cur .ic { width: 13px; height: 13px; }
+
+.cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding-top: var(--sp-5);
+}
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4);
+  padding-top: var(--sp-5);
+}
+
+.cat-card,
+.cat-tile {
+  position: relative;
+  display: grid;
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.cat-card { grid-template-columns: 132px minmax(0, 1fr); }
+.cat-tile { grid-template-rows: auto 1fr auto; }
+.cat-card > .cat-foot { grid-column: 1 / -1; }
+
+/* 모자람 — 점선 칸(빨강은 경고·실패에만). 그림은 그대로 둔다: 갖고 싶은 건 흐리게 하지 않는다 */
+.cat-card.is-short,
+.cat-tile.is-short { border-style: dashed; border-color: var(--dust); }
+
+.cat-card.is-owned,
+.cat-tile.is-owned { border-color: var(--dust-2); }
+
+/* 그림판 — 한 톤 낮은 종이. 오려 붙인 종이 후광은 sprites가 같이 찍는다 */
+.cat-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  padding: var(--sp-3);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.cat-card > .cat-art { border-right: 2px solid var(--ink); }
+.cat-tile > .cat-art { border-bottom: 2px solid var(--ink); }
+.cat-card.is-short > .cat-art { border-right-style: dashed; border-right-color: var(--dust); }
+.cat-tile.is-short > .cat-art { border-bottom-style: dashed; border-bottom-color: var(--dust); }
+.cat-card.is-owned > .cat-art { border-right-color: var(--dust-2); }
+.cat-tile.is-owned > .cat-art { border-bottom-color: var(--dust-2); }
+
+/* 폭 80 논리 그림 — 칸은 1.25배, 무기는 주인공이라 1.5배. 높이는 그림 비율대로(필살은 의성어 한 줄만큼 길다) */
+.cat-art img { width: 100px; max-width: 100%; height: auto; }
+.cat-card > .cat-art img { width: 120px; }
+
+.cat-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+}
+
+.cat-kind {
+  font: 700 var(--fs-1) var(--font-mono);
+  letter-spacing: 0.08em;
   color: var(--dust);
 }
 
-.shop-row.owned .price {
+.cat-name {
+  font: 21px/1.15 var(--font-display);
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+}
+
+.cat-desc {
+  font: 600 var(--fs-2)/1.4 var(--font-ui);
+  color: var(--dust);
+  word-break: keep-all;
+}
+
+/* 무기 막대 — 옅은 칸 = 철거칼, 잉크 = 이 무기. 잉크가 옅은 칸을 넘으면 더 세고, 못 미치면 약하다 */
+.cat-stats { display: grid; gap: 5px; padding-top: var(--sp-3); }
+
+.cat-stat {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-4);
   font: 700 var(--fs-1) var(--font-ui);
-  padding: 2px 6px;
-  border: 1px solid var(--dust-2);
 }
 
-/* 잔액 부족 — 빨강은 쓰지 않는다(빨강 = 경고·실패). 점선 칸 + 잉크 가격 + 「N 모자람」이 이유를 말한다 */
-.shop-row.short { border-style: dashed; border-color: var(--dust); }
-.shop-row.short .price { color: var(--ink); }
+.cat-stat .bar { width: 100%; height: 8px; }
+.cat-stat .bar .fill { background: var(--ink); }
 
-.price-col {
+/* 아래 띠 */
+.cat-foot {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: var(--tap);
+  padding: 0 var(--sp-5);
+  border-top: 1.5px solid var(--ink);
 }
 
-.lack { font: 600 var(--fs-1)/1.2 var(--font-ui); color: var(--dust); }
+.is-short > .cat-foot { border-top: 1.5px dashed var(--dust); }
+.is-owned > .cat-foot { border-top-color: var(--dust-2); }
+
+.cat-foot .bar { flex: 1 1 auto; width: auto; height: 8px; }
+/* 차오르는 중 = 필살 게이지와 같은 잉크 줄무늬 */
+.cat-foot .bar .fill { background: repeating-linear-gradient(-45deg, var(--ink) 0 3px, transparent 3px 6px); }
+
+.cat-have {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: 700 var(--fs-2) var(--font-mono);
+  white-space: nowrap;
+}
+
+.cat-have .ic { width: 14px; height: 14px; }
+.cat-have b { font-weight: 700; color: var(--dust); }
+
+/* 띠 자체가 단추 — 칸 아래를 가득 채운다 */
+.cat-buy,
+.cat-equip {
+  justify-content: space-between;
+  width: 100%;
+  border-right: none;
+  border-bottom: none;
+  border-left: none;
+  background: var(--ink);
+  color: var(--ivory);
+  font: 700 var(--fs-5) var(--font-ui);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.cat-buy .price { font-size: var(--fs-5); }
+.cat-buy .price .ic { width: 16px; height: 16px; }
+/* 노랑은 화면에 하나 — 처음 살 수 있는 품목 */
+.cat-buy.is-main { background: var(--yellow); color: var(--ink); }
+.cat-buy:active { background: var(--ivory); color: var(--ink); }
+
+.cat-equip {
+  justify-content: center;
+  background: transparent;
+  color: var(--ink);
+}
+
+.cat-equip:active { background: var(--ink); color: var(--ivory); }
+
+.cat-equip:disabled {
+  color: var(--dust);
+  cursor: default;
+}
+
+.cat-equip:disabled:active { background: transparent; color: var(--dust); }
+
+/* 보유 도장 — 서류(이름) 쪽 오른쪽 위에 결재 도장처럼. 그림은 가리지 않는다. 방금 산 품목만 쿵 찍힌다 */
+.cat-stamp {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  padding: 4px 7px;
+  border: 2.5px solid currentColor;
+  border-radius: 5px;
+  font: 16px/1 var(--font-display);
+  color: var(--ink);
+  opacity: 0.88;
+  transform: rotate(-10deg);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.cat-stamp::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+.cat-stamp.fresh { animation: cat-stamp-in 360ms var(--ease-pop) both; }
+
+@keyframes cat-stamp-in {
+  from { opacity: 0; transform: rotate(-10deg) scale(2.4); }
+  60% { opacity: 0.95; }
+  to { opacity: 0.88; transform: rotate(-10deg) scale(1); }
+}
+
+/* 다음 목표 — 판 끝 결과 카드가 가리키는 그 품목(nextDustGoal). 잉크 꼬리표, 도장 자리(둘이 같이 뜰 일은 없다) */
+.cat-goal {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  padding: 3px 6px;
+  background: var(--ink);
+  color: var(--ivory);
+  font: 700 var(--fs-1) var(--font-ui);
+  pointer-events: none;
+}
+
+/* 자격증 그림판 — 오를 등급을 겹선 틀에 */
+.cert-badge {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border: 4px double var(--ink);
+  background: var(--ivory);
+  font: 28px/1 var(--font-display);
+  transform: rotate(-4deg);
+}
+
+.cert-fee {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: 700 var(--fs-3) var(--font-mono);
+  color: var(--ink);
+}
+
+.cert-fee .ic { width: 14px; height: 14px; }
+
+/* 궤도조각 얻기 — 필살·꾸미기 위 두 칸 */
+.earn {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: var(--sp-4);
+  padding-top: var(--sp-5);
+}
+
+.earn-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  min-height: var(--tap);
+  padding: 0 var(--sp-4);
+  border: 2px solid var(--ink);
+  background: var(--ivory);
+  color: var(--ink);
+  font: 700 var(--fs-3) var(--font-ui);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.earn-btn .ic { width: 17px; height: 17px; flex: 0 0 auto; }
+.earn-btn b { display: inline-flex; align-items: center; gap: 2px; font: 700 var(--fs-3) var(--font-mono); }
+.earn-btn b .ic { width: 14px; height: 14px; }
+.earn-btn:not(:disabled):active { background: var(--ink); color: var(--ivory); }
+
+.earn-btn:disabled {
+  border-style: dashed;
+  border-color: var(--dust);
+  color: var(--dust);
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-stamp.fresh { animation: none; }
+}
 
 /* 꾸미기 */
 .pick-grid {

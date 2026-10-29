@@ -1,10 +1,19 @@
 // B1 소리 — 순수 부분만 시험한다(AudioContext는 node에 없다). 믹스·음량은 OfflineAudioContext 렌더로 따로 쟀다.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BGM_TRACKS, SFX_PRESETS, chordRootPc, type SfxName } from '../src/audio/sfx';
-import { comboSemitones, comboMilestone, mapEvent } from '../src/audio/consume';
-import { AUDIO } from '../src/config';
+import { comboSemitones, comboMilestone, mapEvent, consumeAudio } from '../src/audio/consume';
+import { AUDIO, STACK } from '../src/config';
 import { lateSkipSteps, comboLayerOf } from '../src/audio/audio';
 import type { GameState, JuiceEvent } from '../src/core/types';
+
+// consumeAudio가 부르는 재생·덕킹만 가로챈다(AudioContext는 node에 없다)
+vi.mock('../src/audio/audio', async (orig) => ({
+  ...(await orig<typeof import('../src/audio/audio')>()),
+  playSfx: vi.fn(),
+  pulseDuckBgm: vi.fn(),
+  setComboLayer: vi.fn(),
+}));
+import * as audioMod from '../src/audio/audio';
 
 const pcOf = (hz: number): number => ((Math.round(12 * Math.log2(hz / 440)) + 9) % 12 + 12) % 12;
 const state = (o: Partial<GameState> = {}): GameState => ({ mode: 'act1', act2Phase: null, weapon: 'sword', boss: null, player: { pose: 'idle' }, ...o }) as unknown as GameState;
@@ -115,6 +124,14 @@ describe('이벤트 → 소리 배선', () => {
     for (let i = 0; i < 6; i++) seen.add(map({ kind: 'hit', mat: 'soft' as never, combo: i })![0]);
     expect(seen.size).toBe(3);
   });
+  it('대검 — 값싼 넷은 연장 소리를 빌리고, 1200부터 넷은 제 소리를 붕괴음 위에 얹는다', () => {
+    const hit: JuiceEvent = { kind: 'hit', lane: 0, mat: 'soft' as never, combo: 1 };
+    expect(map(hit, state({ weapon: 'saw' }))).toEqual(['hitGrind']);
+    expect(map(hit, state({ weapon: 'flame' }))).toEqual(['hitFlame']);
+    expect(map({ kind: 'floorCollapse', lane: 0 }, state({ weapon: 'gold' }))).toEqual(['floorCollapse', 'hitGold']);
+    expect(map({ kind: 'stackDestroy', n: 4 }, state({ weapon: 'onyx' }))).toEqual(['destroy', 'gorogoro', 'hitOnyx']);
+    expect(map({ kind: 'stackDestroy', n: 4 }, state({ weapon: 'iron' }))).toEqual(['destroy', 'gorogoro']);
+  });
 });
 
 describe('스케줄러 — 밀리면 건너뛴다 (snd-08)', () => {
@@ -135,5 +152,106 @@ describe('스케줄러 — 밀리면 건너뛴다 (snd-08)', () => {
 describe('콤보 층 (snd-04)', () => {
   it('50 미만 0 · 50~149 햇 · 150 이상 아르페지오', () => {
     expect([0, 49, 50, 149, 150, 999].map(comboLayerOf)).toEqual([0, 0, 1, 1, 2, 2]);
+  });
+});
+
+// ─── 파괴 소리 겹층 ────────────────────────────────────────────
+
+/** 노드 생성 수와 파라미터 예약값을 세고 검사하는 가짜 컨텍스트 */
+function fakeCtx() {
+  const counts = { nodes: 0 };
+  const bad: string[] = [];
+  const param = () => ({
+    value: 0,
+    setValueAtTime(v: number, t: number) { if (!Number.isFinite(v) || !Number.isFinite(t) || t < 0) bad.push(`set ${v}@${t}`); },
+    linearRampToValueAtTime(v: number, t: number) { if (!Number.isFinite(v) || !Number.isFinite(t)) bad.push(`lin ${v}@${t}`); },
+    exponentialRampToValueAtTime(v: number, t: number) { if (!(v > 0) || !Number.isFinite(t)) bad.push(`exp ${v}@${t}`); },
+  });
+  const node = (): Record<string, unknown> => {
+    counts.nodes++;
+    const params: Record<string, ReturnType<typeof param>> = {};
+    return new Proxy({ connect() {}, start() {}, stop() {}, type: '', buffer: null, loop: false } as Record<string, unknown>, {
+      get: (t, k: string) => (k in t ? t[k] : (params[k] ??= param())),
+      set: (t, k: string, v) => { t[k] = v; return true; },
+    });
+  };
+  const noise = { getChannelData: () => new Float32Array(44100) };
+  const ctx = {
+    sampleRate: 44100,
+    createOscillator: node, createGain: node, createBufferSource: node, createBiquadFilter: node, createStereoPanner: node,
+    createBuffer: () => noise,
+  };
+  return { ctx: ctx as unknown as AudioContext, counts, bad };
+}
+
+describe('파괴 소리 레시피 — CPU 예산', () => {
+  const names: SfxName[] = [
+    'hit', 'hitLow', 'hitTick', 'hitStrong', 'hitHammer', 'hitBar', 'hitGrind',
+    'floorCollapse', 'destroy', 'gorogoro', 'special', 'specialCharge', 'incoming',
+    'hitFlame', 'hitFrost', 'hitOnyx', 'hitGold',
+  ];
+  it('소리 하나당 노드 14개 이하, 예약값은 모두 유한·양수', () => {
+    for (const n of names) {
+      for (let k = 0; k < 20; k++) { // 그레인 수·시각이 무작위라 여러 번
+        const { ctx, counts, bad } = fakeCtx();
+        SFX_PRESETS[n](ctx, ctx as unknown as AudioNode, 0.5, 1.2);
+        expect(counts.nodes, n).toBeGreaterThan(1);
+        expect(counts.nodes, n).toBeLessThanOrEqual(14);
+        expect(bad, n).toEqual([]);
+      }
+    }
+  });
+});
+
+describe('믹스 — 덜 누르고 리미터로 막는다', () => {
+  it('컴프레서 비율 4 이하, 리미터는 높은 비율·-1~-2dB 근처', () => {
+    expect(AUDIO.COMP.RATIO).toBeLessThanOrEqual(4);
+    expect(AUDIO.LIMIT.RATIO).toBeGreaterThanOrEqual(10);
+    expect(AUDIO.LIMIT.THRESHOLD).toBeLessThanOrEqual(-1);
+    expect(AUDIO.LIMIT.THRESHOLD).toBeGreaterThanOrEqual(-3);
+  });
+  it('완파 덕킹은 필살보다 가볍고 짧다', () => {
+    expect(AUDIO.DUCK_DESTROY).toBeGreaterThan(AUDIO.DUCK_PULSE);
+    expect(AUDIO.DUCK_DESTROY_S).toBeLessThan(AUDIO.DUCK_PULSE_S);
+  });
+});
+
+describe('consumeAudio — 낙하 예고음 · 완파 덕킹', () => {
+  const play = vi.mocked(audioMod.playSfx);
+  const duck = vi.mocked(audioMod.pulseDuckBgm);
+  const tick = (o: Partial<GameState> = {}) =>
+    ({ events: [], combo: 0, boss: null, over: false, stack: null, stackSpawnCd: 99, ...o }) as unknown as GameState;
+  const names = () => play.mock.calls.map((c) => c[0]);
+  beforeEach(() => { play.mockClear(); duck.mockClear(); consumeAudio(tick()); play.mockClear(); });
+
+  it('스택이 없고 남은 카운트가 SPAWN_CUE_TICKS인 틱에 한 번 울린다', () => {
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS }));
+    expect(names()).toEqual(['incoming']);
+  });
+  it('같은 틱이 히트스톱으로 반복돼도 한 번만, 카운트가 움직이면 다시 무장', () => {
+    const s = tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS });
+    consumeAudio(s); consumeAudio(s); consumeAudio(s);
+    expect(names()).toEqual(['incoming']);
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS - 1 }));
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS }));
+    expect(names()).toEqual(['incoming', 'incoming']);
+  });
+  it('건물이 있거나 판이 끝났거나 다른 카운트면 울리지 않는다', () => {
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS, stack: {} as never }));
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS, over: 'gameover' }));
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS + 1 }));
+    expect(names()).toEqual([]);
+  });
+  it('완파는 가벼운 덕킹, 필살이 같이 오면 깊은 덕킹 한 번', () => {
+    consumeAudio(tick({ events: [{ kind: 'stackDestroy', n: 3 }] as JuiceEvent[] }));
+    expect(duck).toHaveBeenLastCalledWith(AUDIO.DUCK_DESTROY, AUDIO.DUCK_DESTROY_S);
+    duck.mockClear();
+    consumeAudio(tick({ events: [{ kind: 'special' }, { kind: 'stackDestroy', n: 3 }] as JuiceEvent[] }));
+    expect(duck).toHaveBeenCalledTimes(1);
+    expect(duck).toHaveBeenCalledWith();
+  });
+  it('필살은 휘익(즉시)과 폭발(늦춤) 둘로 울린다', () => {
+    consumeAudio(tick({ events: [{ kind: 'special' }] as JuiceEvent[], weapon: 'sword' } as Partial<GameState>));
+    expect(names()).toEqual(['whiff', 'specialCharge', 'special']);
   });
 });

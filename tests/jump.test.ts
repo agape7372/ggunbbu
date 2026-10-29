@@ -65,6 +65,33 @@ describe('점프 — 단발 엣지 (08-30 5차)', () => {
     expect(Math.abs(fallTicks - riseTicks)).toBeLessThan(riseTicks * 0.15);
   });
 
+  // ★10-28 검수: 공격 버퍼가 점프를 이기고, 점프 버퍼가 공격 6틱 안에서 사라져 연타 중 점프가 0%였다.
+  it('공격 연타 중에 누른 점프도 나간다 — 주기 안 어느 틱이든', () => {
+    for (const period of [6, 7]) {
+      for (let k = 0; k < period; k++) {
+        const s = makeState();
+        s.stackSpawnCd = 100000;
+        let jumped = false;
+        for (let t = 0; t < 60 && !jumped; t++) {
+          const before = s.events.length;
+          advance(s, inp({ attack: t % period === 0, jump: t === period * 4 + k }));
+          jumped = s.events.slice(before).some((e) => e.kind === 'jump');
+        }
+        expect(jumped, `주기 ${period} · ${k}틱`).toBe(true);
+      }
+    }
+  });
+
+  it('공격과 점프를 같이 누르면 뛰고, 이어서 공중 공격이 나간다', () => {
+    const s = makeState();
+    s.stackSpawnCd = 100000;
+    advance(s, inp({ attack: true, jump: true }));
+    expect(s.player.pose).toBe('jump');
+    advance(s, inp());
+    expect(s.player.pose).toBe('attack');
+    expect(s.player.attackFromAir).toBe(true);
+  });
+
   it('정점이 필드를 살짝 넘는다 — 그래서 데드존 카메라가 필요하다 (설계 전제)', () => {
     const apex = (PLAYER.JUMP_V0 * PLAYER.JUMP_V0) / (2 * PLAYER.GRAVITY);
     // 머리 끝(apex + 키)이 필드 하단선을 넘어선다 = 고정 카메라로는 못 담는다.

@@ -1,7 +1,7 @@
 // 장비 탭 조각. 장착만 — 무기와 필살만 판정(사거리·띄우기·필살 게이지·종류)을 바꾸고, 나머지는 겉모습이다.
 
 import { SUPPLY, WEAPON } from '../config';
-import { DEFAULT_LOADOUT, isOwned, WEAPON_IDS } from '../meta';
+import { DEFAULT_LOADOUT, GREATSWORD_IDS, isOwned, WEAPON_IDS } from '../meta';
 import type { BladeId, BodyId, LettersId, Loadout, WazaId, WeaponId } from '../meta/types';
 import { ITEM_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
 import { ICON } from './icons';
@@ -99,7 +99,7 @@ export function paintCustom(
     const picks = sec.items.map((item) => {
       const open = isOwned(owned, sec.slot, item.id);
       const on = open && current === item.id;
-      const icon = sec.slot === 'weapon' ? ICON[item.id as WeaponId] : '';
+      const icon = sec.slot === 'weapon' ? weaponIcon(item.id as WeaponId) : '';
       // 잠김은 여는 곳을 말한다 — 상점 (08-30, D-3)
       return open
         ? `<button type="button" class="pick${on ? ' on' : ''}" data-equip-slot="${sec.slot}" data-equip-id="${item.id}" aria-pressed="${on}">${icon}${escapeHtml(item.name)}${on ? '<small>장착</small>' : ''}</button>`
@@ -131,4 +131,9 @@ function equippedId(loadout: Loadout, slot: Slot): string {
   if (slot === 'blade') return loadout.blade || DEFAULT_LOADOUT.blade;
   if (slot === 'waza') return loadout.waza || DEFAULT_LOADOUT.waza;
   return loadout.letters || DEFAULT_LOADOUT.letters;
+}
+
+/** 대검 여덟은 아이콘 하나를 같이 쓴다 — 가르는 건 이름, 모양은 상점 그림이 보인다 */
+function weaponIcon(id: WeaponId): string {
+  return (GREATSWORD_IDS as readonly string[]).includes(id) ? ICON.greatsword : ICON[id as 'sword' | 'hammer' | 'crowbar' | 'grinder'];
 }

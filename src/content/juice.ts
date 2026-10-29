@@ -27,6 +27,9 @@ export const CAPTIONS = {
   specialReady: '눌러.',
 } as const;
 
+/** 완파 자막 — 몇 층을 무너뜨렸는지가 정보다. */
+export const destroyedCaption = (floors: number): string => `${floors}층 철거!`;
+
 export function onomatoFor(kind: string, combo: number): string | null {
   switch (kind) {
     case 'hit': return ONOMATO.hit(combo);

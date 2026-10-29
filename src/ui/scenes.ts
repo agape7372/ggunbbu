@@ -284,7 +284,7 @@ export function createApp(
 
   function openShop(): void {
     overlay.showShop({
-      dust: save.dust, orbit: save.orbit, license: save.license, buildings: save.stats.buildings,
+      dust: save.dust, orbit: save.orbit, license: save.license, buildings: save.stats.buildings, loadout: save.loadout,
     }, ownedSet(), {
       iap: iap.available(),
       ad: ads.ready(),
@@ -455,7 +455,7 @@ export function createApp(
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
     playSfx('coin');
-    overlay.toast('열었습니다. 장비에서 고르세요.');
+    overlay.toast('열었습니다.');
     openShop();
   }
 
@@ -465,7 +465,7 @@ export function createApp(
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
     playSfx('coin');
-    overlay.toast('샀습니다. 장비에서 고르세요.');
+    overlay.toast('샀습니다.');
     openShop();
   }
 
@@ -474,7 +474,9 @@ export function createApp(
     applyCosmetics(save.loadout); // 즉시 반영 — 팔리는 물건은 실제로 바뀐다 (P1-3)
     saveSave(save);
     playSfx('stamp');
-    openCustom();
+    // 상점의 「장착」 띠에서도 부른다 — 누른 화면을 그대로 다시 그린다
+    if (overlay.getScreen() === 'shop') openShop();
+    else openCustom();
   }
 
   function startTokoton(): void {

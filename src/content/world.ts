@@ -229,6 +229,14 @@ export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   hammer: { name: '오함마', desc: '칠 때마다 건물을 더 띄운다. 짧다.' },
   crowbar: { name: '빠루', desc: '멀리 닿는다. 필살이 느리다.' },
   grinder: { name: '그라인더', desc: '필살이 빨리 찬다. 덜 띄운다.' },
+  iron: { name: '무쇠 대검', desc: '길게 닿는다. 필살이 조금 느리다.' },
+  saw: { name: '톱날 대검', desc: '필살이 빨리 찬다. 덜 띄운다.' },
+  hazard: { name: '공사중 대검', desc: '멀리, 높이 친다. 필살이 느리다.' },
+  beam: { name: '철골 대검', desc: '가장 높이 띄운다. 짧다.' },
+  flame: { name: '화염 대검', desc: '멀리 닿고 필살이 빨리 찬다. 덜 띄운다.' },
+  frost: { name: '서리 대검', desc: '아주 멀리 닿는다. 덜 띄운다.' },
+  onyx: { name: '흑철 대검', desc: '가장 멀리, 높이 친다. 필살이 아주 느리다.' },
+  gold: { name: '황금 대검', desc: '필살이 가장 빨리 찬다. 조금 덜 띄운다.' },
 };
 
 /** 보급 상자에서 나오는 것. pop = 열릴 때 머리 위에 뜨는 말. */

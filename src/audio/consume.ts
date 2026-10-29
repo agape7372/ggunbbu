@@ -1,7 +1,7 @@
 // GameState.events → SFX. core는 이벤트만 발행, 이 모듈이 프레임마다 소비(클리어는 씬).
 // boltCue/land 등은 kind 재사용 — 페이즈·보스 상태로 전용 프리셋을 고른다.
-import type { GameState, JuiceEvent, JuiceKind, Material } from '../core/types';
-import { AUDIO, BOSS, JUICE, TPS } from '../config';
+import type { GameState, JuiceEvent, JuiceKind, Material, WeaponId } from '../core/types';
+import { AUDIO, BOSS, JUICE, STACK, TPS } from '../config';
 import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
 
@@ -11,11 +11,20 @@ const COMBO_DROP_COVER: ReadonlySet<JuiceKind> = new Set([
   'guardBounce', 'hurt', 'butterCollapse',
 ]);
 
+/** 1200부터 대검은 제 소리 — 타격에, 층 깨기·완파엔 붕괴음 위에 얹는다 */
+const GREAT_OWN: Partial<Record<WeaponId, SfxName>> = { flame: 'hitFlame', frost: 'hitFrost', onyx: 'hitOnyx', gold: 'hitGold' };
+/** 무기별 타격음 — 연장 셋, 값싼 대검 넷(연장 소리를 빌린다), 비싼 대검 넷. 없으면(철거칼) 재질·변형 */
+const WEAPON_HIT: Partial<Record<WeaponId, SfxName>> = {
+  hammer: 'hitHammer', crowbar: 'hitBar', grinder: 'hitGrind',
+  iron: 'hitStrong', saw: 'hitGrind', hazard: 'hitBar', beam: 'hitHammer', ...GREAT_OWN,
+};
+
 /** 기본 타격 3변형(중음·저음·노이즈 비중) — 라운드로빈으로 반복 피로를 던다 */
 const HIT_VARIANTS: readonly SfxName[] = ['hit', 'hitLow', 'hitTick'];
 let hitRR = 0;
 let prevCombo = 0;
 let bossBreakFired = false;
+let incomingFired = false;
 
 /** 콤보 → 타격음 피치(반음). 장조 펜타토닉 사다리, 상한 +7, 내려가지 않는다. */
 export function comboSemitones(combo: number): number {
@@ -46,12 +55,16 @@ export function consumeAudio(s: GameState): void {
       const semis = e.kind === 'hit' ? comboSemitones(e.combo ?? 0) : 0;
       for (const name of mapped) {
         // 필살 폭발은 히트스톱이 풀리는 틱에 화면에서 터진다 — 폭발음도 그 박자로 늦춘다
-        if (name === 'special') playSfx(name, { delay: JUICE.special.hitstop / TPS });
-        else playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
+        if (name === 'special') {
+          playSfx('specialCharge'); // 휘익은 지금, 폭발은 히트스톱이 풀릴 때
+          playSfx(name, { delay: JUICE.special.hitstop / TPS });
+        } else playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
       }
     }
-    if (e.kind === 'special' || e.kind === 'bossDefeat') pulseDuckBgm();
   }
+  // 덕킹은 틱당 한 번 — 필살·격파(깊게)가 완파(가볍게)와 겹치면 깊은 쪽만
+  if (kinds.has('special') || kinds.has('bossDefeat')) pulseDuckBgm();
+  else if (kinds.has('stackDestroy')) pulseDuckBgm(AUDIO.DUCK_DESTROY, AUDIO.DUCK_DESTROY_S);
 
   if (comboMilestone(prevCombo, s.combo) !== null) playSfx('milestone');
   prevCombo = s.combo;
@@ -64,27 +77,36 @@ export function consumeAudio(s: GameState): void {
   } else {
     bossBreakFired = false;
   }
+
+  // 다음 건물 낙하 예고(렌더의 ▼가 뜨는 바로 그 틱) — 히트스톱으로 틱이 반복돼도 한 번만
+  const cue = !s.over && s.stack === null && s.stackSpawnCd === STACK.SPAWN_CUE_TICKS;
+  if (cue && !incomingFired) playSfx('incoming');
+  incomingFired = cue;
 }
 
 export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[] | null {
   switch (e.kind) {
     case 'slash':
       return ['whiff'];
-    case 'hit':
+    case 'hit': {
       if (!e.mat && s.boss?.pattern === 'rabbits') return ['cancel'];
-      if (s.weapon === 'hammer') return ['hitHammer'];
-      if (s.weapon === 'crowbar') return ['hitBar'];
-      if (s.weapon === 'grinder') return ['hitGrind'];
+      const own = WEAPON_HIT[s.weapon];
+      if (own) return [own];
       if (e.mat && STRONG_MAT.has(e.mat)) return ['hitStrong'];
       return [HIT_VARIANTS[hitRR++ % HIT_VARIANTS.length]];
+    }
     case 'supply':
       return ['supply'];
     case 'hatBreak':
       return ['hatBreak'];
-    case 'floorCollapse':
-      return ['floorCollapse'];
-    case 'stackDestroy':
-      return ['destroy', 'gorogoro'];
+    case 'floorCollapse': {
+      const own = GREAT_OWN[s.weapon];
+      return own ? ['floorCollapse', own] : ['floorCollapse'];
+    }
+    case 'stackDestroy': {
+      const own = GREAT_OWN[s.weapon];
+      return own ? ['destroy', 'gorogoro', own] : ['destroy', 'gorogoro'];
+    }
     case 'butterCollapse':
       return ['butterPop'];
     case 'special':

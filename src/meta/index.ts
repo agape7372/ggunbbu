@@ -58,6 +58,7 @@ export {
   validateLoadout as parseLoadout,
   WAZA_CATALOG,
   WAZA_IDS,
+  GREATSWORD_IDS,
   WEAPON_IDS,
 } from './loadout';
 export type { BladeSkinId, BodySkinId, LetterSkinId, Loadout, WazaId, WeaponId } from './loadout';

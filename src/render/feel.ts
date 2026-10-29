@@ -34,6 +34,39 @@ export function shakePx(e: JuiceEvent, weaponShake = 1): number {
 }
 
 /**
+ * 흔들림 누적 — 큰 쪽 + 작은 쪽의 SHAKE_STACK배. 예전엔 최댓값만 남겨 연타·연쇄가 쌓이지 않았다.
+ * 같은 크기를 끝없이 더하면 연타 중 화면이 계속 요동치니 더하는 몫은 작은 쪽의 일부만.
+ */
+export function addTrauma(cur: number, px: number): number {
+  if (px <= 0) return cur;
+  const hi = Math.max(cur, px);
+  const lo = Math.min(cur, px);
+  return Math.min(JUICE_SYS.SHAKE_MAX_AMP, hi + JUICE_SYS.SHAKE_STACK * lo);
+}
+
+/** 방향 킥(px) — 타격·붕괴·완파만. 무기 배율은 타격·층붕괴만, 완파는 층수 규모를 살짝 탄다. */
+export function kickPx(e: JuiceEvent, weaponShake = 1): number {
+  const base = JUICE_SYS.KICK_PX[e.kind] ?? 0;
+  if (e.kind === 'hit' || e.kind === 'floorCollapse') return base * weaponShake;
+  if (e.kind === 'stackDestroy') return base * Math.min(1.4, stackScale(e.n));
+  return base;
+}
+
+/**
+ * 흔들림 한 장면 — [dx, dy, 회전(rad)]. t = 프레임 수. 사인 둘을 더한 부드러운 떨림이라
+ * 프레임마다 방향이 튀는 지지직이 없다. 각속도는 프레임당 2.6 아래(60Hz에서 겹쳐 보이지 않는 대역).
+ * |dx|·|dy| ≤ amp, 회전은 진폭 비율의 제곱이라 작은 흔들림엔 거의 없다.
+ */
+export function shakeSample(amp: number, t: number): [number, number, number] {
+  if (amp <= 0) return [0, 0, 0];
+  const nx = 0.6 * Math.sin(t * 1.3) + 0.4 * Math.sin(t * 2.1 + 1.7);
+  const ny = 0.6 * Math.sin(t * 1.7 + 0.6) + 0.4 * Math.sin(t * 2.6 + 2.9);
+  const nr = 0.6 * Math.sin(t * 0.9 + 0.4) + 0.4 * Math.sin(t * 1.6 + 1.1);
+  const k = Math.min(1, amp / JUICE_SYS.SHAKE_MAX_AMP);
+  return [amp * nx, amp * 0.8 * ny, JUICE_SYS.SHAKE_ROT_MAX * k * k * nr];
+}
+
+/**
  * 보스 격파 뒤 파티클·카메라 배속. 격파 틱(stTick 0, 히트스톱 동안도 0)에 BOSS.DEFEAT_SLOW로 시작해
  * BOSS.DEFEAT_SLOW_S초에 걸쳐 1배로 돌아온다. core 틱은 건드리지 않는다.
  */

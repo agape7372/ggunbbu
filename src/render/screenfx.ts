@@ -1,4 +1,5 @@
-// 화면 단위 연출 — 번쩍(다단) · 공사 테이프 · 필살 예비동작(링·유령) · 사망 틀 · 지면선 번쩍.
+// 화면 단위 연출 — 번쩍(다단) · 공사 테이프 · 필살 예비동작(링·유령) · 사망 틀 · 지면선 번쩍
+// · 집중선·색 반전(큰 한 방) · 예능 자막 · 콤보 속도선.
 // 파티클(effects.ts)과 달리 "화면 전체나 한 줄"을 그리는 것들이다. core는 모른다. 상태는 이 모듈에만 있다.
 // DOM 없음 — ctx만 받는다. 시간은 drawGame이 틱마다 부르는 stepScreenFx()가 한 칸씩 흘린다.
 
@@ -176,6 +177,160 @@ export function drawPrelude(ctx: CanvasRenderingContext2D, u: number, x: number,
   ctx.restore();
 }
 
+// ── 큰 한 방 — 잉크 집중선 + 색 반전 두 프레임 ─────────────────
+let impactT = 0;
+let impactX = 0;
+let impactY = 0;
+let impactSeed = 1;
+let invertT = 0;
+let invertCd = 0;
+
+function clipField(ctx: CanvasRenderingContext2D): void {
+  ctx.beginPath();
+  ctx.rect(0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
+  ctx.clip();
+}
+
+/**
+ * (x, y)(화면 좌표)로 모이는 집중선을 건다. invert면 색 반전 두 프레임도 —
+ * 번쩍임 설정이 기본(2)일 때만, INVERT_COOLDOWN 틱에 한 번만(연달아 터지면 눈이 아프다).
+ */
+export function startImpact(x: number, y: number, invert: boolean): void {
+  impactT = JUICE_SYS.IMPACT_TICKS;
+  impactX = x;
+  impactY = y;
+  impactSeed = (impactSeed * 7919 + 13) % 100003;
+  if (invert && flashLevel >= 2 && invertCd <= 0) {
+    invertT = JUICE_SYS.INVERT_TICKS;
+    invertCd = JUICE_SYS.INVERT_COOLDOWN;
+    // 반전이 번쩍을 대신한다 — 같은 틱에 건 번쩍(필살 아이보리→잉크 · 격파 아이보리)이 화면 전체를 회색으로 덮지 않게.
+    // 빨강(피격·사망)은 정보라 남긴다
+    if (stages[0]?.color !== PALETTE.RED) {
+      stages = [];
+      stageT = 0;
+    }
+  }
+}
+
+/** 집중선 — 가운데는 비워 두고 화면 끝에서 안으로 꽂히는 잉크 가시. 옅어지며 바깥으로 물러난다. */
+function drawFocusLines(ctx: CanvasRenderingContext2D): void {
+  if (impactT <= 0) return;
+  const u = impactT / JUICE_SYS.IMPACT_TICKS; // 1 → 0
+  let seed = impactSeed;
+  const rnd = (): number => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const n = 40;
+  const R = 560;
+  ctx.save();
+  clipField(ctx);
+  ctx.globalAlpha = Math.min(1, u * u * 1.4);
+  ctx.fillStyle = PALETTE.INK;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + (rnd() - 0.5) * 0.1;
+    const r0 = 120 + rnd() * 80 + (1 - u) * 90;
+    const half = 0.005 + rnd() * 0.014;
+    ctx.moveTo(impactX + Math.cos(a) * r0, impactY + Math.sin(a) * r0);
+    ctx.lineTo(impactX + Math.cos(a - half) * R, impactY + Math.sin(a - half) * R);
+    ctx.lineTo(impactX + Math.cos(a + half) * R, impactY + Math.sin(a + half) * R);
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.restore();
+}
+
+/** 색 반전 — 필드만. 차이(흰색)로 뒤집고 채도(회색)로 색을 뺀다 — 집중선은 흰 선으로 남는다. */
+function drawInvert(ctx: CanvasRenderingContext2D): void {
+  if (invertT <= 0) return;
+  ctx.save();
+  clipField(ctx);
+  ctx.globalCompositeOperation = 'difference';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, VIEW.W, VIEW.H);
+  ctx.globalCompositeOperation = 'saturation';
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, VIEW.W, VIEW.H);
+  ctx.restore();
+}
+
+// ── 콤보 열기 — 콤보가 오를수록 필드 양옆에 아래로 흐르는 속도선 ──
+let heatT = 0;
+
+/** 필드 양옆 속도선 — HEAT_COMBO 단계마다 선이 늘고 진해지고 빨라진다. 화면 고정. */
+export function drawHeatEdges(ctx: CanvasRenderingContext2D, combo: number): void {
+  let tier = 0;
+  for (const c of JUICE_SYS.HEAT_COMBO) if (combo >= c) tier += 1;
+  if (tier === 0) return;
+  const span = VIEW.FIELD_H - VIEW.FIELD_TOP;
+  ctx.save();
+  ctx.globalAlpha = 0.12 + 0.06 * tier;
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < tier * 4; i++) {
+    const left = i % 2 === 0;
+    const inset = 3 + ((i * 7) % 5) * 5;
+    const len = 26 + ((i * 37) % 48);
+    const y = VIEW.FIELD_TOP - len + ((heatT * (5 + tier * 2) + i * 131) % (span + len));
+    const x = left ? inset : VIEW.W - inset;
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + len);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── 예능 자막 — 잉크 판 위 노랑 글자. 왼쪽에서 박혀 들어와 버티다 오른쪽으로 빠진다 ──
+interface Caption { main: string; sub: string; t: number }
+let caption: Caption | null = null;
+
+/** 자막을 건다 — 하나만(새 자막이 앞 것을 밀어낸다). sub = 아래 붉은 꼬리표(점수 등). */
+export function startCaption(main: string, sub = ''): void {
+  caption = { main, sub, t: 0 };
+}
+
+const backOut = (n: number): number => { const k = n - 1; return 1 + 2.70158 * k * k * k + 1.70158 * k * k; };
+
+function drawCaption(ctx: CanvasRenderingContext2D): void {
+  const c = caption;
+  if (!c) return;
+  const L = JUICE_SYS.CAPTION_TICKS;
+  const inU = Math.min(1, c.t / 6);
+  const outU = Math.max(0, (c.t - (L - 7)) / 7);
+  const cx = VIEW.W / 2 - (1 - backOut(inU)) * VIEW.W + outU * outU * VIEW.W * 1.2;
+  const cy = VIEW.FIELD_TOP + 92;
+  ctx.save();
+  clipField(ctx);
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.06);
+  ctx.font = '30px "Black Han Sans", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const w = ctx.measureText(c.main).width + 34;
+  const h = 46;
+  ctx.fillStyle = PALETTE.INK;                  // 판 그림자 — 화면에 붙인 스티커처럼 한 겹 아래
+  ctx.fillRect(-w / 2 + 4, -h / 2 + 5, w, h);
+  ctx.fillStyle = '#26252B';
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = PALETTE.YELLOW;
+  ctx.fillText(c.main, 0, 2);
+  if (c.sub) {
+    ctx.rotate(0.1);
+    // 숫자 글꼴 — 제목 글꼴의 쉼표는 마침표처럼 보였다. 숫자 글꼴엔 한글이 없어(「100 콤보」) 본문 글꼴로 잇는다
+    ctx.font = '700 16px "Gunbbu Mono", "Gunbbu Sans", monospace';
+    const sw = ctx.measureText(c.sub).width + 18;
+    const sx = w / 2 - sw / 2 - 6;
+    const sy = h / 2 + 10;
+    ctx.fillStyle = PALETTE.INK;
+    ctx.fillRect(sx - sw / 2 + 3, sy - 13 + 3, sw, 26);
+    ctx.fillStyle = PALETTE.RED;
+    ctx.fillRect(sx - sw / 2, sy - 13, sw, 26);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(c.sub, sx, sy + 1);
+  }
+  ctx.restore();
+}
+
 // ── 흐름 ────────────────────────────────────────────────────────
 /** drawGame이 틱마다 한 번 — 모든 타이머를 한 칸 흘린다. */
 export function stepScreenFx(): void {
@@ -187,11 +342,19 @@ export function stepScreenFx(): void {
   if (deathT > 0) deathT -= 1;
   if (deathSlowT > 0) deathSlowT -= 1;
   if (lineT > 0) lineT -= 1;
+  if (impactT > 0) impactT -= 1;
+  if (invertT > 0) invertT -= 1;
+  if (invertCd > 0) invertCd -= 1;
+  heatT += 1;
+  if (caption && ++caption.t >= JUICE_SYS.CAPTION_TICKS) caption = null;
 }
 
-/** 화면 위에 얹는 것들(흔들림 밖) — 테이프 · 사망 틀 · 번쩍 순서. */
+/** 화면 위에 얹는 것들(흔들림 밖) — 집중선 · 반전 · 테이프 · 자막 · 사망 틀 · 번쩍 순서. */
 export function drawScreenOverlay(ctx: CanvasRenderingContext2D): void {
+  drawFocusLines(ctx);
+  drawInvert(ctx);
   drawTape(ctx);
+  drawCaption(ctx);
   drawDeathFrame(ctx);
   drawFlash(ctx);
 }
@@ -203,4 +366,8 @@ export function resetScreenFx(): void {
   deathT = 0;
   deathSlowT = 0;
   lineT = 0;
+  impactT = 0;
+  invertT = 0;
+  invertCd = 0;
+  caption = null;
 }
