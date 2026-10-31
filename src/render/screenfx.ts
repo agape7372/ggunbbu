@@ -1,10 +1,11 @@
-// 화면 단위 연출 — 번쩍(다단) · 공사 테이프 · 필살 예비동작(링·유령) · 사망 틀 · 지면선 번쩍
+// 화면 단위 연출 — 번쩍(다단) · 공사 테이프 · 필살 예비동작(엔소·유령) · 사망 틀 · 지면선 번쩍
 // · 집중선·색 반전(큰 한 방) · 예능 자막 · 콤보 속도선.
 // 파티클(effects.ts)과 달리 "화면 전체나 한 줄"을 그리는 것들이다. core는 모른다. 상태는 이 모듈에만 있다.
 // DOM 없음 — ctx만 받는다. 시간은 drawGame이 틱마다 부르는 stepScreenFx()가 한 칸씩 흘린다.
 
 import { JUICE_SYS, PALETTE, VIEW } from '../config';
 import { flashMul } from './feel';
+import { enso, inkDrop } from './ink';
 
 // ── 번쩍 ────────────────────────────────────────────────────────
 export interface FlashStage { color: string; a: number; ticks: number }
@@ -138,42 +139,28 @@ export function drawGroundLine(ctx: CanvasRenderingContext2D): void {
   ctx.restore();
 }
 
-// ── 필살 예비동작 — 링이 안으로 수축하고 노랑 선이 모인다 ─────────
+// ── 필살 예비동작 — 붓이 졸라맨 둘레에 엔소를 긋는다 ─────────────
 /**
  * u = 0 → 1 (예비동작 진행). 월드 좌표(카메라 안쪽) (x, y)가 중심.
- * 링은 바깥에서 안으로 가속하며 좁아지고, 짧은 방사선이 같이 모여든다.
+ * 원은 바깥에서 안으로 좁아지며 붓이 한 바퀴를 그어 가고(먹을 머금어 굵어진다), 먹 방울이 사방에서 빨려 든다.
+ * 다 그은 원은 풀리는 틱에 노랑으로 터져 나간다(effects 필살 엔소) — 여기엔 노랑이 없다(노랑 = 베는 순간).
  */
 export function drawPrelude(ctx: CanvasRenderingContext2D, u: number, x: number, y: number): void {
   const p = Math.max(0, Math.min(1, u));
-  const r = 14 + JUICE_SYS.PRELUDE_RING_R * (1 - p) * (1 - p);
+  const r = 40 + (JUICE_SYS.PRELUDE_RING_R - 30) * (1 - p) * (1 - p);
+  const drawn = 0.12 + 0.88 * (p < 0.5 ? 2 * p * p : 1 - 2 * (1 - p) * (1 - p)); // 붓질 — 천천히 대서 빨라졌다 감속
+  const w = 3 + 9 * p;
   ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.globalAlpha = 0.35 + 0.6 * p;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.strokeStyle = PALETTE.WHITE;
-  ctx.lineWidth = 6;
-  ctx.stroke();
-  ctx.strokeStyle = PALETTE.YELLOW;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.strokeStyle = PALETTE.INK;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(x, y, r + 3.5, 0, Math.PI * 2);
-  ctx.stroke();
-  // 모여드는 선 — 같은 각도로 바깥에서 중심으로
-  ctx.lineWidth = 2;
-  ctx.beginPath();
+  ctx.fillStyle = PALETTE.WHITE; // 종이 테 — 건물·밤 위에서도 먹 획이 읽히게
+  enso(ctx, x, y, r, w + 5, -Math.PI / 2, 0, drawn, 0, 1, 7);
+  ctx.fillStyle = PALETTE.INK;
+  enso(ctx, x, y, r, w, -Math.PI / 2, 0, drawn, 0, 1, 7);
+  // 빨려 드는 먹 방울 — 바깥에서 원으로, 다가올수록 작아진다
   for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2 + 0.3;
-    const r0 = r + 8 + 26 * (1 - p);
-    const r1 = r + 8;
-    ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
-    ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+    const a = (i / 10) * Math.PI * 2 + 0.3 + (i % 2) * 0.12;
+    const d = r + 10 + (34 + (i % 3) * 14) * (1 - p);
+    inkDrop(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d, 1.4 + 1.6 * (1 - p), a + Math.PI, 3 + 9 * (1 - p));
   }
-  ctx.stroke();
   ctx.restore();
 }
 

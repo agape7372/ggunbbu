@@ -99,7 +99,7 @@ function renderBanner(mode: 'prompt' | 'ios', deferred: BeforeInstallPromptEvent
     <div class="ip-card">
       <div class="ip-copy">
         <p class="ip-title">홈 화면에 추가</p>
-        <p class="ip-sub">${mode === 'ios' ? '공유 → 홈 화면에 추가. 설치하면 바로 열립니다.' : '앱처럼 전체화면으로 엽니다.'}</p>
+        <p class="ip-sub">${mode === 'ios' ? '공유 → 홈 화면에 추가. 설치하면 바로 열려요.' : '앱처럼 전체 화면으로 열려요.'}</p>
       </div>
       <button type="button" class="ip-x" aria-label="닫기">×</button>
       <button type="button" class="ip-go">${mode === 'ios' ? '방법 보기' : '설치'}</button>
@@ -137,11 +137,11 @@ function showIosGuide(): void {
     <div class="ip-sheet">
       <h2>홈 화면에 추가하는 방법</h2>
       <ol>
-        <li><span class="ip-num">1</span><span>Safari 하단의 공유 버튼을 누른다</span></li>
-        <li><span class="ip-num">2</span><span>「홈 화면에 추가」를 찾아 누른다</span></li>
-        <li><span class="ip-num">3</span><span>오른쪽 위 「추가」를 누르면 끝</span></li>
+        <li><span class="ip-num">1</span><span>Safari 아래쪽 공유 버튼을 눌러요</span></li>
+        <li><span class="ip-num">2</span><span>「홈 화면에 추가」를 찾아 눌러요</span></li>
+        <li><span class="ip-num">3</span><span>오른쪽 위 「추가」를 누르면 끝나요</span></li>
       </ol>
-      <p class="ip-note">설치하면 홈에서 바로 열립니다. 알림은 쓰지 않습니다.</p>
+      <p class="ip-note">설치하면 홈에서 바로 열려요. 알림은 보내지 않아요.</p>
       <button type="button">확인</button>
     </div>
   `;

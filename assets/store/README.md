@@ -20,7 +20,7 @@
 - `npm run dev`로 개발 서버 실행. 필요하면 `-- --port 5174`처럼 빈 포트를 지정한다.
 - `npm run images:capture -- --url http://127.0.0.1:5174 --playwright-module <Playwright 패키지 경로>`로 재촬영한다. Playwright는 작업용이며 게임 런타임 의존성이 아니다.
 - 이미지 변환: `npm run images:prepare -- assets/ref/image-production-jobs.json --sharp-module <sharp 패키지 경로>`.
-- PWA 아이콘 배치: `npm run icons`. imagegen 정본에서 축소한 `assets/brand/`의 192/512 PNG를 복사하므로 과거 얼굴 아이콘을 재생성하지 않는다.
+- PWA 아이콘 배치: `npm run icons`. `assets/brand/`의 192/512 PNG를 복사한다. 이 PNG와 `icon-512.png`는 원본 `assets/brand/src/gunbbu-icon.svg`에서 `scripts/gen-native-icons.mjs`가 굽는다.
 - 오프라인 검사: 빌드 후 preview 서버를 열고 `npm run images:check -- --url http://127.0.0.1:5175 --playwright-module <Playwright 패키지 경로>`.
 - 원본과 실제 프롬프트: `assets/ref/generated/`, `assets/ref/image-production-prompts.json`. 층 행 절단 좌표와 최종 치수: `assets/ref/image-production-jobs.json`.
 

@@ -22,13 +22,13 @@ export const SCREENS = {
   /** 타이틀 메뉴 — 이름표 + 한 줄 보조(잠김이면 여는 조건) */
   menu: {
     arcade: '아케이드 시작',
-    arcadeSub: '4구역 지나 집행기까지',
+    arcadeSub: '4구역 → 집행기',
     tokoton: '야근',
     tokotonSub: '끝없이 떨어진다',
     tokotonLocked: '2막을 깨면 열림',
     butter: '버터바 챌린지',
     butterSub: (round: number) => `${round}회차까지`,
-    butterLocked: '1막 보너스를 만나면 열림',
+    butterLocked: '판에서 만나면 열림',
     ops: '구역 작전',
     opsSub: '구역 골라 시작',
   },
@@ -47,7 +47,7 @@ export const SCREENS = {
     petals: '민들레 홀씨가 흩날린다…',
     score: (n: number) => `점수 ${n.toLocaleString('ko-KR')}`,
     tokotonUnlock: '야근이 열렸다. 하늘은 아직 던진다.',
-    fullComboNote: '풀콤보 — 기계가 더 못 셉니다. 야근이 열렸다.',
+    fullComboNote: '풀콤보. 「기계가 더 못 셉니다.」 야근이 열렸다.',
   },
 
   gameover: {
@@ -65,7 +65,7 @@ export const SCREENS = {
     dust: '먼지',
     zone: '도달 구역',
     /** 다음 목표 한 줄 — 가장 싼 미보유 먼지 구매품 */
-    nextGoal: (name: string, short: number) => (short > 0 ? `${name}까지 먼지 ${short}` : `${name}, 지금 살 수 있다`),
+    nextGoal: (name: string, short: number) => (short > 0 ? `${name}까지 먼지 ${short}` : `${name} 살 먼지가 모였다`),
     nextTag: '다음 목표',
   },
 
@@ -78,7 +78,7 @@ export const SCREENS = {
   },
 
   butter: {
-    banner: '— 버터바 타임! —',
+    banner: '버터바 타임!',
     bannerHud: '버터바 타임!',
     short: '버터바',
     best: (n: number) => `최고 ${n.toLocaleString('ko-KR')}`,
@@ -150,20 +150,20 @@ export const SCREENS = {
 
 /** 게임오버 만담. 톤 = 건조한 전단지. 점수·틱으로 고르면 된다. */
 export const GAMEOVER_QUIPS: readonly string[] = [
-  '건물주가 당신을 고소했습니다',
+  '건물주가 고소장을 보냈습니다',
   '철거 자격증 정지 3개월',
   '보험: 천재지변 해당 없음',
   '오늘 알바는 여기까지입니다',
   '깔린 채로 퇴근 도장을 찍었습니다',
-  `${HERO}의 머리가 납작해졌습니다`,
-  `${BOSS_NAME}가 평가를 남겼다: 「못생김.」`,
-  '현장 실습 학점이 인정되지 않았습니다',
+  `${HERO} 머리가 납작해졌습니다`,
+  `${BOSS_NAME}가 평가를 남겼습니다: 「못생김.」`,
+  '현장 실습은 학점으로 안 쳐 줍니다',
   '하늘이 한 채 더 던졌습니다',
   '견습은 산재 처리 대상이 아닙니다',
   '허가 없이 깔렸습니다',
-  '무단 철거 신고가 접수되었습니다',
+  '무단 철거 신고가 들어왔습니다',
   '파괴자 측 변호인이 이겼습니다',
-  '지구 잔여분이 퇴근을 거부했습니다',
+  '남은 지구가 퇴근을 막았습니다',
 ];
 
 export function gameoverQuip(seed: number): string {

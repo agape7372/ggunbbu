@@ -246,9 +246,8 @@ function wazaFx(w: WazaId, x: number, y: number, top: number, bottom: number, sc
 
 // ── 그림 없던 순간 셋 ─────────────────────────────────────────
 
-/** 필살 게이지가 다 찬 순간 — 몸 둘레 반짝 별 넷 + 작은 노랑 고리 */
+/** 필살 게이지가 다 찬 순간 — 몸 둘레 반짝 별 넷(몸을 감는 먹 엔소는 effects — 필살 예비동작이 긋는 원의 예고) */
 function gaugeFull(x: number, y: number): void {
-  ring(x, y, 8, 22, 0.3, PALETTE.YELLOW);
   for (let i = 0; i < 4; i++) {
     const a = -Math.PI / 2 + (i * TAU) / 4 + sgn() * 0.3;
     twinkle(x + Math.cos(a) * 24, y + Math.sin(a) * 26, 4 + n01() * 1.5, 0.36 + n01() * 0.1, PALETTE.YELLOW, -20);

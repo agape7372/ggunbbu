@@ -1,7 +1,7 @@
 // GameState.events → SFX. core는 이벤트만 발행, 이 모듈이 프레임마다 소비(클리어는 씬).
 // boltCue/land 등은 kind 재사용 — 페이즈·보스 상태로 전용 프리셋을 고른다.
 import type { GameState, JuiceEvent, JuiceKind, Material, WeaponId } from '../core/types';
-import { AUDIO, BOSS, JUICE, STACK, TPS } from '../config';
+import { AUDIO, BOSS, HAT_FX, JUICE, STACK, TPS } from '../config';
 import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
 
@@ -12,7 +12,7 @@ const COMBO_DROP_COVER: ReadonlySet<JuiceKind> = new Set([
 ]);
 
 /** 1200부터 대검은 제 소리 — 타격에, 층 깨기·완파엔 붕괴음 위에 얹는다 */
-const GREAT_OWN: Partial<Record<WeaponId, SfxName>> = { flame: 'hitFlame', frost: 'hitFrost', onyx: 'hitOnyx', gold: 'hitGold' };
+export const GREAT_OWN: Partial<Record<WeaponId, SfxName>> = { flame: 'hitFlame', frost: 'hitFrost', onyx: 'hitOnyx', gold: 'hitGold' };
 /** 무기별 타격음 — 연장 셋, 값싼 대검 넷(연장 소리를 빌린다), 비싼 대검 넷. 없으면(철거칼) 재질·변형 */
 const WEAPON_HIT: Partial<Record<WeaponId, SfxName>> = {
   hammer: 'hitHammer', crowbar: 'hitBar', grinder: 'hitGrind',
@@ -33,7 +33,7 @@ export function comboSemitones(combo: number): number {
 }
 
 /**
- * 콤보가 이정표(50/100/200/500/999)를 올라서는 틱이면 그 값, 아니면 null.
+ * 콤보가 이정표(50/100/200/300/500/999)를 올라서는 틱이면 그 값, 아니면 null.
  * 이어하기(체크포인트 콤보 168)처럼 한 번에 크게 뛰는 건 타격이 아니므로 세지 않는다.
  */
 export function comboMilestone(prev: number, now: number): number | null {
@@ -58,7 +58,8 @@ export function consumeAudio(s: GameState): void {
         if (name === 'special') {
           playSfx('specialCharge'); // 휘익은 지금, 폭발은 히트스톱이 풀릴 때
           playSfx(name, { delay: JUICE.special.hitstop / TPS });
-        } else playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
+        } else if (name === 'hatGet') playSfx(name, { delay: HAT_FX.LAND / TPS }); // 고비 소리는 지금, 「팅」은 머리에 씌워질 때
+        else playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
       }
     }
   }
@@ -99,6 +100,8 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
       return ['supply'];
     case 'hatBreak':
       return ['hatBreak'];
+    case 'hatGet':
+      return ['hatGet'];
     case 'floorCollapse': {
       const own = GREAT_OWN[s.weapon];
       return own ? ['floorCollapse', own] : ['floorCollapse'];

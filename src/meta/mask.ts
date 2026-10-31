@@ -1,7 +1,12 @@
-// 마스크 — 사용자가 도트판에 찍은 16×16 그림. 저장은 문자열 하나(save.maskArt).
+// 마스크(가면) — 사용자가 도트판에 찍은 16×16 그림. 저장 = 가면 목록 save.masks(최대 8장, 장마다 id · 이름 · 그림 문자열).
+// 「가면 공방」(owned 'mask', 먼지 3000)을 연 뒤엔 새 가면을 공짜로 더 만든다. 쓰는 가면 = loadout.mask('mask'면 쓴다) + save.maskId.
+// save.maskArt = 고른 가면의 그림(파생) — 렌더 · 타이틀 · 도감이 아직 이 문자열 하나를 읽는다. 바꾸는 길은 아래 함수들만(syncMaskArt가 맞춘다).
+// 옛 저장(masks 없음): 'mask'를 가졌으면 maskArt가 [{ id: 'm1', name: '내 가면', art }] 한 장이 된다(loadMaskBook).
 // 새 판 = `m2:` 뒤에 칸마다 `.`(빈칸) 또는 색 여섯 자리(16진 소문자). 「색 만들기」로 만든 색도 그대로 담는다.
 // 옛 판 = 256자, 칸마다 옛 팔레트 번호 한 글자(0 빈칸 · 1~c). 견본과 옛 저장을 읽을 때만 쓴다.
 // DOM/캔버스 없음. 그리기는 render/maskArt.ts, 도트판 화면은 ui/maskEditor.ts.
+
+import type { Loadout, MaskEntry } from './types';
 
 export const MASK_N = 16;
 export const MASK_CELLS = MASK_N * MASK_N;
@@ -189,4 +194,132 @@ export const SAMPLE_MASK =
 /** 졸라맨이 쓰는 그림 — 아직 안 그렸으면(빈 그림·깨진 값) 견본. 상점 그림과 판 속이 같은 규칙을 탄다 */
 export function wornMask(art: string): string {
   return isMaskArt(art) && !maskIsBlank(art) ? art : SAMPLE_MASK;
+}
+
+// ── 가면 목록 ─────────────────────────────────────────────────────────────
+
+/** 가면 최대 장수 · 이름 최대 글자 수(유니코드 글자 단위) */
+export const MASK_MAX = 8;
+export const MASK_NAME_MAX = 10;
+/** 옛 저장 한 장이 받는 이름 */
+export const MASK_OLD_NAME = '내 마스크';
+
+const ID_RE = /^m(\d{1,3})$/;
+const idNo = (id: string): number => Number(ID_RE.exec(id)?.[1] ?? 0);
+
+/** 이름 정리 — 조작 문자 빼고 앞뒤 공백을 걷고 10글자로 자른다. 비면 「마스크 N」(N = id 번호) */
+export function cleanMaskName(raw: unknown, no: number): string {
+  const s = typeof raw === 'string'
+    // eslint-disable-next-line no-control-regex
+    ? Array.from(raw.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()).slice(0, MASK_NAME_MAX).join('').trim()
+    : '';
+  return s || `마스크 ${no}`;
+}
+
+/** 저장에서 읽은 가면 목록 — 모양이 틀린 장은 버리고, id가 겹치면 앞 장만, 8장까지. 그림이 깨진 장은 빈 판으로 살린다 */
+export function validMasks(v: unknown): MaskEntry[] {
+  if (!Array.isArray(v)) return [];
+  const out: MaskEntry[] = [];
+  for (const e of v) {
+    if (out.length >= MASK_MAX) break;
+    const o = typeof e === 'object' && e !== null ? (e as Record<string, unknown>) : null;
+    const id = o?.id;
+    if (!o || typeof id !== 'string' || !ID_RE.test(id) || out.some((m) => m.id === id)) continue;
+    out.push({ id, name: cleanMaskName(o.name, idNo(id)), art: isMaskArt(o.art) ? o.art : emptyMask() });
+  }
+  return out;
+}
+
+/** 불러오기 — 목록이 있으면 검증, 없으면(옛 저장) 가면 공방이 열려 있을 때만 maskArt 한 장으로 옮긴다 */
+export function loadMaskBook(
+  rawMasks: unknown, rawId: unknown, art: string, ownsWorkshop: boolean,
+): { masks: MaskEntry[]; maskId: string; maskArt: string } {
+  const listed = validMasks(rawMasks);
+  // 목록이 없거나 비었는데 공방이 열려 있으면: 옛 그림이 남아 있거나(옛 저장) 키 자체가 없을 때(그림 없이 산 옛 저장) 한 장으로 옮긴다.
+  // 다 지운 저장은 deleteMask가 그림을 비워 두니 여기 안 걸린다
+  const old = ownsWorkshop && (rawMasks === undefined || !maskIsBlank(art));
+  const masks = listed.length ? listed : old ? [{ id: 'm1', name: MASK_OLD_NAME, art }] : [];
+  const maskId = typeof rawId === 'string' && masks.some((m) => m.id === rawId) ? rawId : masks[0]?.id ?? '';
+  return { masks, maskId, maskArt: masks.find((m) => m.id === maskId)?.art ?? art };
+}
+
+/** 도감 · 상점이 읽는 내 가면들 — 만든 순서 */
+export function ownedMasks(save: { masks: readonly MaskEntry[] }): MaskEntry[] {
+  return save.masks.map((m) => ({ ...m }));
+}
+
+/** 가면을 바꾸는 쪽이 만지는 저장 부분 */
+export interface MaskSave {
+  masks: MaskEntry[];
+  maskId: string;
+  maskArt: string;
+  owned: string[];
+  loadout: Loadout;
+}
+
+/** 쓰는 가면 id — 안 쓰면 'none' */
+export function wornMaskId(s: Pick<MaskSave, 'loadout' | 'maskId'>): string {
+  return s.loadout.mask === 'mask' ? s.maskId : 'none';
+}
+
+/** 파생 maskArt를 고른 가면에 맞춘다(목록이 비면 남은 옛 그림은 그대로 둔다) */
+function syncMaskArt(s: MaskSave): void {
+  const m = s.masks.find((x) => x.id === s.maskId);
+  if (m) s.maskArt = m.art;
+}
+
+/** 공방을 막 열었을 때 — 목록이 비어 있고 옛 그림이 남아 있으면 그 그림이 첫 장이 된다 */
+export function adoptLegacyMask(s: MaskSave): void {
+  if (s.masks.length || maskIsBlank(s.maskArt)) return;
+  s.masks = [{ id: 'm1', name: MASK_OLD_NAME, art: s.maskArt }];
+  s.maskId = 'm1';
+}
+
+/** 새 가면 한 장(공짜) — 공방이 열려 있고 8장 미만일 때만. 그림이 있으면 고르고 바로 쓴다. 못 만들면 null */
+export function createMask(s: MaskSave, name: unknown, art: string): MaskEntry | null {
+  if (!s.owned.includes('mask') || s.masks.length >= MASK_MAX) return null;
+  const no = Math.max(0, ...s.masks.map((m) => idNo(m.id))) + 1;
+  const m: MaskEntry = { id: `m${no}`, name: cleanMaskName(name, no), art };
+  s.masks = [...s.masks, m];
+  // 그림이 있으면 바로 고르고 쓴다. 빈 판이면 지금 쓰는 가면을 안 바꾼다(첫 가면일 때만 고른다)
+  if (!maskIsBlank(art)) {
+    s.maskId = m.id;
+    s.loadout = { ...s.loadout, mask: 'mask' };
+  } else if (!s.masks.some((x) => x.id === s.maskId)) s.maskId = m.id;
+  syncMaskArt(s);
+  return m;
+}
+
+/** 이름 · 그림 고치기. 없는 id면 false. 쓰는 가면이 아니어도 쓰는 걸 바꾸지 않는다 */
+export function updateMask(s: MaskSave, id: string, name: unknown, art: string): boolean {
+  const at = s.masks.findIndex((m) => m.id === id);
+  if (at < 0) return false;
+  s.masks = s.masks.map((m, i) => (i === at ? { id, name: cleanMaskName(name, idNo(id)), art } : m));
+  syncMaskArt(s);
+  return true;
+}
+
+/** 지우기 — 쓰던 가면이면 벗는다(장착 'none'). 고른 가면이 지워지면 남은 첫 장이 고른 가면 */
+export function deleteMask(s: MaskSave, id: string): boolean {
+  if (!s.masks.some((m) => m.id === id)) return false;
+  const worn = wornMaskId(s) === id;
+  s.masks = s.masks.filter((m) => m.id !== id);
+  if (s.maskId === id) s.maskId = s.masks[0]?.id ?? '';
+  if (!s.masks.length) s.maskArt = emptyMask(); // 다 지웠다 — 남은 그림이 옛 저장처럼 되살아나지 않게
+  if (worn) s.loadout = { ...s.loadout, mask: 'none' };
+  syncMaskArt(s);
+  return true;
+}
+
+/** 쓰기 — id = 가면 id 또는 'none'(벗기). 안 산 공방 · 없는 id면 false */
+export function wearMask(s: MaskSave, id: string): boolean {
+  if (id === 'none') {
+    s.loadout = { ...s.loadout, mask: 'none' };
+    return true;
+  }
+  if (!s.owned.includes('mask') || !s.masks.some((m) => m.id === id)) return false;
+  s.maskId = id;
+  s.loadout = { ...s.loadout, mask: 'mask' };
+  syncMaskArt(s);
+  return true;
 }

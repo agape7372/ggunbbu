@@ -6,7 +6,8 @@ import type { GameState, InputFrame } from '../core/types';
 import { enterBonus } from '../core/sim';
 import { enterAct2Phase } from '../core/act2';
 import { GUARD_GAUGE, PLAYER, SCORE, TICK, WAZA_GAUGE } from '../config';
-import { loadSave, saveSave } from '../storage';
+import { freezeSaves, loadSave, saveSave } from '../storage';
+import { WEAPON_IDS } from '../meta/loadout';
 import { phaseName } from '../content';
 import { playSfx } from '../audio/audio';
 
@@ -111,7 +112,8 @@ function applyFallMul(s: GameState, mul: FallMul): void {
   }
 }
 
-export function mountDebugMenu(getState: () => GameState | null): void {
+/** open = 펼친 채로 붙인다(로고 연타 · 해금 콤보). 시험판 부팅(전해금 뒤)은 접어서 붙인다 */
+export function mountDebugMenu(getState: () => GameState | null, open = true): void {
   if (mounted) return;
   mounted = true;
 
@@ -156,11 +158,14 @@ export function mountDebugMenu(getState: () => GameState | null): void {
     sv.unlockedChapters = 3;
     sv.act2Cleared = true;
     sv.butterTierReached = 3;
-    sv.owned = [...new Set([...sv.owned, 'tenchi', 'ageba', 'tetsu', 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit', 'mask'])]; // 산 무기는 그대로
+    // 무기 열둘까지 전부 — 시험판에서 상점 · 도감을 끝까지 보려고(10-31 사용자 「내 계정은 테스트용, 다 풀어줘」)
+    sv.owned = [...new Set([...sv.owned, ...WEAPON_IDS, 'tenchi', 'ageba', 'tetsu', 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit', 'mask'])];
     sv.dust = Math.max(sv.dust, 999);
     sv.orbit = Math.max(sv.orbit, 999);
     saveSave(sv);
     try { localStorage.setItem('gunbbu.devUnlock', '1'); } catch {}
+    // 새로고침하며 페이지가 숨겨질 때 앱이 든 옛 저장을 쓴다(scenes onLifecycle) — 얼리지 않으면 방금 푼 게 그걸로 덮였다(10-31 시험판 실측)
+    freezeSaves();
     location.reload(); // 앱이 들고 있는 저장을 새로 읽는다 — 그대로 두면 판을 시작할 때 옛 소유 목록으로 덮는다
   });
 
@@ -241,6 +246,18 @@ export function mountDebugMenu(getState: () => GameState | null): void {
   statusEl.style.cssText = 'flex-basis:100%;font-size:9px;opacity:.8;line-height:1.3;';
   el.appendChild(statusEl);
   paintStatus();
+
+  // 시험판은 전해금 뒤로 부팅마다 붙는다 — 접으면 「디버그」 한 칸만 남아 화면 머리(제목 · 장착 줄)를 덮지 않는다
+  const fold = document.createElement('button');
+  fold.type = 'button';
+  fold.style.cssText = 'font-size:12px;padding:4px 7px;background:#1A1A20;color:#F4F1E8;border:0;'; // 먹 칸 — 화면 테 선 위에서도 읽힌다
+  const setOpen = (v: boolean): void => {
+    fold.textContent = v ? '접기' : '디버그';
+    for (const c of el.children) if (c !== fold) (c as HTMLElement).style.display = v ? '' : 'none';
+  };
+  fold.addEventListener('click', () => setOpen(fold.textContent === '디버그'));
+  el.prepend(fold);
+  setOpen(open);
 
   document.body.appendChild(el);
 

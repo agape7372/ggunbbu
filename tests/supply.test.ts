@@ -1,11 +1,12 @@
-// 보급 상자 — 주기·순서·난수 불변·효과, 안전모(깔림 1회 대신 받기), 1막·토코톤만 센다.
+// 보급 상자 — 주기·순서·난수 불변·효과, 1막·토코톤만 센다. 안전모는 상자 밖(콤보 50 · 200 · 500), 깔림 1회 대신 받기.
 import { describe, it, expect } from 'vitest';
 import { makeState, advance, enterBonus } from '../src/core/sim';
-import { applyItem, onBuildingDown, pickItem } from '../src/core/items';
+import { applyItem, onBuildingDown } from '../src/core/items';
+import { addCombo } from '../src/core/combat';
 import { enterAct2, enterAct2Phase } from '../src/core/act2';
 import { makeFloor, makeStack } from '../src/core/building';
 import { EMPTY_INPUT, type GameState, type ItemId } from '../src/core/types';
-import { GUARD_GAUGE, PLAYER, SUPPLY, WAZA_GAUGE } from '../src/config';
+import { GUARD_GAUGE, HAT, PLAYER, SUPPLY, WAZA_GAUGE } from '../src/config';
 
 /** onBuildingDown을 n번 — 상자가 나온 완파 번호와 내용물 */
 function downs(s: GameState, n: number): { at: number[]; items: ItemId[] } {
@@ -33,21 +34,8 @@ describe('보급 상자', () => {
     expect(s.rngState).toBe(before);
   });
 
-  it('안전모 → 믹스커피 → 장갑 → 먼지 자루 순서로 돈다', () => {
-    const s = makeState();
-    const got: ItemId[] = [];
-    for (let i = 0; i < 4 * SUPPLY.EVERY; i++) {
-      got.push(...downs(s, 1).items);
-      s.hat = false; // 매번 벗겨서 순서만 본다
-    }
-    expect(got).toEqual(['hat', 'coffee', 'gloves', 'dust']);
-  });
-
-  it('안전모를 쓰고 있으면 다음 것이 나온다', () => {
-    const s = makeState();
-    s.hat = true;
-    s.drops = SUPPLY.FIRST; // 첫 상자 = 안전모 차례
-    expect(pickItem(s)).toBe('coffee');
+  it('믹스커피 → 장갑 → 먼지 자루 순서로 돈다 — 안전모는 상자에 없다', () => {
+    expect(downs(makeState(), 4 * SUPPLY.EVERY).items).toEqual(['coffee', 'gloves', 'dust', 'coffee']);
   });
 
   it('네 가지 효과 — 먼지는 저장 몫이라 시뮬은 그대로', () => {
@@ -108,6 +96,42 @@ function landing(s: GameState): void {
     y: 1, vy: -200,
   });
 }
+
+/** 콤보를 n까지 올린다(타격마다 부르는 addCombo 그대로) */
+function comboTo(s: GameState, n: number): void {
+  while (s.combo < n) addCombo(s);
+}
+
+describe('안전모 — 콤보로 받는다', () => {
+  it('콤보가 50에 닿는 타격에 하나 — hatGet 이벤트, 난수는 그대로', () => {
+    const s = makeState({ seed: 3 });
+    const before = s.rngState;
+    comboTo(s, HAT.COMBO_AT[0] - 1);
+    expect(s.hat).toBe(false);
+    addCombo(s);
+    expect(s.hat).toBe(true);
+    expect(s.events.filter((e) => e.kind === 'hatGet')).toEqual([expect.objectContaining({ combo: HAT.COMBO_AT[0] })]);
+    expect(s.rngState).toBe(before);
+  });
+
+  it('쓰고 있으면 다음 고비에도 없다(이월 없음) — 벗은 뒤 고비에 다시', () => {
+    const s = makeState();
+    comboTo(s, HAT.COMBO_AT[1]);
+    expect(s.events.filter((e) => e.kind === 'hatGet')).toHaveLength(1); // 50에서 받은 하나뿐
+    s.hat = false;
+    s.events.length = 0;
+    comboTo(s, HAT.COMBO_AT[2]);
+    expect(s.events.filter((e) => e.kind === 'hatGet')).toEqual([expect.objectContaining({ combo: HAT.COMBO_AT[2] })]);
+  });
+
+  it('2막은 벗고 들어가니 콤보 고비에도 주지 않는다', () => {
+    const s = makeState();
+    enterAct2Phase(s, 'bolt');
+    comboTo(s, HAT.COMBO_AT[0]);
+    expect(s.hat).toBe(false);
+    expect(s.events.some((e) => e.kind === 'hatGet')).toBe(false);
+  });
+});
 
 describe('안전모', () => {
   it('깔림 1회를 대신 받는다 — 목숨·콤보 그대로, 건물은 튕겨 오른다', () => {

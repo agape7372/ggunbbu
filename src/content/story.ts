@@ -30,7 +30,7 @@ export const CHAPTER_LINES: readonly (readonly string[])[] = [
 
 /** 1막 → 2막. 짧은 내레이션 [정본 구조]. */
 export const ACT2_INTRO: readonly string[] = [
-  '— 최종 국면 —',
+  '최종 국면',
   '',
   '하늘에서 집게가 내려왔다.',
   '건물만 집으라는 지시는 없었다.',
@@ -43,9 +43,9 @@ export const ACT2_INTRO: readonly string[] = [
 
 /** 클리어 후 전체 내레이션. 엔딩 오버레이. */
 export const ENDING_LINES: readonly string[] = [
-  '— 작전성공 —',
+  '작전성공',
   '',
-  '집행이 정지되었다.',
+  '집행이 멈췄다.',
   '지구는 절반쯤 무너져 있다.',
   `베어 낸 쪽은 전부 ${HERO}다.`,
   '',
@@ -58,7 +58,7 @@ export const ENDING_LINES: readonly string[] = [
 ];
 
 /** 2막 풀콤보(99,999,999) 엔딩에 덧붙이는 한 줄. */
-export const ENDING_FULL_COMBO = '기계가 더 못 셉니다.';
+export const ENDING_FULL_COMBO = '「기계가 더 못 셉니다.」';
 
 export function chapterLines(chapter: number): readonly string[] {
   return CHAPTER_LINES[Math.max(0, Math.min(3, chapter | 0))];

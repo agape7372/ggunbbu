@@ -1,0 +1,173 @@
+/* 미션(ms-) · 구역 작전(op-) — 「먹 한 획」. 색은 토큰만, 섞기 0, 깊이는 단단한 먹 그림자.
+   주홍 = 지금 누를 것 하나 · 먹 채움 도장 = 판정·상태 · 옅은 먹 = 아직 못 하는 것.
+   논리 무대 높이는 늘 780 — vh·뷰포트 조건 없이 고정 px. SVG 필터는 컷 틀·도장에만. */
+
+/* ── 갈래 머리(오늘 · 업적 · 구역 · 특별작전) ─────────────── */
+.ms-h,
+.op-h {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 18px 0 6px 2px;
+  font: 400 30px/1 var(--brush);
+  rotate: -2deg;
+  transform-origin: 0 100%;
+}
+
+.ms-h small,
+.op-h small { font: 700 13px/1 var(--body); color: var(--ink2); }
+
+/* ── 미션 줄 ───────────────────────────────────────────── */
+.ms-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'name act' 'desc act' 'prog act' 'rew act';
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 5px;
+  padding: 12px 2px 14px;
+}
+
+/* 줄 사이 = 굵게 들어가 가늘게 빠지는 먹 한 획(필터 없이 clip-path) */
+.ms-row::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 92%;
+  height: 4px;
+  background: var(--ink);
+  clip-path: polygon(0 10%, 70% 30%, 100% 55%, 70% 80%, 0 100%);
+  rotate: -0.6deg;
+}
+
+.ms-row:nth-child(even)::after { width: 84%; rotate: 0.5deg; }
+.ms-name { grid-area: name; font: 700 16px/1.25 var(--body); }
+.ms-desc { grid-area: desc; font: 700 13px/1.35 var(--body); color: var(--ink2); }
+.ms-prog { grid-area: prog; display: flex; align-items: center; gap: 10px; }
+
+/* 붓 막대 — 먹 테두리 안에 먹이 차오른다. 끝은 갈필처럼 빠진다 */
+.ms-bar {
+  position: relative;
+  flex: 1;
+  height: 13px;
+  border: 2.5px solid var(--ink);
+  border-radius: 2px 7px 3px 6px;
+  overflow: hidden;
+}
+
+.ms-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--p);
+  background: var(--ink);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 45%, calc(100% - 3px) 100%, 0 100%);
+  transform-origin: 0 50%;
+}
+
+.ms-count { font: 700 14px/1 var(--body); white-space: nowrap; }
+.ms-rew { grid-area: rew; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 700 15px/1 var(--body); }
+.ms-act { grid-area: act; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+/* 처음 받을 것 = 주홍 「받기」 인장 하나 */
+.ms-take { width: 78px; height: 78px; rotate: -4deg; }
+.ms-take b { font-size: 36px; line-height: 0.95; }
+/* 나머지 받을 것 = 먹 획 */
+.ms-take2 { width: 96px; height: 56px; padding: 0 16px 3px 18px; rotate: 1.5deg; }
+.ms-take2 b { font-size: 30px; }
+/* 받은 것 = 작은 먹 「받음」 도장(못 누름) */
+.ms-got { width: 56px; height: 56px; rotate: 7deg; }
+.ms-got b { font-size: 27px; }
+.ms-got.fresh { animation: stamp 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.ms-boost { font: 700 13px/1.1 var(--body); color: var(--ink); white-space: nowrap; rotate: -2deg; }
+.ms-done { margin-top: 12px; font: 700 13px/1.5 var(--body); color: var(--ink2); }
+
+/* ── 작전 컷 2×2 ──────────────────────────────────────── */
+.op-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; }
+
+.op-cut {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 3px;
+  height: 156px;
+  min-width: 0;
+  padding: 0 16px 20px 22px;
+  color: var(--ink);
+  text-align: left;
+  background: var(--paper);
+}
+
+.op-cut:active:not(:disabled) { scale: 0.96; }
+.op-cut .frame { left: 6px; top: 6px; width: calc(100% - 12px); height: calc(100% - 12px); }
+.op-cut:disabled .frame path { stroke: var(--ink3); }
+
+/* 구역 층 그림 — 먹 윤곽 + 단단한 먹 그림자, 컷 위 변을 뚫고 나온다(홈 건물과 같은 문법) */
+.op-pic {
+  position: absolute;
+  right: 12px;
+  top: -8px;
+  height: 104px;
+  aspect-ratio: 540 / 680;
+  rotate: 4deg;
+  box-shadow: 5px 6px 0 var(--ink);
+  border: 4px solid var(--ink);
+  background: var(--paper);
+  z-index: 6;
+}
+
+.op-grid > :nth-child(even) .op-pic { rotate: -3deg; right: 16px; }
+.op-pic img { width: 100%; height: 100%; object-fit: cover; }
+/* 잠긴 구역 = 그림 대신 옅은 먹 판 */
+.op-cut:disabled .op-pic { background: var(--ink3); border-color: var(--ink3); box-shadow: 5px 6px 0 var(--ink3); }
+
+.op-name {
+  position: relative;
+  z-index: 7;
+  font: 400 30px/1 var(--brush);
+  white-space: nowrap;
+  rotate: -3deg;
+  transform-origin: 0 100%;
+  text-shadow: var(--halo);
+}
+
+.op-cut small { position: relative; z-index: 7; font: 700 13px/1.3 var(--body); }
+.op-why,
+.op-cut:disabled .op-name { color: var(--ink2); }
+.op-why { text-shadow: var(--halo); }
+.op-ladder { color: var(--ink2); }
+
+/* 특별작전 최고 도장 = 먹 채움 글자 하나(판정, 못 누름) */
+.op-grade {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 50px;
+  height: 50px;
+  font: 700 28px/1 var(--body); /* 붓글씨 S는 5로 읽힌다 — 등급 글자만 본문 굵게 */
+  font-style: normal;
+  rotate: 8deg;
+  z-index: 7;
+}
+
+/* ── 등장 안무(0.7초 안) ─────────────────────────────── */
+[data-screen='missions'].anim .meta-title,
+[data-screen='ops'].anim .meta-title { animation: wipe 0.28s ease-out both; }
+
+[data-screen='missions'].anim .ms-row,
+[data-screen='missions'].anim .ms-h,
+[data-screen='ops'].anim .op-h { animation: rise 0.3s var(--ease-out) calc(var(--i, 0) * 45ms) both; }
+
+[data-screen='missions'].anim .ms-bar i { animation: ms-fill 0.25s ease-out calc(0.1s + var(--i, 0) * 45ms) both; }
+[data-screen='missions'].anim .ms-take { animation: stamp 0.28s cubic-bezier(0.2, 1.3, 0.4, 1) 0.4s both; }
+
+[data-screen='ops'].anim .op-cut { animation: rise 0.3s var(--ease-out) calc(var(--i, 0) * 45ms) both; }
+[data-screen='ops'].anim .op-pic { animation: drop 0.36s cubic-bezier(0.2, 1.2, 0.4, 1) calc(0.05s + var(--i, 0) * 45ms) both; }
+[data-screen='ops'].anim .op-grade { animation: stamp 0.26s cubic-bezier(0.2, 1.3, 0.4, 1) 0.42s both; }
+
+@keyframes ms-fill { from { scale: 0 1; } to { scale: 1 1; } }

@@ -1,8 +1,7 @@
 // 렌더러의 이벤트 소비 — 진동 고르기·스로틀, 필살 예비동작(미루기), 보스 상태 읽기.
 // 캔버스는 쓰지 않는다(consumeEvents만) — 그리기 검증은 헤드리스 브라우저 캡처가 맡는다.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BOSS, HAPTIC, JUICE } from '../src/config';
-import { CAPTIONS } from '../src/content';
+import { BOSS, COMBO_MARK, HAPTIC, JUICE } from '../src/config';
 import { initBoss } from '../src/core/boss';
 import { makeState } from '../src/core/sim';
 import type { GameState, JuiceEvent } from '../src/core/types';
@@ -24,7 +23,7 @@ vi.mock('../src/render/screenfx', async (orig) => ({
 const { vibrate } = await import('../src/platform/native');
 const fx = await import('../src/render/effects');
 const screen = await import('../src/render/screenfx');
-const { consumeEvents, setFeedbackOptions } = await import('../src/render/renderer');
+const { comboMarkView, consumeEvents, setFeedbackOptions } = await import('../src/render/renderer');
 
 function state(events: JuiceEvent[] = []): GameState {
   const s = makeState();
@@ -52,23 +51,81 @@ beforeEach(() => {
   vi.mocked(screen.startCaption).mockClear();
 });
 
-describe('콤보 고비 자막', () => {
-  it('100을 넘는 틱에 한 번', () => {
+/** 연출 상태를 비운다 — 틱이 되감기면 새 런으로 본다 */
+function rewind(): void {
+  const s = state();
+  s.tick = 1;
+  tick(s);
+  s.tick = 0;
+  tick(s);
+}
+
+/** 타격 하나 — 시뮬처럼 s.combo를 올리고 같은 수를 이벤트에 싣는다 */
+function hitTo(s: GameState, n: number, kind: JuiceEvent['kind'] = 'hit'): void {
+  s.combo = n;
+  tick(s, [{ kind, y: 100, combo: n }]);
+}
+
+describe('콤보 도장 — 판 위 타격 자리', () => {
+  beforeEach(rewind);
+
+  it('타격마다 그 콤보를 찍고, 고비(10 · 30)를 넘는 타격에 그 칸 연출을 켠다', () => {
     const s = state();
-    s.combo = 99;
-    tick(s);
-    s.combo = 100;
-    tick(s);
-    expect(screen.startCaption).toHaveBeenCalledTimes(1);
-    expect(screen.startCaption).toHaveBeenCalledWith(CAPTIONS.combo100, '100 콤보');
+    for (let n = 1; n <= 9; n++) hitTo(s, n);
+    expect(comboMarkView()).toMatchObject({ n: 9, shown: true, step: -1 });
+    hitTo(s, 10);
+    expect(comboMarkView()).toMatchObject({ n: 10, step: 0 });
+    for (let n = 11; n <= 30; n++) hitTo(s, n, n % 2 ? 'hit' : 'floorCollapse');
+    expect(comboMarkView()).toMatchObject({ n: 30, step: 1 });
   });
 
-  it('이어하기처럼 한 번에 뛴 콤보(0 → 148)는 친 게 아니다 — 자막 없음', () => {
+  it('필살이 부순 층(콤보가 안 실린 층 붕괴)은 도장에 안 찍힌다', () => {
     const s = state();
+    hitTo(s, 5);
+    tick(s, [{ kind: 'floorCollapse', y: 100 }]);
+    expect(comboMarkView().n).toBe(5);
+  });
+
+  it('이어하기처럼 한 번에 뛴 콤보(0 → 149)는 친 게 아니다 — 고비 연출 없음', () => {
+    const s = state();
+    hitTo(s, 149);
+    expect(comboMarkView()).toMatchObject({ n: 149, step: -1 });
+  });
+
+  it('999에서 멈춘다 — 카운터스톱 뒤 타격(1000)도 999', () => {
+    const s = state();
+    hitTo(s, 998);
+    hitTo(s, 999);
+    expect(comboMarkView()).toMatchObject({ n: 999, step: COMBO_MARK.STEPS.length - 1 });
+    tick(s, [{ kind: 'hit', y: 100, combo: 1000 }]);
+    expect(comboMarkView().n).toBe(999);
+  });
+
+  it('끊기면 10 이상은 두 동강 난 조각이 남고, 9 이하는 그냥 사라진다', () => {
+    const s = state();
+    for (let n = 1; n <= 12; n++) hitTo(s, n);
+    s.combo = 0;
+    tick(s, [{ kind: 'comboBreak', combo: 12 }]);
+    expect(comboMarkView()).toMatchObject({ n: 0, shown: false, broken: 12 });
+    rewind();
+    for (let n = 1; n <= 9; n++) hitTo(s, n);
+    s.combo = 0;
+    tick(s, [{ kind: 'comboBreak', combo: 9 }]);
+    expect(comboMarkView()).toMatchObject({ n: 0, shown: false, broken: 0 });
+  });
+
+  it('보스 입장처럼 끊김 없이 0이 되면 조용히 거둔다', () => {
+    const s = state();
+    for (let n = 1; n <= 30; n++) hitTo(s, n);
+    s.combo = 0;
     tick(s);
-    s.combo = 148;
-    tick(s);
-    expect(screen.startCaption).not.toHaveBeenCalled();
+    expect(comboMarkView()).toMatchObject({ n: 0, shown: false, broken: 0 });
+  });
+
+  it('안전모 받기 이벤트에 받기 연출을 켠다', () => {
+    const s = state();
+    tick(s, [{ kind: 'hatGet', combo: 50, y: 60 }]);
+    expect(comboMarkView().hat).toBe(0);
   });
 });
 

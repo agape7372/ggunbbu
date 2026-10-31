@@ -7,8 +7,14 @@ export type CosmeticSlot = 'body' | 'blade' | 'letters' | 'mask';
 export type BodyId = 'ink' | 'amber' | 'slate';
 export type BladeId = 'wire' | 'rebar' | 'crescent';
 export type LettersId = 'flyer' | 'stamp' | 'orbit';
-/** 마스크 칸 — 그림은 저장의 maskArt 하나. 'mask' = 그 그림을 쓴다 */
+/** 마스크 칸 — 'mask' = 가면을 쓴다(어느 가면인지는 저장의 maskId), 'none' = 안 쓴다 */
 export type MaskId = 'none' | 'mask';
+/** 내 가면 한 장 — id는 'm1' · 'm2'… 안 바뀌는 값, name은 사용자가 지은 이름, art는 도트판 그림(meta/mask.ts) */
+export interface MaskEntry {
+  id: string;
+  name: string;
+  art: string;
+}
 
 export interface Loadout {
   waza: WazaId;

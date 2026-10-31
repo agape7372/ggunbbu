@@ -15,6 +15,7 @@ import { floorImageKey, floorMaterialKey } from './floorSheets';
 import { floorSheetTile } from './floorSheetCache';
 import { entityAssetKey, playerSheetFrame } from './frames';
 import { drawMaskAt } from './maskArt';
+import { SWORD_HOLD, parseShape } from './swordShapes';
 import { isMaskArt, maskIsBlank } from '../meta/mask';
 
 // ── 공통 색상 ────────────────────────────────────────────────────
@@ -346,20 +347,26 @@ export function floorTile(mat: Material, theme: Theme, index: number, count: num
 // ══════════════════════════════════════════════════════════════
 /** ax/ay = 캔버스 안 발 기준점(논리 px), hx/hy = 기준점에서 본 머리 중심(안전모 자리). */
 /** blade = 대검의 손 → 칼끝(발 기준). 칼 기운(bladeFx)이 칼날을 따라 피어난다 */
-interface PFrame { cv: HTMLCanvasElement; ax: number; ay: number; hx: number; hy: number; blade: Seg | null }
+interface PFrame { cv: HTMLCanvasElement; ax: number; ay: number; hx: number; hy: number; blade: Seg | null; ss: number }
 type Seg = readonly [number, number, number, number];
 /** 지금 굽는 프레임에 그린 대검 — weapon()이 적고 pframe()이 가져간다 */
 let bakedBlade: Seg | null = null;
 
-// 졸라맨 프레임만 2배로 굽고 절반으로 찍는다 — 칼 아닌 무기는 늘 프로시저럴이라 계단이 보인다.
-const SS = 2;
+// 졸라맨 프레임은 그리는 자리의 배율에 맞춰 굽는다. 판 캔버스는 기기 배율을 2로 묶어 늘 2배다.
+// 홈 뿌뿌는 기기 배율 3 × 큰 그림이라 2배로 구운 걸 6배 넘게 늘려 흐렸다(10-31 사용자 캡처) → 최대 SS_MAX배로 따로 굽는다.
+const SS_MIN = 2;
+const SS_MAX = 6;
+/** 지금 굽는 프레임의 배율 — pickPlayerFrame이 정하고 mkFrame · pframe이 읽는다 */
+let bakeSS = SS_MIN;
+/** 배율별 프레임 캐시 — 최근 두 배율만(판 2배 · 홈 큰 그림). 무기 · 색을 바꾸면 비운다 */
+const frameCache = new Map<number, Partial<Record<PlayerFrameKey, PFrame>>>();
 // 쇠머리·갈고리·원판·참격 호가 캔버스 끝에서 잘리지 않게 사방 여백(논리 px).
 // 대검 참격 호가 가장 멀리 나간다 — 서리 얼음 조각이 넓은 프레임 오른쪽 +17, 위는 호 끝 −6
 const PAD = 20;
 
 function mkFrame(w: number, h: number): { cv: HTMLCanvasElement; c: CanvasRenderingContext2D } {
-  const r = mkCanvas((w + PAD * 2) * SS, (h + PAD * 2) * SS);
-  r.c.scale(SS, SS);
+  const r = mkCanvas((w + PAD * 2) * bakeSS, (h + PAD * 2) * bakeSS);
+  r.c.scale(bakeSS, bakeSS);
   r.c.translate(PAD, PAD);
   bakedBlade = null;
   return r;
@@ -368,7 +375,7 @@ function mkFrame(w: number, h: number): { cv: HTMLCanvasElement; c: CanvasRender
 function pframe(cv: HTMLCanvasElement, ax: number, ay: number, headX: number, headY: number): PFrame {
   const b = bakedBlade;
   const blade: Seg | null = b && [b[0] - ax, b[1] - ay, b[2] - ax, b[3] - ay];
-  return { cv, ax: ax + PAD, ay: ay + PAD, hx: headX - ax, hy: headY - ay, blade };
+  return { cv, ax: ax + PAD, ay: ay + PAD, hx: headX - ax, hy: headY - ay, blade, ss: bakeSS };
 }
 type PlayerFrameKey =
   | 'idle' | 'jump' | 'attack0' | 'attack1' | 'attack2'
@@ -405,24 +412,22 @@ export function setPlayerCosmetics(bodyColor: string, bladeColor: string): void 
   LINE = bodyColor;
   ARC = bladeColor;
   cosmeticsActive = bodyColor !== DEFAULT_LINE || bladeColor !== DEFAULT_ARC;
-  playerFrames = null;
+  frameCache.clear();
 }
 
 let playerWeapon: WeaponId = 'sword';
-const IRON = '#948E82';      // 오함마 쇠머리
-const DISC = '#E2DED3';      // 그라인더 원판
 const HAT_WHITE = '#FFFFFF'; // 안전모 — 아이보리보다 밝게
 
 /** 장착 무기 — 렌더러가 매 프레임 s.weapon을 넘긴다. 바뀔 때만 프레임을 다시 굽는다. */
 export function setPlayerWeapon(w: WeaponId): void {
   if (playerWeapon === w) return;
   playerWeapon = w;
-  playerFrames = null;
+  frameCache.clear();
 }
 
-/** PNG 시트 키. 'player'는 기본 룩 + 철거칼 전용, 다른 무기는 'player-<무기>'(없으면 프로시저럴). */
+/** PNG 시트 키. 열두 무기 모두 상점과 같은 칼 그림(swordBody)으로 그려야 해서, 칼이 구워진 시트는 쓰지 않는다(SWORD_HOLD에 없는 무기만 시트가 이긴다). */
 function playerPngKey(): string | null {
-  if (cosmeticsActive) return null;
+  if (cosmeticsActive || SWORD_HOLD[playerWeapon]) return null;
   const key = playerWeapon === 'sword' ? 'player' : `player-${playerWeapon}`;
   return hasAsset(key) ? key : null;
 }
@@ -460,7 +465,8 @@ export function playerHead(pose: PlayerPose, animTick: number): readonly [number
   return [f.hx, f.hy];
 }
 
-function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+/** 흰 안전모 한 개 — 머리 위(drawHat)와 받기 연출(렌더러 hatFx)이 같은 그림을 쓴다. r = 머리 반지름 */
+export function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   const R = r + 0.8;
   const base = cy - r * 0.2;
   ctx.save();
@@ -479,8 +485,20 @@ function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numbe
   ctx.restore();
 }
 
-/** 안전모 — 렌더러가 s.hat일 때 drawPlayer 직후 같은 인자로 부른다. 머리 위치는 drawPlayer와 같은 프레임에서 읽는다.
+/** 안전모가 앉는 자리 [cx, cy, r] — drawHat과 받기 연출이 같이 쓴다. 깔림 · 사망은 null.
  *  마스크를 쓰면 마스크 위에 — 마스크 폭만큼 키워 윗단만 덮는다 */
+export function hatSpot(pose: PlayerPose, animTick: number, x: number, footCanvasY: number): [number, number, number] | null {
+  if (pose === 'pinned' || pose === 'dead') return null;
+  const h = playerHead(pose, animTick);
+  if (!h) return null;
+  const cx = x + h[0];
+  const cy = footCanvasY + playerBob(pose, animTick) + h[1];
+  return playerMask
+    ? [cx, cy - MASK_DRAW.LIFT - MASK_DRAW.HAT_UP, MASK_DRAW.SIZE / 2 + 1]
+    : [cx, cy, playerPngKey() ? SHEET_HEAD_R : HEAD_R];
+}
+
+/** 안전모 — 렌더러가 s.hat일 때 drawPlayer 직후 같은 인자로 부른다. 머리 위치는 drawPlayer와 같은 프레임에서 읽는다 */
 export function drawHat(
   ctx: CanvasRenderingContext2D,
   pose: PlayerPose,
@@ -488,13 +506,8 @@ export function drawHat(
   x: number,
   footCanvasY: number,
 ): void {
-  if (pose === 'pinned' || pose === 'dead') return;
-  const h = playerHead(pose, animTick);
-  if (!h) return;
-  const cx = x + h[0];
-  const cy = footCanvasY + playerBob(pose, animTick) + h[1];
-  if (playerMask) hardHat(ctx, cx, cy - MASK_DRAW.LIFT - MASK_DRAW.HAT_UP, MASK_DRAW.SIZE / 2 + 1);
-  else hardHat(ctx, cx, cy, playerPngKey() ? SHEET_HEAD_R : HEAD_R);
+  const at = hatSpot(pose, animTick, x, footCanvasY);
+  if (at) hardHat(ctx, at[0], at[1], at[2]);
 }
 
 /** 마스크 — 렌더러가 drawPlayer 직후·drawHat 직전에 같은 인자로 부른다. art를 넘기면 그 그림(상점·도트판 미리보기).
@@ -579,218 +592,65 @@ function seg(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1
   c.stroke();
 }
 
-/** 잉크 테두리 점 — 자루 끝·보석 */
-function knob(c: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string): void {
-  c.beginPath();
-  c.arc(x, y, r, 0, Math.PI * 2);
-  c.fillStyle = fill;
-  c.fill();
-  c.strokeStyle = PALETTE.INK;
-  c.lineWidth = 1;
-  c.stroke();
-}
+/** 칼 몸 그림 한 조각 — 상점 실루엣(swordShapes)의 path를 Path2D로 풀어 둔 것 */
+interface InkPart { path: Path2D; cls: string }
+const swordParts = new Map<string, InkPart[]>();
 
-/** 칼날 윤곽 — 손 쪽 b에서 칼끝 L까지, 반폭 h. 눕힌 좌표(칼끝 = +x, 등 = −y) */
-function bladePath(c: CanvasRenderingContext2D, shape: GreatShape, b: number, L: number, h: number): void {
-  const t = L - h * 2.4; // 칼끝 비탈이 시작되는 곳
-  c.beginPath();
-  switch (shape) {
-    case 'saw': // 등이 톱니
-      c.moveTo(b, h);
-      c.lineTo(t, h);
-      c.lineTo(L, 0);
-      for (let x = t; x > b + 2; x -= 3) {
-        c.lineTo(x, -h);
-        c.lineTo(x - 1.4, -h - 1.8);
-      }
-      c.lineTo(b, -h);
-      break;
-    case 'stripe': // 공사 차단봉처럼 비스듬히 자른 끝
-      c.moveTo(b, -h);
-      c.lineTo(L - h * 1.6, -h);
-      c.lineTo(L, h);
-      c.lineTo(b, h);
-      break;
-    case 'beam': // H빔 토막 — 끝이 뭉툭
-      c.rect(b, -h, L - b, h * 2);
-      break;
-    case 'wave': // 물결날
-      c.moveTo(b, -h);
-      for (let x = b; x <= t; x += 1) c.lineTo(x, -h - 0.9 * Math.sin((x - b) / 2.2));
-      c.lineTo(L, 0);
-      for (let x = t; x >= b; x -= 1) c.lineTo(x, h + 0.9 * Math.sin((x - b) / 2.2));
-      break;
-    case 'crystal': { // 깎은 얼음
-      const s = (L - b) / 6;
-      c.moveTo(b, -h * 0.8);
-      c.lineTo(b + s, -h * 1.15);
-      c.lineTo(b + s * 2, -h * 0.75);
-      c.lineTo(b + s * 3, -h * 1.2);
-      c.lineTo(b + s * 4.4, -h * 0.8);
-      c.lineTo(L, 0);
-      c.lineTo(b + s * 4.6, h * 0.95);
-      c.lineTo(b + s * 3.4, h * 0.7);
-      c.lineTo(b + s * 2.2, h * 1.15);
-      c.lineTo(b + s, h * 0.75);
-      c.lineTo(b, h * 0.9);
-      break;
-    }
-    case 'jag': { // 아래 날에 미늘 셋
-      const s = (L - b) / 4;
-      c.moveTo(b, -h);
-      c.lineTo(L - h * 2.6, -h);
-      c.lineTo(L, -h * 0.3);
-      c.lineTo(L - h * 1.4, h * 0.7);
-      for (let k = 3; k >= 1; k--) {
-        const x = b + s * k;
-        c.lineTo(x, h);
-        c.lineTo(x - s * 0.3, h * 1.9);
-        c.lineTo(x - s * 0.5, h);
-      }
-      c.lineTo(b, h);
-      break;
-    }
-    case 'royal': // 넓은 날 + 긴 칼끝
-      c.moveTo(b, -h);
-      c.lineTo(t - h, -h * 1.05);
-      c.lineTo(L, 0);
-      c.lineTo(t - h, h * 1.05);
-      c.lineTo(b, h);
-      break;
-    default: // 곧은 양날
-      c.moveTo(b, -h);
-      c.lineTo(t, -h);
-      c.lineTo(L, 0);
-      c.lineTo(t, h);
-      c.lineTo(b, h);
+/** 칼마다 한 번만 푼다(매 프레임 문자열 처리 없음). Path2D가 있는 브라우저에서만 부른다 */
+function inkParts(id: string): InkPart[] {
+  let p = swordParts.get(id);
+  if (!p) {
+    p = parseShape(id).map(({ cls, d }) => ({ cls, path: new Path2D(d) }));
+    swordParts.set(id, p);
   }
-  c.closePath();
+  return p;
 }
 
-/** 칼날 위 무늬 — 채움 뒤, 테두리 앞 */
-function bladeMarks(c: CanvasRenderingContext2D, g: GreatLook, b: number, L: number, h: number): void {
-  switch (g.shape) {
-    case 'stripe': // 검정 사선 띠 — 칼날 안에서만
-      c.save();
-      bladePath(c, 'stripe', b, L, h);
-      c.clip();
-      c.strokeStyle = PALETTE.INK;
-      c.lineWidth = 2.2;
-      c.beginPath();
-      for (let x = b - h * 2; x < L; x += 5.5) {
-        c.moveTo(x, h + 1);
-        c.lineTo(x + h * 2 + 2, -h - 1);
-      }
-      c.stroke();
-      c.restore();
-      return;
-    case 'beam': { // 위아래 날개 금 + 볼트 줄, 위 날개에 빛줄
-      seg(c, b, -h * 0.42, L, -h * 0.42, g.guard, 0.8);
-      seg(c, b, h * 0.42, L, h * 0.42, g.guard, 0.8);
-      seg(c, b + 1, -h + 0.8, L - 1, -h + 0.8, g.hi, 0.8);
-      c.fillStyle = g.guard;
-      for (let x = b + 4; x < L - 2; x += 6) {
-        c.beginPath();
-        c.arc(x, 0, 0.75, 0, Math.PI * 2);
-        c.fill();
-      }
-      return;
-    }
-    case 'crystal': { // 깎인 면 — 흰 금
-      const s = (L - b) / 6;
-      c.strokeStyle = g.hi;
-      c.lineWidth = 0.8;
-      c.beginPath();
-      c.moveTo(b + s, -h * 1.15);
-      c.lineTo(b + s * 1.7, h * 0.3);
-      c.moveTo(b + s * 3, -h * 1.2);
-      c.lineTo(b + s * 3.6, h * 0.35);
-      c.moveTo(b + 1, -0.2);
-      c.lineTo(L - 3, -0.4);
-      c.stroke();
-      return;
-    }
-    case 'jag': { // 붉은 날 선 + 어두운 빛줄
-      const red = g.edge ?? PALETTE.RED;
-      seg(c, b + 1, -h + 0.75, L - h * 2.6, -h + 0.75, red, 1);
-      seg(c, L - h * 2.6, -h + 0.75, L - 1.2, -h * 0.3, red, 1);
-      seg(c, b + 2, h * 0.2, L - h * 3, h * 0.2, g.hi, 0.8);
-      return;
-    }
-    case 'royal': // 가운데 등줄 + 빛줄
-      seg(c, b + 1, 0, L - h * 1.5, 0, g.guard, 0.8);
-      seg(c, b + 2, -h * 0.5, L - h * 3, -h * 0.5, g.hi, 1);
-      return;
-    default: // 빛줄 하나 — 손 쪽에서 칼끝 비탈 앞까지
-      seg(c, b + 2, -h * 0.4, L - h * 2.8, -h * 0.4, g.hi, 1);
-  }
-}
-
-/** 코등이 — 칼날 바로 앞 가로대. 황금은 끝이 벌어지고 가운데 보석, 흑철은 가시 */
-function crossGuard(c: CanvasRenderingContext2D, g: GreatLook, h: number): void {
-  const e = h + 3; // 반길이
-  c.beginPath();
-  if (g.shape === 'royal') {
-    c.moveTo(-0.6, -e - 1.4);
-    c.lineTo(2.8, -e + 0.6);
-    c.lineTo(2.8, e - 0.6);
-    c.lineTo(-0.6, e + 1.4);
-    c.lineTo(0.8, 0);
-  } else if (g.shape === 'jag') {
-    c.moveTo(-1, -e - 1.6);
-    c.lineTo(2.6, -h);
-    c.lineTo(2.6, h);
-    c.lineTo(-1, e + 1.6);
-    c.lineTo(0.6, 0);
-  } else {
-    c.rect(0, -e, 2.4, e * 2);
-  }
-  c.closePath();
-  c.fillStyle = g.guard;
-  c.fill();
-  c.strokeStyle = PALETTE.INK;
-  c.lineWidth = 1;
-  c.stroke();
-  if (g.shape === 'royal') knob(c, 1.3, 0, 1.3, g.edge ?? PALETTE.RED);
-}
-
-/** 대검 — 손(hx,hy)에서 칼끝(tx,ty)까지가 칼날, 자루는 손 뒤로. 눕힌 좌표로 그린다 */
-function greatsword(c: CanvasRenderingContext2D, g: GreatLook, hx: number, hy: number, tx: number, ty: number): void {
-  const L = Math.hypot(tx - hx, ty - hy);
-  const h = g.w;
-  const b = 2.4; // 칼날은 코등이 바로 앞에서
+/** 칼 몸 — 상점 칼 그림(120×300 칸)을 손(hx,hy) → 칼끝(tx,ty)에 맞춰 돌리고 줄여 그린다.
+ *  색은 상점과 같다: 먹 몸통 · 한지색 무늬 · 참격 노랑(= 칼빛 ARC). 칼은 따로 선 물건이라 몸 색(LINE)이 아니라 잉크 */
+function swordBody(c: CanvasRenderingContext2D, id: string, hx: number, hy: number, tx: number, ty: number): void {
+  const hold = SWORD_HOLD[id] ?? SWORD_HOLD.sword;
+  const s = (Math.hypot(tx - hx, ty - hy) * hold.k) / (hold.handY - hold.tipY);
   c.save();
   c.translate(hx, hy);
-  c.rotate(Math.atan2(ty - hy, tx - hx));
-  c.lineJoin = 'round';
-  c.lineCap = 'round';
-  seg(c, -6, 0, 0, 0, PALETTE.INK, 2.2); // 자루
-  knob(c, -7, 0, 1.5, g.shape === 'royal' ? g.edge ?? PALETTE.RED : g.guard);
-  if (g.glow) { // 칼날 뒤로 번지는 기운
-    c.globalAlpha = 0.35;
-    seg(c, b + 2, 0, L - 2, 0, g.glow, h * 2 + 5);
-    c.globalAlpha = 1;
+  c.rotate(Math.atan2(ty - hy, tx - hx) + Math.PI / 2); // 칸의 위쪽(칼끝)이 손 → 칼끝 방향을 본다
+  c.scale(s, s);
+  c.translate(-60, -hold.handY);
+  c.lineWidth = 3; // 한지색 고리(pr)의 테 굵기 — 상점 CSS와 같다
+  for (const { path, cls } of inkParts(id)) {
+    if (cls === 'pr') {
+      c.strokeStyle = PALETTE.BG;
+      c.stroke(path);
+    } else {
+      c.fillStyle = cls === 'p' ? PALETTE.BG : cls === 'y' ? ARC : PALETTE.INK;
+      c.fill(path);
+    }
   }
-  bladePath(c, g.shape, b, L, h);
-  c.fillStyle = g.blade;
-  c.fill();
-  bladeMarks(c, g, b, L, h);
-  bladePath(c, g.shape, b, L, h);
-  c.strokeStyle = PALETTE.INK;
-  c.lineWidth = LINE_W;
-  c.stroke();
-  crossGuard(c, g, h);
   c.restore();
+}
+
+/** 대검 — 손(hx,hy)에서 칼끝(tx,ty)까지가 칼날. 몸은 상점 그림, 칼날 뒤로 번지는 기운(glow)만 여기서 깐다 */
+function greatsword(c: CanvasRenderingContext2D, id: string, g: GreatLook, hx: number, hy: number, tx: number, ty: number): void {
+  if (g.glow) {
+    c.save();
+    c.translate(hx, hy);
+    c.rotate(Math.atan2(ty - hy, tx - hx));
+    c.lineCap = 'round';
+    c.globalAlpha = 0.35;
+    seg(c, 4.4, 0, Math.hypot(tx - hx, ty - hy) - 2, 0, g.glow, g.w * 2 + 5);
+    c.restore();
+  }
+  swordBody(c, id, hx, hy, tx, ty);
 }
 
 /** 대검 하나만 — 상점 그림. 판 속 칼과 같은 그리기에 손·칼끝만 받는다. 대검이 아니면 false */
 export function drawGreatsword(c: CanvasRenderingContext2D, w: WeaponId, hx: number, hy: number, tx: number, ty: number): boolean {
   const g = greatLook(w);
-  if (g) greatsword(c, g, hx, hy, tx, ty);
+  if (g) greatsword(c, w, g, hx, hy, tx, ty);
   return g !== undefined;
 }
 
-/** 무기: 손(hx,hy)과 방향(→tx,ty)은 포즈 그대로, 길이·머리 모양만 장착 무기별로 바꾼다.
+/** 무기: 손(hx,hy)과 방향(→tx,ty)은 포즈 그대로. 열두 무기 모두 상점과 같은 칼 그림(swordBody)을 길이에 맞춰 줄여 쥔다.
  *  great = 대검일 때의 [손x, 손y, 칼끝x, 칼끝y] — 칼이 길어 바닥·머리를 뚫지 않게 포즈마다 따로 잡는다 */
 function weapon(
   c: CanvasRenderingContext2D, hx: number, hy: number, tx: number, ty: number,
@@ -799,63 +659,11 @@ function weapon(
   const g = greatLook(playerWeapon);
   if (g) {
     const [gx, gy, gtx, gty] = great ?? [hx, hy, tx, ty];
-    greatsword(c, g, gx, gy, gtx, gty);
+    greatsword(c, playerWeapon, g, gx, gy, gtx, gty);
     bakedBlade = [gx, gy, gtx, gty];
     return;
   }
-  const L = Math.hypot(tx - hx, ty - hy) || 1;
-  const ux = (tx - hx) / L, uy = (ty - hy) / L;
-  const nx = -uy, ny = ux;
-  const at = (k: number, side = 0): [number, number] => [hx + ux * L * k + nx * side, hy + uy * L * k + ny * side];
-  switch (playerWeapon) {
-    case 'hammer': {
-      // 오함마: 자루 끝에 가로로 긴 쇠머리(T자). 뭉툭한 네모는 가방으로 읽힌다(10-25 캡처).
-      const [ex, ey] = at(1);
-      stroke(c, [[hx, hy], [ex, ey]]);
-      c.save();
-      c.translate(ex, ey);
-      c.rotate(Math.atan2(uy, ux));
-      c.fillStyle = IRON;
-      c.fillRect(-2, -5, 5, 10); // 머리 길이 = 자루의 약 40%
-      c.strokeStyle = LINE;
-      c.lineWidth = LINE_W;
-      c.lineJoin = 'round';
-      c.strokeRect(-2, -5, 5, 10);
-      c.restore();
-      break;
-    }
-    case 'crowbar': {
-      // 빠루: 칼의 1.28배 막대(손 뒤로 조금 남김) + 앞끝 갈고리
-      const [bx, by] = at(-0.14);
-      const [fx, fy] = at(1.14);
-      stroke(c, [[bx, by], [fx, fy]]);
-      c.beginPath();
-      c.moveTo(fx, fy);
-      c.quadraticCurveTo(fx + ux * 4, fy + uy * 4, fx + ux * 2 + nx * 5, fy + uy * 2 + ny * 5);
-      c.stroke();
-      circle(c, hx, hy, 1.5);
-      break;
-    }
-    case 'grinder': {
-      // 그라인더: 굵은 짧은 몸통 + 옆 손잡이 + 끝 원판
-      const [ex, ey] = at(0.5);
-      stroke(c, [at(0.18), at(0.18, -5)]);
-      c.lineWidth = LINE_W * 1.7; // 몸통은 졸라맨 선의 2배를 넘지 않는다
-      c.beginPath();
-      c.moveTo(hx, hy);
-      c.lineTo(ex, ey);
-      c.stroke();
-      circle(c, ex + ux * 2, ey + uy * 2, 3.6, DISC);
-      c.fillStyle = LINE;
-      c.beginPath();
-      c.arc(ex + ux * 2, ey + uy * 2, 1, 0, Math.PI * 2);
-      c.fill();
-      break;
-    }
-    default:
-      stroke(c, [[hx, hy], [tx, ty]]);
-      circle(c, hx, hy, 1.5);
-  }
+  swordBody(c, playerWeapon, hx, hy, tx, ty);
 }
 
 // ── 대검 참격 호 ─────────────────────────────────────────────
@@ -1233,42 +1041,54 @@ function buildDead(): PFrame {
   return pframe(cv, FLAT_W / 2, fy + 4, 10, fy - 6);
 }
 
-let playerFrames: Record<PlayerFrameKey, PFrame> | null = null;
+const BUILD: Readonly<Record<PlayerFrameKey, () => PFrame>> = {
+  idle: buildIdle,
+  jump: buildJump,
+  attack0: () => buildAttack(0),
+  attack1: () => buildAttack(1),
+  attack2: () => buildAttack(2),
+  guardG: () => buildGuard(false),
+  guardA: () => buildGuard(true),
+  guardBreak: buildGuardBreak,
+  special: buildSpecial,
+  pinned: buildPinned,
+  dead: buildDead,
+};
 
-function rebuildPlayerFrames(): void {
-  playerFrames = {
-    idle: buildIdle(),
-    jump: buildJump(),
-    attack0: buildAttack(0),
-    attack1: buildAttack(1),
-    attack2: buildAttack(2),
-    guardG: buildGuard(false),
-    guardA: buildGuard(true),
-    guardBreak: buildGuardBreak(),
-    special: buildSpecial(),
-    pinned: buildPinned(),
-    dead: buildDead(),
-  };
+function frameKey(pose: PlayerPose, animTick: number): PlayerFrameKey {
+  switch (pose) {
+    case 'attack':
+      if (animTick < PLAYER.ATTACK_PRE) return 'attack0';
+      if (animTick < PLAYER.ATTACK_PRE + PLAYER.ATTACK_ACTIVE) return 'attack1';
+      return 'attack2';
+    case 'jump': case 'guardG': case 'guardA': case 'guardBreak': case 'special': case 'pinned': case 'dead':
+      return pose;
+    default: return 'idle';
+  }
 }
 
-function pickPlayerFrame(pose: PlayerPose, animTick: number): PFrame {
-  if (!playerFrames) rebuildPlayerFrames(); // 코스메틱 변경 시 지연 재빌드
-  const f = playerFrames!;
-  switch (pose) {
-    case 'idle': return f.idle;
-    case 'jump': return f.jump;
-    case 'attack':
-      if (animTick < PLAYER.ATTACK_PRE) return f.attack0;
-      if (animTick < PLAYER.ATTACK_PRE + PLAYER.ATTACK_ACTIVE) return f.attack1;
-      return f.attack2;
-    case 'guardG': return f.guardG;
-    case 'guardA': return f.guardA;
-    case 'guardBreak': return f.guardBreak;
-    case 'special': return f.special;
-    case 'pinned': return f.pinned;
-    case 'dead': return f.dead;
-    default: return f.idle;
+/** ss배로 구운 프레임 — 처음 쓰는 자세만 그때 굽는다(코스메틱 · 무기를 바꾸면 캐시가 비어 다시 굽는다) */
+function pickPlayerFrame(pose: PlayerPose, animTick: number, ss = SS_MIN): PFrame {
+  let m = frameCache.get(ss);
+  if (!m) {
+    if (frameCache.size >= 2) frameCache.delete(frameCache.keys().next().value!);
+    m = {};
+    frameCache.set(ss, m);
   }
+  const k = frameKey(pose, animTick);
+  let f = m[k];
+  if (!f) {
+    bakeSS = ss;
+    f = m[k] = BUILD[k]();
+  }
+  return f;
+}
+
+/** 지금 변환이 논리 1px을 몇 기기 px로 찍나 → 구울 배율. 판(2 이하)은 늘 2배라 판 도중엔 다시 굽지 않는다 */
+function frameSS(ctx: CanvasRenderingContext2D): number {
+  const m = ctx.getTransform();
+  const sc = Math.hypot(m.a, m.b);
+  return sc <= SS_MIN + 0.5 ? SS_MIN : Math.min(SS_MAX, Math.ceil(sc - 0.25));
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1564,8 +1384,7 @@ export function initSprites(): void {
     renderMatTile(c, VIEW.LANE_W, VIEW.FLOOR_H, mat, 'europe'); // 특수 재질은 테마 무관
     tileCache.set(mat, cv);
   }
-
-  rebuildPlayerFrames();
+  // 졸라맨 프레임은 처음 그릴 때 그 배율로 굽는다(pickPlayerFrame)
 
   entityCache = new Map();
   entityCache.set('bolt', buildBoltIcon());
@@ -1605,11 +1424,11 @@ export function drawPlayer(
   const sheetFrame = playerSheetFrame(pose, animTick);
   if (key) drawAssetHalo(ctx, key, x, footY, sheetFrame); // 종이 오려내기 후광 — 기와 배경에서도 졸라맨이 산다
   if (!key || !drawAsset(ctx, key, x, footY, sheetFrame)) {
-    const frame = pickPlayerFrame(pose, animTick);
-    ctx.imageSmoothingEnabled = true; // 2배 프레임을 절반으로 — 이 save 안에서만
-    const dw = frame.cv.width / SS;
-    const dh = frame.cv.height / SS;
-    const halo = haloFor(frame.cv, 'p', 0, 0, frame.cv.width, frame.cv.height, dw, dh);
+    const frame = pickPlayerFrame(pose, animTick, frameSS(ctx));
+    ctx.imageSmoothingEnabled = true; // ss배 프레임을 논리 크기로 — 이 save 안에서만
+    const dw = frame.cv.width / frame.ss;
+    const dh = frame.cv.height / frame.ss;
+    const halo = haloFor(frame.cv, 'p', 0, 0, frame.cv.width, frame.cv.height, dw, dh, frame.ss); // 후광도 프레임 배율로
     if (halo) drawHalo(ctx, halo, x - frame.ax, footY - frame.ay);
     ctx.drawImage(frame.cv, x - frame.ax, footY - frame.ay, dw, dh);
   }

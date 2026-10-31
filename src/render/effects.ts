@@ -11,19 +11,30 @@
 import type { FallingStack, GameState, ItemId, JuiceEvent, WeaponId } from '../core/types';
 import { DEBRIS, JUICE, JUICE_SYS, PALETTE, TICK, VIEW } from '../config';
 import { drawAsset } from './assets';
-import { bladeReact, resetBladeFx, updateBladeFx } from './bladeFx';
+import { bladeReact, resetBladeFx, tierK, updateBladeFx } from './bladeFx';
 import { stackScale } from './feel';
+import { enso, inkBlot, inkDrop, inkSplat, popScale } from './ink';
 import { greatLook } from './sprites';
 
-/** chip = 잉크 외곽선 두른 파편(안전모 조각) · frag = 층 그림을 그대로 든 조각 · puff = 만화 먼지 구름 · star = 타격 별 */
-type Style = 'spark' | 'shard' | 'chip' | 'dust' | 'cream' | 'ring' | 'pollen' | 'frag' | 'puff' | 'star';
+/**
+ * chip = 잉크 외곽선 두른 파편(안전모 조각) · frag = 층 그림을 그대로 든 조각 · puff = 만화 먼지 구름 · star = 타격 별
+ * — 먹 한 획(ink.ts): ink = 먹 방울 · splat = 땅에 번진 먹 · blot = 친 자리에 터진 먹 · enso = 붓으로 그은 원
+ */
+type Style = 'spark' | 'shard' | 'chip' | 'dust' | 'cream' | 'ring' | 'pollen' | 'frag' | 'puff' | 'star'
+  | 'ink' | 'splat' | 'blot' | 'enso';
 
-/** 그리는 순서 — 조각·파편이 뒤, 먼지 구름이 가운데, 불꽃·별·링이 맨 앞 */
+/** 그리는 순서 — 조각·파편·엔소가 뒤, 먼지 구름이 가운데, 불꽃·별·먹 방울이 맨 앞 */
 const LAYER: Record<Style, number> = {
-  frag: 0, shard: 0, chip: 0, cream: 0, dust: 1, puff: 1, spark: 2, ring: 2, star: 2, pollen: 2,
+  frag: 0, shard: 0, chip: 0, cream: 0, enso: 0, splat: 0, blot: 0, dust: 1, puff: 1,
+  spark: 2, ring: 2, star: 2, pollen: 2, ink: 2,
 };
-/** 층 조각·먼지 구름 — 건물과 같은 층이라 졸라맨을 가리지 않게 플레이어보다 먼저 그린다(drawBackEffects). 화면 고정으로는 안 뿌린다. */
-const BACK: ReadonlySet<Style> = new Set<Style>(['frag', 'puff']);
+/**
+ * 층 조각·먼지 구름·먹 터짐 — 건물과 같은 층이라 졸라맨을 가리지 않게 플레이어보다 먼저 그린다(drawBackEffects).
+ * 먹 터짐은 맞은 건물 밑면에 튄 먹이다(머리 위에서 졸라맨을 덮지 않는다). 화면 고정으로는 안 뿌린다.
+ */
+const BACK: ReadonlySet<Style> = new Set<Style>(['frag', 'puff', 'blot']);
+/** 제자리에서 모양만 바뀌는 것 — 적분하지 않는다 */
+const STILL: ReadonlySet<Style> = new Set<Style>(['ring', 'enso', 'blot', 'splat']);
 
 interface Particle {
   alive: boolean;
@@ -46,12 +57,14 @@ interface Particle {
   drag: number;
   /** puff·star 모양을 정하는 수 */
   seed: number;
-  /** frag: 구운 조각 캔버스(FRAG_SS배) · 그 안의 기준점(무게중심) · 논리 크기 */
+  /** frag: 구운 조각 캔버스(FRAG_SS배) · 그 안의 기준점(무게중심) · 논리 크기 — enso: w = 획 굵기 · h = 세로 배율 */
   img: HTMLCanvasElement | null;
   ax: number;
   ay: number;
   w: number;
   h: number;
+  /** 둘째 색 — enso: 베는 순간(앞 12%)만 이 색으로 그린다(노랑 = 베는 순간) · ink: 땅에 닿으면 번진다(빈 문자열 = 안 번짐) */
+  c2: string;
 }
 
 const POOL = JUICE_SYS.PARTICLE_POOL;
@@ -73,6 +86,7 @@ function blank(): Particle {
     drag: 0,
     seed: 0,
     img: null, ax: 0, ay: 0, w: 0, h: 0,
+    c2: '',
   };
 }
 
@@ -126,7 +140,7 @@ function fill(
   vx: number, vy: number, g: number,
   life: number, size: number,
   color: string,
-  extra?: { rot?: number; spin?: number; bounce?: number; drag?: number; seed?: number },
+  extra?: { rot?: number; spin?: number; bounce?: number; drag?: number; seed?: number; c2?: string },
 ): Particle {
   const p = take();
   if (p.img) releaseFrag(p); // 풀이 넘쳐 살아 있던 조각 칸을 덮을 때 — 캔버스를 먼저 돌려받는다
@@ -146,6 +160,7 @@ function fill(
   p.fixed = spawnFixed;
   p.drag = extra?.drag ?? 0;
   p.seed = extra?.seed ?? 0;
+  p.c2 = extra?.c2 ?? '';
   return p;
 }
 
@@ -296,6 +311,69 @@ function puffs(x: number, y: number, n: number, spreadX: number, size: number, o
 /** 타격 별 — 노랑 별 + 흰 속 + 잉크 외곽. 몇 프레임만 튀었다 사라진다. */
 function star(x: number, y: number, r: number, life: number): void {
   fill('star', x, y, 0, 0, 0, life, r, PALETTE.YELLOW, { rot: n01() * Math.PI, seed: n01() * 1000 });
+}
+
+// ── 먹 한 획 — 먹 방울 · 먹 터짐 · 엔소(모양은 ink.ts). 옅어지지 않고 줄고 마른다 ──
+// 무게 위계: 타격(작은 먹 터짐 · 방울 몇) < 층 붕괴·가드·피격(땅에 눕는 엔소 · 번지는 방울) < 완파·필살·격파(겹 엔소 · 먹 왕관).
+// 노랑은 베는 순간만 — 엔소의 노랑 획은 앞 12%뿐이고 곧 먹으로 바뀐다.
+
+/** 먹 방울 n개 — a0~a1 방향, s0~s1 속도. lands = 땅에 닿으면 번진다(큰 순간만 — 연타마다 땅이 얼룩지면 지저분하다) */
+function drops(x: number, y: number, n: number, a0: number, a1: number, s0: number, s1: number, r: number, life: number, lands = false): void {
+  for (let i = 0; i < n; i++) {
+    const a = a0 + (a1 - a0) * n01();
+    const sp = s0 + (s1 - s0) * n01();
+    fill('ink', x + signed() * 4, y + signed() * 3, Math.cos(a) * sp, Math.sin(a) * sp, 1500,
+      life * (0.75 + n01() * 0.5), r * (0.55 + n01() * 0.75), PALETTE.INK, { drag: 0.8, c2: lands ? PALETTE.INK : '' });
+  }
+}
+
+/** 친 자리에 터진 먹 — 맞은 밑면에 묻는다(BACK, 졸라맨 뒤) */
+function blot(x: number, y: number, R: number, life: number): void {
+  fill('blot', x, y, 0, 0, 0, life, R, PALETTE.INK, { seed: n01() * 1000 });
+}
+
+/** 흰 별 「깡」 — 먹 테 두른 흰 타격 별(맨 앞). 막아 낸 순간 · 안전모가 깨진 순간 — 노랑 별(벤 순간)과 짝 */
+function clang(x: number, y: number, r: number, life: number): void {
+  fill('star', x, y, 0, 0, 0, life, r, FLASH_WHITE, { rot: n01() * Math.PI, seed: n01() * 1000 });
+}
+
+/** 엔소 충격파 — r0에서 grow만큼 퍼지며 붓이 한 바퀴를 긋고 시작점부터 마른다. w = 굵기 · flat = 세로 배율 · core = 베는 순간 색 */
+function ensoAt(x: number, y: number, r0: number, grow: number, life: number, w: number, flat = 1, core = ''): void {
+  const p = fill('enso', x, y, 0, 0, grow, life, r0, PALETTE.INK, { rot: n01() * Math.PI * 2, spin: signed() * 0.8, seed: n01() * 1000, c2: core });
+  p.w = w;
+  p.h = flat;
+}
+
+/** 타격 — 맞은 밑면에 작은 먹 터짐, 방울이 위로 튄다. 콤보 단(k)이 오르면 방울이 늘고 100부터 작은 엔소가 휙 */
+function inkHit(x: number, y: number, k: number): void {
+  blot(x + signed() * 6, y + 2, 4.5 + 2 * k, 0.12); // 연타라 작고 짧게 — 머리 위가 늘 시커멓지 않게
+  drops(x, y, Math.round(2 + 2 * k), -Math.PI / 2 - 1.1, -Math.PI / 2 + 1.1, 180, 360 + 60 * k, 2.4, 0.3);
+  if (k >= 1.5) ensoAt(x, y - 4, 8, 22 + 10 * k, 0.2, 3.5);
+}
+
+/** 층 붕괴 — 큰 먹 터짐 · 땅에 떨어져 번지는 방울 · 층 밑면을 따라 눕는 엔소 */
+function inkCollapse(x: number, y: number, k: number): void {
+  blot(x + signed() * 8, y + 2, 12 + 2 * k, 0.2);
+  drops(x, y, Math.round(5 + 3 * k), -Math.PI / 2 - 1.35, -Math.PI / 2 + 1.35, 240, 520, 3, 0.65, true);
+  ensoAt(x, y + 2, 20, 110 + 20 * k, 0.32, 6, 0.3);
+}
+
+/** 가드 — 막힌 자리에 흰 별 · 밑면을 따라 좌우로 쳐내는 굵은 획 · 눕는 엔소 · 옆으로 튀는 방울 */
+function parry(x: number, y: number, air: boolean): void {
+  const k = air ? 1.2 : 1;
+  clang(x, y, 15 * k, 0.12);
+  ensoAt(x, y, 16, 96 * k, 0.3, 7 * k, 0.28);
+  for (const d of [-1, 1]) {
+    fill('spark', x + d * 12, y + 1, d * 620 * k, -24, 0, 0.07, 20, PALETTE.INK); // size > 16 → 굵은 획 · 옅어지기 전에 빠진다
+    drops(x + d * 8, y, 2, d > 0 ? -0.9 : Math.PI + 0.15, d > 0 ? -0.15 : Math.PI + 0.9, 200, 380, 2.4, 0.4);
+  }
+}
+
+/** 피격·깔림 — 발밑에 눕는 큰 엔소 · 양옆으로 밀려 나오는 먼지 구름 · 번지는 방울 몇 */
+function crush(x: number, footY: number): void {
+  ensoAt(x, footY - 2, 26, 120, 0.36, 9, 0.22);
+  puffs(x, footY - 6, 4, VIEW.LANE_W * 0.42, 12, 210, 0.5);
+  drops(x, footY - 10, 4, -Math.PI + 0.2, -0.2, 160, 340, 2.6, 0.45, true);
 }
 
 function sparks(x: number, y: number, n: number, color: string, spread: number, up: number): void {
@@ -611,8 +689,11 @@ function pollen(x: number, y: number, n: number): void {
 function burst(kind: string, x: number, y: number, count: number, mat?: string): void {
   switch (kind) {
     case 'hit':
-    case 'bossHit':
       sparks(x, y, count, PALETTE.INK, 170, 140);
+      return;
+    case 'bossHit': // 보스 몸이 먹 터짐(BACK)을 가린다 — 방울만 맨 앞으로
+      sparks(x, y, count, PALETTE.INK, 170, 140);
+      drops(x, y, 3, -Math.PI / 2 - 1.2, -Math.PI / 2 + 1.2, 180, 360, 2.4, 0.3);
       return;
     case 'floorCollapse':
       shards(x, y, count, mat, 1);
@@ -624,9 +705,10 @@ function burst(kind: string, x: number, y: number, count: number, mat?: string):
       cream(x, y, count);
       return;
     case 'special': {
-      fill('ring', x, y, 0, 0, 90, 0.28, 36, PALETTE.YELLOW);
-      fill('ring', x, y, 0, 0, 160, 0.40, 72, PALETTE.YELLOW);
-      fill('ring', x, y, 0, 0, 240, 0.55, 110, PALETTE.YELLOW);
+      // 예비동작 동안 그어 둔 엔소가 터져 나간다 — 첫 획은 노랑(베는 순간), 안쪽 둘째 획은 먹. 먹 왕관이 사방으로
+      ensoAt(x, y, 34, 210, 0.58, 16, 1, PALETTE.YELLOW);
+      if (!spawnFixed) ensoAt(x, y, 14, 120, 0.42, 9); // 안쪽 둘째 획은 졸라맨 쪽만 — 가운데까지 겹이면 화면이 막힌다
+      drops(x, y, 12, 0, Math.PI * 2, 260, 640, 3.4, 0.6, !spawnFixed);
       radial(x, y, count, PALETTE.INK);
       sparks(x, y, Math.max(12, count >> 1), PALETTE.YELLOW, 280, 240);
       const slashN = 8 + Math.min(4, (count / 12) | 0);
@@ -647,16 +729,17 @@ function burst(kind: string, x: number, y: number, count: number, mat?: string):
     }
     case 'hurt':
       dust(x, y, count);
+      crush(x, y);
       return;
     // 밑면에 머리를 부딪힘 — 위로 튀는 먼지 몇 알. 가드 바운스와 같은 톤(먼지색)이되 더 작게.
     case 'headBonk':
       sparks(x, y, Math.max(3, count >> 1), '#6E695F', 60, 120);
       return;
     case 'guardBounce':
-      sparks(x, y, count, '#6E695F', 70, 180);
+      parry(x, y, false);
       return;
     case 'guardAirBounce':
-      sparks(x, y, count, '#6E695F', 90, 220);
+      parry(x, y, true);
       return;
     case 'bossDefeat': {
       // 링은 defeatRings가 셋을 따로 깐다
@@ -720,7 +803,7 @@ export function updateEffects(dt: number): void {
       if (p.img) releaseFrag(p);
       continue;
     }
-    if (p.style === 'ring') continue;
+    if (STILL.has(p.style)) continue;
     if (p.drag > 0) {
       const k = Math.max(0, 1 - p.drag * step);
       p.vx *= k;
@@ -750,6 +833,16 @@ export function updateEffects(dt: number): void {
       } else {
         p.vy = 0;
       }
+    } else if (p.style === 'ink' && p.c2 && p.vy > 0 && p.y >= ground - 1) {
+      // 땅에 떨어진 먹 방울 — 납작하게 번졌다가 오그라든다
+      p.style = 'splat';
+      p.y = ground - 0.5;
+      p.vx = 0;
+      p.vy = 0;
+      p.size *= 2.4;
+      p.life = 0.3 + n01() * 0.25;
+      p.maxLife = p.life;
+      p.seed = n01() * 1000;
     } else if (p.bounce > 0 && p.vy > 0 && p.y > ground - p.size) {
       p.y = ground - p.size;
       p.vy *= DEBRIS.BOUNCE_VY;
@@ -818,8 +911,16 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     weaponBurst(s.weapon, e.kind, x, y, footY, JUICE[e.kind]?.particles ?? 0, e.mat);
     if (s.gimmick === 'glass') glassBurst(x, y, e.kind === 'floorCollapse' ? JUICE_SYS.GLASS_CHIPS : JUICE_SYS.GLASS_CHIPS_HIT);
     const collapse = e.kind === 'floorCollapse';
+    const k = tierK(e.combo ?? s.combo);
+    if (collapse) inkCollapse(x, y, k);
+    else inkHit(x, y, k);
     star(x + signed() * 10, y - 3, JUICE_SYS.STAR_PX[e.kind], collapse ? 0.18 : 0.12);
     if (collapse) puffs(x, y + 2, JUICE_SYS.PUFF_COLLAPSE, VIEW.LANE_W * 0.36, 12, 120); // 벤 자리(층 밑면)에서 옆으로 밀려 나온다
+    return;
+  }
+  if (e.kind === 'gaugeFull') {
+    // 필살이 찼다 — 몸을 감는 먹 엔소 하나(필살 예비동작이 긋는 원의 예고). 반짝 별은 weaponFx
+    ensoAt(x, VIEW.GROUND_Y - s.player.y - 31, 20, 16, 0.5, 4.5);
     return;
   }
   if (e.kind === 'supply') {
@@ -831,6 +932,8 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   if (e.kind === 'hatBreak') {
     // 흰 파편(잉크 외곽선) 5개 + 남은 수만큼 먼지
     const n = JUICE.hatBreak?.particles ?? 10;
+    clang(x, y, 17, 0.14); // 막아 준 순간 — 흰 별과 작은 엔소
+    ensoAt(x, y, 10, 50, 0.28, 5);
     shards(x, y, 5, undefined, 1.1, HAT_WHITE, 'chip');
     dust(x, y, Math.max(0, n - 5));
     return;
@@ -872,13 +975,15 @@ function iceSparks(x: number, y: number, n: number): void {
   fill('ring', x, y, 0, 0, 70, 0.3, 12, PALETTE.BLUE);
 }
 
-/** 완파 — 층수(n)가 클수록 파편·링이 커진다. 층수 3 이상이면 노랑 링 한 줄이 더 붙는다. */
+/** 완파 — 층수(n)가 클수록 파편·엔소가 커진다. 층수 3 이상이면 노랑으로 긋는 바깥 엔소가 하나 더 붙는다. 먹 왕관이 위로 */
 function stackBurst(x: number, y: number, n?: number): void {
   const k = stackScale(n);
   const count = Math.min(48, Math.round(JUICE.stackDestroy.particles * k));
   shards(x, y, count, undefined, 1.45 + 0.2 * k);
-  fill('ring', x, y, 0, 0, 60 * k, 0.30, 14 * k, PALETTE.INK);
-  if ((n ?? 0) >= JUICE_SYS.STACK_RING_FLOORS) fill('ring', x, y, 0, 0, 110 * k, 0.42, 26 * k, PALETTE.YELLOW);
+  blot(x, y, 15 * k, 0.24);
+  ensoAt(x, y, 18, 70 * k, 0.4, 8 * k);
+  if ((n ?? 0) >= JUICE_SYS.STACK_RING_FLOORS) ensoAt(x, y, 30, 120 * k, 0.5, 11 * k, 1, PALETTE.YELLOW);
+  drops(x, y, Math.round(8 * k), -Math.PI / 2 - 1.5, -Math.PI / 2 + 1.5, 260, 640, 3.4, 0.7, true);
   puffs(x, y, JUICE_SYS.PUFF_DESTROY, VIEW.LANE_W * 0.42, 15 + 3 * k, 150, 0.8);
   star(x, y, JUICE_SYS.STAR_PX.stackDestroy * Math.min(1.3, k), 0.24);
 }
@@ -900,11 +1005,11 @@ function boltStrikeBurst(x: number, groundY: number, n: number): void {
   fill('ring', x, groundY - 2, 0, 0, 44, 0.25, 8, PALETTE.INK);
 }
 
-/** 보스 격파 — 한가운데서 번지는 링 셋(잉크·노랑·잉크, 크기·수명이 달라 겹겹이 읽힌다). */
+/** 보스 격파 — 한가운데서 번지는 엔소 셋(먹 · 노랑으로 긋는 먹 · 먹, 크기·수명이 달라 겹겹이 읽힌다). */
 function defeatRings(x: number, y: number): void {
-  fill('ring', x, y, 0, 0, 90, 0.45, 24, PALETTE.INK);
-  fill('ring', x, y, 0, 0, 150, 0.62, 44, PALETTE.YELLOW);
-  fill('ring', x, y, 0, 0, 230, 0.85, 70, PALETTE.INK);
+  ensoAt(x, y, 24, 90, 0.5, 10);
+  ensoAt(x, y, 44, 150, 0.7, 15, 1, PALETTE.YELLOW);
+  ensoAt(x, y, 70, 230, 0.9, 12);
 }
 
 /** 보스 입장 — 물고 온 층이 부서지는 틱: 파편 + 먼지. y는 월드(화면) 좌표. */
@@ -1066,6 +1171,38 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle, py: number): v
       ctx.stroke();
       return;
     }
+    case 'ink': { // 머리는 끝 35%에만 줄고, 꼬리는 빠를수록 길다(늘어남)
+      ctx.globalAlpha = 1;
+      const r = p.size * Math.min(1, t / 0.35);
+      inkDrop(ctx, p.x, py, r, Math.atan2(p.vy, p.vx), Math.min(16, Math.hypot(p.vx, p.vy) * 0.02) * (r / p.size) + r * 0.4);
+      return;
+    }
+    case 'splat':
+      ctx.globalAlpha = 1;
+      inkSplat(ctx, p.x, py, p.size, Math.pow(t, 0.6), p.seed);
+      return;
+    case 'blot':
+      ctx.globalAlpha = 1;
+      inkBlot(ctx, p.x, py, p.size * popScale(1 - t), p.seed);
+      return;
+    case 'enso': {
+      // 빨리 퍼지다 선다 · 앞 16%에 붓이 한 바퀴를 긋는다 · 30%부터 시작점이 말라 꼬리가 머리를 쫓는다 · 마를수록 세 갈래(비백)
+      ctx.globalAlpha = 1;
+      const u = 1 - t;
+      const r = p.size + p.g * (1 - (1 - u) ** 3);
+      const head = Math.min(1, u / 0.16);
+      const tail = u < 0.3 ? 0 : ((u - 0.3) / 0.7) ** 1.15;
+      const dry = Math.min(1, Math.max(0, (u - 0.18) / 0.45));
+      const w = p.w * (1 - 0.45 * u);
+      const a0 = p.rot + p.spin * (p.maxLife - p.life);
+      if (p.c2 && u < 0.12) {
+        ctx.fillStyle = PALETTE.INK; // 노랑 획엔 먹 테 — 아이보리 위에서도 읽히게
+        enso(ctx, p.x, py, r, w * 1.5 + 2, a0, tail, head, 0, p.h, p.seed);
+        ctx.fillStyle = p.c2;
+      }
+      enso(ctx, p.x, py, r, w, a0, tail, head, dry, p.h, p.seed);
+      return;
+    }
     default: {
       ctx.beginPath();
       ctx.arc(p.x, py, p.size, 0, Math.PI * 2);
@@ -1107,7 +1244,7 @@ function drawPuff(ctx: CanvasRenderingContext2D, p: Particle, py: number, u: num
   ctx.fill();
 }
 
-/** 타격 별 — 들쭉날쭉한 노랑 별 + 잉크 외곽 + 흰 속. 첫 프레임이 가장 크고 줄어든다. */
+/** 타격 별 — 들쭉날쭉한 별(노랑 = 벤 순간 · 흰 = 막은 순간) + 잉크 외곽 + 노랑 별만 흰 속. 첫 프레임이 가장 크고 줄어든다. */
 function drawStar(ctx: CanvasRenderingContext2D, p: Particle, py: number, u: number): void {
   const R = p.size * (1.15 - 0.75 * u);
   const spikes = 10;
@@ -1122,11 +1259,12 @@ function drawStar(ctx: CanvasRenderingContext2D, p: Particle, py: number, u: num
     else ctx.lineTo(sx, sy);
   }
   ctx.closePath();
-  ctx.fillStyle = PALETTE.YELLOW;
+  ctx.fillStyle = p.color;
   ctx.fill();
   ctx.lineWidth = 2;
   ctx.strokeStyle = PALETTE.INK;
   ctx.stroke();
+  if (p.color === FLASH_WHITE) return;
   ctx.beginPath();
   ctx.moveTo(p.x + R * 0.28, py);
   ctx.arc(p.x, py, R * 0.28, 0, Math.PI * 2);

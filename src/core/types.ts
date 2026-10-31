@@ -187,7 +187,7 @@ export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder' | GreatswordId
 /** 대검 — 칼날 모양·색(render/sprites)과 세 칸(config WEAPON)만 다르다. 쥐는 자세는 하나 */
 export type GreatswordId = 'iron' | 'saw' | 'hazard' | 'beam' | 'flame' | 'frost' | 'onyx' | 'gold';
 
-/** 보급 상자에서 나오는 것. 고정 순서로 돈다(config SUPPLY.ROTATION) — 확률 없음. */
+/** 보급품. 상자는 고정 순서로 돈다(config SUPPLY.ROTATION) — 확률 없음. 안전모(hat)는 상자 밖, 콤보로 번다(HAT). */
 export type ItemId = 'gloves' | 'coffee' | 'hat' | 'dust';
 
 /** 타격감 이벤트 — core가 발행, 렌더/오디오/햅틱이 소비 (JUICE 매트릭스 키) */
@@ -197,7 +197,7 @@ export type JuiceKind =
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
-  | 'supply' | 'hatBreak' | 'pinEscape';
+  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape';
 
 export interface JuiceEvent {
   kind: JuiceKind;

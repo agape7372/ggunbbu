@@ -1,10 +1,12 @@
-// 인게임 HUD — DOM 오버레이. 캔버스 drawHud와 정보가 겹치면
-// renderer.ts에서 drawHud 호출을 빼는 패치를 권장(이 파일은 renderer를 건드리지 않음).
+// 인게임 HUD — DOM 오버레이(「먹 한 획」). 위 52 한지 띠 + 먹 밑줄 획, 오른쪽 가운데 콤보.
+// 가드·필살 게이지는 조작 키 안에 그린다(touch.ts setGuardFill · setSpecialFill, 10-31 옆 게이지 걷음).
+// 매 프레임 부르지만 값이 바뀐 칸만 쓴다. 거친 붓 필터는 안 바뀌는 칸(밑줄·일시정지 인장)에만 걸려 있다(style.css).
 
 import type { GameState } from '../core/types';
 import { ACT2, BOSS, CAPTION_MS } from '../config';
 import { ACT2_PHASES, BOSS_NAME, CAPTIONS, hudModeLabel, SCREENS } from '../content';
 import { ICON } from './icons';
+import { fmt } from './ink';
 
 export interface HudApi {
   /** op = 특별작전 한 줄(남은 시간 · 다음 도장). 작전이 아니면 생략 */
@@ -15,7 +17,12 @@ export interface HudApi {
   teach(on: boolean): void;
 }
 
-const pinHint = `${CAPTIONS.pinned}<small>가드: 빠져나오기 · 공격: 아래층 베기</small>`;
+const LIVES = 3;
+const pinHint = `${CAPTIONS.pinned}<small>탈출: 빠져나오기 · 공격: 아래층 베기</small>`;
+
+/** 졸라맨 목숨 하나 — 잃으면 옅은 먹 위에 사선 한 획 */
+const life = (on: boolean): string =>
+  `<svg viewBox="0 0 16 22"${on ? '' : ' class="lost"'} aria-hidden="true"><use href="#g-life"/>${on ? '' : '<path class="xx" d="M1 3 L15 20"/>'}</svg>`;
 
 export function mountHud(
   root: HTMLElement,
@@ -23,52 +30,28 @@ export function mountHud(
 ): HudApi {
   root.innerHTML = `
     <div class="hud">
-      <button type="button" class="hud-pause" aria-label="일시정지">${ICON.pause}</button>
-      <div class="hud-row hud-row-top">
-        <div class="hud-col hud-col-left">
-          <div class="hud-score" data-el="score">00000000</div>
-          <div class="hud-life-row">
-            <div class="hud-lives" data-el="lives"></div>
-            <span class="hud-hat" data-el="hat" role="img" aria-label="안전모" hidden>${ICON.hat}</span>
-          </div>
+      <div class="hud-band"></div>
+      <svg class="hud-line" viewBox="0 0 360 12" preserveAspectRatio="none" aria-hidden="true"><path d="M0 1 Q150 -1 296 3.5 L306 6 L294 8.5 Q150 11 0 11 Z"/></svg>
+      <div class="hud-left">
+        <div class="hud-row1">
+          <span class="hud-zone" data-el="mode"></span>
+          <span class="hud-lives" data-el="lives" role="img"></span>
+          <span class="hud-hat" data-el="hat" role="img" aria-label="안전모" hidden>${ICON.hat}</span>
         </div>
-        <div class="hud-col hud-col-mid">
-          <div class="hud-mode" data-el="mode"></div>
-          <div class="hud-floor" data-el="floor"></div>
-        </div>
-        <div class="hud-col hud-col-right">
-          <div class="hud-combo" data-el="combo"></div>
-          <div class="hud-gauges">
-            <div class="gauge-row">
-              <span class="gauge-label">가드</span>
-              <div class="bar bar-guard">
-                <span class="ghost" data-el="guard-ghost"></span>
-                <span class="fill" data-el="guard-fill"></span>
-              </div>
-            </div>
-            <div class="gauge-row">
-              <span class="gauge-label">필살</span>
-              <div class="bar bar-waza" data-el="waza-bar">
-                <span class="ghost" data-el="waza-ghost"></span>
-                <span class="fill" data-el="waza-fill"></span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="hud-floor" data-el="floor"></div>
       </div>
+      <div class="hud-score" data-el="score">0</div>
+      <button type="button" class="inkseal hud-pause" aria-label="일시정지"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M4 2 L11 2 L10 24 L3 24 Z"/><path d="M15 2 L22 2 L23 24 L16 24 Z"/></svg></button>
       <div class="hud-op" data-el="op" hidden></div>
       <div class="hud-boss" data-el="boss" hidden>
         <span class="hud-boss-label" data-el="boss-label">${BOSS_NAME}</span>
-        <div class="bar bar-boss">
-          <span class="fill" data-el="boss-fill"></span>
-        </div>
+        <div class="boss-bar"><i class="fill" data-el="boss-fill"></i><svg viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true"><path d="M1 1.5 L99 1 L99.5 13 L.5 13.4 Z"/></svg></div>
       </div>
       <div class="hud-bonus" data-el="bonus" hidden></div>
-      <div class="hud-cap" data-el="cap" hidden>${CAPTIONS.combo999}</div>
+      <div class="hud-cap" data-el="cap" hidden></div>
       <div class="hud-note" data-el="note" role="status" hidden></div>
       <div class="hud-teach" data-el="teach" hidden>${SCREENS.teach.guard}<small>${SCREENS.teach.guardSub}</small></div>
       <div class="hud-pin" data-el="pin" hidden>${pinHint}</div>
-      <div class="hud-waza-ready" data-el="ready" hidden></div>
     </div>
   `;
 
@@ -78,19 +61,12 @@ export function mountHud(
   const hatEl = el('hat');
   const modeEl = el('mode');
   const floorEl = el('floor');
-  const comboEl = el('combo');
-  const guardFill = el('guard-fill');
-  const guardGhost = el('guard-ghost');
-  const wazaFill = el('waza-fill');
-  const wazaGhost = el('waza-ghost');
-  const wazaBar = el('waza-bar');
   const bossWrap = el('boss');
   const bossFill = el('boss-fill');
   const bossLabel = el('boss-label');
   const bonusEl = el('bonus');
   const capEl = el('cap');
   const pinEl = el('pin');
-  const readyEl = el('ready');
   const opEl = el('op');
   const noteEl = el('note');
   const teachEl = el('teach');
@@ -100,7 +76,6 @@ export function mountHud(
   let teaching = false;
 
   capEl.textContent = CAPTIONS.combo999;
-  readyEl.textContent = CAPTIONS.specialReady;
 
   const pauseBtn = root.querySelector('.hud-pause') as HTMLButtonElement;
   pauseBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
@@ -113,42 +88,11 @@ export function mountHud(
   let lastScore = -1;
   let lastLives = -1;
   let lastHat: boolean | null = null;
-  let lastCombo = -1;
+  let lastCap = false;
   let lastMode = '';
   let lastFloor = '';
   let lastBonus = '';
   let lastBoss = '';
-  let comboPunchTimer = 0;
-  // 게이지: 매 프레임 style.width를 다시 쓰면 레이아웃이 매 프레임 무효화된다(08-30 실측).
-  // 정수 %가 바뀔 때만 쓴다.
-  let lastG = -1;
-  let lastW = -1;
-  // 고스트(지연 추격)는 CSS transition으로 하면 매 프레임 목표값이 다시 쓰여 트랜지션이
-  // 계속 재시작돼 화면에 아무것도 안 나온다 — JS에서 감쇠값을 직접 굴린다.
-  let ghostG = 0;
-  let ghostW = 0;
-  let lastGhostG = -1;
-  let lastGhostW = -1;
-  // punch 애니메이션 재시작에 쓰던 void offsetWidth(강제 동기 리플로우)를 없애고
-  // 같은 키프레임을 가리키는 클래스 2개를 번갈아 단다.
-  let punchAlt = false;
-
-  /** 값이 오르면 즉시 따라가고, 내려갈 때만 프레임당 GHOST_DECAY_PCT 씩 천천히 내려온다. */
-  const GHOST_DECAY_PCT = 1.6;
-  function chaseGhost(prev: number, v: number): number {
-    if (v >= prev) return v;
-    return Math.max(v, prev - GHOST_DECAY_PCT);
-  }
-
-  function livesHtml(n: number): string {
-    let s = '';
-    for (let i = 0; i < 3; i++) s += `<i class="life${i < n ? ' on' : ''}"></i>`;
-    return s;
-  }
-
-  function modeText(s: GameState): string {
-    return hudModeLabel(s.mode, s.chapter, s.act2Phase);
-  }
 
   function floorText(s: GameState): string {
     if (s.mode === 'act2' && s.act2Phase === 'bolt' && s.act2c) {
@@ -171,7 +115,6 @@ export function mountHud(
       window.clearTimeout(noteTimer);
       noteEl.textContent = text;
       noteEl.hidden = false;
-      // 클래스 2개를 번갈아 달아 같은 키프레임을 강제 리플로우 없이 재시작한다
       noteAlt = !noteAlt;
       noteEl.classList.toggle('in-a', noteAlt);
       noteEl.classList.toggle('in-b', !noteAlt);
@@ -190,85 +133,38 @@ export function mountHud(
       }
       if (s.score !== lastScore) {
         lastScore = s.score;
-        // 앞자리 0은 흐리게(.z) — 실제 자릿수만 읽히게
-        const digits = String(s.score);
-        const pad = Math.max(0, 8 - digits.length);
-        scoreEl.innerHTML = `<span class="z">${'0'.repeat(pad)}</span>${digits}`;
+        scoreEl.textContent = fmt(s.score);
+        scoreEl.classList.toggle('long', s.score >= 10_000_000);
       }
       if (s.lives !== lastLives) {
         lastLives = s.lives;
-        livesEl.innerHTML = livesHtml(s.lives);
-        // 마지막 하나만 빨강 — 빨강을 아껴야 위험 신호로 읽힌다(ART_DIRECTION).
-        livesEl.dataset.last = s.lives === 1 ? '1' : '';
+        let h = '';
+        for (let i = 0; i < LIVES; i++) h += life(i < s.lives);
+        livesEl.innerHTML = h;
+        livesEl.setAttribute('aria-label', `목숨 ${Math.max(0, s.lives)}/${LIVES}`);
       }
-
       if (s.hat !== lastHat) {
         lastHat = s.hat;
         hatEl.hidden = !s.hat;
       }
 
-      const mt = modeText(s);
+      const mt = hudModeLabel(s.mode, s.chapter, s.act2Phase);
       if (mt !== lastMode) {
         lastMode = mt;
         modeEl.textContent = mt;
       }
-
       const ft = floorText(s);
       if (ft !== lastFloor) {
         lastFloor = ft;
         floorEl.textContent = ft;
       }
 
-      if (s.combo !== lastCombo) {
-        const rose = s.combo > lastCombo && s.combo > 0;
-        const broke = lastCombo > 0 && s.combo === 0;
-        lastCombo = s.combo;
-        comboEl.innerHTML = s.combo > 0 ? `${s.combo}<small>콤보</small>` : '';
-        comboEl.classList.toggle('hot', s.combo >= 500 && s.combo < 999);
-        comboEl.classList.toggle('mid', s.combo >= 100 && s.combo < 500);
-        comboEl.classList.toggle('hi', s.combo >= 50 && s.combo < 100);
-        comboEl.classList.toggle('cap', s.combo >= 999);
-        comboEl.classList.toggle('broke', broke);
-        if (rose) {
-          // 클래스 2개를 번갈아 달아 애니메이션을 재시작한다 — 강제 리플로우 없이 같은 효과.
-          punchAlt = !punchAlt;
-          comboEl.classList.toggle('punch', punchAlt);
-          comboEl.classList.toggle('punch-b', !punchAlt);
-          window.clearTimeout(comboPunchTimer);
-          comboPunchTimer = window.setTimeout(() => {
-            comboEl.classList.remove('punch');
-            comboEl.classList.remove('punch-b');
-          }, 90);
-        }
-        capEl.hidden = s.combo < 999;
+      // 콤보 수는 판 위 타격 자리에 캔버스로 찍는다(renderer 콤보 도장) — HUD엔 999 카운터스톱 자막만
+      const cap = s.combo >= 999;
+      if (cap !== lastCap) {
+        lastCap = cap;
+        capEl.hidden = !cap;
       }
-
-      const g = Math.max(0, Math.min(100, s.guardGauge));
-      const w = Math.max(0, Math.min(100, s.wazaGauge));
-      const gi = Math.round(g);
-      const wi = Math.round(w);
-      if (gi !== lastG) {
-        lastG = gi;
-        guardFill.style.width = `${gi}%`;
-      }
-      if (wi !== lastW) {
-        lastW = wi;
-        wazaFill.style.width = `${wi}%`;
-      }
-      ghostG = chaseGhost(ghostG, g);
-      ghostW = chaseGhost(ghostW, w);
-      const ggi = Math.round(ghostG);
-      const gwi = Math.round(ghostW);
-      if (ggi !== lastGhostG) {
-        lastGhostG = ggi;
-        guardGhost.style.width = `${ggi}%`;
-      }
-      if (gwi !== lastGhostW) {
-        lastGhostW = gwi;
-        wazaGhost.style.width = `${gwi}%`;
-      }
-      wazaBar.classList.toggle('full', w >= 100);
-      readyEl.hidden = w < 100;
 
       if (s.boss && s.act2Phase === 'moon') {
         const key = `${s.boss.hp}`;
@@ -276,7 +172,7 @@ export function mountHud(
           lastBoss = key;
           bossWrap.hidden = false;
           bossLabel.textContent = `${BOSS_NAME} ${s.boss.hp}`;
-          bossFill.style.width = `${(100 * s.boss.hp) / BOSS.HP}%`;
+          bossFill.style.transform = `scaleX(${Math.max(0, s.boss.hp) / BOSS.HP})`;
         }
       } else if (!bossWrap.hidden) {
         bossWrap.hidden = true;

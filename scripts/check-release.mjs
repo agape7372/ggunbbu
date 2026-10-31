@@ -12,6 +12,7 @@ const UNIT_RE = /^ca-app-pub-\d{16}\/\d{10}$/;
 /** env를 받아 문제 목록을 돌려준다. 빈 배열이면 통과. 릴리스 모드가 아니면 항상 빈 배열. */
 export function checkRelease(env) {
   if (env.GUNBBU_RELEASE !== '1') return [];
+  if (env.VITE_TESTER === '1') return ['VITE_TESTER=1 이 켜져 있다 — 시험판 디버그 메뉴(전해금)가 릴리스에 실린다'];
   const id = (env.VITE_ADMOB_REWARDED_ID ?? '').trim();
   if (!id) return ['VITE_ADMOB_REWARDED_ID 가 비어 있다 — 비면 앱이 테스트 보상형 광고 단위로 돌아간다'];
   if (id.includes(TEST_PUBLISHER)) return ['VITE_ADMOB_REWARDED_ID 가 Google 테스트 단위다 — 실제 발급 값을 넣을 것'];

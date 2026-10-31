@@ -97,7 +97,7 @@ npx @capacitor/assets generate --android \
 Android 12+ 시스템 스플래시와 androidx 호환 경로(API 24~30)가 같은 두 값을 쓴다.
 `drawable/splash.png`와 `drawable-{land,port}-*/splash.png`는 구형 템플릿 호환용으로 **남겨 둔** 파일이다.
 `BridgeActivity`가 곧바로 `AppTheme.NoActionBar`로 바꾸므로 사실상 보이지 않는다. 위 `@capacitor/assets` 명령으로
-다시 만들지 않는다 — PNG 재생성은 `scripts/gen-native-icons.mjs`. 아이콘 원본은 `assets/icon/`에 버전관리.
+다시 만들지 않는다 — PNG 재생성은 `scripts/gen-native-icons.mjs`(런처·스플래시·웹·스토어 아이콘 전부). 아이콘 원본은 `assets/brand/src/gunbbu-icon.svg` 하나(10-31 「먹 한 획」으로 교체).
 
 ## 5. 서명·키스토어 (★미생성 — 사용자 작업)
 

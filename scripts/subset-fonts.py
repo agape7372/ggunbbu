@@ -2,9 +2,10 @@
 
     python scripts/subset-fonts.py <원본 TTF 폴더>
 
-원본(OFL, Google Fonts 저장소)은 레포에 넣지 않는다(합계 7MB). 폴더에 아래 파일명이 있어야 한다:
+원본(OFL, Google Fonts 저장소)은 레포에 넣지 않는다(합계 27MB). 폴더에 아래 파일명이 있어야 한다:
   BlackHanSans-Regular.ttf · IBMPlexSansKR-Medium.ttf · IBMPlexSansKR-Bold.ttf ·
-  IBMPlexMono-Medium.ttf · IBMPlexMono-Bold.ttf
+  IBMPlexMono-Medium.ttf · IBMPlexMono-Bold.ttf ·
+  EastSeaDokdo-Regular.ttf · GowunBatang-Regular.ttf · GowunBatang-Bold.ttf
 
 출력: public/fonts/*.woff2 + src/assets/font-glyphs.json(서브셋에 넣은 글자 목록).
 tests/font-glyphs.test.mjs 가 소스 글자 ⊆ 목록을 검사한다 — 새 문구를 넣고 테스트가 깨지면 이 스크립트를 다시 돌린다.
@@ -33,6 +34,10 @@ FONTS = [
     ('IBMPlexSansKR-Bold.ttf', 'ui-700.woff2', True, 'Gunbbu Sans'),
     ('IBMPlexMono-Medium.ttf', 'mono-500.woff2', False, 'Gunbbu Mono'),
     ('IBMPlexMono-Bold.ttf', 'mono-700.woff2', False, 'Gunbbu Mono'),
+    # UI 「먹 한 획」(2026-10-31): 붓글씨 = 동해독도, 본문 = 고운바탕. 둘 다 예약 이름이 없어 그대로 둔다.
+    ('EastSeaDokdo-Regular.ttf', 'brush.woff2', True, None),
+    ('GowunBatang-Regular.ttf', 'body-400.woff2', True, None),
+    ('GowunBatang-Bold.ttf', 'body-700.woff2', True, None),
 ]
 
 

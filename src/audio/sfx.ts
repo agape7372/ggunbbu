@@ -10,7 +10,7 @@ export type SfxName =
   | 'rockWhistle' | 'rockLand' | 'bossTele' | 'bossPbTele'
   | 'zap' | 'zap2' | 'zap3'
   | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect'
-  | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak'
+  | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak' | 'hatGet'
   | 'hitLow' | 'hitTick' | 'incoming' | 'specialCharge' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd';
 
 export type BgmTrack = 'title' | 'act1' | 'act2a' | 'butter' | 'bolt' | 'boss' | 'ending';
@@ -304,6 +304,14 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
     playOsc(ctx, dest, t, 'triangle', 1200, 0.14, 0.4, rate, { freqEnd: 800, attack: 0.001 });
     playOsc(ctx, dest, t, 'square', 1800, 0.06, 0.15, rate, { freqEnd: 1300, attack: 0.001 });
     playNoise(ctx, dest, t + 0.03, 0.12, 0.25, { filterType: 'highpass', freqStart: 2500 });
+  },
+
+  // 안전모가 머리에 씌워짐 — 플라스틱 '똑' + 금속 '팅' + 두 음 차임. 받기 연출이 머리에 닿는 박자에 늦춰 낸다(consume.ts)
+  hatGet: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'square', 900, 0.03, 0.18, rate, { freqEnd: 500, attack: 0.001 });
+    playOsc(ctx, dest, t + 0.01, 'triangle', 1568, 0.16, 0.3, rate, { freqEnd: 1480, attack: 0.001 });
+    playOsc(ctx, dest, t + 0.08, 'sine', 1046.5, 0.1, 0.24, rate, { attack: 0.004 });
+    playOsc(ctx, dest, t + 0.15, 'sine', 1567.98, 0.18, 0.26, rate, { attack: 0.004 });
   },
 
   // 헛스윙 — 타격보다 얇고 짧게 (slash 이벤트)

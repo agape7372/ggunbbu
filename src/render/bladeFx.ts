@@ -297,7 +297,7 @@ interface Recipe {
   tint?: fx.FlashStage;
 }
 
-const RECIPES: Record<GreatLook['shape'], Recipe> = {
+export const RECIPES: Record<GreatLook['shape'], Recipe> = {
   // 무쇠 — 군더더기 없이 묵직하게: 쇠 불꽃 · 잉크 고리 · 쇳조각
   plain: {
     cut: (g) => [g.guard, g.hi],

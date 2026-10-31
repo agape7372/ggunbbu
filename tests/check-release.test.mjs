@@ -21,6 +21,8 @@ it('릴리스 모드: 빈 값·테스트 단위·잘못된 형식은 실패, 실
   expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: TEST })[0]).toMatch(/테스트/);
   expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: 'abc' })[0]).toMatch(/형식/);
   expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: REAL })).toEqual([]);
+  expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: REAL, VITE_TESTER: '1' })[0]).toMatch(/VITE_TESTER/);
+  expect(checkRelease({ VITE_TESTER: '1' })).toEqual([]); // 시험판(릴리스 아님)은 통과
 });
 
 it('명령줄: 릴리스 모드 + 테스트 단위는 종료 코드 1, 평소엔 0', () => {

@@ -1,10 +1,12 @@
 import { SAVE_KEY } from './config';
+import { sanitizeLayout, type ButtonLayout } from './input/layout';
 import {
   DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, enforceOwnedLoadout, sanitizeOwned, validateLoadout, type Loadout,
 } from './meta/loadout';
 import { initAchieveProgress, type DailyState, type MissionProgress } from './meta/missions';
 import { LICENSE_EXAMS } from './meta/economy';
-import { emptyMask, isMaskArt } from './meta/mask';
+import { emptyMask, isMaskArt, loadMaskBook } from './meta/mask';
+import type { MaskEntry } from './meta/types';
 import { isOpGrade, isOpId, type OpGrade, type OpId } from './meta/ops';
 
 export interface SaveSettings {
@@ -15,6 +17,8 @@ export interface SaveSettings {
   flashLevel: 0 | 1 | 2; // 화면 번쩍임 — 0=off 1=약 2=기본
   bgm: boolean; // 음악 (sound = 전체 음소거가 우선)
   sfx: boolean; // 효과음
+  /** 조작 키 배치 — 오른손 기준 무대 좌표(input/layout.ts). 없으면 기본 배치(무버전 추가 키) */
+  buttonLayout?: ButtonLayout;
 }
 
 export interface SaveData {
@@ -39,7 +43,9 @@ export interface SaveData {
   stats: { buildings: number; runs: number }; // 평생 누적 — 철거 자격 조건 · 첫 판 판별 (무버전 추가 키)
   license: number; // 철거 자격 등급 0(견습)~3(1급) (무버전 추가 키)
   opsGrade: Partial<Record<OpId, OpGrade>>; // 특별작전 최고 도장 (무버전 추가 키)
-  maskArt: string; // 도트판 그림 — 상점 마스크, 형식은 meta/mask.ts 머리 주석 (무버전 추가 키)
+  maskArt: string; // 고른 가면의 그림(파생) — 형식은 meta/mask.ts 머리 주석 (무버전 추가 키)
+  masks: MaskEntry[]; // 내 가면 목록(최대 8장). 옛 저장은 loadMaskBook이 maskArt에서 옮긴다 (무버전 추가 키)
+  maskId: string; // 고른 가면 id — 쓰는지는 loadout.mask (무버전 추가 키)
 }
 
 export const DEFAULT_SAVE: SaveData = {
@@ -73,6 +79,8 @@ export const DEFAULT_SAVE: SaveData = {
   license: 0,
   opsGrade: {},
   maskArt: emptyMask(),
+  masks: [],
+  maskId: '',
 };
 
 const BAK_KEY = `${SAVE_KEY}.bak`;
@@ -121,6 +129,10 @@ function normalize(raw: Record<string, unknown>): SaveData {
   // 마이그레이션 후 필드 검증이 살릴 수 있는 만큼 살린다(clamp — 버리지 않는다).
   const data = migrate(raw);
   const owned = sanitizeOwned(data.owned); // BL-13: 카탈로그 교집합
+  // 깨진 그림은 빈 판으로 — 장착·소유는 그대로
+  const book = loadMaskBook(data.masks, data.maskId, isMaskArt(data.maskArt) ? data.maskArt : emptyMask(), owned.includes('mask'));
+  let loadout = enforceOwnedLoadout(validateLoadout(data.loadout), owned);
+  if (loadout.mask === 'mask' && !book.maskId) loadout = { ...loadout, mask: 'none' }; // 쓸 가면이 없다
   return {
     v: 1,
     bestArcade: num(data.bestArcade, DEFAULT_SAVE.bestArcade, 99_999_999),
@@ -135,7 +147,7 @@ function normalize(raw: Record<string, unknown>): SaveData {
     dust: num(data.dust, 0),
     orbit: num(data.orbit, 0),
     owned,
-    loadout: enforceOwnedLoadout(validateLoadout(data.loadout), owned),
+    loadout,
     daily: isDailyState(data.daily) ? data.daily : null,
     achieves: Array.isArray(data.achieves) ? data.achieves.filter(isProgress) : initAchieveProgress(),
     howtoSeen: typeof data.howtoSeen === 'boolean' ? data.howtoSeen : DEFAULT_SAVE.howtoSeen,
@@ -143,7 +155,7 @@ function normalize(raw: Record<string, unknown>): SaveData {
     stats: validateStats(data.stats),
     license: num(data.license, 0, LICENSE_EXAMS.length),
     opsGrade: validateOpsGrade(data.opsGrade),
-    maskArt: isMaskArt(data.maskArt) ? data.maskArt : emptyMask(), // 깨진 그림은 빈 판으로 — 장착·소유는 그대로
+    ...book,
   };
 }
 
@@ -207,8 +219,10 @@ function validateSettings(settings: unknown): SaveSettings {
   }
 
   const s = settings as Record<string, unknown>;
+  const buttonLayout = sanitizeLayout(s.buttonLayout);
 
   return {
+    ...(buttonLayout ? { buttonLayout } : {}),
     sound:
       typeof s.sound === 'boolean' ? s.sound : DEFAULT_SAVE.settings.sound,
     vibration:
@@ -254,12 +268,19 @@ function clampButterBest(v: unknown): Record<number, number> {
 }
 
 
+let frozen = false;
+
+/** 이 페이지에선 더 저장하지 않는다 — 새로고침 직전(디버그 전해금)에 부른다. 숨김 저장(onLifecycle)이 앱이 든 옛 저장으로 덮지 않게 */
+export function freezeSaves(): void {
+  frozen = true;
+}
+
 /**
  * 저장 데이터를 localStorage에 저장한다. 본 키가 써진 뒤에만 .bak을 같은 내용으로 갱신한다.
- * 실패 시(QuotaExceededError 포함) 조용히 무시한다.
+ * 실패 시(QuotaExceededError 포함) 조용히 무시한다. freezeSaves() 뒤엔 아무것도 쓰지 않는다.
  */
 export function saveSave(d: SaveData): void {
-  if (typeof localStorage === 'undefined') {
+  if (frozen || typeof localStorage === 'undefined') {
     return;
   }
 

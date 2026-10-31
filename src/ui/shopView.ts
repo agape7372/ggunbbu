@@ -1,19 +1,26 @@
-// 상점 탭 — 「자재 카탈로그」. 품목마다 판 속 졸라맨을 찍은 그림 + 아래 띠 하나(모자람 막대 / 사기 / 장착).
-// 먼지로 무기·마스크, 궤도조각으로 필살·꾸미기, 먼지로 철거 자격 응시. IAP SKU(≤₩1,900)는 결제가 붙을 때만 그린다(v1 제외).
+// 상점 — 「먹 한 획」. 사기와 장착을 같이 하는 유일한 곳(옛 장비 탭을 합쳤다).
+// 무기는 칼 그림이 주인: 고른 칼을 크게(획 순서대로 다시 그림) + 칼꽂이(연장 넷 · 대검 여덟). 필살·마스크·꾸미기는 판 속 졸라맨 그림 칸.
+// 주홍은 화면에 하나 — 그리는 순서로 처음 만나는 살 수 있는 「사기」·「응시」. 나머지 살 것은 먹 획, 모자라면 옅은 먹 획에 남은 양.
+// 보유 = 먹 작은 도장 · 장착 중 = 먹 도장(못 누름) · 장착 = 먹 획. 먼지로 무기·마스크·응시, 궤도조각으로 필살·꾸미기.
+// IAP SKU(≤₩1,900)는 결제가 붙을 때만 그린다(v1 제외).
 
+import './shop.css';
 import { WEAPON } from '../config';
 import {
   COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, GREATSWORD_IDS, MASK_DUST_COST, ORBIT_PER_AD, WAZA_ORBIT_COST,
   WEAPON_DUST_COST, WEAPON_IDS, examStatus, licenseTitle, nextDustGoal, nextExam,
 } from '../meta';
 import type { Loadout, WeaponId } from '../meta';
-import { SAMPLE_MASK, wornMask } from '../meta/mask';
-import { MASK_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
+import { MASK_MAX, SAMPLE_MASK, wornMask, wornMaskId } from '../meta/mask';
+import type { MaskEntry } from '../meta/types';
+import { FX_SLOTS, WEAPON_TIER, filledSlots } from '../meta/tier';
+import { FX_SLOT_COPY, TIER_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
 import { SCREENS } from '../content/screens';
 import { SKUS, type Sku } from '../platform/iap';
-import { ICON } from './icons';
 import { escapeHtml } from './html';
-import { lettersArt, maskedArt, playerArt, restoreLook, swordArt, wazaArt } from './shopArt';
+import { ICON } from './icons';
+import { auraSvg, countTo, flashSvg, fmt, glyph, reduceMotion, swordSvg } from './ink';
+import { lettersArt, maskedArt, playerArt, restoreLook, wazaArt } from './shopArt';
 
 type Pay = 'dust' | 'orbit';
 type Slot = keyof Loadout;
@@ -24,42 +31,63 @@ interface Item {
   name: string;
   cost: number;
   pay: Pay;
-  /** 칸 위 작은 이름표 — 칸(2열)에만. 보유 도장·다음 목표가 이 줄 오른쪽에 앉아 긴 이름과 겹치지 않는다 */
+  /** 큰 칼 위 작은 이름표(무기 · 대검) */
   kind?: string;
-  /** 그림만으로 안 보이는 것(필살)만 한 줄 */
-  desc?: string;
 }
 
-const weaponItem = (id: WeaponId, kind?: string, name = WEAPON_COPY[id].name): Item =>
-  ({ id, slot: 'weapon', kind, name, cost: WEAPON_DUST_COST[id], pay: 'dust' });
+const GREAT = new Set<string>(GREATSWORD_IDS);
 
-/** 연장 셋 — 큰 카드 */
-const TOOL_ITEMS: readonly Item[] = (['hammer', 'crowbar', 'grinder'] as const).map((id) => weaponItem(id));
-/** 대검 — 칸. 이름표가 「대검」이라 이름은 앞말만 */
-const GREAT_ITEMS: readonly Item[] = GREATSWORD_IDS.map((id) => weaponItem(id, '대검', WEAPON_COPY[id].name.replace(/ 대검$/, '')));
-
-const WAZA_ITEMS: readonly Item[] = (['ageba', 'tetsu'] as const).map((id) => ({
-  id, slot: 'waza', kind: '필살', name: WAZA_COPY[id].name, desc: WAZA_COPY[id].desc, cost: WAZA_ORBIT_COST, pay: 'orbit',
+/** 무기 열둘 — 대검은 이름표가 「대검」이라 이름은 앞말만 */
+const WEAPONS: readonly Item[] = WEAPON_IDS.map((id) => ({
+  id,
+  slot: 'weapon',
+  kind: GREAT.has(id) ? '대검' : '무기',
+  name: WEAPON_COPY[id].name.replace(/ 대검$/, ''),
+  cost: WEAPON_DUST_COST[id] ?? 0,
+  pay: 'dust',
 }));
 
-const LOOK_ITEMS: readonly Item[] = ([
-  ['amber', 'body', '졸라맨', '호박'],
-  ['slate', 'body', '졸라맨', '석판'],
-  ['rebar', 'blade', '칼빛', '철근'],
-  ['crescent', 'blade', '칼빛', '초승달'],
-  ['stamp', 'letters', '효과글자', '도장'],
-  ['orbit', 'letters', '효과글자', '궤도'],
-] as const).map(([id, slot, kind, name]) => ({ id, slot, kind, name, cost: COSMETIC_ORBIT_COST, pay: 'orbit' }));
+const WAZA: readonly Item[] = (['tenchi', 'ageba', 'tetsu'] as const).map((id) => ({
+  id, slot: 'waza', name: WAZA_COPY[id].name, cost: WAZA_ORBIT_COST, pay: 'orbit',
+}));
 
-/** 마스크 — 큰 카드 하나. 한 번 사면 다시 그리기는 무료 */
-const MASK_ITEM: Item = { id: 'mask', slot: 'mask', name: MASK_COPY.name, cost: MASK_DUST_COST, pay: 'dust' };
+/** 가면 공방 — 한 번 열면(3000 먼지) 새 가면은 공짜. 안 열었을 때만 이 칸이 보인다 */
+const MASK: Item = { id: 'mask', slot: 'mask', name: '마스크 공방', cost: MASK_DUST_COST, pay: 'dust' };
+const NO_MASK: Item = { id: 'none', slot: 'mask', name: '없음', cost: 0, pay: 'dust' };
 
-/** 무기 막대 셋 — 장비 탭과 같은 값·같은 정규화(무기 전부 중 최댓값) */
-const STATS: readonly { key: 'reach' | 'lift' | 'gauge'; label: string }[] = [
-  { key: 'reach', label: '사거리' },
-  { key: 'lift', label: '띄우기' },
-  { key: 'gauge', label: '필살' },
+const look = (slot: Slot, id: string, name: string): Item => ({ id, slot, name, cost: COSMETIC_ORBIT_COST, pay: 'orbit' });
+/** 꾸미기 — 칸마다 기본 하나(되돌리기) + 살 것 둘 */
+const LOOKS: readonly { title: string; items: readonly Item[] }[] = [
+  { title: '졸라맨', items: [look('body', 'ink', '먹물'), look('body', 'amber', '호박'), look('body', 'slate', '석판')] },
+  { title: '칼빛', items: [look('blade', 'wire', '철사'), look('blade', 'rebar', '철근'), look('blade', 'crescent', '초승달')] },
+  { title: '효과글자', items: [look('letters', 'flyer', '전단지'), look('letters', 'stamp', '도장'), look('letters', 'orbit', '궤도')] },
 ];
+
+const ALL: readonly Item[] = [...WEAPONS, ...WAZA, MASK, NO_MASK, ...LOOKS.flatMap((g) => g.items)];
+
+/** 무기 능력치 셋 — 막대 = 무기 전부 중 최댓값 대비, 오른쪽 숫자 = 실제 값(+ 장착 칼 대비 차이) */
+const num = (n: number): string => String(Math.round(n * 100) / 100);
+const STATS: readonly { key: 'reach' | 'lift' | 'gauge'; label: string; show: (n: number) => string }[] = [
+  { key: 'reach', label: '사거리', show: num },
+  { key: 'lift', label: '띄우기', show: num },
+  { key: 'gauge', label: '필살', show: (n) => `×${num(n)}` },
+];
+
+/** 등급 꼬리표 — 일반 맨글씨 · 고급 굵게 · 희귀 먹 테두리 상자 · 전설 뒤집힌 먹 상자(모양은 shop.css .sh-tier) */
+const tierTag = (id: string): string => {
+  const t = WEAPON_TIER[id as WeaponId];
+  return `<span class="sh-tier t-${t}">${TIER_COPY[t]}</span>`;
+};
+
+/** 전설 칼 순서 — 칸마다 섬광 박자를 어긋나게 */
+const LEGEND = WEAPON_IDS.filter((w) => WEAPON_TIER[w] === 'legend');
+
+/** 칼꽂이 칼 기울기 — 같은 줄이 자로 잰 듯 서지 않게 */
+const TILT = [-3, 2, -2, 3, -4, 3, -2, 2, 3, -3, 1, -4];
+
+/** 산 순간 도장 둘레 먹 튐 넷 */
+const SPLASH = [[-24, -16], [26, -12], [-18, 20], [22, 18]]
+  .map(([x, y]) => `<i class="spl" style="--tx:${x}px;--ty:${y}px"></i>`).join('');
 
 export type CardState = 'owned' | 'ok' | 'short';
 
@@ -69,7 +97,7 @@ export function cardState(has: boolean, wallet: number, cost: number): CardState
   return wallet >= cost ? 'ok' : 'short';
 }
 
-/** 상점이 읽는 지갑 + 철거 자격 현황 + 장착(그림 되돌리기·장착 띠) */
+/** 상점이 읽는 지갑 + 철거 자격 현황 + 장착(그림 되돌리기·장착 표시) */
 export interface ShopInv {
   dust: number;
   orbit: number;
@@ -78,8 +106,11 @@ export interface ShopInv {
   /** 평생 누적 철거 건물 수 */
   buildings: number;
   loadout: Loadout;
-  /** 도트판 그림(저장 maskArt) — 마스크 카드 그림 */
+  /** 도트판 그림(저장 maskArt) — 고른 가면의 그림 */
   maskArt: string;
+  /** 내 가면 목록(만든 순서)과 고른 가면 id — 저장의 masks · maskId */
+  masks?: readonly MaskEntry[];
+  maskId?: string;
 }
 
 export interface ShopHandlers {
@@ -88,10 +119,10 @@ export interface ShopHandlers {
   onBuy(skuId: string): void;
   onAdPack(): void;
   onOrbit(id: string): void;
-  /** 먼지로 사는 줄(무기) — economy WEAPON_DUST_COST */
+  /** 먼지로 사는 것(무기·마스크) — economy dustCost */
   onDust(id: string): void;
   onExchange(): void;
-  /** 산 품목을 상점에서 바로 장착 */
+  /** 산 것·기본 품목 장착 */
   onEquip(slot: string, id: string): void;
   /** 산 마스크의 「그리기」 — 도트판을 연다 */
   onMaskEdit(): void;
@@ -99,6 +130,12 @@ export interface ShopHandlers {
 
 /** 방금 「사기」를 누른 품목 — 다음 그리기에서 보유로 바뀌었으면 도장을 쿵 찍는다 */
 let pendingBuy: string | null = null;
+/** 큰 칼로 보이는 무기 — 화면을 떠났다 와도 남는다 */
+let picked: WeaponId | null = null;
+/** 칼꽂이를 눌러 다시 그리는 중 — 등장 안무는 쉬고 큰 칼만 다시 그린다 */
+let selecting = false;
+/** 지난 그리기의 지갑 — 산 순간 여기서부터 숫자를 굴린다 */
+let lastWallet: { dust: number; orbit: number } | null = null;
 
 export function paintShop(
   root: HTMLElement,
@@ -109,100 +146,254 @@ export function paintShop(
 ): void {
   const fresh = pendingBuy;
   pendingBuy = null;
+  const sel = selecting;
+  selecting = false;
+  const l = inv.loadout;
+  const has = (id: string): boolean => owned.has(id) || DEFAULT_OWNED_IDS.includes(id);
+  const stateOf = (it: Item): CardState => cardState(has(it.id), inv[it.pay], it.cost);
   const goal = nextDustGoal([...owned], inv.dust);
-  // 노랑은 화면에 하나 — 그리는 순서로 처음 만나는 「사기」·「응시」
+  if (!picked) picked = (goal && WEAPONS.some((w) => w.id === goal.id) ? goal.id : l.weapon) as WeaponId;
+
+  // 주홍은 화면에 하나 — 그리는 순서로 처음 만나는 「사기」·「응시」
   let mainLeft = true;
   const takeMain = (ok: boolean): boolean => {
     if (!ok || !mainLeft) return false;
     mainLeft = false;
     return true;
   };
-  /** 품목 하나 — 무기 연장은 큰 카드(그림 옆에 막대), 나머지는 2열 칸 */
-  const card = (it: Item, art: string, more = ''): string => {
-    const st = cardState(hasItem(owned, it.id), inv[it.pay], it.cost);
-    const tag = goal && goal.id === it.id && st === 'short' ? '<span class="cat-goal">다음 목표</span>' : '';
-    const stamp = st === 'owned' ? `<span class="cat-stamp${fresh === it.id ? ' fresh' : ''}">보유</span>` : '';
-    const img = art ? `<img src="${art}" alt="" draggable="false">` : '';
-    const kind = it.kind ? `<p class="cat-kind">${escapeHtml(it.kind)}</p>` : '';
-    // 도장·꼬리표는 서류(이름) 쪽 — 그림을 가리지 않는다
-    return `<article class="${it.kind ? 'cat-tile' : 'cat-card'} is-${st}">
-      <div class="cat-art">${img}</div>
-      <div class="cat-body">${kind}<h3 class="cat-name">${escapeHtml(it.name)}</h3>${more}${tag}${stamp}</div>
-      ${footHtml(it, st, takeMain(st === 'ok'), inv)}
-    </article>`;
+
+  const hero = heroHtml(WEAPONS.find((w) => w.id === picked) ?? WEAPONS[0], stateOf, inv, fresh, takeMain, goal?.id ?? null);
+  const rack = (items: readonly Item[], from: number): string =>
+    items.map((it, i) => rackCell(it, stateOf(it), it.id === picked, l.weapon === it.id, fresh === it.id, inv, from + i)).join('');
+  const tools = WEAPONS.filter((w) => !GREAT.has(w.id));
+  const greats = WEAPONS.filter((w) => GREAT.has(w.id));
+
+  /** 그림 칸 하나(필살 · 마스크 · 꾸미기) */
+  const cell = (it: Item, art: string, wide = false): string => {
+    const st = stateOf(it);
+    const on = l[it.slot] === it.id;
+    const base = DEFAULT_OWNED_IDS.includes(it.id);
+    const price = base ? '기본' : `${glyph(it.pay === 'dust' ? 'dust' : 'orb')}${fmt(it.cost)}`;
+    const badge = st === 'owned' && !on && !base ? ownStamp(fresh === it.id, 'sh-badge') : '';
+    return `<div class="sh-it${wide ? ' wide' : ''} is-${st}">
+      <div class="sh-art">${art ? `<img src="${art}" alt="" draggable="false">` : ''}${badge}</div>
+      <p class="sh-name">${escapeHtml(it.name)}</p>
+      <p class="sh-price">${price}</p>
+      <div class="sh-acts">${actHtml(it, st, on, takeMain, inv)}</div>
+    </div>`;
   };
-  const tools = TOOL_ITEMS.map((it) => card(
-    it,
-    playerArt({ weapon: it.id as WeaponId, body: inv.loadout.body, blade: inv.loadout.blade, pose: 'attack' }),
-    statsHtml(it.id as WeaponId),
-  )).join('');
-  const greats = GREAT_ITEMS.map((it) => card(it, swordArt(it.id as WeaponId), statsHtml(it.id as WeaponId))).join('');
-  const waza = WAZA_ITEMS.map((it) => card(
-    it,
-    wazaArt(it.id, { weapon: inv.loadout.weapon, body: inv.loadout.body, blade: inv.loadout.blade }),
-    `<p class="cat-desc">${escapeHtml(it.desc ?? '')}</p>`,
-  )).join('');
-  // 사기 전엔 견본을 씌워 보인다. 산 뒤엔 내 그림(아직 안 그렸으면 견본 — 판 속과 같은 규칙)
-  const maskLook = hasItem(owned, MASK_ITEM.id) ? wornMask(inv.maskArt) : SAMPLE_MASK;
-  const mask = card(MASK_ITEM, maskedArt(inv.loadout, maskLook), `<p class="cat-desc">${escapeHtml(MASK_COPY.desc)}</p>`);
-  const looks = LOOK_ITEMS.map((it) => card(it, lookArt(it, inv.loadout))).join('');
+
+  const look3 = { weapon: l.weapon, body: l.body, blade: l.blade };
+  const waza = WAZA.map((it) => cell(it, wazaArt(it.id, look3))).join('');
+  // 공방을 안 열었으면 사기 칸 하나(견본을 씌워 보인다). 연 뒤엔 가진 가면들 + 「새 가면」 + 「없음」
+  const masks = inv.masks ?? [];
+  const wornId = wornMaskId({ loadout: l, maskId: inv.maskId ?? '' });
+  const maskCard = (m: MaskEntry): string => {
+    const on = wornId === m.id;
+    const acts = (on ? '<span class="seal ink sh-on"><b>장착 중</b></span>'
+      : `<button type="button" class="stroke s3 sh-act" data-equip-slot="mask" data-equip-id="${m.id}"><b>장착</b></button>`)
+      + `<button type="button" class="stroke s3 sh-act sh-draw" data-equip-slot="mask-edit" data-equip-id="${m.id}" aria-label="${escapeHtml(m.name)} 그리기"><b>그리기</b></button>`;
+    return `<div class="sh-it is-owned">
+      <div class="sh-art"><img src="${maskedArt(look3, wornMask(m.art))}" alt="" draggable="false"></div>
+      <p class="sh-name uname">${escapeHtml(m.name)}</p>
+      <div class="sh-acts sh-col">${acts}</div>
+    </div>`;
+  };
+  const newCard = masks.length >= MASK_MAX ? '' : `<div class="sh-it is-owned">
+      <div class="sh-art sh-new" aria-hidden="true">${ICON.plus}</div>
+      <p class="sh-name">새 마스크</p>
+      <p class="sh-price">무료</p>
+      <div class="sh-acts"><button type="button" class="stroke s3 sh-act" data-equip-slot="mask-new" data-equip-id="new"><b>만들기</b></button></div>
+    </div>`;
+  const mask = has(MASK.id)
+    ? masks.map(maskCard).join('') + newCard + cell(NO_MASK, playerArt({ ...look3, pose: 'idle' }))
+    : cell(MASK, maskedArt(look3, SAMPLE_MASK), true) + cell(NO_MASK, playerArt({ ...look3, pose: 'idle' }));
+  const looks = LOOKS.map((g) => `<p class="sh-sub">${g.title}</p><div class="sh-grid">${g.items.map((it) => cell(it, lookArt(it, l))).join('')}</div>`).join('');
   // 찍기가 바꾼 졸라맨 전역 상태를 장착대로 — 뒤 화면 졸라맨이 미리보기 색을 입고 남지 않게
-  restoreLook(inv.loadout);
+  restoreLook(l);
   const exam = examHtml(inv, takeMain);
 
   const canExchange = inv.dust >= DUST_EXCHANGE.dust;
   // 웹(광고 미배선)에선 광고 칸을 아예 안 그린다 — 무료 지급 위장 금지 (08-30, P0-2)
-  const earn = `<div class="earn">
-      ${paths.ad ? `<button type="button" class="earn-btn" data-shop-ad="1">${ICON.ad}광고 <b>+${ORBIT_PER_AD}${ICON.orbit}</b></button>` : ''}
-      <button type="button" class="earn-btn" data-shop-exchange="1"${canExchange ? '' : ' disabled'}><b>${ICON.dust}${DUST_EXCHANGE.dust}</b>→<b>${ICON.orbit}${DUST_EXCHANGE.orbit}</b>바꾸기</button>
+  const earn = `<div class="sh-earn">
+      ${paths.ad ? `<button type="button" class="stroke s2" data-shop-ad="1"><b>광고</b><span>궤도조각 +${ORBIT_PER_AD}</span></button>` : ''}
+      <button type="button" class="stroke s2" data-shop-exchange="1"${canExchange ? '' : ' disabled'}><b>바꾸기</b><span>먼지 ${DUST_EXCHANGE.dust} → 궤도조각 ${DUST_EXCHANGE.orbit}</span></button>
     </div>`;
 
-  root.innerHTML = `
-    <header class="sheet-head">
-      <div class="sheet-head-row">
-        <h2>상점</h2>
-        <p class="wallet wallet-lg"><span aria-label="먼지 ${fmt(inv.dust)}">${ICON.dust}${fmt(inv.dust)}</span><span aria-label="궤도조각 ${fmt(inv.orbit)}">${ICON.orbit}${fmt(inv.orbit)}</span></p>
-      </div>
+  const from = fresh && lastWallet ? lastWallet : inv;
+  const wasFocus = (document.activeElement as HTMLElement | null)?.dataset?.sel;
+
+  root.innerHTML = `<div class="sh${sel ? ' sel' : ''}">
+    <header class="sh-top">
+      <h2 class="meta-title sh-title">상점</h2>
+      <p class="sh-wallet">
+        <span class="cur" aria-label="먼지 ${fmt(inv.dust)}">${glyph('dust')}먼지 <b data-w="dust">${fmt(from.dust)}</b></span>
+        <span class="cur" aria-label="궤도조각 ${fmt(inv.orbit)}">${glyph('orb')}궤도조각 <b data-w="orbit">${fmt(from.orbit)}</b></span>
+      </p>
     </header>
-    <p class="sec-h">무기 <small class="cur">${ICON.dust}먼지</small></p>
-    <div class="cat-list">${tools}</div>
-    <p class="sec-h">대검 <small class="cur">${ICON.dust}먼지</small></p>
-    <div class="cat-grid">${greats}</div>
-    <p class="sec-h">필살 <small class="cur">${ICON.orbit}궤도조각</small></p>
+    ${wornHtml(l, inv)}
+    ${hero}
+    <h3 class="sh-grp">무기</h3>
+    <div class="sh-rack tools">${rack(tools, 0)}</div>
+    <h3 class="sh-grp">대검</h3>
+    <div class="sh-rack">${rack(greats, tools.length)}</div>
+    <h3 class="sh-grp">필살 <small>궤도조각</small></h3>
+    <div class="sh-grid">${waza}</div>
     ${earn}
-    <div class="cat-grid">${waza}</div>
-    <p class="sec-h">마스크 <small class="cur">${ICON.dust}먼지</small></p>
-    <div class="cat-list">${mask}</div>
-    <p class="sec-h">꾸미기 <small class="cur">${ICON.orbit}궤도조각</small></p>
-    <div class="cat-grid">${looks}</div>
-    <p class="sec-h">${SCREENS.license.heading} <small>${escapeHtml(licenseTitle(inv.license))}</small></p>
-    <div class="cat-list">${exam}</div>
-    ${paths.iap ? `<p class="sec-h">결제 <small>부가세 포함</small></p><div class="list">${skuRowsHtml()}</div>` : ''}`;
+    <h3 class="sh-grp">마스크 <small>${has(MASK.id) ? `${masks.length}/${MASK_MAX}` : '먼지'}</small></h3>
+    <div class="sh-grid">${mask}</div>
+    <h3 class="sh-grp">꾸미기 <small>궤도조각</small></h3>
+    ${looks}
+    <h3 class="sh-grp">${SCREENS.license.heading} <small>${escapeHtml(licenseTitle(inv.license))}</small></h3>
+    ${exam}
+    ${paths.iap ? `<h3 class="sh-grp">결제 <small>부가세 포함</small></h3><div class="sh-skus">${skuRowsHtml()}</div>` : ''}
+  </div>`;
+
+  if (fresh && lastWallet) {
+    countTo([root.querySelector<HTMLElement>('[data-w="dust"]')!], lastWallet.dust, inv.dust, 650);
+    countTo([root.querySelector<HTMLElement>('[data-w="orbit"]')!], lastWallet.orbit, inv.orbit, 650);
+  }
+  lastWallet = { dust: inv.dust, orbit: inv.orbit };
+  if (wasFocus) root.querySelector<HTMLElement>(`[data-sel="${wasFocus}"]`)?.focus({ preventScroll: true });
 
   root.onclick = (e) => {
-    const t = (e.target as HTMLElement).closest('[data-shop-sku],[data-shop-ad],[data-orbit-id],[data-dust-id],[data-shop-exchange],[data-shop-exam],[data-equip-id],[data-mask-edit]') as HTMLButtonElement | null;
+    const t = (e.target as HTMLElement).closest('[data-sel],[data-shop-sku],[data-shop-ad],[data-orbit-id],[data-dust-id],[data-shop-exchange],[data-shop-exam],[data-equip-id]') as HTMLButtonElement | null;
     if (!t || t.disabled) return;
     e.preventDefault();
+    const pick = t.getAttribute('data-sel');
+    if (pick) {
+      if (pick === picked) return;
+      picked = pick as WeaponId;
+      selecting = true;
+      paintShop(root, inv, owned, paths, h);
+      // 목록을 내린 채 고르면 큰 칼이 붙어 있는 머리 밑에 가린다 — 가렸으면 머리 바로 아래로 끌어온다
+      const top = root.querySelector('.sh-top');
+      const hero = root.querySelector('.sh-hero');
+      if (top && hero) {
+        const gap = hero.getBoundingClientRect().top - top.getBoundingClientRect().bottom;
+        const k = root.getBoundingClientRect().height / (root.offsetHeight || 1); // 무대 배율(화면 px → 무대 px)
+        if (gap < 0) root.scrollBy({ top: gap / k, behavior: reduceMotion() ? 'auto' : 'smooth' });
+      }
+      return;
+    }
     if (t.hasAttribute('data-shop-exam')) { h.onExam(); return; }
-    if (t.hasAttribute('data-mask-edit')) { h.onMaskEdit(); return; }
     const eid = t.getAttribute('data-equip-id');
     const slot = t.getAttribute('data-equip-slot');
     if (eid && slot) { h.onEquip(slot, eid); return; }
     const did = t.getAttribute('data-dust-id');
     if (did) {
-      if (!hasItem(owned, did)) { pendingBuy = did; h.onDust(did); }
+      if (!has(did)) { pendingBuy = did; h.onDust(did); }
       return;
     }
     if (t.hasAttribute('data-shop-exchange')) { h.onExchange(); return; }
     if (t.hasAttribute('data-shop-ad')) { h.onAdPack(); return; }
     const oid = t.getAttribute('data-orbit-id');
     if (oid) {
-      if (!hasItem(owned, oid)) { pendingBuy = oid; h.onOrbit(oid); }
+      if (!has(oid)) { pendingBuy = oid; h.onOrbit(oid); }
       return;
     }
     const id = t.getAttribute('data-shop-sku');
     if (id && skuById(id)) h.onBuy(id);
   };
+}
+
+/** 지금 장착 — 여섯 칸 이름을 먹 쪽지로 한 줄에 */
+function wornHtml(l: Loadout, inv: ShopInv): string {
+  const name = (slot: Slot): string => ALL.find((it) => it.slot === slot && it.id === l[slot])?.name ?? '';
+  const weapon = WEAPON_COPY[l.weapon as WeaponId]?.name ?? '';
+  const mask = l.mask === 'mask' ? inv.masks?.find((m) => m.id === inv.maskId)?.name ?? '' : '';
+  // 가면 이름은 사용자가 친 글자라 서브셋 글꼴이 아니라 시스템 글꼴(.uname)로 통째로 그린다
+  const tags = [[weapon], [name('waza')], [mask, ' uname'], [name('body')], [name('blade')], [name('letters')]]
+    .filter(([n]) => n).map(([n, c]) => `<span class="tag${c ?? ''}">${escapeHtml(n)}</span>`).join('');
+  return `<p class="sh-worn"><span class="sh-worn-h">장착 중</span>${tags}</p>`;
+}
+
+/** 큰 칼 — 고른 무기. 이름표 · 이름 · 값 · 막대 셋 · 할 일 */
+function heroHtml(
+  it: Item,
+  stateOf: (it: Item) => CardState,
+  inv: ShopInv,
+  fresh: string | null,
+  takeMain: (ok: boolean) => boolean,
+  goal: string | null,
+): string {
+  const st = stateOf(it);
+  const l = inv.loadout;
+  const on = l.weapon === it.id;
+  const base = DEFAULT_OWNED_IDS.includes(it.id);
+  const price = base ? '<b>기본</b>' : `<b>${fmt(it.cost)}</b> 먼지`;
+  const note = st === 'owned' && !on && !base
+    ? ownStamp(fresh === it.id, 'sh-own')
+    : goal === it.id && st !== 'owned' ? '<span class="sh-goal">다음 목표</span>' : '';
+  const eq = l.weapon as WeaponId;
+  const stats = STATS.map(({ key, label, show }, i) => {
+    const max = Math.max(...WEAPON_IDS.map((w) => WEAPON[w][key]));
+    const val = WEAPON[it.id as WeaponId][key];
+    const d = it.id === eq ? 0 : Math.round((val - WEAPON[eq][key]) * 100) / 100;
+    const diff = d ? `<span class="sh-d ${d > 0 ? 'up' : 'dn'}">${d > 0 ? '+' : '-'}${num(Math.abs(d))}</span>` : '<span class="sh-d"></span>';
+    return `<div class="sh-stat" style="--i:${4 + i}"><span>${label}</span><span class="sh-bar" role="img" aria-label="${label} ${show(val)}"><i style="width:${Math.round((100 * val) / max)}%"></i></span><span class="sh-v">${show(val)}</span>${diff}</div>`;
+  }).join('');
+  const tier = WEAPON_TIER[it.id as WeaponId];
+  const fill = filledSlots(tier);
+  const fx = FX_SLOTS.map(({ id }) => `<span class="${fill.has(id) ? 'on' : 'off'}">${FX_SLOT_COPY[id]}</span>`).join('');
+  const rareUp = tier === 'rare' || tier === 'legend';
+  const art = (rareUp ? swordSvg(it.id, 'sh-ghost') : '') + swordSvg(it.id, 'sh-big', true)
+    + (tier === 'legend' ? auraSvg('sh-aura') + flashSvg('sh-flash') : '');
+  return `<section class="sh-hero t-${tier}" aria-label="${escapeHtml(WEAPON_COPY[it.id as WeaponId].name)}">
+    ${art}
+    <div class="sh-info">
+      <p class="sh-kind" style="--i:0">${escapeHtml(it.kind ?? '')}${tierTag(it.id)}</p>
+      <h3 class="sh-hname" style="--i:1">${escapeHtml(it.name)}</h3>
+      <p class="sh-hprice" style="--i:2">${price}${note}</p>
+      <p class="sh-desc" style="--i:3">${escapeHtml(WEAPON_COPY[it.id as WeaponId].desc)}</p>
+      ${stats}
+      <div class="sh-fx" style="--i:7">${fx}</div>
+      <div class="sh-hact" style="--i:8">${actHtml(it, st, on, takeMain, inv, true)}</div>
+    </div>
+  </section>`;
+}
+
+/** 칼꽂이 칸 — 고르는 단추. 살 수 있음 = 받침 획 · 모자람 = 옅은 먹 + 「N 더」 쪽지 · 보유 · 장착 = 먹 도장 */
+function rackCell(it: Item, st: CardState, sel: boolean, on: boolean, fresh: boolean, inv: ShopInv, i: number): string {
+  const base = DEFAULT_OWNED_IDS.includes(it.id);
+  const price = base ? '기본' : fmt(it.cost);
+  const badge = on ? '<span class="sh-stampw sh-badge"><span class="seal ink"><small>장착</small></span></span>'
+    : st === 'owned' && !base ? ownStamp(fresh, 'sh-badge') : '';
+  const more = st === 'short' ? `<span class="tag sh-more">${fmt(it.cost - inv.dust)} 더</span>` : '';
+  const stand = st === 'ok' ? '<svg class="sh-stand" viewBox="0 0 60 10" aria-hidden="true"><path d="M1 3 Q30 0 59 4 L58 8 Q30 10 2 7 Z"/></svg>' : '';
+  const ring = sel ? '<svg class="sh-ring" viewBox="0 0 80 104" aria-hidden="true"><path d="M40 4 C70 2 80 30 76 60 C72 92 40 104 20 96 C2 88 0 50 8 28 C14 12 28 6 44 6"/></svg>' : '';
+  const say = on ? '장착 중' : st === 'owned' ? '보유' : st === 'ok' ? `${price} 먼지` : `먼지 ${fmt(it.cost - inv.dust)} 더`;
+  const tier = WEAPON_TIER[it.id as WeaponId];
+  const ghost = tier === 'rare' ? swordSvg(it.id, 'sh-pic sh-gh') : '';
+  const flash = tier === 'legend' ? '<svg class="sw sh-cflash" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path class="y" d="M0 100 Q50 56 100 0 Q54 74 0 100 Z"/></svg>' : '';
+  const label = tier === 'common' ? '' : tierTag(it.id);
+  return `<button type="button" class="sh-cell t-${tier} is-${st}" data-sel="${it.id}" aria-pressed="${sel}" aria-label="${escapeHtml(WEAPON_COPY[it.id as WeaponId].name)} ${TIER_COPY[tier]} ${say}" style="--i:${i};--k:${LEGEND.indexOf(it.id as WeaponId)};--r:${TILT[i] ?? 0}deg">
+    ${ring}<span class="sh-pw">${ghost}${swordSvg(it.id, 'sh-pic')}${flash}</span>${stand}${label}${badge}${more}
+    <span class="sh-cname">${escapeHtml(it.name)}</span><span class="sh-cprice">${price}</span>
+  </button>`;
+}
+
+/** 할 일 하나 — 살 수 있음 = 주홍(첫 하나) 또는 먹 획 · 모자람 = 옅은 먹 획 + 남은 양 · 장착 중 = 먹 도장 · 보유 = 장착 획.
+ *  big = 큰 칼(폭이 넓어 남은 양에 재화 이름까지) */
+function actHtml(it: Item, st: CardState, on: boolean, takeMain: (ok: boolean) => boolean, inv: ShopInv, big = false): string {
+  if (on) return '<span class="seal ink sh-on"><b>장착 중</b></span>';
+  if (st === 'owned') {
+    return `<button type="button" class="stroke s3 sh-act" data-equip-slot="${it.slot}" data-equip-id="${it.id}"><b>장착</b></button>`;
+  }
+  const word = it.pay === 'dust' ? '먼지' : '궤도조각';
+  if (st === 'ok') {
+    if (takeMain(true)) {
+      return `<button type="button" class="seal sh-main${big ? ' big' : ''}" data-${it.pay}-id="${it.id}" aria-label="사기 ${word} ${fmt(it.cost)}"><b>사기</b><small>${fmt(it.cost)}</small></button>`;
+    }
+    return `<button type="button" class="stroke s3 sh-act" data-${it.pay}-id="${it.id}" aria-label="사기 ${word} ${fmt(it.cost)}"><b>사기</b></button>`;
+  }
+  const left = `${big ? `${word} ` : ''}${fmt(it.cost - inv[it.pay])} 더`;
+  return `<button type="button" class="stroke s3 sh-act" disabled><b>사기</b><span>${left}</span></button>`;
+}
+
+/** 보유 도장 — 산 순간이면 쿵 + 먹 튐 */
+function ownStamp(fresh: boolean, cls: string): string {
+  return `<span class="sh-stampw ${cls}${fresh ? ' sh-fresh' : ''}"><span class="seal ink"><small>보유</small></span>${fresh ? SPLASH : ''}</span>`;
 }
 
 /** 꾸미기 그림 — 몸 색은 서 있는 졸라맨, 칼빛은 필살 참격(호가 가장 크다), 효과글자는 판 속 글자 */
@@ -212,67 +403,35 @@ function lookArt(it: Item, l: Loadout): string {
   return lettersArt(it.id);
 }
 
-/** 옅은 칸 = 철거칼, 잉크 = 이 무기 */
-function statsHtml(id: WeaponId): string {
-  const rows = STATS.map(({ key, label }) => {
-    const max = Math.max(...WEAPON_IDS.map((w) => WEAPON[w][key]));
-    const pct = (w: WeaponId): number => Math.round((100 * WEAPON[w][key]) / max);
-    return `<div class="cat-stat"><span>${label}</span><span class="bar" role="img" aria-label="${label} ${pct(id)}%"><span class="ghost" style="width:${pct('sword')}%"></span><span class="fill" style="width:${pct(id)}%"></span></span></div>`;
-  }).join('');
-  return `<div class="cat-stats">${rows}</div>`;
-}
-
-/** 아래 띠 — 모자람 = 차오르는 막대 + 가진 것/값, 살 수 있음 = 「사기」, 보유 = 「장착」(장착 중이면 꺼짐) */
-function footHtml(it: Item, st: CardState, main: boolean, inv: ShopInv): string {
-  if (st === 'owned') {
-    const on = inv.loadout[it.slot] === it.id;
-    const equip = `<button type="button" class="cat-foot cat-equip" data-equip-slot="${it.slot}" data-equip-id="${it.id}"${on ? ' disabled' : ''}>${on ? '장착 중' : '장착'}</button>`;
-    // 마스크는 띠 둘 — 「그리기」(도트판) + 장착. 벗기는 건 장비 탭
-    return it.slot === 'mask'
-      ? `<div class="cat-feet"><button type="button" class="cat-foot cat-draw" data-mask-edit="1">그리기</button>${equip}</div>`
-      : equip;
-  }
-  const icon = ICON[it.pay];
-  if (st === 'ok') {
-    return `<button type="button" class="cat-foot cat-buy${main ? ' is-main' : ''}" data-${it.pay}-id="${it.id}">사기<span class="price">${icon}${fmt(it.cost)}</span></button>`;
-  }
-  return progressFoot(icon, inv[it.pay], it.cost);
-}
-
-/** 모자란 띠 — 막대 + 「가진 것/필요」 */
-function progressFoot(icon: string, have: number, need: number): string {
-  const pct = Math.max(0, Math.min(100, Math.floor((100 * have) / need)));
-  return `<div class="cat-foot"><span class="bar" role="img" aria-label="${fmt(have)}/${fmt(need)}"><span class="fill" style="width:${pct}%"></span></span><span class="cat-have">${icon}${fmt(have)}<b>/${fmt(need)}</b></span></div>`;
-}
-
-/** 철거 자격 — 건물 조건이 먼저, 응시료는 그다음. 모자란 쪽을 막대로 보인다 */
+/** 철거 자격 — 건물 조건이 먼저, 응시료는 그다음. 모자란 쪽을 옅은 먹 획에 적는다 */
 function examHtml(inv: ShopInv, takeMain: (ok: boolean) => boolean): string {
   const exam = nextExam(inv.license);
-  const badge = (t: string): string => `<div class="cat-art cert-art"><span class="cert-badge">${escapeHtml(t)}</span></div>`;
+  const grade = (t: string): string => `<span class="sh-grade">${escapeHtml(t)}</span>`;
   if (!exam) {
-    return `<article class="cat-card is-owned">${badge(licenseTitle(inv.license))}<div class="cat-body"><h3 class="cat-name">${escapeHtml(SCREENS.license.maxTitle)}</h3></div></article>`;
+    return `<div class="sh-exam">${grade(licenseTitle(inv.license))}
+      <p class="sh-ename">${escapeHtml(SCREENS.license.maxTitle)}</p>
+      <span class="seal ink sh-on"><b>${escapeHtml(SCREENS.license.maxTag)}</b></span></div>`;
   }
   const to = licenseTitle(inv.license + 1);
   const status = examStatus(inv.license, inv.buildings, inv.dust);
-  let foot: string;
+  const word = escapeHtml(SCREENS.license.exam);
+  let act: string;
   if (status === 'ok') {
-    foot = `<button type="button" class="cat-foot cat-buy${takeMain(true) ? ' is-main' : ''}" data-shop-exam="1">${escapeHtml(SCREENS.license.exam)}<span class="price">${ICON.dust}${fmt(exam.fee)}</span></button>`;
-  } else if (status === 'dust') {
-    foot = progressFoot(ICON.dust, inv.dust, exam.fee);
+    act = takeMain(true)
+      ? `<button type="button" class="seal sh-main" data-shop-exam="1"><b>${word}</b><small>${fmt(exam.fee)}</small></button>`
+      : `<button type="button" class="stroke s3 sh-act" data-shop-exam="1"><b>${word}</b></button>`;
   } else {
-    foot = progressFoot(ICON.play, Math.min(inv.buildings, exam.buildings), exam.buildings);
+    const left = status === 'dust'
+      ? `먼지 ${fmt(exam.fee - inv.dust)} 더`
+      : SCREENS.license.needBuildings(exam.buildings - inv.buildings);
+    act = `<button type="button" class="stroke s3 sh-act" disabled><b>${word}</b><span>${escapeHtml(left)}</span></button>`;
   }
-  // 응시료는 띠가 건물 막대일 때만 몸에 적는다 — 「응시」·먼지 막대는 띠가 이미 값을 보인다
-  const fee = status === 'buildings' ? `<p class="cat-desc cert-fee">${ICON.dust}${fmt(exam.fee)}</p>` : '';
-  return `<article class="cat-card is-${status === 'ok' ? 'ok' : 'short'}">
-      ${badge(to)}
-      <div class="cat-body"><h3 class="cat-name">${escapeHtml(to)} ${escapeHtml(SCREENS.license.exam)}</h3>${fee}</div>
-      ${foot}
-    </article>`;
-}
-
-function hasItem(owned: ReadonlySet<string>, id: string): boolean {
-  return owned.has(id) || (DEFAULT_OWNED_IDS as readonly string[]).includes(id);
+  return `<div class="sh-exam">${grade(to)}
+    <div class="sh-ebody">
+      <p class="sh-ename">${escapeHtml(to)} ${word}</p>
+      <p class="sh-price">${escapeHtml(SCREENS.license.progress(Math.min(inv.buildings, exam.buildings), exam.buildings))} · ${glyph('dust')}${fmt(exam.fee)}</p>
+    </div>
+    ${act}</div>`;
 }
 
 function skuById(id: string): Sku | undefined {
@@ -281,13 +440,8 @@ function skuById(id: string): Sku | undefined {
 
 function skuRowsHtml(): string {
   return SKUS.filter((s) => s.krw <= 1900).map((sku) =>
-    `<button type="button" class="shop-row" data-shop-sku="${escapeHtml(sku.id)}">
-      <span class="shop-name">${escapeHtml(sku.title)}${sku.orbit != null ? `<small>궤도조각 ${fmt(sku.orbit)}</small>` : ''}</span>
-      <span class="price">₩${fmt(sku.krw)}</span>
+    `<button type="button" class="stroke s2" data-shop-sku="${escapeHtml(sku.id)}">
+      <b>₩${fmt(sku.krw)}</b><span>${escapeHtml(sku.title)}${sku.orbit != null ? ` · 궤도조각 ${fmt(sku.orbit)}` : ''}</span>
     </button>`,
   ).join('');
-}
-
-function fmt(n: number): string {
-  return Math.trunc(n).toLocaleString('ko-KR');
 }

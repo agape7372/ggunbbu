@@ -23,8 +23,6 @@ export const CAPTIONS = {
   combo999: '기계가 더 못 셉니다',
   scoreCap: '기계가 더 못 셉니다',
   record: '기록 돌파',
-  gaugeFull: '눌러.',
-  specialReady: '눌러.',
 } as const;
 
 /** 완파 자막 — 몇 층을 무너뜨렸는지가 정보다. */

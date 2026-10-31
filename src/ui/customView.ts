@@ -91,7 +91,7 @@ function supplyHtml(): string {
     `<li class="supply-row">${SUPPLY_ICON[id]}<span class="supply-name">${escapeHtml(ITEM_COPY[id].name)}<small>${escapeHtml(ITEM_COPY[id].desc)}</small></span></li>`,
   ).join('');
   return `<p class="sec-h">보급 상자</p>
-    <p class="pick-note">건물 ${SUPPLY.FIRST}채째, 그 뒤로 ${SUPPLY.EVERY}채마다 하나.</p>
+    <p class="pick-note">건물 ${SUPPLY.FIRST}채째부터 ${SUPPLY.EVERY}채마다 하나.</p>
     <ul class="supply">${rows}</ul>`;
 }
 

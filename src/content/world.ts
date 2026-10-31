@@ -3,6 +3,7 @@
 // 멸망해가는 지구. 하늘이 건물을 뽑아 던지고, 자격 없는 졸라맨이 벤다.
 
 import type { Act2Phase, ItemId, Theme, WeaponId } from '../core/types';
+import type { FxSlot, Tier } from '../meta/tier';
 
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
 export const HERO = '뿌뿌';
@@ -12,7 +13,7 @@ export const BOSS_NAME = '집행기';
 
 export const TITLE = '건뿌!!';
 export const TITLE_EN = 'GUNBBU';
-export const TAGLINE = '하늘이 던지면, 베면 된다';
+export const TAGLINE = '하늘이 던진다. 베면 된다';
 
 export interface RegionCopy {
   /** GameState.chapter / Theme 인덱스 0~3 */
@@ -20,7 +21,7 @@ export interface RegionCopy {
   theme: Theme;
   /** 짧은 지명 (HUD·도감) */
   name: string;
-  /** 「제n구역 — 이름」 */
+  /** 「제n구역: 이름」 */
   headline: string;
   /** 도감 한 줄 */
   blurb: string;
@@ -34,33 +35,33 @@ export const REGIONS: readonly RegionCopy[] = [
     index: 0,
     theme: 'europe',
     name: '서쪽 회랑',
-    headline: '제1구역 — 서쪽 회랑',
-    blurb: '땅이 죽었다. 아치가 날아온다.',
-    locked: '제1구역 — ???',
+    headline: '제1구역: 서쪽 회랑',
+    blurb: '죽은 땅 위로 아치가 날아온다.',
+    locked: '제1구역: ???',
   },
   {
     index: 1,
     theme: 'asia',
     name: '강턱 시장',
-    headline: '제2구역 — 강턱 시장',
-    blurb: '가게는 비었다. 지붕이 떨어진다.',
-    locked: '제2구역 — ???',
+    headline: '제2구역: 강턱 시장',
+    blurb: '가게는 비었고 지붕만 떨어진다.',
+    locked: '제2구역: ???',
   },
   {
     index: 2,
     theme: 'eastasia',
     name: '기와능선',
-    headline: '제3구역 — 기와능선',
-    blurb: '능선은 비었다. 기와가 쏟아진다.',
-    locked: '제3구역 — ???',
+    headline: '제3구역: 기와능선',
+    blurb: '아무도 없는 능선에 기와가 쏟아진다.',
+    locked: '제3구역: ???',
   },
   {
     index: 3,
     theme: 'modern',
     name: '철근 해안',
-    headline: '제4구역 — 철근 해안',
+    headline: '제4구역: 철근 해안',
     blurb: '바다는 말랐다. 철근이 꽂힌다.',
-    locked: '제4구역 — ???',
+    locked: '제4구역: ???',
   },
 ] as const;
 
@@ -84,30 +85,30 @@ export const GIMMICK_ZONES: readonly GimmickZoneCopy[] = [
   {
     gimmick: 'glass',
     name: '유리 골목',
-    headline: '특별작전 — 유리 골목',
-    blurb: '유리가 먼저 깨진다. 조각이 남는다.',
-    locked: '특별작전 — ???',
+    headline: '특별작전: 유리 골목',
+    blurb: '유리 층이 먼저 깨지고 조각이 남는다.',
+    locked: '특별작전: ???',
   },
   {
     gimmick: 'ice',
     name: '빙결 부두',
-    headline: '특별작전 — 빙결 부두',
-    blurb: '부두가 얼었다. 튕김이 시원찮다.',
-    locked: '특별작전 — ???',
+    headline: '특별작전: 빙결 부두',
+    blurb: '언 부두에서는 가드가 덜 튕긴다.',
+    locked: '특별작전: ???',
   },
   {
     gimmick: 'night',
     name: '야간 투척',
-    headline: '특별작전 — 야간 투척',
-    blurb: '밤에도 하늘은 던진다. 겹친다.',
-    locked: '특별작전 — ???',
+    headline: '특별작전: 야간 투척',
+    blurb: '밤에는 다음 건물이 빨리 온다.',
+    locked: '특별작전: ???',
   },
   {
     gimmick: 'orbit',
     name: '궤도 직하',
-    headline: '특별작전 — 궤도 직하',
+    headline: '특별작전: 궤도 직하',
     blurb: '궤도에서 꽂힌다. 빛만 먼저 온다.',
-    locked: '특별작전 — ???',
+    locked: '특별작전: ???',
   },
 ] as const;
 
@@ -132,21 +133,21 @@ export const OPERATIONS: readonly OperationCopy[] = [
   {
     id: 'west',
     name: '서쪽 회랑',
-    blurb: '땅이 죽었다. 아치가 날아온다.',
+    blurb: '죽은 땅 위로 아치가 날아온다.',
     gimmick: 'none',
     themeIndex: 0,
   },
   {
     id: 'market',
     name: '강턱 시장',
-    blurb: '가게는 비었다. 지붕이 떨어진다.',
+    blurb: '가게는 비었고 지붕만 떨어진다.',
     gimmick: 'none',
     themeIndex: 1,
   },
   {
     id: 'ridge',
     name: '기와능선',
-    blurb: '능선은 비었다. 기와가 쏟아진다.',
+    blurb: '아무도 없는 능선에 기와가 쏟아진다.',
     gimmick: 'none',
     themeIndex: 2,
   },
@@ -160,21 +161,21 @@ export const OPERATIONS: readonly OperationCopy[] = [
   {
     id: 'glass',
     name: '유리 골목',
-    blurb: '유리가 먼저 깨진다. 조각이 남는다.',
+    blurb: '유리 층이 먼저 깨지고 조각이 남는다.',
     gimmick: 'glass',
     themeIndex: 0,
   },
   {
     id: 'ice',
     name: '빙결 부두',
-    blurb: '부두가 얼었다. 튕김이 시원찮다.',
+    blurb: '언 부두에서는 가드가 덜 튕긴다.',
     gimmick: 'ice',
     themeIndex: 1,
   },
   {
     id: 'night',
     name: '야간 투척',
-    blurb: '밤에도 하늘은 던진다. 겹친다.',
+    blurb: '밤에는 다음 건물이 빨리 온다.',
     gimmick: 'night',
     themeIndex: 2,
   },
@@ -201,8 +202,8 @@ export const WAZA_COPY: Record<WazaCopyId, WazaCopy> = {
   tenchi: {
     id: 'tenchi',
     name: '천지개벽',
-    desc: '화면을 가른다. 아래는 빈 자리.',
-    blurb: '화면을 가른다. 아래는 빈 자리.',
+    desc: '떨어지는 건물을 통째로 부순다.',
+    blurb: '떨어지는 건물을 통째로 부순다.',
   },
   ageba: {
     id: 'ageba',
@@ -231,11 +232,11 @@ export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   grinder: { name: '그라인더', desc: '필살이 빨리 찬다. 덜 띄운다.' },
   iron: { name: '무쇠 대검', desc: '길게 닿는다. 필살이 조금 느리다.' },
   saw: { name: '톱날 대검', desc: '필살이 빨리 찬다. 덜 띄운다.' },
-  hazard: { name: '공사중 대검', desc: '멀리, 높이 친다. 필살이 느리다.' },
+  hazard: { name: '공사중 대검', desc: '멀리 닿고 높이 띄운다. 필살이 느리다.' },
   beam: { name: '철골 대검', desc: '가장 높이 띄운다. 짧다.' },
   flame: { name: '화염 대검', desc: '멀리 닿고 필살이 빨리 찬다. 덜 띄운다.' },
   frost: { name: '서리 대검', desc: '아주 멀리 닿는다. 덜 띄운다.' },
-  onyx: { name: '흑철 대검', desc: '가장 멀리, 높이 친다. 필살이 아주 느리다.' },
+  onyx: { name: '흑철 대검', desc: '가장 멀리 닿고 높이 띄운다. 필살이 아주 느리다.' },
   gold: { name: '황금 대검', desc: '필살이 가장 빨리 찬다. 조금 덜 띄운다.' },
 };
 
@@ -245,7 +246,7 @@ export const MASK_COPY = {
   desc: '도트판에 직접 찍어 얼굴에 씌운다.',
 } as const;
 
-/** 보급 상자에서 나오는 것. pop = 열릴 때 머리 위에 뜨는 말. */
+/** 보급품(안전모는 상자 밖, 콤보 고비에서 받는다). pop = 받을 때 뜨는 말 — 안전모는 렌더러 받기 띠에 찍힌다. */
 export interface ItemCopy {
   name: string;
   desc: string;
@@ -272,27 +273,27 @@ export const ACT2_PHASES: Record<Act2Phase, PhaseCopy> = {
   cathedral: {
     id: 'cathedral',
     name: '석조 대성당',
-    banner: ['— 석조 대성당 —', '하늘이 종탑을 뽑아 던진다.'],
+    banner: ['석조 대성당', '하늘이 종탑을 뽑아 던진다.'],
   },
   tower: {
     id: 'tower',
     name: '110층 마천루',
-    banner: ['— 110층 마천루 —', '한 동이 통째로 내려온다.'],
+    banner: ['110층 마천루', '한 동이 통째로 내려온다.'],
   },
   bolt: {
     id: 'bolt',
     name: '궤도 낙뢰',
-    banner: ['— 궤도 낙뢰 —', '지붕 없는 밤에 떨어진다.'],
+    banner: ['궤도 낙뢰', '지붕 없는 밤에 떨어진다.'],
   },
   rock: {
     id: 'rock',
     name: '화산탄',
-    banner: ['— 화산탄 —', '죽은 땅에 돌만 쌓인다.'],
+    banner: ['화산탄', '죽은 땅에 돌만 쌓인다.'],
   },
   moon: {
     id: 'moon',
     name: BOSS_NAME,
-    banner: [`— 철거 집행 ${BOSS_NAME} —`, '건물만 집으라는 지시는 없었다.'],
+    banner: [`철거 집행: ${BOSS_NAME}`, '건물만 집으라는 지시는 없었다.'],
   },
 };
 
@@ -307,3 +308,13 @@ export function checkpointLabel(n: number): string {
   if (n === 40 || n === 148 || n === 168) return CHECKPOINT_LABEL[n];
   return '이어하기';
 }
+
+/** 무기 등급 이름표(src/meta/tier.ts) — 상점 큰 칼 · 칼꽂이 꼬리표 */
+export const TIER_COPY: Record<Tier, string> = {
+  common: '일반', fine: '고급', rare: '희귀', legend: '전설',
+};
+
+/** 이펙트 칸 이름표(src/meta/tier.ts FX_SLOTS) */
+export const FX_SLOT_COPY: Record<FxSlot, string> = {
+  hit: '타격음', shard: '파편', trail: '잔상', aura: '칼 기운', tint: '물들임',
+};

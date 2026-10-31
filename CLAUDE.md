@@ -39,18 +39,37 @@
    새 판 = `m2:` + 칸 256개(`.` 빈칸 · 16진 소문자 6자리). 옛 판(256자, `0` 빈칸 · `1`~`c` = `MASK_PALETTE` 번호)도
    계속 읽는다. 옛 저장과 `SAMPLE_MASK`가 이 번호로 색을 가리키니 `MASK_PALETTE`는 순서도 값도 바꾸지 마라.
    도트판 기본 색 `MASK_SWATCHES`는 저장과 무관해서 마음대로 바꿔도 된다. 가드: `tests/mask.test.ts`.
+10. **화면(`src/ui`)은 「먹 한 획」 문법이다**(2026-10-31, 정본 = `src/style.css` 머리말). 한지 · 먹 · 옅은 먹에
+    주홍 인장은 **화면마다 누를 것 하나**, 노랑은 베는 순간만. 그라데이션 · 흐림 · 반투명 없음(깊이는 단단한 먹 그림자).
+    붓글씨(동해독도)는 25px 이상만. 등급 글자(S · A · B)는 본문 굵게(붓글씨 S는 5로 읽힌다).
+    오버레이의 `data-el` 이름은 전체에서 하나만 쓴다. `$()`는 첫 일치를 잡는다(10-31 작전 목록이 홈 단추 속에 그려졌다).
+11. **콤보 수는 판 위 타격 자리에 렌더러가 찍는다**(콤보 도장, `COMBO_MARK` · 2026-10-31 사용자 요청). HUD 옆 띠에 콤보 칸을
+    되살리지 마라. **안전모는 보급 상자에 없다.** 콤보 고비(`HAT.COMBO_AT` 50 · 200 · 500)에서 받는다. 쓰고 있거나 2막이면 없다.
+    가드: `tests/renderer-feel.test.ts` 「콤보 도장」 · `tests/supply.test.ts` 「안전모 — 콤보로 받는다」.
+12. **앱이 든 `save`는 페이지가 숨겨질 때 저장된다**(`scenes` onLifecycle). localStorage를 직접 고치고 새로고침하는 길은
+    `freezeSaves()`를 먼저 부른다. 안 그러면 새로고침에 옛 저장으로 덮인다(10-31 시험판 전해금이 이걸로 안 먹었다).
+13. **판 이펙트도 「먹 한 획」이다**(2026-10-31 저녁, 모양 = `src/render/ink.ts`). 먹 방울 · 먹 터짐 · 엔소(붓 원) · 흰 별 「깡」으로 그린다.
+    **알파로 지우지 말고 모양으로 지운다**(줄이고 꼬리부터 깎고 마르게). 노랑은 벤 순간과 엔소의 첫 12%만.
+    무게는 사건 등급을 따른다. 타격 = 작은 먹 터짐 · 층 무너짐 · 가드 · 다침 = 누운 엔소 · 완파 · 필살 · 보스 격파 = 큰 엔소와 노랑 속.
 
 ## 검증
 
-- `npm test` — 487 테스트(2026-10-29 도트판 2판과 리뷰 고침 뒤 기준, 가지 `feat/mask-fx`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 546 테스트(2026-10-31 저녁 기준, 가지 `feat/ui-ink`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
-  (원본 TTF 5개는 `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).
+  (원본 TTF 8개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 500/700 · 동해독도 · 고운바탕 400/700.
+  `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).
 - 디버그 APK: `npm --prefix shell run web:build` → `npm --prefix shell run sync` → `npm --prefix shell run apk`.
   릴리스 빌드는 `shell/android/key.properties`가 없거나 광고 ID가 테스트 값이면 gradle이 멈춘다(`docs/RELEASE.md`).
 - 브라우저 확인: `.claude/launch.json` → 프리뷰(포트 5173), 모바일 뷰포트 375×812.
   화면 검수는 화면비 여럿으로 — 375×812만 보면 무대가 높이에 먼저 닿는 넓은 기기(사용자 실기기 416×657)에서
   메뉴가 화면 폭 61%에 갇힌 걸 못 본다(10-28). 메뉴 폭 ÷ 화면 폭을 숫자로 잰다.
+  지금 검수 도구 = `node tmp/cap/ink.mjs <개발 서버 주소> <출력 폴더> [WxH...]`(다섯 화면비 × 화면 열셋 + 새 저장 홈,
+  가로 넘침 · 글자 넘침 · 단추 밖 글 · HUD 겹침 · 도트판 세로 예산을 숫자로). 모음 한 장 = `tmp/cap/sheet.mjs`.
+  이펙트 검수 = `node tmp/cap/fx-moments.mjs <개발 서버 주소> <출력 폴더> <무기,> <장면,> [--zoom]`(장면 하나를 틱 열 장으로).
+  개발 서버의 소스를 직접 불러서 배포 판에는 못 쓴다.
+- 도트판은 780 무대에 스크롤 없이 들어간다(위아래 여백 8이면 기둥 ≤ 764, 지금 756 · `maskEditor.css` 머리 주석). 다시 칠하며 간격 · 단추 높이를
+  키우면 저장 줄이 화면 밖으로 밀린다(10-31 한 번 깨짐).
 - `npx tsc --noEmit` 상시 클린.
 
 ## 위임 (토큰 절약 — 사용자 요구)
@@ -68,3 +87,8 @@ core/통합/테스트는 메인이 직접.
   `shell/`에만 있고 루트 런타임 의존성은 0을 유지한다. IAP는 v1 제외(ROADMAP).
 - 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `npm run ota:release -- <version>`이 갱신한다.
 - 에셋 예산 게이트: `npm run build`가 `scripts/check-budget.mjs`로 dist·이미지 상한과 중복을 검사한다.
+- 앱 아이콘 원본 = `assets/brand/src/gunbbu-icon.svg` 하나. 굽기 = `node scripts/gen-native-icons.mjs --playwright-module <playwright 폴더>`
+  (웹 · 스토어 · 런처 · 적응형 전경 · 스플래시 33장, 안전 영역을 화소로 재서 넘치면 실패).
+- 시험판(https://gunbbu-preview.vercel.app) = `VITE_TESTER=1 npm run build` → `D:\gunbbu-preview`에 복사 → `vercel deploy --prod`.
+  디버그 도구(로고 7연타 → 전해금)는 이 판에만 실린다. `GUNBBU_RELEASE=1` 빌드는 `check-release`가 막는다.
+  배포 전에 라이브 `index-*.js`가 내가 마지막에 올린 판인지부터 본다(다른 세션 판을 덮지 않게).

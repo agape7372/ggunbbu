@@ -15,12 +15,10 @@ export function onBuildingDown(s: GameState): void {
   s.events.push({ kind: 'supply', item, y: s.player.y + PLAYER.H + 20 });
 }
 
-/** 순서대로 돈다. 안전모를 이미 쓰고 있으면 다음 것. */
+/** 순서대로 돈다. 안전모는 상자에 없다 — 콤보로 번다(combat.ts addCombo). */
 export function pickItem(s: GameState): ItemId {
   const r = SUPPLY.ROTATION;
-  let i = Math.floor(s.drops / SUPPLY.EVERY) % r.length;
-  if (s.hat && r[i] === 'hat') i = (i + 1) % r.length;
-  return r[i];
+  return r[Math.floor(s.drops / SUPPLY.EVERY) % r.length];
 }
 
 export function applyItem(s: GameState, item: ItemId): void {

@@ -1,7 +1,7 @@
 // 손맛 계산(순수) — 흔들림 곡선 · 완파 규모 · 진동 고르기 · 격파 배속.
 // 그리는 쪽(renderer·effects)은 이 숫자를 읽기만 한다.
 import { describe, expect, it } from 'vitest';
-import { BOSS, HAPTIC, JUICE, JUICE_SYS, WEAPON } from '../src/config';
+import { AUDIO, BOSS, COMBO_MARK, HAPTIC, HAT, JUICE, JUICE_SYS, SCORE, WEAPON } from '../src/config';
 import {
   addTrauma, defeatSlow, flashMul, hapticLength, kickPx, pickHaptic, shakePx, shakeSample, stackScale,
 } from '../src/render/feel';
@@ -223,7 +223,11 @@ describe('JUICE 표 — 새 항목', () => {
     expect(JUICE.bossHit.flash).toBe(0);
   });
 
-  it('숫자 팝업 기본 크기 15px', () => {
-    expect(JUICE_SYS.COMBO_POPUP_PX).toBe(15);
+  it('콤보 도장 고비는 오름차순 · 999에서 끝 — 고비 소리와 안전모 고비는 그 안에 있다', () => {
+    const at = COMBO_MARK.STEPS.map((st) => st.at);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(at[at.length - 1]).toBe(SCORE.COMBO_CAP);
+    for (const m of AUDIO.MILESTONES) expect(at).toContain(m);
+    for (const c of HAT.COMBO_AT) expect(at).toContain(c);
   });
 });

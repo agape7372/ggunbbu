@@ -1,20 +1,33 @@
-// 도트판 — 상점 마스크 「그리기」가 여는 전체 화면 패널. 16×16 칸을 손가락이나 십자 단추로 찍는다.
+// 도트판 — 상점 가면 「그리기」 · 「새 가면」이 여는 전체 화면 패널. 머리에 이름 칸(최대 10자), 아래에 저장 · (있던 가면이면) 삭제. 16×16 칸을 손가락이나 십자 단추로 찍는다.
 // 칸·기본 색·채우기·선·색 값은 meta/mask.ts, 머리에 씌우는 그림은 render/sprites(drawMask)가 정본. 저장은 씬이 받는다(onSave).
 // 오버레이층 안 탭 바 위·확인 창 아래에 스스로 붙는다. 판 입력은 이 캔버스와 십자 단추(화살표 키)만 받는다 — 게임판 조작 키는 플레이 중에만 보인다.
 
 import { playSfx } from '../audio/audio';
 import { MASK_DRAW, PALETTE } from '../config';
 import {
-  MASK_CELLS, MASK_N, MASK_SWATCHES, cellHex, cellLine, edgeCell, encodeMask, floodFill, hexCell, hexHsl, hslHex, maskCells,
+  MASK_CELLS, MASK_N, MASK_NAME_MAX, MASK_SWATCHES, cellHex, cellLine, edgeCell, encodeMask, floodFill, hexCell, hexHsl, hslHex, maskCells,
   maskColors, wornMask,
 } from '../meta/mask';
 import { SHEET_HEAD_R, drawMask, drawPlayer, playerHead } from '../render/sprites';
+import { escapeHtml } from './html';
 import { ICON } from './icons';
+import './maskEditor.css';
 
 type Tool = 'pen' | 'erase' | 'fill';
 
+/** 여는 가면 — name = 지금 이름(새 가면은 빈칸), fallback = 이름을 비워 두면 붙는 「마스크 N」, isNew면 삭제 단추가 없다 */
+export interface MaskEditorInit {
+  name: string;
+  fallback: string;
+  art: string;
+  isNew: boolean;
+}
+
 export interface MaskEditorHandlers {
-  onSave(art: string): void;
+  /** 이름은 쳐 넣은 그대로 — 정리(공백 · 길이 · 빈 이름)는 받는 쪽(meta/mask.ts cleanMaskName) */
+  onSave(name: string, art: string): void;
+  /** 확인 팝업에서 지우기를 누름 */
+  onDelete(): void;
   /** 저장 없이 닫힘(닫기·취소·뒤로) */
   onClose(): void;
 }
@@ -96,8 +109,9 @@ function pxPerCss(cv: HTMLCanvasElement, cssW: number): number {
   return w > 0 && cssW > 0 ? (w / cssW) * dpr : dpr;
 }
 
-export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHandlers): void {
+export function openMaskEditor(host: HTMLElement, init: MaskEditorInit, h: MaskEditorHandlers): void {
   if (panel) return;
+  const art = init.art;
   let cells = maskCells(art);
   let tool: Tool = 'pen';
   let color = FIRST_COLOR;
@@ -121,7 +135,7 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
   el.tabIndex = -1;
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-modal', 'true');
-  el.setAttribute('aria-labelledby', 'mk-title');
+  el.setAttribute('aria-label', '도트판');
   const tools = TOOLS.map(([attr, icon, name]) => `<button type="button" ${attr} aria-label="${name}" title="${name}">${icon}</button>`).join('');
   const swatches = MASK_SWATCHES.map(([hex, name]) =>
     `<button type="button" class="mk-sw" data-mk-color="${hex}" style="--c:${hex}" aria-label="${name}"></button>`,
@@ -133,8 +147,8 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
   el.innerHTML = `
     <div class="mk-col">
       <header class="mk-head">
-        <h2 id="mk-title">도트판</h2>
-        <button type="button" class="icon-btn" data-mk="close" aria-label="닫기">${ICON.close}</button>
+        <input class="mk-name uname" type="text" maxlength="${MASK_NAME_MAX}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="마스크 이름" placeholder="${escapeHtml(init.fallback)}">
+        <button type="button" class="inkseal" data-mk="close">닫기</button>
       </header>
       <div class="mk-views" aria-hidden="true">
         <figure class="mk-view"><canvas data-mk-view="1"></canvas><figcaption>실제 크기</figcaption></figure>
@@ -153,8 +167,9 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
           </div>
         </div>
         <div class="mk-foot">
-          <button type="button" class="btn" data-mk="close">취소</button>
-          <button type="button" class="cta" data-mk="save"><span class="cta-label">저장</span></button>
+          <button type="button" class="inkseal" data-mk="close">취소</button>
+          ${init.isNew ? '' : '<button type="button" class="inkseal" data-mk="del">삭제</button>'}
+          <button type="button" class="seal mk-save" data-mk="save"><b>저장</b></button>
         </div>
         <div class="mk-picker" role="group" aria-labelledby="mk-pick-title" hidden>
           <div class="mk-pick-head">
@@ -163,8 +178,8 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
           </div>
           ${slider('h', '색상', 360)}${slider('s', '채도', 100)}${slider('l', '밝기', 100)}
           <div class="mk-foot">
-            <button type="button" class="btn" data-mk="pick-cancel">취소</button>
-            <button type="button" class="cta" data-mk="pick-ok"><span class="cta-label">이 색으로</span></button>
+            <button type="button" class="inkseal" data-mk="pick-cancel">취소</button>
+            <button type="button" class="seal mk-save" data-mk="pick-ok"><b>이 색으로</b></button>
           </div>
         </div>
       </div>
@@ -179,6 +194,14 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
   for (const c of behind) c.inert = true;
 
   const q = <T extends Element>(sel: string): T => el.querySelector(sel) as T;
+  // 이름 칸 — 글자를 치는 동안 게임 키 · 십자 단추 화살표가 끼지 않게 키를 여기서 끊는다
+  const nameEl = q<HTMLInputElement>('.mk-name');
+  nameEl.value = init.name;
+  nameEl.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') nameEl.blur();
+  });
+  nameEl.addEventListener('keyup', (e) => e.stopPropagation());
   const board = q<HTMLCanvasElement>('[data-mk-board]');
   const view1 = q<HTMLCanvasElement>('[data-mk-view="1"]');
   const view3 = q<HTMLCanvasElement>('[data-mk-view="3"]');
@@ -408,13 +431,56 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
     slide.h.focus({ preventScroll: true });
   };
 
+  /** 지우기 확인 — 가운데 작은 팝업. 도트판은 그동안 inert */
+  let confirmEl: HTMLElement | null = null;
+  const closeConfirm = (): boolean => {
+    if (!confirmEl) return false;
+    confirmEl.remove();
+    confirmEl = null;
+    el.inert = false;
+    q<HTMLElement>('[data-mk="del"]').focus({ preventScroll: true });
+    return true;
+  };
+  const openConfirm = (): void => {
+    stopHold();
+    endStroke();
+    const c = document.createElement('div');
+    c.className = 'mk-confirm';
+    c.setAttribute('role', 'alertdialog');
+    c.setAttribute('aria-modal', 'true');
+    c.setAttribute('aria-labelledby', 'mk-del-title');
+    c.innerHTML = `<div class="m-card" tabindex="-1">
+      <h2 class="m-title" id="mk-del-title">지울까요?</h2>
+      <div class="m-body"><p class="uname mk-del-name">${escapeHtml(init.name || init.fallback)}</p><p>마스크와 그림이 사라져요.</p></div>
+      <div class="m-actions">
+        <button type="button" class="stroke s3" data-mk="del-no"><b>취소</b></button>
+        <button type="button" class="stroke s3" data-mk="del-yes"><b>지우기</b></button>
+      </div></div>`;
+    host.appendChild(c);
+    confirmEl = c;
+    el.inert = true;
+    c.addEventListener('click', (e) => {
+      const act = (e.target as HTMLElement).closest('button')?.dataset.mk;
+      if (act === 'del-no') { closeConfirm(); playSfx('uiBack'); }
+      else if (act === 'del-yes') {
+        c.remove();
+        confirmEl = null;
+        el.inert = false;
+        teardown();
+        h.onDelete();
+      }
+    });
+    c.querySelector<HTMLElement>('[data-mk="del-no"]')?.focus({ preventScroll: true });
+    playSfx('uiBlip');
+  };
+
   const closePicker = (): boolean => {
     if (!picking) return false;
     cover(false);
     q<HTMLElement>('[data-mk="make"]').focus({ preventScroll: true });
     return true;
   };
-  backHook = closePicker;
+  backHook = () => closeConfirm() || closePicker();
   picker.addEventListener('input', tintPicker);
 
   const touch = (e: PointerEvent): void => {
@@ -520,10 +586,12 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
       closeMaskEditor();
       return;
     }
+    if (act === 'del') { openConfirm(); return; }
     if (act === 'save') {
       const out = encodeMask(cells);
+      const name = nameEl.value;
       teardown();
-      h.onSave(out);
+      h.onSave(name, out);
       return;
     }
     if (act === 'make' || (slot !== undefined && !mine[Number(slot)])) {
@@ -571,6 +639,8 @@ export function openMaskEditor(host: HTMLElement, art: string, h: MaskEditorHand
   window.addEventListener('resize', onResize);
   release = () => {
     stopHold();
+    confirmEl?.remove();
+    confirmEl = null;
     window.removeEventListener('resize', onResize);
     for (const c of behind) c.inert = false;
     if (back?.isConnected) back.focus({ preventScroll: true });

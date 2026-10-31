@@ -41,6 +41,7 @@ function fitStage(): void {
   const { scale, dx, dy, ox } = fitStageBox(window.innerWidth, window.innerHeight, insetProbe.read());
   stage.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
   stage.style.setProperty('--ov-x', `${ox}px`); // 메뉴층이 좌우 여백까지 편다(style.css #overlay-layer)
+  stage.dataset.wide = ox >= 48 ? '1' : '0'; // 좌우 띠가 넉넉하면 멈춤 단추를 띠로 내보낸다
 }
 
 setupCanvas();

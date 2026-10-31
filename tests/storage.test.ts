@@ -1,5 +1,5 @@
 // ★08-30: 세이브 전멸 지뢰 제거 가드 — v 불일치·손상에도 기록을 살린다 (levain 사다리 이식)
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadSave, saveSave, resetSave, DEFAULT_SAVE } from '../src/storage';
 import { SAVE_KEY } from '../src/config';
 
@@ -238,5 +238,17 @@ describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무�
     const d = loadSave();
     expect(d.stats).toEqual({ buildings: 0, runs: 0 });
     expect(d.opsGrade).toEqual({});
+  });
+});
+
+describe('저장 얼리기 (디버그 전해금 새로고침)', () => {
+  it('freezeSaves 뒤엔 숨김 저장이 방금 쓴 걸 덮지 못한다', async () => {
+    vi.resetModules(); // 얼린 모듈이 다른 시험에 새지 않게 새 사본으로
+    const st = await import('../src/storage');
+    const d = st.loadSave();
+    st.saveSave({ ...d, dust: 999 });
+    st.freezeSaves();
+    st.saveSave({ ...d, dust: 0 });
+    expect(st.loadSave().dust).toBe(999);
   });
 });

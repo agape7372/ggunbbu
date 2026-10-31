@@ -45,17 +45,17 @@ export const DEFAULT_LOADOUT: Loadout = {
 export const WAZA_CATALOG: Record<WazaId, { name: string; blurb: string; unlockedByDefault: boolean }> = {
   tenchi: {
     name: '천지개벽',
-    blurb: '현재 구조물을 통째로 접는다. 기본 필살.',
+    blurb: '떨어지는 건물을 통째로 부순다.',
     unlockedByDefault: true,
   },
   ageba: {
     name: '올려베기',
-    blurb: '위를 한 칼에 열어 착지 공간을 만든다.',
+    blurb: '발밑에서 위로만 벤다.',
     unlockedByDefault: false,
   },
   tetsu: {
     name: '철벽',
-    blurb: '잠깐 버틴다. 깔림보다 먼저 쓰는 방패.',
+    blurb: '부수지 않는다. 튕기고 버틴다.',
     unlockedByDefault: false,
   },
 };

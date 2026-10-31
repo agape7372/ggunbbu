@@ -206,9 +206,16 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
 export const SUPPLY = {
   EVERY: 5,
   FIRST: 3,
-  // 첫 상자가 안전모 — 머리에 보이고 첫 깔림을 막아 줘서 상자가 뭔지 바로 안다
-  ROTATION: ['hat', 'coffee', 'gloves', 'dust'] as readonly ItemId[],
+  // 안전모는 상자에서 뺐다 — 콤보로 번다(아래 HAT)
+  ROTATION: ['coffee', 'gloves', 'dust'] as readonly ItemId[],
   COFFEE_GAUGE: 50,
+} as const;
+
+// ── 안전모 [튜닝] ─────────────────────────────────────────────────
+// 그냥 주지 않고 콤보로 번다(10-31 사용자 「특정 조건을 달성해야」). 2막이 아닐 때 콤보가 이 수에 닿는 타격에 하나.
+// 이미 쓰고 있으면 없다(이월 없음). 콤보 도장 고비(COMBO_MARK.STEPS)와 같은 수라 「SUPER!」 같은 말과 함께 받는다.
+export const HAT = {
+  COMBO_AT: [50, 200, 500] as readonly number[],
 } as const;
 
 // ── 잔해(파편) 물리 ─────────────────────────────────────────────
@@ -428,6 +435,8 @@ export const JUICE: Record<string, JuiceSpec> = {
   guardDenied:    { hitstop: 0, shake: 1, flash: 0, particles: 0 },
   supply:         { hitstop: 0, shake: 0, flash: 0, particles: 8 },
   hatBreak:       { hitstop: 3, shake: 5, flash: 0, particles: 10 },
+  // 안전모 받기 — 시뮬은 안 세운다(봇 테스트 타이밍 보존). 화면 연출은 렌더 hatFx가 따로 맡는다
+  hatGet:         { hitstop: 0, shake: 0, flash: 0, particles: 0 },
   // 번개 착탄(hurt가 따로 붙는다) — 땅에 꽂히는 순간 불꽃·먼지
   boltStrike:     { hitstop: 0, shake: 6, flash: 2, particles: 10 },
   // ── 보스 연출 · 렌더 전용 ──
@@ -440,22 +449,19 @@ export const JUICE_SYS = {
   SHAKE_HALF_LIFE_F: 8,
   PARTICLE_POOL: 384,
   ONOMATOPOEIA_MAX: 3,    // 동시 의성어 팝업 상한
-  COMBO_POPUP_MAX: 16,    // 동시 콤보 숫자 팝업 상한 (원작: 타격마다 숫자가 흩뿌려짐)
-  COMBO_POPUP_LIFE_F: 26, // 숫자 팝업 수명(프레임)
-  COMBO_POPUP_PX: 15,     // 숫자 팝업 기본 글자 크기(px) — 13에서 키웠다
   PITCH_JITTER: 0.06,     // SFX 피치 ±6%
   PITCH_STEP_PER_10_COMBO: 1, // 반음
-  // 완파 규모 k = clamp(BASE + 층수 × PER_FLOOR, BASE, MAX) — 흔들림·파편·링·팝업을 k배
+  // 완파 규모 k = clamp(BASE + 층수 × PER_FLOOR, BASE, MAX) — 흔들림·파편·엔소·팝업을 k배
   STACK_K_BASE: 0.8, STACK_K_PER_FLOOR: 0.1, STACK_K_MAX: 1.8,
-  STACK_RING_FLOORS: 3,   // 이 층수 이상이면 노랑 링 한 줄 추가
+  STACK_RING_FLOORS: 3,   // 이 층수 이상이면 노랑 엔소 한 획 추가
   // 번쩍 강도(설정 flashLevel 0 끔 · 1 약 · 2 기본) — 알파에 곱한다
   FLASH_LEVEL_MUL: [0, 0.5, 1] as const,
   // 몸 반응(발 기준 눌림) — 착지는 세로, 점프는 가로
   SQUASH_TICKS: 3, SQUASH_LAND_Y: 0.9, SQUASH_JUMP_X: 0.92,
   LAND_DUST: 4,
-  // 종이 오려내기 후광 — 오프스크린 캐시는 캔버스 DPR과 무관하게 고정 HALO_SS배
+  // 종이 오려내기 후광 — 오프스크린 캐시는 기본 HALO_SS배(졸라맨 프레임 후광은 프레임 배율을 따른다)
   HALO_PX: 1.75, HALO_SS: 2,
-  // 필살 예비동작 — 유령 알파·링 수축 시작 반지름 (길이는 JUICE.special.hitstop)
+  // 필살 예비동작 — 유령 알파·엔소 수축 시작 반지름 (길이는 JUICE.special.hitstop)
   PRELUDE_GHOST_ALPHA: 0.5, PRELUDE_RING_R: 150,
   // 사망 — 붉은 번쩍 틱·파티클 배속·틀 지속
   DEATH_FLASH_TICKS: 8, DEATH_SLOW: 0.3, DEATH_SLOW_TICKS: 24, DEATH_FRAME_TICKS: 18,
@@ -476,8 +482,9 @@ export const JUICE_SYS = {
   KICK_SPRING: 0.3, KICK_DAMP: 0.45,
   // 맞은 층 하얗게 번쩍(틱 · 알파) — 화면 전체가 아니라 그 층만
   HIT_FLASH_TICKS: 3, HIT_FLASH_A: 0.75,
-  // 층 조각: 층 그림을 가로 COLS × 세로 ROWS 칸으로 자르고 칸 일부는 대각선으로 한 번 더 자른다
-  FRAG_COLS: 3, FRAG_ROWS: 2, FRAG_LIFE: 1.05, FRAG_G: 1150,
+  // 층 조각: 층 그림을 가로 COLS × 세로 ROWS 칸으로 자르고 칸 일부는 대각선으로 한 번 더 자른다.
+  // 중력 1150은 조각이 화면 위까지 떠 1초 가까이 머물러 콘크리트가 종이처럼 날렸다(10-31 이펙트 캡처) → 1650: 정점 ~100px · 0.35초
+  FRAG_COLS: 3, FRAG_ROWS: 2, FRAG_LIFE: 1.05, FRAG_G: 1650,
   // 만화 먼지 구름 수 — 층 붕괴 / 완파
   PUFF_COLLAPSE: 3, PUFF_DESTROY: 8,
   // 타격 별 반지름(px)
@@ -494,6 +501,41 @@ export const JUICE_SYS = {
   CAPTION_TICKS: 50,
 } as const;
 
+// ── 콤보 도장(필드) [튜닝] ─────────────────────────────────────────
+// 타격 지점 옆 「COMBO」 + 숫자 하나(10-31 사용자 「옆에 뜨지 말고 부술 때 영어로」). 렌더 전용 — 시뮬 타이밍 무관.
+// 칠 때마다 튀고(PUNCH), 고비(STEPS)마다 새 효과가 하나씩 더 붙는다(앞 칸 효과는 이어진다):
+//   0 NICE 단어 · 1 먹 고리 · 2 노랑 베기 · 3 위에서 내리꽂기 + 집중선 · 4 X 베기 · 5 먹 방울 · 6 주홍 낙관(이후 늘) · 7 MAX
+// 숫자 모양도 지나온 칸 수로 바뀐다: 10부터 앞으로 기울고, 30부터 먹 그림자, 500부터 낙관 위 흰 숫자.
+export const COMBO_MARK = {
+  DX: 96,           // 레인 가운데에서 오른쪽으로 — 졸라맨을 비킨다
+  DY: 34,           // 맞은 자리(건물 밑면)보다 아래 — 건물 · 의성어를 안 가린다
+  PX: 30,           // 숫자 기본 크기. 콤보 500까지 (1 + GROW)배로 큰다
+  GROW: 0.75,
+  LABEL_PX: 13,     // 「COMBO」 먹 이름표
+  PUNCH: 0.22,      // 평타 튐(배) — 연타(7f 주기)엔 작게, 큰 건 고비에 몬다
+  PUNCH_TICKS: 6,
+  HOLD: 75,         // 마지막 타격 뒤 버티는 틱. 지나면 EXIT 틱에 접힌다
+  EXIT: 8,
+  BREAK: 26,        // 콤보가 끊기면 숫자가 두 동강 나 떨어지는 틱
+  BREAK_MIN: 10,    // 이 아래에서 끊기면 조용히 접는다
+  BURST: 44,        // 고비 연출 길이(틱)
+  STEPS: [
+    { at: 10, word: 'NICE' },
+    { at: 30, word: 'GREAT!' },
+    { at: 50, word: 'SUPER!' },
+    { at: 100, word: 'AWESOME!!' },
+    { at: 200, word: 'CRAZY!!' },
+    { at: 300, word: 'INSANE!!' },
+    { at: 500, word: 'LEGEND!!!' },
+    { at: 999, word: 'MAX' },
+  ] as readonly { at: number; word: string }[],
+} as const;
+
+// 안전모 받기 연출(렌더 전용 · 틱) — 먹 띠가 IN 동안 왼쪽에서 들어와 OUT~GONE에 오른쪽으로 빠진다.
+// 안전모는 띠에 박혔다가 OUT부터 머리로 날아가 LAND에 씌워진다(그 전엔 머리 위 안전모를 숨긴다). 띠 = 필드 위에서 BAND_Y.
+// 띠를 필드 가운데에 둔 이유: 위쪽(FIELD_TOP+92)은 완파 자막, HUD 자막(196px~250)은 콤보 100 · 500 밈 자리다(500엔 둘이 같이 뜬다).
+export const HAT_FX = { IN: 9, OUT: 34, GONE: 44, LAND: 56, END: 68, BAND_Y: 282, BAND_H: 60 } as const;
+
 // ── 진동 패턴 (podoal feedback.ts 차용) ─────────────────────────
 // 숫자 = ms 한 번, 배열 = [진동, 휴지, 진동, …] (웹 Vibration API와 같은 문법 — 네이티브도 세그먼트로 풀어 쏜다).
 // 한 틱에 여러 개가 겹치면 총 길이가 가장 긴 패턴 하나만 쏜다(renderer pickHaptic).
@@ -501,7 +543,7 @@ export const HAPTIC = {
   hit: 14, floorCollapse: 20, stackDestroy: [30, 20, 30],
   butterCollapse: 10, special: [100, 50, 200], hurt: 60,
   guardBounce: 15, headBonk: 12, bossDefeat: [100, 50, 100, 50, 200],
-  supply: 10, hatBreak: [30, 20, 30], pinEscape: [20, 30, 20],
+  supply: 10, hatBreak: [30, 20, 30], hatGet: [15, 40, 30], pinEscape: [20, 30, 20],
   bossHit: 14, lifeLost: [60, 40, 90], gaugeFull: [12, 30, 12], guardDenied: 10,
   boltStrike: 25, bonusPerfect: [20, 30, 20, 30, 40], phaseClear: [20, 30, 40],
   HIT_THROTTLE: 3,        // 연타 시 3회당 1회 (hit·bossHit는 카운터를 따로 쓴다)
@@ -561,8 +603,8 @@ export const AUDIO = {
   DETUNE_CENTS: 6,
   /** BGM 음량 — MEL은 이중 발음 한 쪽 몫. 킥 스텝에선 멜로디를 KICK_MEL_MUL배로 눌러 피크를 낮춘다. */
   LEVEL: { MEL: 0.14, BASS: 0.3, KICK: 0.4, HAT: 0.18, KICK_MEL_MUL: 0.7, LAYER_HAT: 0.1, LAYER_ARP: 0.08 },
-  /** 콤보 이정표 — 경계 통과 때 한 번 */
-  MILESTONES: [50, 100, 200, 500, 999],
+  /** 콤보 이정표 — 경계 통과 때 한 번. 콤보 도장(COMBO_MARK.STEPS)의 큰 고비와 같다(10 · 30은 그림만) */
+  MILESTONES: [50, 100, 200, 300, 500, 999],
   /** 한 틱에 이만큼보다 크게 뛴 콤보는 타격이 아니다(이어하기) — 이정표로 세지 않는다 */
   MILESTONE_MAX_JUMP: 5,
   /** 타격음 피치 사다리 — 장조 펜타토닉, 상한 +7반음, 내려가지 않는다 */

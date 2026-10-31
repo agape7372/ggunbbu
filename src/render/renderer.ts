@@ -6,10 +6,12 @@
 // 틱마다 줄어드는 값으로 읽는다.
 
 import type { DebrisPiece, FallingStack, GameState, JuiceEvent } from '../core/types';
-import { AUDIO, BOSS, CAMERA, COSMETIC_COLORS, DEBRIS, JUICE, JUICE_SYS, PALETTE, PLAYER, SCORE, STACK, VIEW, WEAPON } from '../config';
+import {
+  AUDIO, BOSS, CAMERA, COMBO_MARK, COSMETIC_COLORS, DEBRIS, HAT_FX, JUICE, JUICE_SYS, PALETTE, PLAYER, SCORE, STACK, VIEW, WEAPON,
+} from '../config';
 import { onomatoFor, CAPTIONS, ITEM_COPY, destroyedCaption } from '../content';
 import {
-  initSprites, drawPlayer, drawHat, drawMask, drawStack, drawBoss, drawEntity,
+  initSprites, drawPlayer, drawHat, drawMask, drawStack, drawBoss, drawEntity, hardHat, hatSpot,
   drawGroundRocks, drawStackShadow, floorTile, setPlayerCosmetics, setPlayerMask, setPlayerWeapon,
 } from './sprites';
 import { maskColors, wornMask } from '../meta/mask';
@@ -47,8 +49,6 @@ let jumpT = 0;
 let hitFlashT = 0;
 /** 새 건물 양옆 낙하 선 남은 틱 */
 let dropT = 0;
-/** 지난 틱 콤보 — 고비(100·500)를 넘는 틱에 자막을 한 번 */
-let lastCombo = 0;
 /** 층 붕괴 때 시뮬이 뿌린 잔해에 그 층 그림 한 조각을 입힌다 — 시뮬 잔해는 크기만 안다(렌더 전용) */
 interface DebrisSkin { tile: HTMLCanvasElement; sx: number; sy: number; sw: number; sh: number; x0: number }
 const debrisSkin = new WeakMap<DebrisPiece, DebrisSkin>();
@@ -77,10 +77,22 @@ let releasing: Prelude | null = null;
 interface Popup { text: string; x: number; y: number; ticks: number; life: number; px: number; rot: number }
 const popups: Popup[] = [];
 
-/** 콤보 숫자 팝업 — 원작은 타격마다 하나씩 생겨 여러 개가 동시에 흩뿌려진다. */
-interface NumPopup { n: number; x: number; y: number; vx: number; vy: number; ticks: number; scale: number; color: string }
-const numPopups: NumPopup[] = [];
 let popupSeed = 0;
+
+/**
+ * 콤보 도장 — 타격 지점 옆 숫자 하나 + 「COMBO」(10-31 옆 자리 숫자를 걷고 판 위로). 칠 때마다 튀고,
+ * 고비(COMBO_MARK.STEPS)마다 효과가 하나씩 는다. 자리는 월드 좌표로 쥐고 그릴 때 카메라를 더한다.
+ * age = 마지막 타격 뒤 틱(HOLD + EXIT를 넘기면 접혀서 다음 타격을 기다린다) · burst = 고비 연출 나이(−1 = 없음)
+ */
+interface ComboMark { n: number; x: number; y: number; tx: number; ty: number; age: number; burst: number; step: number }
+let mark: ComboMark | null = null;
+const MARK_GONE = COMBO_MARK.HOLD + COMBO_MARK.EXIT;
+/** 끊긴 콤보 — 두 동강 나 떨어지는 숫자. 새 콤보 도장과 따로 논다(끊기자마자 다시 쳐도 끝까지 떨어진다) */
+let shards: { n: number; x: number; y: number; t: number } | null = null;
+/** 안전모 받기 — 먹 띠가 지나가며 「안전모!」를 찍고, 띠에 박힌 안전모가 머리로 날아간다(HAT_FX) */
+let hatFx: { t: number; n: number } | null = null;
+/** OS 「동작 줄이기」 — 내리꽂기 · 흔들림 · 흩어짐 · 날아가기를 빼고 글자와 낙관만 남긴다 */
+let reduceMotion = false;
 
 /** 결정적 흩뿌림 — rngState는 core 전용이라 여기선 카운터 해시를 쓴다. */
 function scatter(): number {
@@ -116,19 +128,21 @@ function resetRunState(): void {
   jumpT = 0;
   hitFlashT = 0;
   dropT = 0;
-  lastCombo = 0;
   lastStack = null;
   bossMark = '';
   prelude = null;
   lastTick = -1;
   popups.length = 0;
-  numPopups.length = 0;
+  mark = null;
+  shards = null;
+  hatFx = null;
 }
 
 export function initRenderer(): void {
   initSprites();
   resetRunState();
   smoothCam = 0;
+  reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 /** 장착 코스메틱 일괄 적용 — 씬이 런 시작·장착 변경·도트판 저장 시 호출 (08-30, P1-3). maskArt = 저장의 도트판 그림 */
@@ -177,6 +191,10 @@ function reactFlash(e: JuiceEvent): void {
       return;
     case 'hit': // 연타 장면이 번쩍이면 눈이 아프다 — 맞은 층만 하얗게(drawHitFlash)
     case 'floorCollapse': // 화면 전체가 회색으로 눌려 탁해졌다 — 층 조각·킥·별이 대신한다
+      return;
+    case 'guardBounce': // 막아 냈다 — 잉크 번쩍은 화면이 어두워져 맞은 것처럼 읽혔다. 종이 번쩍(「깡」)으로
+    case 'guardAirBounce':
+      fx.flash({ color: PALETTE.BG, a: 0.32, ticks: spec.flash });
       return;
     default:
       if (spec && spec.flash > 0) fx.flash({ color: PALETTE.INK, a: Math.min(0.4, 0.1 * spec.flash), ticks: spec.flash });
@@ -252,15 +270,42 @@ function reactImpact(s: GameState, e: JuiceEvent): void {
   }
 }
 
-/** 콤보 고비(100·500)를 넘는 틱에 자막 한 번 — 끊기면 다시 센다. 필살 예비동작과 무관하게 틱마다 본다. */
-function watchCombo(s: GameState): void {
-  const c = s.combo;
-  // 한 번에 크게 뛴 콤보(이어하기가 148·168로 바로 넣는다)는 친 게 아니다 — 고비 소리와 같은 기준
-  if (c - lastCombo <= AUDIO.MILESTONE_MAX_JUMP) {
-    if (lastCombo < 100 && c >= 100) fx.startCaption(CAPTIONS.combo100, '100 콤보');
-    else if (lastCombo < 500 && c >= 500) fx.startCaption(CAPTIONS.combo500, '500 콤보');
+/**
+ * 콤보 도장에 타격 하나 — y = 맞은 자리(건물 밑면) 고도. 고비를 넘는 타격이면 그 칸 연출을 켠다.
+ * 콤보 100 · 500 밈 자막은 HUD(runCaps)가 판당 한 번 맡는다 — 여기선 판 위 도장만.
+ */
+function markHit(n: number, y: number): void {
+  const C = COMBO_MARK;
+  n = Math.min(n, SCORE.COMBO_CAP);
+  const tx = VIEW.LANE_X[0] + C.DX;
+  const ty = VIEW.GROUND_Y - y + C.DY;
+  // 보스 입장은 끊김 이벤트 없이 콤보를 0으로 돌린다 — 작아진 수는 새 도장
+  if (!mark || n < mark.n) mark = { n: 0, x: tx, y: ty, tx, ty, age: MARK_GONE, burst: -1, step: -1 };
+  const m = mark;
+  if (m.age >= MARK_GONE) { m.x = tx; m.y = ty; } // 접혀 있던 도장은 맞은 자리에서 다시 편다
+  m.tx = tx;
+  m.ty = ty;
+  m.age = 0;
+  if (n === m.n) return; // 999 카운터스톱 — 같은 수로는 고비를 다시 터뜨리지 않는다
+  const prev = m.n;
+  m.n = n;
+  // 한 번에 크게 뛴 콤보(이어하기가 148 · 168로 바로 넣는다)는 친 게 아니다 — 고비 소리와 같은 기준
+  if (n - prev > AUDIO.MILESTONE_MAX_JUMP) return;
+  for (let i = C.STEPS.length - 1; i >= 0; i--) {
+    if (prev >= C.STEPS[i].at || n < C.STEPS[i].at) continue;
+    m.burst = 0;
+    m.step = i;
+    if (i >= 3 && !reduceMotion) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - 4); // 100부터 내리꽂기 — 화면도 툭
+    return;
   }
-  lastCombo = c;
+}
+
+/** 콤보가 끊겼다 — 떠 있던 10 이상은 두 동강 나 떨어지고, 그 밖엔 조용히 사라진다 */
+function markBreak(n: number): void {
+  const m = mark;
+  mark = null;
+  if (!m || m.age >= MARK_GONE || n < COMBO_MARK.BREAK_MIN || reduceMotion) return;
+  shards = { n: m.n, x: m.x, y: m.y, t: 0 };
 }
 
 /** 의성어 글자 크기 — 타격은 작게, 무너질수록 크게. 콤보가 오르면 조금씩 더 커진다. */
@@ -289,23 +334,12 @@ function react(s: GameState, e: JuiceEvent): void {
   // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
   spawnFromEvent(s, e);
   if (e.kind === 'floorCollapse') shatterFloor(s, e);
-  // 콤보 숫자 팝업 (타격마다 1개, 상한까지 누적)
-  if (e.kind === 'hit' || e.kind === 'bossHit') {
-    const n = e.combo ?? s.combo;
-    if (n > 0) {
-      if (numPopups.length >= JUICE_SYS.COMBO_POPUP_MAX) numPopups.shift();
-      numPopups.push({
-        n,
-        x: VIEW.LANE_X[0] + scatter() * 22,
-        y: VIEW.GROUND_Y - (e.y ?? 100) - 12 + scatter() * 10,
-        vx: scatter() * 0.9,
-        vy: -1.4 - Math.abs(scatter()) * 0.8,
-        ticks: JUICE_SYS.COMBO_POPUP_LIFE_F,
-        scale: 1 + Math.min(n / 400, 1.1),
-        color: comboColor(n),
-      });
-    }
-  }
+  // 콤보 도장 — 콤보를 올린 타격만(층 붕괴는 타격일 때만 combo가 실린다 · 보스 타격은 combo 없이 온다)
+  const hitCombo = e.kind === 'hit' || e.kind === 'bossHit' ? e.combo ?? s.combo
+    : e.kind === 'floorCollapse' || e.kind === 'butterCollapse' ? e.combo : undefined;
+  if (hitCombo !== undefined && hitCombo > 0) markHit(hitCombo, e.y ?? s.player.y + PLAYER.H);
+  if (e.kind === 'comboBreak') markBreak(e.combo ?? 0);
+  if (e.kind === 'hatGet') hatFx = { t: 0, n: e.combo ?? s.combo };
   // 의성어 (동시 3개 상한)
   const combo = e.combo ?? s.combo;
   let word = onomatoFor(e.kind, combo);
@@ -397,15 +431,17 @@ export function consumeEvents(s: GameState): void {
   if (s.tick < lastTick) resetRunState();
   lastTick = s.tick;
   watchBoss(s);
-  watchCombo(s);
   if (prelude) {
     prelude.left -= 1;
     if (prelude.left <= 0) releasePrelude(s);
   }
   const evs = s.events;
-  if (evs.length === 0) return;
-  if (!prelude && evs.some((e) => e.kind === 'special')) beginPrelude(s, evs);
-  else playEvents(s, evs);
+  if (evs.length > 0) {
+    if (!prelude && evs.some((e) => e.kind === 'special')) beginPrelude(s, evs);
+    else playEvents(s, evs);
+  }
+  // 보스 입장은 끊김 이벤트 없이 콤보를 0으로 돌린다 — 떠 있던 수를 조용히 거둔다
+  if (s.combo === 0) mark = null;
 }
 
 /**
@@ -543,7 +579,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     }
     drawPlayer(ctx, s.player.pose, s.player.poseTick, px, footY);
     drawMask(ctx, s.player.pose, s.player.poseTick, px, footY);
-    if (s.hat) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY);
+    if (s.hat && !hatFlying()) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY); // 받는 중엔 날아오는 쪽이 그린다
     if (squash) ctx.restore();
   }
   if (prelude) fx.drawPrelude(ctx, 1 - prelude.left / prelude.total, prelude.x, prelude.y);
@@ -564,9 +600,10 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   drawBladeFx(ctx, cam);
   ctx.save();
   ctx.translate(0, cam);
-  drawNumPopups(ctx);
   drawPopups(ctx);
   ctx.restore();
+  drawComboMark(ctx, cam);
+  drawHatFx(ctx, s, cam);
   ctx.restore();
   ctx.restore();
 
@@ -728,35 +765,328 @@ function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.restore();
 }
 
-function drawNumPopups(ctx: CanvasRenderingContext2D): void {
-  for (let i = numPopups.length - 1; i >= 0; i--) {
-    const p = numPopups[i];
-    p.ticks -= 1;
-    if (p.ticks <= 0) { numPopups.splice(i, 1); continue; }
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.09;            // 살짝 떨어지며 사라짐
-    const t = p.ticks / JUICE_SYS.COMBO_POPUP_LIFE_F;
-    const pop = p.ticks > JUICE_SYS.COMBO_POPUP_LIFE_F - 3 ? 1.35 : 1; // 등장 순간 튐
+const markFont = (px: number): string => `${Math.round(px)}px "Black Han Sans", sans-serif`;
+/** 숫자 크기 — 콤보 500까지 (1 + GROW)배로 큰다 */
+const markPx = (n: number): number => COMBO_MARK.PX * (1 + (COMBO_MARK.GROW * Math.min(n, 500)) / 500);
+/** 지나온 고비 수 — 10부터 기울고 30부터 먹 그림자 */
+const markTier = (n: number): number => COMBO_MARK.STEPS.filter((st) => n >= st.at).length;
+/** 도장 높이(화면) — 필드 위아래 끝에 걸리면 안으로 민다(밑엔 이름표 자리까지) */
+const markScreenY = (y: number, cam: number, px: number): number =>
+  Math.max(VIEW.FIELD_TOP + px * 0.5 + 6, Math.min(VIEW.FIELD_H - px * 0.5 - COMBO_MARK.LABEL_PX - 10, y + cam));
+const hatFlying = (): boolean => !reduceMotion && hatFx !== null && hatFx.t < HAT_FX.LAND;
+
+/**
+ * 판 위 글씨 붓 — 잉크 링 + 흰 링 + 채움. ★08-30 7차: 아이보리 헤일로 하나만 두면 배경색과 같은 색이라
+ * 밝은 건물 면 위에서 통째로 사라진다(사용자 영상 판정). 잉크 링을 바깥에 둘러 밝은 곳 · 어두운 곳 어디서든 한 겹은 산다.
+ * shadow = 먹 그림자 한 겹(글자가 찍힌 것처럼)
+ */
+function inkText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fill: string, shadow = false): void {
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = PALETTE.INK;
+  if (shadow) {
+    ctx.fillStyle = PALETTE.INK;
+    ctx.strokeText(text, x + 3, y + 3.5);
+    ctx.fillText(text, x + 3, y + 3.5);
+  }
+  ctx.strokeText(text, x, y);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = PALETTE.WHITE;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+}
+
+/**
+ * 콤보 도장(화면 좌표, 틱마다 한 번). 고비 칸 k에 따라 효과가 쌓인다:
+ * 0 말 · 1 먹 고리 · 2 노랑 베기 · 3 내리꽂기 + 집중선 · 4 X 베기 · 5 먹 방울 · 6 주홍 낙관 · 7 MAX
+ */
+function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
+  drawShards(ctx, cam);
+  const m = mark;
+  if (!m || m.age >= MARK_GONE) return;
+  const C = COMBO_MARK;
+  m.x += (m.tx - m.x) * 0.35;
+  m.y += (m.ty - m.y) * 0.35;
+  const px = markPx(m.n);
+  const txt = String(m.n);
+  const tier = markTier(m.n);
+  const t = m.burst;
+  const k = t >= 0 ? m.step : -1;
+  ctx.save();
+  ctx.font = markFont(px);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const w = ctx.measureText(txt).width;
+  const x = Math.max(w / 2 + 8, Math.min(VIEW.W - w / 2 - 8, m.x));
+  const y = markScreenY(m.y, cam, px);
+  // 칠 때마다 튀고, 다 버티면 접힌다
+  const pu = Math.max(0, 1 - m.age / C.PUNCH_TICKS);
+  let sc = 1 + C.PUNCH * pu * pu;
+  if (m.age > C.HOLD) sc *= 1 - ((m.age - C.HOLD) / C.EXIT) ** 2;
+  let dy = 0;
+  let jx = 0;
+  if (k >= 3 && !reduceMotion) {
+    // 내리꽂기 — 2.2배로 위에서 떨어져 한 번 눌렸다 선다(감쇠 진동) + 제자리 떨림
+    sc = 1 + 1.2 * Math.exp(-t / 2.2) * Math.cos(t * 0.55);
+    dy = -36 * Math.max(0, 1 - t / 4) ** 2;
+    if (t < 10) jx = Math.sin(t * 2.7) * 2.2 * (1 - t / 10);
+  } else if (k >= 0) {
+    sc *= 1 + 0.3 * Math.max(0, 1 - t / 8) ** 2;
+  }
+  if (k >= 0) drawBurstBack(ctx, k, t, x, y, px);
+  ctx.translate(x + jx, y + dy);
+  ctx.scale(sc, sc);
+  const seal = m.n >= 500;
+  if (seal) {
+    // 500부터 주홍 낙관 — 숫자를 한지색으로 뺀다(500 고비엔 숫자와 같이 내리꽂힌다)
+    const sw = w + 16;
+    const sh = px * 0.95;
     ctx.save();
-    ctx.globalAlpha = Math.min(1, t * 2.2);
-    ctx.translate(p.x, p.y);
-    ctx.font = `${Math.round(JUICE_SYS.COMBO_POPUP_PX * p.scale * pop)}px "Black Han Sans", sans-serif`;
-    ctx.textAlign = 'center';
-    // ★08-30 7차 이중 외곽선: 아이보리 헤일로 하나만 두면 **배경색과 같은 색**이라
-    // 밝은 건물 면 위에서 통째로 사라진다(사용자 영상 판정). 잉크 링을 바깥에 하나 더 둘러
-    // 밝은 곳/어두운 곳 양쪽에서 최소 한 겹은 살아남게 한다.
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 4.5;
-    ctx.strokeStyle = PALETTE.INK;
-    ctx.strokeText(String(p.n), 0, 0);
+    ctx.rotate(-0.06);
+    ctx.fillStyle = PALETTE.RED;
+    ctx.fillRect(-sw / 2, -sh / 2, sw, sh);
     ctx.lineWidth = 2.5;
-    ctx.strokeStyle = PALETTE.WHITE;
-    ctx.strokeText(String(p.n), 0, 0);
-    ctx.fillStyle = p.color;
-    ctx.fillText(String(p.n), 0, 0);
+    ctx.strokeStyle = PALETTE.INK;
+    ctx.strokeRect(-sw / 2, -sh / 2, sw, sh);
     ctx.restore();
   }
+  // 이름표 — 먹 글씨 + 흰 테
+  const label = m.n >= SCORE.COMBO_CAP ? 'MAX COMBO' : 'COMBO';
+  const ly = px * 0.5 + C.LABEL_PX * 0.5 + 4;
+  ctx.font = markFont(C.LABEL_PX);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = PALETTE.WHITE;
+  ctx.strokeText(label, 0, ly);
+  ctx.fillStyle = PALETTE.INK;
+  ctx.fillText(label, 0, ly);
+  ctx.font = markFont(px);
+  if (tier >= 1) ctx.transform(1, 0, -0.2, 1, 0, 0); // 앞으로 기운다
+  inkText(ctx, txt, 0, 0, seal ? PALETTE.WHITE : comboColor(m.n), tier >= 2);
+  ctx.restore();
+  if (k >= 0) drawBurstFront(ctx, k, t, x, y, px);
+  m.age += 1;
+  if (t >= 0) m.burst = t + 1 > C.BURST ? -1 : t + 1;
+}
+
+/** 고비 연출 — 숫자 뒤: 집중선(100~) · 노랑 베기(50~, 200부터 X) · 먹 고리(30~) */
+function drawBurstBack(ctx: CanvasRenderingContext2D, k: number, t: number, x: number, y: number, px: number): void {
+  ctx.save();
+  if (k >= 3 && !reduceMotion && t < 10) {
+    const r0 = px * 0.9 + 6;
+    const r1 = r0 + 12 + 26 * (1 - t / 10);
+    ctx.fillStyle = PALETTE.INK;
+    ctx.beginPath();
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + 0.2;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      ctx.moveTo(x + c * r0 - sn * 2.2, y + sn * r0 + c * 2.2);
+      ctx.lineTo(x + c * r0 + sn * 2.2, y + sn * r0 - c * 2.2);
+      ctx.lineTo(x + c * r1, y + sn * r1);
+      ctx.closePath();
+    }
+    ctx.fill();
+  }
+  if (k >= 2) slashBand(ctx, x, y, -0.32, t);
+  if (k >= 4) slashBand(ctx, x, y, 0.42, t - 3);
+  if (k >= 1 && !reduceMotion && t < 14) {
+    ctx.strokeStyle = PALETTE.INK;
+    ctx.lineWidth = 7 * (1 - t / 14);
+    ctx.beginPath();
+    ctx.arc(x, y, px * 0.6 + t * 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** 노랑 베기 한 줄 — 3틱에 그어지고 남은 틱에 가늘어진다. 먹 테를 둘러 한지 위에서도 산다 */
+function slashBand(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, t: number): void {
+  if (t < 0 || t >= 14) return;
+  const len = 170 * Math.min(1, (t + 1) / 3);
+  const h = 12 * (t < 3 ? 1 : 1 - (t - 3) / 11);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.beginPath();
+  ctx.moveTo(-85, 0);
+  ctx.lineTo(-85 + len - 10, -h / 2);
+  ctx.lineTo(-85 + len, 0);
+  ctx.lineTo(-85 + len - 10, h / 2);
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.YELLOW;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = PALETTE.INK;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** 고비 연출 — 숫자 앞: 먹 방울(300~) · 고비 말(숫자 위에 노랑으로 박혔다가 끝 8틱에 접힌다) */
+function drawBurstFront(ctx: CanvasRenderingContext2D, k: number, t: number, x: number, y: number, px: number): void {
+  const C = COMBO_MARK;
+  ctx.save();
+  if (k >= 5 && !reduceMotion && t < 24) {
+    ctx.fillStyle = PALETTE.INK;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.4;
+      const d = px * 0.55 + (3 + (i % 3)) * t; // 숫자 가장자리에서 튄다 — 숫자에 묻지 않게
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d + 0.12 * t * t, (3.4 - (i % 2) * 1.2) * (1 - t / 24), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const word = C.STEPS[k].word;
+  const wpx = 17 + 2 * k;
+  ctx.font = markFont(wpx);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const ww = ctx.measureText(word).width;
+  const inU = Math.max(0, 1 - t / 6);
+  const out = Math.max(0, (t - (C.BURST - 8)) / 8);
+  ctx.translate(
+    Math.max(ww / 2 + 6, Math.min(VIEW.W - ww / 2 - 6, x - 4)),
+    Math.max(VIEW.FIELD_TOP + wpx, y - px * 0.5 - wpx * 0.5 - 10),
+  );
+  ctx.rotate(-0.1);
+  const wsc = (1 + 0.5 * inU * inU) * (1 - out * out);
+  ctx.scale(wsc, wsc);
+  inkText(ctx, word, 0, 0, PALETTE.YELLOW, true);
+  ctx.restore();
+}
+
+/** 끊긴 콤보 — 비스듬한 금을 따라 두 동강 나 벌어지며 떨어진다(잔해 색) */
+function drawShards(ctx: CanvasRenderingContext2D, cam: number): void {
+  const sh = shards;
+  if (!sh) return;
+  const t = sh.t;
+  const end = COMBO_MARK.BREAK;
+  const px = markPx(sh.n);
+  const txt = String(sh.n);
+  ctx.save();
+  ctx.font = markFont(px);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const half = ctx.measureText(txt).width / 2 + 8;
+  const x = Math.max(half + 2, Math.min(VIEW.W - half - 2, sh.x));
+  const y = markScreenY(sh.y, cam, px) + 0.35 * t * t;
+  const sc = t > end - 8 ? 1 - (t - (end - 8)) / 8 : 1;
+  for (const side of [-1, 1]) {
+    ctx.save();
+    ctx.translate(x + side * t * 1.6, y);
+    ctx.rotate(side * t * 0.035);
+    ctx.scale(sc, sc);
+    // 금 = (4, −px) → (−4, px). 왼쪽 반은 금 왼편만, 오른쪽 반은 오른편만
+    ctx.beginPath();
+    ctx.moveTo(4, -px);
+    ctx.lineTo(side * half * 1.5, -px);
+    ctx.lineTo(side * half * 1.5, px);
+    ctx.lineTo(-4, px);
+    ctx.closePath();
+    ctx.clip();
+    inkText(ctx, txt, 0, 0, PALETTE.RUBBLE);
+    ctx.restore();
+  }
+  ctx.restore();
+  sh.t += 1;
+  if (sh.t >= end) shards = null;
+}
+
+/**
+ * 안전모 받기(화면 좌표, 틱마다 한 번) — 먹 띠가 IN에 왼쪽에서 들어와 OUT부터 오른쪽으로 빠진다.
+ * 띠에 찍힌 안전모는 OUT부터 돌며 머리로 날아가 LAND에 씌워지고, END까지 머리에 먹 고리 하나.
+ */
+function drawHatFx(ctx: CanvasRenderingContext2D, s: GameState, cam: number): void {
+  const f = hatFx;
+  if (!f) return;
+  const H = HAT_FX;
+  const t = f.t;
+  const slotX = 112;
+  const slotY = H.BAND_Y - 2;
+  const run = VIEW.W + 60;
+  let off = 0;
+  if (!reduceMotion && t < H.IN) off = -run * (1 - t / H.IN) ** 3;
+  else if (!reduceMotion && t >= H.OUT) off = run * Math.min(1, (t - H.OUT) / (H.GONE - H.OUT)) ** 2;
+  if (t < H.GONE) drawHatBand(ctx, off, f.n);
+  if (t >= H.IN - 2 && t < H.OUT) {
+    // 띠에 도장처럼 찍힌다 — 크게 박혔다 앉는다
+    const pu = reduceMotion ? 0 : Math.max(0, 1 - (t - (H.IN - 2)) / 6);
+    bigHat(ctx, slotX + off, slotY, 5, 3.2 * (1 + 0.7 * pu * pu), 0);
+  }
+  // 깔려서 벌써 깨졌으면(같은 틱에 깔림) 날아갈 안전모가 없다
+  const at = s.hat ? hatSpot(s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], VIEW.GROUND_Y - s.player.y) : null;
+  if (at && !reduceMotion && t >= H.OUT && t < H.LAND) {
+    const u = (t - H.OUT) / (H.LAND - H.OUT);
+    const e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) ** 2;
+    const x1 = at[0];
+    const y1 = at[1] + cam;
+    const cx = (slotX + x1) / 2;
+    const cy = Math.min(slotY, y1) - 70; // 위로 한 번 솟았다 내려앉는 포물선
+    const q = 1 - e;
+    bigHat(ctx, q * q * slotX + 2 * q * e * cx + e * e * x1, q * q * slotY + 2 * q * e * cy + e * e * y1,
+      5 + (at[2] - 5) * e, 1 + 2.2 * q, -q * Math.PI * 1.5);
+  }
+  if (at && !reduceMotion && t >= H.LAND) {
+    const u = (t - H.LAND) / (H.END - H.LAND);
+    ctx.save();
+    ctx.strokeStyle = PALETTE.INK;
+    ctx.lineWidth = 3 * (1 - u);
+    ctx.beginPath();
+    ctx.arc(at[0], at[1] + cam - 2, 8 + u * 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  f.t += 1;
+  if (f.t >= H.END) hatFx = null;
+}
+
+function bigHat(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, k: number, rot: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.scale(k, k);
+  hardHat(ctx, 0, 0, r);
+  ctx.restore();
+}
+
+/** 띠 — 양 끝을 비스듬히 자른 먹 띠 + 위아래 노랑 테 한 줄씩. 「안전모!」 한지색 + 「COMBO n」 노랑 */
+function drawHatBand(ctx: CanvasRenderingContext2D, off: number, n: number): void {
+  const y = HAT_FX.BAND_Y;
+  const h = HAT_FX.BAND_H / 2;
+  ctx.save();
+  ctx.translate(off, 0);
+  ctx.beginPath();
+  ctx.moveTo(-10, y - h);
+  ctx.lineTo(VIEW.W + 30, y - h);
+  ctx.lineTo(VIEW.W + 10, y + h);
+  ctx.lineTo(-30, y + h);
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.INK;
+  ctx.fill();
+  ctx.fillStyle = PALETTE.YELLOW;
+  ctx.fillRect(-30, y - h - 6, VIEW.W + 60, 3);
+  ctx.fillRect(-30, y + h + 3, VIEW.W + 60, 3);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = markFont(30);
+  ctx.fillStyle = PALETTE.WHITE;
+  ctx.fillText(ITEM_COPY.hat.pop, 148, y - 6);
+  ctx.font = markFont(14);
+  ctx.fillStyle = PALETTE.YELLOW;
+  ctx.fillText(`COMBO ${n}`, 150, y + 18);
+  ctx.restore();
+}
+
+/** 시험용 — 지금 콤보 도장(n · 떠 있나 · 고비 칸) · 끊긴 조각 수 · 안전모 연출 나이(−1 = 없음) */
+export function comboMarkView(): { n: number; shown: boolean; step: number; broken: number; hat: number } {
+  return {
+    n: mark?.n ?? 0,
+    shown: mark !== null && mark.age < MARK_GONE,
+    step: mark !== null && mark.burst >= 0 ? mark.step : -1,
+    broken: shards?.n ?? 0,
+    hat: hatFx?.t ?? -1,
+  };
 }
 
 /**

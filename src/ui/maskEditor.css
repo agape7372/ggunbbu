@@ -1,0 +1,269 @@
+/* 도트판 — 「먹 한 획」(ui/maskEditor.ts). 상점 마스크 「그리기」가 여는 전체 화면 패널.
+   한지 바탕 · 먹 칸선 · 판은 단단한 먹 그림자로 띄운다. 주홍은 「저장」 하나(색 만들기 창에선 「이 색으로」 하나 — 밑 조작은 그동안 숨는다).
+   닫기 · 취소 = 먹 테두리 도장(가는 길). 붓글씨는 제목만, 나머지는 고운바탕.
+   300 기둥 하나에 미리보기 · 판 · 도구 · 팔레트 · 저장을 쌓는다. 높이가 모자라면 패널 안에서 세로로 민다 — 판은 손가락을 먹는다.
+   색 만들기의 무지개 · 채도 · 밝기 길만은 고를 색을 보여 주는 그림이라 그라데이션을 쓴다 */
+
+.mk-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  padding: 8px 18px;
+  background: var(--paper);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  pointer-events: auto;
+  scrollbar-width: none;
+}
+
+/* 닫은 뒤 잠깐 남는 빈 판 — 보이지 않게 탭만 받아 낸다(maskEditor SWALLOW_MS) */
+.mk-panel.gone { opacity: 0; }
+
+.mk-panel::-webkit-scrollbar { display: none; }
+.mk-panel:focus { outline: none; }
+
+/* 남는 높이가 있으면 가운데, 모자라면 위에서부터(위아래 auto 여백).
+   세로 예산: 780 무대 − 위아래 여백 16 = 기둥 764 이하(머리 48 · 미리보기 106 · 판 294 · 도구 40 · 색 168 · 저장 60, 간격 8 → 756) — 넘으면 저장 줄이 화면 밖으로 밀린다 */
+.mk-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
+  margin: auto 0;
+}
+
+.mk-head { display: flex; align-items: center; justify-content: space-between; }
+.mk-head h2 { font: 400 40px/1 var(--brush); rotate: -3deg; transform-origin: 0 100%; }
+.mk-head .inkseal { width: 48px; height: 48px; font-size: 25px; rotate: 3deg; }
+
+.mk-views { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+
+.mk-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 8px;
+  background: var(--paper-2);
+}
+
+.mk-view canvas { display: block; }
+.mk-view figcaption { font: 700 12.5px/1.2 var(--body); color: var(--ink2); }
+
+/* 판 — 먹 테두리 + 단단한 먹 그림자 */
+.mk-board { border: 3px solid var(--ink); box-shadow: 6px 7px 0 var(--ink); margin-right: 6px; }
+
+.mk-board canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* 판 아래 조작 묶음(도구 · 색 · 십자 단추 · 저장) — 색 만들기 창이 이 자리를 통째로 덮는다 */
+.mk-ctrl { position: relative; display: flex; flex-direction: column; gap: 8px; }
+
+/* 먹 칸 단추 — 도구 · 색 만들기 · 십자 단추가 같이 쓴다. 켠 것 = 먹 채움 */
+.mk-tools button,
+.mk-make,
+.mk-pad button {
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+.mk-tools button[aria-pressed="true"],
+.mk-pad [data-mk="ink"][aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.mk-tools button:not(:disabled):active,
+.mk-make:active,
+.mk-pad button:active { background: var(--paper-2); color: var(--ink); }
+
+/* 도구 여섯 — 아이콘만(이름은 단추 aria-label) */
+.mk-tools { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.mk-tools button { display: grid; place-items: center; min-height: 40px; padding: 0; }
+.mk-tools .ic { width: 22px; height: 22px; }
+.mk-tools button:disabled { border-color: var(--ink3); color: var(--ink3); cursor: default; }
+
+/* 색(기본 30 + 내 색 6) + 오른쪽 기둥(색 만들기 · 십자 단추) — 십자 단추는 오른손 엄지 쪽 */
+.mk-under { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.mk-palette { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; align-content: start; }
+
+.mk-sw {
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  background: var(--c);
+  pointer-events: auto;
+}
+
+/* 고른 색 — 굵은 먹 테두리 + 한지 안쪽 고리(먹·진한 색 위에서도 보이게) */
+.mk-sw[aria-pressed="true"] { border-width: 3px; box-shadow: inset 0 0 0 2px var(--paper); }
+
+/* 내 색 — 기본 색과 조금 띄운 마지막 줄. 빈 칸은 옅은 먹 테두리 + 더하기(누르면 색 만들기) */
+.mk-mine { margin-top: 4px; }
+.mk-mine .ic { width: 14px; height: 14px; margin: auto; }
+.mk-mine:not(.empty) .ic { display: none; }
+.mk-mine.empty { display: grid; border-color: var(--ink3); color: var(--ink2); }
+
+.mk-side { display: flex; flex-direction: column; gap: 8px; }
+
+/* 색 만들기 — 지금 색 네모 + 이름. 기둥에서 십자 단추 위 남는 높이를 다 쓴다 */
+.mk-make {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 4px;
+  font: 700 12.5px/1 var(--body);
+  white-space: nowrap;
+}
+
+.mk-now { flex: 0 0 auto; width: 20px; height: 20px; border: 2px solid var(--ink); }
+
+/* 십자 단추 — 가운데 = 지금 도구로 그 칸에(찍기·지우기는 켜 두면 옮길 때마다 칠한다). 누르고 있으면 계속 간다 */
+.mk-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  grid-template-areas: ". up ." "left ink right" ". down .";
+  gap: 3px;
+  touch-action: none;
+}
+
+.mk-pad button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font: 700 12.5px/1 var(--body);
+  white-space: nowrap;
+}
+
+.mk-pad [data-mk="ink"] { grid-area: ink; font-size: 11px; } /* 「채우기」 세 글자가 38 칸 안쪽 32에 — 이 한 칸만 12.5 아래 */
+.mk-pad [data-mk-move="up"] { grid-area: up; }
+.mk-pad [data-mk-move="down"] { grid-area: down; }
+.mk-pad [data-mk-move="left"] { grid-area: left; }
+.mk-pad [data-mk-move="right"] { grid-area: right; }
+.mk-pad [data-mk-move="up"] .ic { transform: rotate(-90deg); }
+.mk-pad [data-mk-move="down"] .ic { transform: rotate(90deg); }
+.mk-pad [data-mk-move="left"] .ic { transform: rotate(180deg); }
+
+/* 아래 줄 — 취소(먹 테두리 도장) + 저장(주홍) */
+.mk-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; }
+.mk-foot .inkseal { rotate: -3deg; }
+.mk-save { height: 54px; rotate: -1.5deg; }
+.mk-save b { font-size: 32px; }
+
+/* 색 만들기 — 판 아래 조작 묶음을 덮는다. 미끄럼 셋(색상 · 채도 · 밝기), 채도·밝기 길 바탕은 다른 두 값을 따라 바뀐다 */
+.mk-picker {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--paper);
+  pointer-events: auto;
+}
+
+.mk-picker[hidden] { display: none; }
+
+/* 창이 덮는 동안 밑의 조작은 자리만 남긴다 — 겹친 가장자리가 소수 픽셀에서 비쳐 보이지 않게 */
+.mk-ctrl.picking > :not(.mk-picker) { visibility: hidden; }
+
+/* 창을 열고 닫은 직후 잠깐 — 같은 자리에 겹친 창 단추와 밑 단추가 두 번 톡톡의 둘째 탭을 받지 않게(특이도 0,2,0 > 단추들 0,1,1) */
+.mk-ctrl.settling * { pointer-events: none; }
+
+.mk-pick-head { display: flex; align-items: center; justify-content: space-between; }
+.mk-pick-head h3 { font: 400 30px/1 var(--brush); rotate: -2deg; }
+
+/* 전 색 | 새 색 */
+.mk-pick-sw {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 84px;
+  height: 30px;
+  border: 3px solid var(--ink);
+}
+
+.mk-pick-sw i { display: block; }
+
+.mk-slide { display: grid; gap: 4px; font: 700 12.5px/1.2 var(--body); color: var(--ink); }
+
+.mk-slide input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  border: 3px solid var(--ink);
+  background: var(--track, var(--paper-2));
+  pointer-events: auto;
+}
+
+.mk-slide input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 26px;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+}
+
+.mk-slide input::-moz-range-thumb {
+  width: 8px;
+  height: 20px;
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+}
+
+.mk-slide input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+[data-pick="h"] {
+  --track: linear-gradient(to right, hsl(0, 100%, 50%), hsl(60, 100%, 50%), hsl(120, 100%, 50%), hsl(180, 100%, 50%), hsl(240, 100%, 50%), hsl(300, 100%, 50%), hsl(360, 100%, 50%));
+}
+
+.mk-picker .mk-foot { margin-top: auto; }
+.mk-picker .mk-save b { font-size: 30px; }
+
+/* ── 가면 이름 칸(머리) — 사용자가 친 글자라 .uname(shop.css, 시스템 글꼴 묶음)으로 그린다. 먹 밑줄 한 획 ── */
+.mk-head { gap: 10px; }
+
+.mk-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 4px solid var(--ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.mk-name::placeholder { color: var(--ink2); opacity: 1; }
+.mk-name:focus { outline: none; background: var(--paper-2); }
+
+/* 아래 줄 — 취소 · (삭제) · 저장 */
+.mk-foot:has([data-mk="del"]) { grid-template-columns: auto auto minmax(0, 1fr); }
+.mk-foot [data-mk="del"] { rotate: 2deg; }
+
+/* 지우기 확인 — 가운데 작은 컷(상점 확인 창과 같은 .m-card). 오버레이층 맨 위 */
+.mk-confirm { position: absolute; inset: 0; z-index: 25; display: grid; place-items: center; padding: 24px; pointer-events: auto; }
+.mk-confirm .m-title { font-size: 40px; }
+.mk-del-name { font: 700 18px/1.3 sans-serif; overflow-wrap: anywhere; }
+.mk-confirm .m-actions { justify-content: space-between; }
+.mk-confirm .m-actions .stroke { min-width: 0; flex: 1 1 0; }

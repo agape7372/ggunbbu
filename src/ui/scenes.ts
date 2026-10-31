@@ -28,9 +28,10 @@ import {
   ENDING_FULL_COMBO,
 } from '../content';
 import { introFor } from '../content/story';
-import { MASK_COPY, OPERATIONS, WEAPON_COPY } from '../content/world';
-import { maskIsBlank } from '../meta/mask';
+import { MASK_COPY, OPERATIONS, WEAPON_COPY, regionOf } from '../content/world';
+import { MASK_MAX, adoptLegacyMask, createMask, deleteMask, ownedMasks, updateMask, wearMask, wornMaskId } from '../meta/mask';
 import { closeMaskEditor, openMaskEditor } from './maskEditor';
+import { closeLayoutEditor, openLayoutEditor } from './layoutEditor';
 import { mountHud, ensureHudLayer } from './hud';
 import { createRunCaps, type RunCap, type RunCaps } from './runCaps';
 import {
@@ -48,7 +49,7 @@ import {
 import { createAdsPort, type AdKind } from '../platform/ads';
 import { minimizeApp, onBackButton, onLifecycle } from '../platform/native';
 import { createIapPort, SKUS, type SkuId } from '../platform/iap';
-import { isDevUnlocked } from '../platform/devUnlock';
+import { DEV_TOOLS, isDevUnlocked } from '../platform/devUnlock';
 import {
   applyDebug as tickDebug,
   settleDebug,
@@ -128,6 +129,7 @@ export function createApp(
     setSfxOn,
     setFeedbackOptions,
     setLeftHanded: (on) => { touch?.setLeftHanded(on); },
+    setButtonLayout: (layout) => { touch?.setLayout(layout); },
   };
   applySettingsToRuntime(save, settingsSinks);
   initRenderer();
@@ -227,7 +229,8 @@ export function createApp(
     setChrome('playing');
   }
 
-  function goTitle(): void {
+  /** show = false — 홈을 거치지 않고 바로 다른 화면(작전 목록 · 상점)으로 간다. 베는 칼이 결과 화면에서 바로 넘어가게 */
+  function goTitle(show = true): void {
     gameoverDelay = 0;
     pendingOver = null;
     pendingOps = null;
@@ -239,7 +242,7 @@ export function createApp(
     butterChallenge = false;
     save = { ...save, ...loadSave() };
     setChrome('title');
-    overlay.showTitle(titleView());
+    if (show) overlay.showTitle(titleView());
     bgm('title');
   }
 
@@ -284,18 +287,19 @@ export function createApp(
     overlay.showMissions(daily, save.achieves, ads.ready());
   }
 
+  function openBook(): void {
+    // 내 가면은 가면마다 칸 하나(공방을 연 사람만 — 이름은 사용자가 지은 글자)
+    overlay.showBook({ loadout: save.loadout, maskArt: save.maskArt }, ownedSet(), save.owned.includes('mask') ? ownedMasks(save) : undefined);
+  }
+
   function openShop(): void {
     overlay.showShop({
       dust: save.dust, orbit: save.orbit, license: save.license, buildings: save.stats.buildings, loadout: save.loadout,
-      maskArt: save.maskArt,
+      maskArt: save.maskArt, masks: save.masks, maskId: save.maskId,
     }, ownedSet(), {
       iap: iap.available(),
       ad: ads.ready(),
     });
-  }
-
-  function openCustom(): void {
-    overlay.showCustom(save.loadout, ownedSet());
   }
 
   function startOp(id: string): void {
@@ -390,7 +394,7 @@ export function createApp(
       const r = await ads.showRewarded(kind);
       overlay.toast('');
       if (r === 'ok') return true;
-      overlay.toast(r === 'skip' ? '끝까지 봐야 받을 수 있습니다.' : '광고를 못 불러왔습니다. 다시 눌러 주세요.');
+      overlay.toast(r === 'skip' ? '끝까지 봐야 받아요.' : '광고를 못 불러왔어요. 다시 눌러 주세요.');
       playSfx('uiDeny');
       return false;
     } finally {
@@ -420,7 +424,7 @@ export function createApp(
     menuIndex = 0;
     playSfx('uiBack');
     overlay.showTitle(titleView());
-    overlay.toast('기록을 지웠습니다.');
+    overlay.toast('기록을 지웠어요.');
   }
 
   async function buySku(id: string): Promise<void> {
@@ -458,7 +462,7 @@ export function createApp(
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
     saveSave(save);
     playSfx('coin');
-    overlay.toast('열었습니다.');
+    overlay.toast('열었어요.');
     openShop();
   }
 
@@ -466,45 +470,67 @@ export function createApp(
     const cost = dustCost(id);
     if (cost == null || !spendDust(save, cost)) { playSfx('uiDeny'); return; }
     if (!save.owned.includes(id)) save.owned = [...save.owned, id];
+    if (id === 'mask') adoptLegacyMask(save); // 가면 공방 — 옛 그림이 남아 있으면 첫 가면
     saveSave(save);
     playSfx('coin');
-    overlay.toast('샀습니다.');
+    overlay.toast('샀어요.');
     openShop();
   }
 
   function doEquip(slot: string, id: string): void {
-    save.loadout = equip(save.loadout, slot, id, ownedSet());
+    // 가면 칸의 「그리기」 · 「새 가면」은 상점이 장착 길(onEquip)로 보낸다 — 여기서 도트판을 연다
+    if (slot === 'mask-edit') { openMaskBoard(id); return; }
+    if (slot === 'mask-new') { openMaskBoard(null); return; }
+    if (slot === 'mask') wearMask(save, id); // id = 가면 id 또는 'none'
+    else save.loadout = equip(save.loadout, slot, id, ownedSet());
     applyCosmetics(save.loadout, save.maskArt); // 즉시 반영 — 팔리는 물건은 실제로 바뀐다 (P1-3)
     saveSave(save);
     playSfx('stamp');
-    // 상점의 「장착」 띠에서도 부른다 — 누른 화면을 그대로 다시 그린다
-    if (overlay.getScreen() === 'shop') openShop();
-    else openCustom();
+    // 장착은 상점 안에서만 한다(꾸미기 탭을 합쳤다) — 상점을 그대로 다시 그린다
+    openShop();
   }
 
-  /** 상점 마스크 「그리기」 — 산 사람만. 다시 그리기는 무료 */
-  function openMaskBoard(): void {
-    if (!save.owned.includes('mask')) { playSfx('uiDeny'); return; }
+  /** 가면 도트판 — id = 있던 가면(다시 그리기 · 이름 고치기), null = 새 가면(공방을 연 사람만, 8장까지). 둘 다 무료 */
+  function openMaskBoard(id: string | null): void {
+    const cur = id === null ? undefined : save.masks.find((m) => m.id === id);
+    if (!save.owned.includes('mask') || (id === null ? save.masks.length >= MASK_MAX : !cur)) { playSfx('uiDeny'); return; }
     playSfx('uiBlip');
-    openMaskEditor(ensureOverlayLayer(), save.maskArt, {
-      onSave: saveMask,
+    const no = (mid: string): number => Number(mid.slice(1)) || 1;
+    const nextNo = Math.max(0, ...save.masks.map((m) => no(m.id))) + 1;
+    openMaskEditor(ensureOverlayLayer(), {
+      name: cur?.name ?? '', fallback: `마스크 ${cur ? no(cur.id) : nextNo}`, art: cur?.art ?? '0'.repeat(256), isNew: !cur,
+    }, {
+      onSave: (name, art) => saveMask(cur?.id ?? null, name, art),
+      onDelete: () => { if (cur) removeMask(cur.id); },
       onClose: () => playSfx('uiBack'),
     });
   }
 
-  /** 도트판 저장. 처음 그린 그림이고 아직 안 쓰고 있으면 바로 씌운다 */
-  function saveMask(art: string): void {
-    const first = maskIsBlank(save.maskArt) && !maskIsBlank(art) && save.loadout.mask !== 'mask';
-    save.maskArt = art;
-    if (first) save.loadout = equip(save.loadout, 'mask', 'mask', ownedSet());
+  /** 도트판 저장 — 새 가면은 목록 끝에 붙고(그림이 있으면 바로 씌운다), 있던 가면은 이름 · 그림만 바꾼다 */
+  function saveMask(id: string | null, name: string, art: string): void {
+    const made = id === null ? createMask(save, name, art) : null;
+    if (id !== null) updateMask(save, id, name, art);
+    else if (!made) { playSfx('uiDeny'); return; }
     applyCosmetics(save.loadout, save.maskArt);
     saveSave(save);
     playSfx('stamp');
-    overlay.toast(first ? '저장하고 장착했습니다.' : '저장했습니다.');
+    overlay.toast(made && save.loadout.mask === 'mask' ? '저장하고 장착했어요.' : '저장했어요.');
     if (overlay.getScreen() !== 'shop') return;
     openShop();
-    // 다시 그린 상점은 연 「그리기」 단추를 갈아 끼운다 — 초점을 새 단추로(취소·뒤로는 도트판이 돌려준다)
-    document.querySelector<HTMLElement>('[data-mask-edit]')?.focus({ preventScroll: true });
+    // 다시 그린 상점은 연 단추를 갈아 끼운다 — 초점을 그 가면의 「그리기」로(취소·뒤로는 도트판이 돌려준다)
+    const at = made?.id ?? id;
+    document.querySelector<HTMLElement>(`[data-equip-slot="mask-edit"][data-equip-id="${at}"]`)?.focus({ preventScroll: true });
+  }
+
+  /** 가면 지우기(도트판의 확인 팝업 뒤) — 쓰고 있었으면 벗는다 */
+  function removeMask(id: string): void {
+    const worn = wornMaskId(save) === id;
+    if (!deleteMask(save, id)) return;
+    applyCosmetics(save.loadout, save.maskArt);
+    saveSave(save);
+    playSfx('stamp');
+    overlay.toast(worn ? '지우고 벗었어요.' : '지웠어요.');
+    if (overlay.getScreen() === 'shop') openShop();
   }
 
   function startTokoton(): void {
@@ -620,6 +646,18 @@ export function createApp(
     playSfx('uiBlip');
   }
 
+  /** 설정 「버튼 배치」 — 저장하면 판 키에 바로 적용. 전부 기본 자리면 저장값을 지운다 */
+  function openLayoutBoard(): void {
+    playSfx('uiBlip');
+    openLayoutEditor(ensureOverlayLayer(), { layout: save.settings.buttonLayout, leftHanded: save.settings.leftHanded }, {
+      onSave: (layout) => {
+        applySettingsPatch({ buttonLayout: layout ?? undefined });
+        overlay.toast('저장했어요.');
+      },
+      onClose: () => playSfx('uiBack'),
+    });
+  }
+
   function openSettings(): void {
     settingsFrom = scene === 'pause' ? 'pause' : 'title';
     overlay.showSettings(save.settings, settingsFrom === 'pause');
@@ -628,6 +666,7 @@ export function createApp(
   /** 안드로이드 뒤로가기·Esc 공용. 창 → 하위 화면 → 타이틀 → 앱 내리기 순으로 한 칸씩 물러난다. */
   function handleBack(): void {
     if (closeMaskEditor()) return; // 도트판이 가장 위 — 저장 없이 닫는다
+    if (closeLayoutEditor()) return; // 버튼 배치도 같다
     if (overlay.modalOpen()) { overlay.closeModal(); return; }
     const scr = overlay.getScreen();
     switch (scene) {
@@ -697,6 +736,7 @@ export function createApp(
     onPauseQuit: () => { playSfx('uiBack'); persist(); goTitle(); },
     onSettingsBack: () => { playSfx('uiBack'); backFromSettings(); },
     onSettingsPatch: applySettingsPatch,
+    onLayoutEdit: openLayoutBoard,
     onGameOverContinue: afterLock(() => {
       if (!state || scene !== 'gameover') return;
       if (state.mode === 'act2' && state.checkpoint > 0) {
@@ -709,13 +749,14 @@ export function createApp(
     onGameOverRetry: afterLock(() => { playSfx('uiOk'); lastRun(); }),
     onGameOverTitle: afterLock(() => { playSfx('uiBack'); goTitle(); }),
     onGameOverRevive: afterLock(() => { void tryRevive(); }),
-    onOpsEndList: afterLock(() => { playSfx('uiBlip'); goTitle(); overlay.showOps(opsOpts()); }),
+    onGameOverShop: afterLock(() => { playSfx('uiBlip'); goTitle(false); openShop(); }),
+    onOpsEndList: afterLock(() => { playSfx('uiBlip'); goTitle(false); overlay.showOps(opsOpts()); }),
     onExam: doExam,
     onEndingDone: afterLock(() => { playSfx('uiBack'); goTitle(); }),
     onEndingRetry: afterLock(() => { playSfx('uiOk'); lastRun(); }),
     missionBadge: () => claimableCount(save.daily, save.achieves),
     onLogoTap: () => {
-      if (!import.meta.env.DEV) return;
+      if (!DEV_TOOLS) return;
       titleTaps += 1;
       if (titleTaps >= DEBUG_TITLE_TAPS) {
         debug = true;
@@ -727,7 +768,7 @@ export function createApp(
     onOpenOps: () => { playSfx('uiBlip'); overlay.showOps(opsOpts()); },
     onOpenMissions: () => { playSfx('uiBlip'); openMissions(); },
     onOpenShop: () => { playSfx('uiBlip'); openShop(); },
-    onOpenCustom: () => { playSfx('uiBlip'); openCustom(); },
+    onOpenBook: () => { playSfx('uiBlip'); openBook(); },
     onMetaBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
     onClaimMission: (id, boost) => { void claimMission(id, boost); },
     onBuySku: (id) => { void buySku(id); },
@@ -735,13 +776,13 @@ export function createApp(
     onUnlockOrbit: (id) => unlockOrbitItem(id),
     onUnlockDust: (id) => unlockDustItem(id),
     onEquip: (slot, id) => doEquip(slot, id),
-    onMaskEdit: openMaskBoard,
+    onMaskEdit: () => openMaskBoard(save.maskId || null), // 옛 길 — 상점은 이제 onEquip('mask-edit' · 'mask-new')로 보낸다
     onExchangeDust: doExchange,
     onHowtoDone: () => { save.howtoSeen = true; saveSave(save); },
     onResetData: resetData,
   });
 
-  if (import.meta.env.DEV && (debug || isDevUnlocked())) mountDebugMenu(() => state);
+  if (DEV_TOOLS && (debug || isDevUnlocked())) mountDebugMenu(() => state, debug); // 전해금 뒤 부팅은 접어서
 
   overlay.showBoot();
   setChrome('boot');
@@ -788,7 +829,7 @@ export function createApp(
         // prevTitleGuard는 update 말미에서 씬 무관하게 갱신 — boot를 가드로 넘긴 같은
         // 홀드가 메뉴를 밀거나, 가드 쥔 채 타이틀 복귀 시 스테일 엣지가 생기지 않게 (08-30 검증)
         const guardEdge = f.guard && !prevTitleGuard;
-        if (import.meta.env.DEV && f.special && f.guard) {
+        if (DEV_TOOLS && f.special && f.guard) {
           // 디버그 해금 콤보(가드 홀드 + 필살) — 사운드 토글·메뉴 이동과 겹치지 않게 단독 처리
           debug = true;
           mountDebugMenu(() => state);
@@ -845,6 +886,8 @@ export function createApp(
         s.events.length = 0;
         touch?.setPinned(s.player.pose === 'pinned');
         touch?.setSpecialReady(s.wazaGauge >= 100);
+        touch?.setSpecialFill(s.wazaGauge);
+        touch?.setGuardFill(s.guardGauge);
         // 장면을 바꾼 틱이면 곡은 전환이 정했다(엔딩·게임오버·작전 종료) — 덮어쓰지 않는다
         if (scene === 'play') bgm(bgmFor(s));
         break;
@@ -1006,6 +1049,8 @@ export function createApp(
       dustGained: runDust,
       zone: hudModeLabel(s.mode, s.chapter, s.act2Phase),
       goal: opGoal || (goal && goalName ? SCREENS.gameover.nextGoal(goalName, goal.short) : ''),
+      goalId: opGoal || !goalName ? undefined : goal?.id,
+      theme: regionOf(s.chapter).theme,
       canContinue: s.mode === 'act2' && s.checkpoint > 0,
       canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
       adRevive: ads.ready(),

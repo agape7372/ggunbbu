@@ -1,0 +1,173 @@
+/* 도감 — 「먹 한 획」(ui/bookView.ts). 접두사 bk-.
+   겉 틀(.ov-screen.ov-meta · 컷 틀 · 가는 길 도장 줄)은 overlay가 그린다. 여기는 스크롤 칸(.ov-body) 안과 팝업 안만.
+   색은 토큰만 · 섞기 0. 가진 것 = 먹, 못 가진 것 = 옅은 먹 실루엣(글자는 연먹). 주홍은 쓰지 않는다(누를 단추가 없다). */
+
+.bk { display: flex; flex-direction: column; padding-bottom: 16px; }
+
+/* ── 머리: 제목 + 모은 수. 스크롤해도 위에 붙어 있다 ── */
+.bk-top {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0 8px;
+  background: var(--paper);
+}
+
+.bk-count { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font: 700 14px/1.2 var(--body); }
+.bk-count b { font-size: 24px; }
+.bk-bar { position: relative; width: 120px; height: 10px; border: 2px solid var(--ink); background: var(--paper); }
+.bk-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+
+/* ── 묶음 머리: 이름 · 모은 수 · 다 모으면 「완」 도장 ── */
+.bk-grp,
+.bk-sub { display: flex; align-items: center; gap: 8px; }
+.bk-grp { margin: 18px 0 4px 2px; font: 400 28px/1 var(--brush); rotate: -2deg; transform-origin: 0 100%; }
+.bk-sub { margin: 8px 0 2px 2px; font: 700 14px/1 var(--body); color: var(--ink2); }
+.bk-grp small,
+.bk-sub small { font: 700 13px/1 var(--body); color: var(--ink2); font-variant-numeric: tabular-nums; }
+.bk-done {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  font: 700 14px/1 var(--body);
+  font-style: normal;
+  color: var(--paper);
+  background: var(--ink);
+  clip-path: var(--sealclip2);
+  rotate: -8deg;
+}
+
+/* ── 칸 ── */
+.bk-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
+.bk-grid.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 4px; }
+
+.bk-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 0 4px;
+  text-align: center;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  font: inherit;
+}
+
+.bk-cell:focus-visible { outline: 3px dashed var(--ink); outline-offset: 2px; }
+.bk-cell:active { scale: 0.94; }
+
+/* 번호 — 칸 왼쪽 위 */
+.bk-no { position: absolute; left: 0; right: 0; top: 0; text-align: center; font: 700 12.5px/1 var(--body); color: var(--ink2); font-variant-numeric: tabular-nums; }
+
+.bk-art { width: 100%; height: 100px; display: grid; place-items: center; }
+.bk-art .bk-img,
+.bk-art .bk-sil { width: 80px; height: auto; }
+.bk-art .ic { width: 52px; height: 52px; color: var(--ink); stroke-width: 1.8; filter: url(#rough2); }
+
+/* 못 가진 것 — 그림의 알파를 거울로 쓴 옅은 먹 한 덩이 */
+.bk-sil {
+  display: block;
+  aspect-ratio: 80 / 79;
+  background: var(--ink3);
+  -webkit-mask: var(--art) center / contain no-repeat;
+  mask: var(--art) center / contain no-repeat;
+}
+
+.k-waza .bk-sil { aspect-ratio: 80 / 96; }
+
+.bk-name { font: 700 14px/1.2 var(--body); white-space: nowrap; }
+/* 사용자가 지은 가면 이름 — 글꼴은 .uname이 정한다. 긴 이름은 칸 안에서 말줄임 */
+.bk-name.uname { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 팝업 제목(.m-title는 붓글씨) — 사용자 이름이면 시스템 글꼴 묶음으로 통째로(.uname과 같은 묶음) */
+.bk-card:has(.bk-pop.is-user) .m-title {
+  font-family: system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif !important;
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.bk-how { font: 700 12.5px/1 var(--body); color: var(--ink2); white-space: nowrap; }
+.is-no .bk-name { color: var(--ink2); }
+
+/* 칼 그림 — 상점 칼꽂이와 같은 굵기(작은 칼은 같은 색 테두리로 날 끝까지 굵게) */
+.bk-art .bk-sw { width: 40px; height: 100px; }
+.bk-sw path, .bk-sw circle, .bk-sw rect { stroke: var(--line, var(--ink)); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; }
+.bk-sw .pr { stroke: var(--paper); stroke-width: 5; }
+.bk-sw .p, .bk-sw .y { stroke: none; }
+.bk-sw.big path, .bk-sw.big circle, .bk-sw.big rect { stroke: none; }
+.bk-sw.big .pr { stroke: var(--paper); stroke-width: 3; }
+/* 못 가진 칼은 한 색 실루엣 */
+.is-no .bk-sw { --line: var(--ink3); }
+.is-no .bk-sw .p, .is-no .bk-sw .y { fill: var(--ink3); }
+.is-no .bk-sw .pr { stroke: var(--ink3); }
+
+/* 등급 꼬리표 — 일반 연먹 맨글씨 · 고급 먹 굵게 · 희귀 먹 테두리 상자 · 전설 뒤집힌 먹 상자 */
+.bk-tier { font: 700 13px/1 var(--body); white-space: nowrap; }
+.bk-tier.t-common { color: var(--ink2); }
+.bk-tier.t-fine { color: var(--ink); }
+.bk-tier.t-rare { color: var(--ink); background: var(--paper); border: 1.5px solid var(--ink); padding: 3px 5px 2px; }
+.bk-tier.t-legend { color: var(--paper); background: var(--ink); padding: 4px 6px 3px; }
+
+/* ── 등장 안무 — 제목 → 모은 수 → 묶음 머리 → 칸 팝 ── */
+[data-screen="book"].anim .bk-title { animation: wipe 0.3s cubic-bezier(0.87, 0.05, 0.02, 0.97) both; }
+[data-screen="book"].anim .bk-count { animation: rise 0.25s ease-out 0.1s both; }
+[data-screen="book"].anim .bk-grp,
+[data-screen="book"].anim .bk-sub { animation: wipe 0.26s cubic-bezier(0.87, 0.05, 0.02, 0.97) 0.14s both; }
+[data-screen="book"].anim .bk-cell { animation: popup 0.24s cubic-bezier(0.2, 1.2, 0.4, 1) calc(0.16s + var(--i) * 0.02s) both; }
+
+/* ── 가는 길 줄 · 홈 줄의 네 번째 도장 ── */
+.nav-pair { display: flex; align-items: center; gap: 12px; }
+.h-nav .inkseal:nth-child(4) { rotate: 3deg; }
+
+/* ── 팝업 — 도감 한 쪽 ── */
+.m-card.bk-card .m-actions { flex-wrap: nowrap; gap: 8px; justify-content: space-between; }
+.m-card.bk-card .m-actions .stroke { flex: 1 1 0; min-width: 0; padding: 0 16px 3px 18px; align-items: center; text-align: center; }
+.m-card.bk-card .m-actions .stroke b { font-size: 26px; }
+
+.bk-pop { display: flex; flex-direction: column; gap: 10px; }
+.bk-pop-art {
+  position: relative;
+  height: 170px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 5px 6px 0 var(--ink);
+}
+
+.bk-pno { position: absolute; left: 10px; top: 6px; font: 400 30px/1 var(--brush); rotate: -4deg; }
+.is-no .bk-pno { color: var(--ink2); }
+.bk-pop-art .bk-sw { width: 56px; height: 140px; rotate: 24deg; }
+.bk-pop-art .bk-img,
+.bk-pop-art .bk-sil { width: 124px; height: auto; }
+.bk-pop-art .ic { width: 84px; height: 84px; color: var(--ink); stroke-width: 1.6; filter: url(#rough2); }
+
+.bk-kind { display: flex; align-items: center; gap: 8px; font: 700 14px/1 var(--body); color: var(--ink2); }
+.bk-state { margin-left: auto; font: 700 13px/1 var(--body); }
+
+/* 능력치 셋 + 이펙트 칸 다섯 */
+.bk-stats { display: flex; flex-direction: column; gap: 7px; }
+.bk-stat { display: grid; grid-template-columns: 48px minmax(0, 1fr) 42px; align-items: center; gap: 8px; font: 700 13px/1 var(--body); }
+.bk-stat b { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bk-sbar { position: relative; height: 10px; border: 2px solid var(--ink); background: var(--paper); }
+.bk-sbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+.bk-fx { display: flex; flex-wrap: wrap; gap: 4px; }
+.bk-fx span { font: 700 12.5px/1 var(--body); padding: 4px 5px 3px; white-space: nowrap; }
+.bk-fx .on { color: var(--paper); background: var(--ink); border: 1px solid var(--ink); }
+.bk-fx .off { color: var(--ink2); background: var(--paper); border: 1px dashed var(--ink3); }
+
+/* 본문 — 읽기 좋은 줄 길이 · 줄 간격 */
+.bk-lore { font: 400 16px/1.8 var(--body); word-break: keep-all; text-wrap: pretty; }
+.bk-lore::before { content: ''; display: block; width: 36px; height: 4px; margin-bottom: 8px; background: var(--ink); }
+.bk-use { font: 400 15px/1.65 var(--body); word-break: keep-all; text-wrap: pretty; }
+.bk-use b { display: inline-block; margin-right: 8px; padding: 3px 6px 2px; border: 2px solid var(--ink); font: 700 12.5px/1 var(--body); }
+.bk-lock { padding: 12px 0 6px; text-align: center; font: 700 16px/1.6 var(--body); color: var(--ink2); }
+.bk-how2 { font: 700 13.5px/1.3 var(--body); color: var(--ink2); }

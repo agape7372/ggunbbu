@@ -11,7 +11,7 @@
 
 import type { GameState, Lane } from './types';
 import { damageStack } from './building';
-import { DEBRIS, GIMMICK, GUARD_GAUGE, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
+import { DEBRIS, GIMMICK, GUARD_GAUGE, HAT, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
 import { VIEW } from '../config';
 import { rand } from './rng';
 
@@ -22,6 +22,11 @@ export function addScore(s: GameState, n: number): void {
 export function addCombo(s: GameState): void {
   if (s.combo < SCORE.COMBO_CAP) s.combo += 1;
   // 999 카운터스톱: 이벤트는 타격 지점이 발행한다 (여기서 중복 발행 금지)
+  // 안전모 = 콤보 고비 상. 2막은 벗고 들어가니 주지 않는다. 같은 틱 뒤의 깔림도 바로 막는다
+  if (!s.hat && s.mode !== 'act2' && HAT.COMBO_AT.includes(s.combo)) {
+    s.hat = true;
+    s.events.push({ kind: 'hatGet', combo: s.combo, y: s.player.y + PLAYER.H });
+  }
 }
 
 export function breakCombo(s: GameState): void {
