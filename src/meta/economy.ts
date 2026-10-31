@@ -31,21 +31,36 @@ export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
   gold: 2400,
 };
 
+/** 마스크(도트판에 직접 찍는 얼굴) — 비싸게: 대검 최고 2400 위, 1급 응시료 4000 아래. 한 번 사면 다시 그리기는 무료 */
+export const MASK_DUST_COST = 3000;
+
+/** 먼지로 사는 꾸미기 — 무기 표와 따로 둔다. 결과 카드 목표는 무기를 다 가진 다음에 여기서 고른다 */
+export const LOOK_DUST_COST: Readonly<Record<string, number>> = {
+  mask: MASK_DUST_COST,
+};
+
+const has = (table: Readonly<Record<string, number>>, id: string): boolean =>
+  Object.prototype.hasOwnProperty.call(table, id);
+
 export function dustCost(id: string): number | undefined {
-  return Object.prototype.hasOwnProperty.call(WEAPON_DUST_COST, id) ? WEAPON_DUST_COST[id] : undefined;
+  if (has(WEAPON_DUST_COST, id)) return WEAPON_DUST_COST[id];
+  return has(LOOK_DUST_COST, id) ? LOOK_DUST_COST[id] : undefined;
 }
 
-/** 결과 카드의 다음 목표 — 아직 안 가진 먼지 구매품 중 가장 싼 것. 모자란 먼지(0이면 지금 살 수 있다). 다 가졌으면 null */
+/** 결과 카드의 다음 목표 — 아직 안 가진 먼지 구매품 중 가장 싼 것(무기 먼저, 다 가졌으면 꾸미기). 모자란 먼지(0이면 지금 살 수 있다). 다 가졌으면 null */
 export function nextDustGoal(
   owned: readonly string[],
   dust: number,
 ): { id: string; cost: number; short: number } | null {
-  let best: { id: string; cost: number } | null = null;
-  for (const [id, cost] of Object.entries(WEAPON_DUST_COST)) {
-    if (owned.includes(id)) continue;
-    if (!best || cost < best.cost) best = { id, cost };
+  for (const table of [WEAPON_DUST_COST, LOOK_DUST_COST]) {
+    let best: { id: string; cost: number } | null = null;
+    for (const [id, cost] of Object.entries(table)) {
+      if (owned.includes(id)) continue;
+      if (!best || cost < best.cost) best = { id, cost };
+    }
+    if (best) return { ...best, short: Math.max(0, best.cost - dust) };
   }
-  return best && { ...best, short: Math.max(0, best.cost - dust) };
+  return null;
 }
 
 // ── 철거 자격 (C4) ─────────────────────────────────────────────

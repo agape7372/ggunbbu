@@ -4,6 +4,7 @@ import {
 } from './meta/loadout';
 import { initAchieveProgress, type DailyState, type MissionProgress } from './meta/missions';
 import { LICENSE_EXAMS } from './meta/economy';
+import { emptyMask, isMaskArt } from './meta/mask';
 import { isOpGrade, isOpId, type OpGrade, type OpId } from './meta/ops';
 
 export interface SaveSettings {
@@ -38,6 +39,7 @@ export interface SaveData {
   stats: { buildings: number; runs: number }; // 평생 누적 — 철거 자격 조건 · 첫 판 판별 (무버전 추가 키)
   license: number; // 철거 자격 등급 0(견습)~3(1급) (무버전 추가 키)
   opsGrade: Partial<Record<OpId, OpGrade>>; // 특별작전 최고 도장 (무버전 추가 키)
+  maskArt: string; // 도트판 그림 — 상점 마스크, 형식은 meta/mask.ts 머리 주석 (무버전 추가 키)
 }
 
 export const DEFAULT_SAVE: SaveData = {
@@ -70,6 +72,7 @@ export const DEFAULT_SAVE: SaveData = {
   stats: { buildings: 0, runs: 0 },
   license: 0,
   opsGrade: {},
+  maskArt: emptyMask(),
 };
 
 const BAK_KEY = `${SAVE_KEY}.bak`;
@@ -140,6 +143,7 @@ function normalize(raw: Record<string, unknown>): SaveData {
     stats: validateStats(data.stats),
     license: num(data.license, 0, LICENSE_EXAMS.length),
     opsGrade: validateOpsGrade(data.opsGrade),
+    maskArt: isMaskArt(data.maskArt) ? data.maskArt : emptyMask(), // 깨진 그림은 빈 판으로 — 장착·소유는 그대로
   };
 }
 

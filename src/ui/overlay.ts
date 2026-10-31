@@ -156,6 +156,8 @@ export interface OverlayHandlers {
   onUnlockDust(id: string): void;
   onExchangeDust(): void;
   onEquip(slot: string, id: string): void;
+  /** 상점 마스크 「그리기」 — 도트판은 씬이 연다 */
+  onMaskEdit(): void;
   onHowtoDone(): void;
   onResetData(): void;
 }
@@ -836,6 +838,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           onExchange: () => h.onExchangeDust(),
           onExam: () => h.onExam(),
           onEquip: (slot, id) => h.onEquip(slot, id),
+          onMaskEdit: () => h.onMaskEdit(),
         },
       );
       show('shop');

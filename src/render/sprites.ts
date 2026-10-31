@@ -7,13 +7,15 @@ import type {
   PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
   FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId, GreatswordId,
 } from '../core/types';
-import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS } from '../config';
+import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS, MASK_DRAW } from '../config';
 import { drawAsset, drawAssetHalo, hasAsset } from './assets';
 import { drawHalo, haloFor } from './halo';
 import { drawExecutor } from './executor';
 import { floorImageKey, floorMaterialKey } from './floorSheets';
 import { floorSheetTile } from './floorSheetCache';
 import { entityAssetKey, playerSheetFrame } from './frames';
+import { drawMaskAt } from './maskArt';
+import { isMaskArt, maskIsBlank } from '../meta/mask';
 
 // ── 공통 색상 ────────────────────────────────────────────────────
 const OUTLINE = '#0A0A14';
@@ -436,6 +438,27 @@ export const SHEET_HEAD: ReadonlyArray<readonly [number, number] | null> = [
   [-2.5, -47.8], [-2.5, -45], [-4, -45.5], [6.5, -30.8], null, null,
 ];
 export const SHEET_HEAD_R = 5; // 실측 머리 반지름 4.8~5.3
+/** 납작한 칸(pinned 9·dead 10) 머리 중심 — 안전모는 안 씌우지만 마스크는 눌린 채 붙는다. SHEET_HEAD와 같은 방법으로 실측 */
+const SHEET_FLAT_HEAD: Readonly<Record<number, readonly [number, number]>> = { 9: [3, -12], 10: [-19, -25.5] };
+
+/** 쓰고 있는 마스크 그림 — applyCosmetics가 정한다. null = 없음 */
+let playerMask: string | null = null;
+
+/** 장착 마스크. 빈 그림·깨진 값은 안 쓴 것으로 친다 */
+export function setPlayerMask(art: string | null): void {
+  playerMask = art && isMaskArt(art) && !maskIsBlank(art) ? art : null;
+}
+
+/** 머리 중심(발 기준, 숨쉬기 전) — 안전모·마스크가 drawPlayer와 같은 프레임에서 읽는다. 시트에 머리 자리가 없으면 null */
+export function playerHead(pose: PlayerPose, animTick: number): readonly [number, number] | null {
+  initSprites();
+  if (playerPngKey()) {
+    const i = playerSheetFrame(pose, animTick);
+    return SHEET_HEAD[i] ?? SHEET_FLAT_HEAD[i] ?? null;
+  }
+  const f = pickPlayerFrame(pose, animTick);
+  return [f.hx, f.hy];
+}
 
 function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
   const R = r + 0.8;
@@ -456,7 +479,8 @@ function hardHat(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numbe
   ctx.restore();
 }
 
-/** 안전모 — 렌더러가 s.hat일 때 drawPlayer 직후 같은 인자로 부른다. 머리 위치는 drawPlayer와 같은 프레임에서 읽는다. */
+/** 안전모 — 렌더러가 s.hat일 때 drawPlayer 직후 같은 인자로 부른다. 머리 위치는 drawPlayer와 같은 프레임에서 읽는다.
+ *  마스크를 쓰면 마스크 위에 — 마스크 폭만큼 키워 윗단만 덮는다 */
 export function drawHat(
   ctx: CanvasRenderingContext2D,
   pose: PlayerPose,
@@ -465,15 +489,30 @@ export function drawHat(
   footCanvasY: number,
 ): void {
   if (pose === 'pinned' || pose === 'dead') return;
-  initSprites();
-  const footY = footCanvasY + playerBob(pose, animTick);
-  if (playerPngKey()) {
-    const h = SHEET_HEAD[playerSheetFrame(pose, animTick)];
-    if (h) hardHat(ctx, x + h[0], footY + h[1], SHEET_HEAD_R);
-    return;
-  }
-  const f = pickPlayerFrame(pose, animTick);
-  hardHat(ctx, x + f.hx, footY + f.hy, HEAD_R);
+  const h = playerHead(pose, animTick);
+  if (!h) return;
+  const cx = x + h[0];
+  const cy = footCanvasY + playerBob(pose, animTick) + h[1];
+  if (playerMask) hardHat(ctx, cx, cy - MASK_DRAW.LIFT - MASK_DRAW.HAT_UP, MASK_DRAW.SIZE / 2 + 1);
+  else hardHat(ctx, cx, cy, playerPngKey() ? SHEET_HEAD_R : HEAD_R);
+}
+
+/** 마스크 — 렌더러가 drawPlayer 직후·drawHat 직전에 같은 인자로 부른다. art를 넘기면 그 그림(상점·도트판 미리보기).
+ *  깔림·사망은 납작한 프레임의 머리 자리에 세로로 눌러 붙인다 — 모자처럼 사라지면 벗겨진 것처럼 보인다 */
+export function drawMask(
+  ctx: CanvasRenderingContext2D,
+  pose: PlayerPose,
+  animTick: number,
+  x: number,
+  footCanvasY: number,
+  art: string | null = playerMask,
+): void {
+  if (!art) return;
+  const h = playerHead(pose, animTick);
+  if (!h) return;
+  const flat = pose === 'pinned' || pose === 'dead';
+  const cy = footCanvasY + playerBob(pose, animTick) + h[1] - (flat ? 0 : MASK_DRAW.LIFT);
+  drawMaskAt(ctx, art, x + h[0], cy, MASK_DRAW.SIZE, flat ? MASK_DRAW.FLAT_SQUASH : 1);
 }
 
 /** pts를 순서대로 잇는 폴리라인 획. 관절 굽힘은 점 3개 이상으로 표현. */

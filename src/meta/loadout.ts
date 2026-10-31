@@ -1,9 +1,9 @@
 // 필살·무기·코스메틱 로드아웃. 해금 집합은 호출측 owned가 정본.
-// tenchi / sword / ink / wire / flyer 는 항상 소유.
+// tenchi / sword / ink / wire / flyer / none(마스크 없음) 은 항상 소유.
 
-import type { BladeId, BodyId, CosmeticSlot, GreatswordId, LettersId, Loadout, WazaId, WeaponId } from './types';
+import type { BladeId, BodyId, CosmeticSlot, GreatswordId, LettersId, Loadout, MaskId, WazaId, WeaponId } from './types';
 
-export type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, WazaId, WeaponId };
+export type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, MaskId, WazaId, WeaponId };
 export type EquipSlot = 'waza' | 'weapon' | CosmeticSlot;
 
 /** index.ts 호환 별칭 — 슬롯 id는 types.ts가 정본. */
@@ -21,14 +21,16 @@ export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'g
 export const BODY_IDS: readonly BodyId[] = ['ink', 'amber', 'slate'];
 export const BLADE_IDS: readonly BladeId[] = ['wire', 'rebar', 'crescent'];
 export const LETTERS_IDS: readonly LettersId[] = ['flyer', 'stamp', 'orbit'];
+export const MASK_IDS: readonly MaskId[] = ['none', 'mask'];
 
 const WAZA_SET: ReadonlySet<string> = new Set(WAZA_IDS);
 const WEAPON_SET: ReadonlySet<string> = new Set(WEAPON_IDS);
 const BODY_SET: ReadonlySet<string> = new Set(BODY_IDS);
 const BLADE_SET: ReadonlySet<string> = new Set(BLADE_IDS);
 const LETTERS_SET: ReadonlySet<string> = new Set(LETTERS_IDS);
+const MASK_SET: ReadonlySet<string> = new Set(MASK_IDS);
 
-export const DEFAULT_OWNED_IDS: readonly string[] = ['tenchi', 'sword', 'ink', 'wire', 'flyer'];
+export const DEFAULT_OWNED_IDS: readonly string[] = ['tenchi', 'sword', 'ink', 'wire', 'flyer', 'none'];
 const DEFAULT_OWNED: ReadonlySet<string> = new Set(DEFAULT_OWNED_IDS);
 
 export const DEFAULT_LOADOUT: Loadout = {
@@ -37,6 +39,7 @@ export const DEFAULT_LOADOUT: Loadout = {
   body: 'ink',
   blade: 'wire',
   letters: 'flyer',
+  mask: 'none',
 };
 
 export const WAZA_CATALOG: Record<WazaId, { name: string; blurb: string; unlockedByDefault: boolean }> = {
@@ -68,6 +71,7 @@ export function slotOf(id: string): EquipSlot | undefined {
   if (BODY_SET.has(id)) return 'body';
   if (BLADE_SET.has(id)) return 'blade';
   if (LETTERS_SET.has(id)) return 'letters';
+  if (MASK_SET.has(id)) return 'mask';
   return undefined;
 }
 
@@ -78,6 +82,7 @@ function belongs(slot: string, id: string): boolean {
     case 'body': return BODY_SET.has(id);
     case 'blade': return BLADE_SET.has(id);
     case 'letters': return LETTERS_SET.has(id);
+    case 'mask': return MASK_SET.has(id);
     default: return false;
   }
 }
@@ -91,7 +96,7 @@ export function isOwned(owned: ReadonlySet<string>, slot: string, id: string): b
 
 /**
  * 소유한 아이템만 장착. 아니면 동일 참조를 돌려준다.
- * slot = waza | weapon | body | blade | letters.
+ * slot = waza | weapon | body | blade | letters | mask.
  */
 export function equip(
   loadout: Loadout,
@@ -116,6 +121,9 @@ export function equip(
     case 'letters':
       if (loadout.letters === id) return loadout;
       return { ...loadout, letters: id as LettersId };
+    case 'mask':
+      if (loadout.mask === id) return loadout;
+      return { ...loadout, mask: id as MaskId };
     default:
       return loadout;
   }
@@ -140,6 +148,7 @@ export function validateLoadout(raw: unknown): Loadout {
     body: pickId(rec.body, BODY_IDS, DEFAULT_LOADOUT.body),
     blade: pickId(rec.blade, BLADE_IDS, DEFAULT_LOADOUT.blade),
     letters: pickId(rec.letters, LETTERS_IDS, DEFAULT_LOADOUT.letters),
+    mask: pickId(rec.mask, MASK_IDS, DEFAULT_LOADOUT.mask), // 마스크 칸 없던 옛 저장 = 없음
   };
 }
 
@@ -149,8 +158,9 @@ function pickId<T extends string>(value: unknown, allowed: readonly T[], fallbac
     : fallback;
 }
 
+// ★마스크도 넣는다 — 빠지면 산 'mask'가 다음 불러오기에서 지워지고 먼지 3000이 증발한다
 const CATALOG_IDS: ReadonlySet<string> = new Set([
-  ...WAZA_IDS, ...WEAPON_IDS, ...BODY_IDS, ...BLADE_IDS, ...LETTERS_IDS,
+  ...WAZA_IDS, ...WEAPON_IDS, ...BODY_IDS, ...BLADE_IDS, ...LETTERS_IDS, ...MASK_IDS,
 ]);
 
 /** 저장 owned를 카탈로그 교집합으로 거른다(중복 제거). 모르는 id·문자열 아닌 값은 버린다. */
@@ -163,7 +173,7 @@ export function sanitizeOwned(raw: unknown): string[] {
 export function enforceOwnedLoadout(loadout: Loadout, owned: readonly string[]): Loadout {
   const set = new Set(owned);
   const out = { ...loadout };
-  for (const slot of ['waza', 'weapon', 'body', 'blade', 'letters'] as const) {
+  for (const slot of ['waza', 'weapon', 'body', 'blade', 'letters', 'mask'] as const) {
     if (!isOwned(set, slot, out[slot])) (out as Record<string, string>)[slot] = DEFAULT_LOADOUT[slot];
   }
   return out;

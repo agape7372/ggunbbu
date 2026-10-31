@@ -17,6 +17,8 @@ export {
   LICENSE_EXAMS,
   LICENSE_TITLES,
   licenseTitle,
+  LOOK_DUST_COST,
+  MASK_DUST_COST,
   nextExam,
   takeExam,
   MAX_REVIVES_PER_RUN,
@@ -61,7 +63,7 @@ export {
   GREATSWORD_IDS,
   WEAPON_IDS,
 } from './loadout';
-export type { BladeSkinId, BodySkinId, LetterSkinId, Loadout, WazaId, WeaponId } from './loadout';
+export type { BladeSkinId, BodySkinId, LetterSkinId, Loadout, MaskId, WazaId, WeaponId } from './loadout';
 export type StickSkinId = import('./loadout').BodySkinId;
 export const WAZA_UNLOCK_DEFAULT = ['tenchi'] as const;
 

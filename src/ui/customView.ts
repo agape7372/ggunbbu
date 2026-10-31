@@ -2,12 +2,12 @@
 
 import { SUPPLY, WEAPON } from '../config';
 import { DEFAULT_LOADOUT, GREATSWORD_IDS, isOwned, WEAPON_IDS } from '../meta';
-import type { BladeId, BodyId, LettersId, Loadout, WazaId, WeaponId } from '../meta/types';
-import { ITEM_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
+import type { BladeId, BodyId, LettersId, Loadout, MaskId, WazaId, WeaponId } from '../meta/types';
+import { ITEM_COPY, MASK_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
 import { ICON } from './icons';
 import { escapeHtml } from './html';
 
-type Slot = 'weapon' | 'waza' | 'body' | 'blade' | 'letters';
+type Slot = 'weapon' | 'waza' | 'body' | 'blade' | 'letters' | 'mask';
 
 interface CatalogItem {
   id: string;
@@ -46,10 +46,17 @@ const LETTER_ITEMS: readonly { id: LettersId; name: string }[] = [
   { id: 'orbit', name: '궤도' },
 ];
 
+/** 그림은 상점 「그리기」에서 — 여기선 쓰고 벗기만 */
+const MASK_ITEMS: readonly { id: MaskId; name: string }[] = [
+  { id: 'none', name: '없음' },
+  { id: 'mask', name: MASK_COPY.name },
+];
+
 const SECTIONS: readonly CatalogSection[] = [
   { slot: 'weapon', title: '무기', items: WEAPON_ITEMS },
   { slot: 'waza', title: '필살', items: WAZA_ITEMS },
   { slot: 'body', title: '졸라맨', items: BODY_ITEMS },
+  { slot: 'mask', title: '마스크', items: MASK_ITEMS },
   { slot: 'blade', title: '칼빛', items: BLADE_ITEMS },
   { slot: 'letters', title: '효과글자', items: LETTER_ITEMS },
 ];
@@ -105,7 +112,8 @@ export function paintCustom(
         ? `<button type="button" class="pick${on ? ' on' : ''}" data-equip-slot="${sec.slot}" data-equip-id="${item.id}" aria-pressed="${on}">${icon}${escapeHtml(item.name)}${on ? '<small>장착</small>' : ''}</button>`
         : `<button type="button" class="pick" disabled>${ICON.lock}${escapeHtml(item.name)}<small>상점</small></button>`;
     }).join('');
-    return `<p class="sec-h">${escapeHtml(sec.title)}</p><div class="pick-grid${sec.slot === 'weapon' ? ' w4' : ''}">${picks}</div>${noteHtml(sec.slot, loadout)}`;
+    const cols = sec.slot === 'weapon' ? ' w4' : sec.items.length === 2 ? ' w2' : '';
+    return `<p class="sec-h">${escapeHtml(sec.title)}</p><div class="pick-grid${cols}">${picks}</div>${noteHtml(sec.slot, loadout)}`;
   }).join('');
   root.innerHTML = `
     <header class="sheet-head">
@@ -130,6 +138,7 @@ function equippedId(loadout: Loadout, slot: Slot): string {
   if (slot === 'body') return loadout.body || DEFAULT_LOADOUT.body;
   if (slot === 'blade') return loadout.blade || DEFAULT_LOADOUT.blade;
   if (slot === 'waza') return loadout.waza || DEFAULT_LOADOUT.waza;
+  if (slot === 'mask') return loadout.mask || DEFAULT_LOADOUT.mask;
   return loadout.letters || DEFAULT_LOADOUT.letters;
 }
 

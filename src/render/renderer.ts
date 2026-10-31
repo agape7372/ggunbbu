@@ -9,9 +9,11 @@ import type { DebrisPiece, FallingStack, GameState, JuiceEvent } from '../core/t
 import { AUDIO, BOSS, CAMERA, COSMETIC_COLORS, DEBRIS, JUICE, JUICE_SYS, PALETTE, PLAYER, SCORE, STACK, VIEW, WEAPON } from '../config';
 import { onomatoFor, CAPTIONS, ITEM_COPY, destroyedCaption } from '../content';
 import {
-  initSprites, drawPlayer, drawHat, drawStack, drawBoss, drawEntity,
-  drawGroundRocks, drawStackShadow, floorTile, setPlayerCosmetics, setPlayerWeapon,
+  initSprites, drawPlayer, drawHat, drawMask, drawStack, drawBoss, drawEntity,
+  drawGroundRocks, drawStackShadow, floorTile, setPlayerCosmetics, setPlayerMask, setPlayerWeapon,
 } from './sprites';
+import { maskColors, wornMask } from '../meta/mask';
+import { setFxMask } from './weaponFx';
 import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
 import { vibrate } from '../platform/native';
@@ -129,13 +131,16 @@ export function initRenderer(): void {
   smoothCam = 0;
 }
 
-/** 장착 코스메틱 일괄 적용 — 씬이 런 시작·장착 변경 시 호출 (08-30, P1-3) */
-export function applyCosmetics(loadout: { body: string; blade: string; letters: string }): void {
+/** 장착 코스메틱 일괄 적용 — 씬이 런 시작·장착 변경·도트판 저장 시 호출 (08-30, P1-3). maskArt = 저장의 도트판 그림 */
+export function applyCosmetics(loadout: { body: string; blade: string; letters: string; mask: string }, maskArt: string): void {
   const body = COSMETIC_COLORS.body[loadout.body] ?? COSMETIC_COLORS.body.ink;
   const blade = COSMETIC_COLORS.blade[loadout.blade] ?? COSMETIC_COLORS.blade.wire;
   lettersColor = COSMETIC_COLORS.letters[loadout.letters] ?? COSMETIC_COLORS.letters.flyer;
   setPlayerCosmetics(body, blade);
   setSlashColor(blade);
+  const mask = loadout.mask === 'mask' ? wornMask(maskArt) : null;
+  setPlayerMask(mask);
+  setFxMask(mask ? maskColors(mask) : null); // 필살·완파 때 그 색 도트가 흩어진다(weaponFx)
 }
 
 /** 사망 — 붉은 번쩍·틀·잠깐 느린 파편. 화면 전환은 B(씬)가 늦춘 만큼 이 연출이 캔버스를 채운다. */
@@ -537,6 +542,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
       ctx.translate(-px, -footY);
     }
     drawPlayer(ctx, s.player.pose, s.player.poseTick, px, footY);
+    drawMask(ctx, s.player.pose, s.player.poseTick, px, footY);
     if (s.hat) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY);
     if (squash) ctx.restore();
   }

@@ -3,27 +3,32 @@
 // ★좌표 계약은 effects.ts와 같다(BL-09) — 월드 좌표로 저장하고 drawBladeFx(ctx, cam)가 그릴 때 cam을 한 번 더한다.
 // 대검은 모양 값이라 비쌀수록 화려하다 — 450~900 칼은 칼마다 다른 타격·붕괴·완파, 1200부터 칼 기운과 완파 물들임이 붙는다.
 // 콤보 50·100·200에서 한 단씩 커지고(100부터 겹 베기), 고비(50·100·200·500·999)를 넘는 타격은 한 번 크게 터진다.
+// 연장 넷·필살 셋·게이지 참·콤보 끊김·깔림 탈출·마스크 도트와 연타 줄 박자는 weaponFx.ts — 이 풀과 뿌리개를 빌려 쓴다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, TICK, VIEW } from '../config';
 import { comboMilestone } from '../audio/consume';
 import { drawGreatArc, greatArcPoint, greatLook, playerBlade, twinkleStar, type GreatLook } from './sprites';
 import * as fx from './screenfx';
+import { drawWeaponBit, resetWeaponFx, weaponReact } from './weaponFx';
 
 /** cut 베기 자국 · ghost 참격 잔상 · spark 불꽃 · shard 마름모 조각 · ring 퍼지는 고리 · ember 불씨 · fire 불덩이 · wisp 검은 불꽃 ·
- *  flake 눈송이 · twinkle 반짝 별 · coin 동전·리벳 · bolt 번개 · burst 가시 별·얼음 결정 · rays 빛살 · gear 톱날 · plate 테이프·철골 토막 · sign 경고판 */
-type Kind =
+ *  flake 눈송이 · twinkle 반짝 별 · coin 동전·리벳 · bolt 번개 · burst 가시 별·얼음 결정 · rays 빛살 · gear 톱날 · plate 테이프·철골 토막 · sign 경고판
+ *  — 아래 줄은 weaponFx가 그린다: pix 마스크 도트 · hex 육각 방패 · crack 잉크 균열 · fold 접힌 종이 빛살 · hook 갈고리 베기 ·
+ *  nail 못·나사 · disc 원판 잔상 · chunk 쇳덩이 · arc 끊어진 고리 토막 */
+export type Kind =
   | 'cut' | 'ghost' | 'spark' | 'shard' | 'ring' | 'ember' | 'fire' | 'wisp' | 'flake'
-  | 'twinkle' | 'coin' | 'bolt' | 'burst' | 'rays' | 'gear' | 'plate' | 'sign';
+  | 'twinkle' | 'coin' | 'bolt' | 'burst' | 'rays' | 'gear' | 'plate' | 'sign'
+  | 'pix' | 'hex' | 'crack' | 'fold' | 'hook' | 'nail' | 'disc' | 'chunk' | 'arc';
 
 /** 그리는 순서 — 잔상·빛살·고리·불덩이가 뒤, 베기 자국이 가운데, 튀는 알갱이가 맨 앞 */
 const LAYER: Record<Kind, number> = {
-  ghost: 0, rays: 0, ring: 0, gear: 0, fire: 0, burst: 0,
-  cut: 1, sign: 1, bolt: 1,
-  spark: 2, shard: 2, ember: 2, wisp: 2, flake: 2, twinkle: 2, coin: 2, plate: 2,
+  ghost: 0, rays: 0, ring: 0, gear: 0, fire: 0, burst: 0, crack: 0, fold: 0, hex: 0, disc: 0,
+  cut: 1, sign: 1, bolt: 1, hook: 1, arc: 1,
+  spark: 2, shard: 2, ember: 2, wisp: 2, flake: 2, twinkle: 2, coin: 2, plate: 2, pix: 2, nail: 2, chunk: 2,
 };
 
-interface Bit {
+export interface Bit {
   alive: boolean;
   k: Kind;
   x: number; y: number; vx: number; vy: number; g: number; drag: number;
@@ -38,22 +43,24 @@ interface Bit {
   seed: number;
   /** ghost: 어느 칼의 호인가 */
   w: WeaponId;
+  /** 필살 그림 — 풀이 넘쳐도 덮지 않는다(keepBits) */
+  keep: boolean;
 }
 
 const POOL = 192;
 const GROUND = VIEW.GROUND_Y;
 const TAU = Math.PI * 2;
 const INK = PALETTE.INK;
-const HOT = '#FFF6D0';                                // 불꽃 속 — 흰빛 노랑
-const SPARK = '#FF9A1F';                              // 쇠 불꽃 겉
+export const HOT = '#FFF6D0';                         // 불꽃 속 — 흰빛 노랑
+export const SPARK = '#FF9A1F';                       // 쇠 불꽃 겉
 const FIRE = ['#E0401E', '#FF9A1F', '#FFE27A'] as const; // 불덩이 겉·가운데·속
 const ICE = '#E8F8FF';                                // 얼음 속
 const GOLD_HI = '#FFF1B8';                            // 동전 테 빛
 const RAY = '#FFE27A';                                // 빛살
 
-const pool: Bit[] = Array.from({ length: POOL }, (): Bit => ({
+export const pool: Bit[] = Array.from({ length: POOL }, (): Bit => ({
   alive: false, k: 'spark', x: 0, y: 0, vx: 0, vy: 0, g: 0, drag: 0, life: 0, max: 1,
-  size: 1, rot: 0, spin: 0, c1: INK, c2: INK, v: 0, a: 0, bounce: 0, seed: 0, w: 'iron',
+  size: 1, rot: 0, spin: 0, c1: INK, c2: INK, v: 0, a: 0, bounce: 0, seed: 0, w: 'iron', keep: false,
 }));
 let allocAt = 0;
 let live = 0;
@@ -64,11 +71,11 @@ let auraN = 0;
 /** 지난 타격의 콤보 — 고비를 넘는 타격을 고른다 */
 let lastCombo = 0;
 
-function n01(): number {
+export function n01(): number {
   fxSeed = (Math.imul(fxSeed, 1103515245) + 12345) & 0x7fffffff;
   return (fxSeed >>> 8) / 0x7fffff;
 }
-const sgn = (): number => n01() * 2 - 1;
+export const sgn = (): number => n01() * 2 - 1;
 
 function take(): Bit {
   for (let k = 0; k < POOL; k++) {
@@ -77,12 +84,27 @@ function take(): Bit {
       allocAt = (i + 1) % POOL;
       pool[i].alive = true;
       live += 1;
+      pool[i].keep = keeping;
       return pool[i];
     }
   }
-  const p = pool[allocAt]; // 넘치면 가장 오래된 칸부터 덮는다
-  allocAt = (allocAt + 1) % POOL;
-  return p;
+  // 넘치면 가장 오래된 칸부터 덮되 필살 그림은 건너뛴다 — 한 묶음(필살 + 층 깨기 여섯 + 완파)이 풀을 넘으면 맨 앞 필살부터 덮였다
+  let i = allocAt;
+  for (let k = 0; k < POOL && pool[i].keep; k++) i = (i + 1) % POOL;
+  allocAt = (i + 1) % POOL;
+  pool[i].keep = keeping;
+  return pool[i];
+}
+
+let keeping = false;
+/** 이 안에서 뿌린 조각은 풀이 넘쳐도 덮이지 않는다 — 필살 그림(weaponFx) */
+export function keepBits(draw: () => void): void {
+  keeping = true;
+  try {
+    draw();
+  } finally {
+    keeping = false;
+  }
 }
 
 interface Opt {
@@ -91,7 +113,7 @@ interface Opt {
   v?: number; a?: number; bounce?: number; w?: WeaponId;
 }
 
-function put(k: Kind, x: number, y: number, o: Opt): void {
+export function put(k: Kind, x: number, y: number, o: Opt): void {
   const p = take();
   p.k = k;
   p.x = x;
@@ -115,24 +137,24 @@ function put(k: Kind, x: number, y: number, o: Opt): void {
 }
 
 /** 각(라디안, 0 = 앞, −π/2 = 위)과 속력 → 속도 */
-const vel = (a: number, s: number): { vx: number; vy: number } => ({ vx: Math.cos(a) * s, vy: Math.sin(a) * s });
-const N = (n: number, k: number): number => Math.round(n * k);
+export const vel = (a: number, s: number): { vx: number; vy: number } => ({ vx: Math.cos(a) * s, vy: Math.sin(a) * s });
+export const N = (n: number, k: number): number => Math.round(n * k);
 type Seg = readonly [number, number, number, number];
 const along = (b: Seg, u: number): [number, number] => [b[0] + (b[2] - b[0]) * u, b[1] + (b[3] - b[1]) * u];
 
 // ── 낱개 뿌리개 ──────────────────────────────────────────────
 
 /** 베기 자국 — 친 자리를 가로지르는 렌즈. 앞 15%에 다 뻗고 가늘어지며 사라진다 */
-function cut(x: number, y: number, ang: number, len: number, thick: number, rim: string, core: string, stripes: number, life = 0.2): void {
+export function cut(x: number, y: number, ang: number, len: number, thick: number, rim: string, core: string, stripes: number, life = 0.2): void {
   put('cut', x, y, { life, size: len, v: thick, rot: ang, c1: rim, c2: core, a: stripes });
 }
 
-/** 참격 잔상 — 칼이 지나간 호가 어깨를 축으로 조금 더 돌며 커지고 옅어진다 */
-function ghost(w: WeaponId, footX: number, footY: number, alpha: number, life = 0.24): void {
-  put('ghost', footX, footY, { life, size: alpha, c1: INK, w });
+/** 참격 잔상 — 칼이 지나간 호가 어깨를 축으로 조금 더 돌며 커지고 옅어진다. turn·grow = 연타 줄 박자의 기울기·크기 */
+function ghost(w: WeaponId, footX: number, footY: number, alpha: number, life = 0.24, turn = 0, grow = 1): void {
+  put('ghost', footX, footY, { life, size: alpha, c1: INK, w, rot: turn, v: grow });
 }
 
-function sparkFan(
+export function sparkFan(
   x: number, y: number, n: number, a0: number, a1: number, s0: number, s1: number,
   c1: string, c2: string, g = 900, life = 0.24, size = 5,
 ): void {
@@ -145,7 +167,7 @@ function sparkFan(
   }
 }
 
-function shardSpray(x: number, y: number, n: number, spd: number, size: number, c1: string, c2: string): void {
+export function shardSpray(x: number, y: number, n: number, spd: number, size: number, c1: string, c2: string): void {
   for (let i = 0; i < n; i++) {
     put('shard', x + sgn() * 12, y + sgn() * 5, {
       ...vel(-Math.PI / 2 + sgn() * 1.35, spd * (0.45 + n01() * 0.7)), g: 1100,
@@ -154,7 +176,7 @@ function shardSpray(x: number, y: number, n: number, spd: number, size: number, 
   }
 }
 
-function ring(x: number, y: number, r0: number, grow: number, life: number, color: string, flat = 1): void {
+export function ring(x: number, y: number, r0: number, grow: number, life: number, color: string, flat = 1): void {
   put('ring', x, y, { life, size: r0, v: grow, c1: color, a: flat });
 }
 
@@ -180,7 +202,7 @@ function flakes(x: number, y: number, n: number, spread: number, edge: string, s
   }
 }
 
-function twinkle(x: number, y: number, size: number, life: number, color: string, vy = -30): void {
+export function twinkle(x: number, y: number, size: number, life: number, color: string, vy = -30): void {
   put('twinkle', x, y, { vx: sgn() * 20, vy, drag: 2, life, size, c1: color });
 }
 
@@ -215,7 +237,7 @@ function strike(x: number, y: number, c2: string): void {
   put('bolt', sx, sy, { life: 0.16 + n01() * 0.06, size: Math.hypot(x - sx, y - sy), rot: Math.atan2(y - sy, x - sx), c1: INK, c2 });
 }
 
-function spikes(x: number, y: number, size: number, life: number, fill: string, edge: string, n: number, crystal = 0): void {
+export function spikes(x: number, y: number, size: number, life: number, fill: string, edge: string, n: number, crystal = 0): void {
   put('burst', x, y, { life, size, v: n, rot: n01() * TAU, c1: fill, c2: edge, a: crystal });
 }
 
@@ -500,7 +522,7 @@ const RECIPES: Record<GreatLook['shape'], Recipe> = {
 };
 
 /** 콤보 단 — 50·100·200에서 한 단씩 */
-const tierK = (c: number): number => (c >= 200 ? 1.8 : c >= 100 ? 1.5 : c >= 50 ? 1.25 : 1);
+export const tierK = (c: number): number => (c >= 200 ? 1.8 : c >= 100 ? 1.5 : c >= 50 ? 1.25 : 1);
 
 /** 콤보 고비를 넘는 타격 — 큰 잔상 · 큰 고리 · 그 칼의 타격을 두 배로 */
 function flare(r: Recipe, g: GreatLook, w: WeaponId, c: number, x: number, y: number, footX: number, footY: number): void {
@@ -512,8 +534,10 @@ function flare(r: Recipe, g: GreatLook, w: WeaponId, c: number, x: number, y: nu
   r.hit(x, y, 2.2, g);
 }
 
-/** effects.spawnFromEvent가 이벤트마다 부른다 — 대검일 때만 */
+/** effects.spawnFromEvent가 이벤트마다 부른다 — 무기·필살 공통은 weaponFx가 먼저, 아래는 대검일 때만 */
 export function bladeReact(s: GameState, e: JuiceEvent): void {
+  if (e.kind === 'butterCollapse' && e.lane === undefined) return; // 버터바에 깔려 뭉개짐(sim) — 휘두른 게 아니다
+  const b = weaponReact(s, e); // 연타 줄 박자 — 대검 베기 자국·잔상도 탄다
   const g = greatLook(s.weapon);
   if (!g) return;
   const r = RECIPES[g.shape];
@@ -536,11 +560,12 @@ export function bladeReact(s: GameState, e: JuiceEvent): void {
     case 'bossHit':
     case 'butterCollapse': {
       const y = GROUND - (e.y ?? s.player.y);
-      if (swing) ghost(s.weapon, footX, footY, 0.7);
-      const a = 0.32 + sgn() * 0.12;
-      const len = 58 + 10 * k;
-      cut(x + sgn() * 8, y, a, len, 7, rim, core, stripes);
+      if (swing) ghost(s.weapon, footX, footY, 0.7, 0.24, b.turn, b.k);
+      const a = b.ang + sgn() * 0.08; // 내려베기 → 올려베기 → 가로
+      const len = (58 + 10 * k) * b.k;
+      cut(x + sgn() * 8, y, a, len, 7 * b.k, rim, core, stripes);
       if (c >= 100) cut(x + sgn() * 8, y + 9, a + 0.06, len * 0.8, 5, rim, core, stripes); // 겹 베기
+      if (b.n === 3) cut(x + sgn() * 6, y - 8, a - 0.75, len * 0.45, 4, rim, core, stripes); // 줄 끝 — 엇갈린 자국 하나 더
       r.hit(x, y, k, g);
       flare(r, g, s.weapon, c, x, y, footX, footY);
       return;
@@ -595,6 +620,7 @@ export function resetBladeFx(): void {
   allocAt = 0;
   auraT = 0;
   lastCombo = 0;
+  resetWeaponFx();
 }
 
 /** effects.updateEffects가 같은 dt로 부른다(히트스톱 중에도 움직인다) */
@@ -686,7 +712,7 @@ function drawBit(ctx: CanvasRenderingContext2D, p: Bit, py: number): void {
   const age = p.max - p.life;
   switch (p.k) {
     case 'ghost':
-      drawGreatArc(ctx, p.w, p.x, py, p.size * t ** 0.8, u * 0.09, 1 + u * 0.14);
+      drawGreatArc(ctx, p.w, p.x, py, p.size * t ** 0.8, p.rot + u * 0.09, p.v * (1 + u * 0.14));
       return;
     case 'cut': {
       const L = p.size * (0.55 + 0.45 * Math.min(1, u / 0.15));
@@ -1033,5 +1059,7 @@ function drawBit(ctx: CanvasRenderingContext2D, p: Bit, py: number): void {
       ctx.restore();
       return;
     }
+    default:
+      drawWeaponBit(ctx, p, py);
   }
 }

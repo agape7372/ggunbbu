@@ -1,18 +1,19 @@
 // 상점 탭 — 「자재 카탈로그」. 품목마다 판 속 졸라맨을 찍은 그림 + 아래 띠 하나(모자람 막대 / 사기 / 장착).
-// 먼지로 무기, 궤도조각으로 필살·꾸미기, 먼지로 철거 자격 응시. IAP SKU(≤₩1,900)는 결제가 붙을 때만 그린다(v1 제외).
+// 먼지로 무기·마스크, 궤도조각으로 필살·꾸미기, 먼지로 철거 자격 응시. IAP SKU(≤₩1,900)는 결제가 붙을 때만 그린다(v1 제외).
 
 import { WEAPON } from '../config';
 import {
-  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, GREATSWORD_IDS, ORBIT_PER_AD, WAZA_ORBIT_COST, WEAPON_DUST_COST,
-  WEAPON_IDS, examStatus, licenseTitle, nextDustGoal, nextExam,
+  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, GREATSWORD_IDS, MASK_DUST_COST, ORBIT_PER_AD, WAZA_ORBIT_COST,
+  WEAPON_DUST_COST, WEAPON_IDS, examStatus, licenseTitle, nextDustGoal, nextExam,
 } from '../meta';
 import type { Loadout, WeaponId } from '../meta';
-import { WAZA_COPY, WEAPON_COPY } from '../content/world';
+import { SAMPLE_MASK, wornMask } from '../meta/mask';
+import { MASK_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
 import { SCREENS } from '../content/screens';
 import { SKUS, type Sku } from '../platform/iap';
 import { ICON } from './icons';
 import { escapeHtml } from './html';
-import { lettersArt, playerArt, restoreLook, swordArt, wazaArt } from './shopArt';
+import { lettersArt, maskedArt, playerArt, restoreLook, swordArt, wazaArt } from './shopArt';
 
 type Pay = 'dust' | 'orbit';
 type Slot = keyof Loadout;
@@ -50,6 +51,9 @@ const LOOK_ITEMS: readonly Item[] = ([
   ['orbit', 'letters', '효과글자', '궤도'],
 ] as const).map(([id, slot, kind, name]) => ({ id, slot, kind, name, cost: COSMETIC_ORBIT_COST, pay: 'orbit' }));
 
+/** 마스크 — 큰 카드 하나. 한 번 사면 다시 그리기는 무료 */
+const MASK_ITEM: Item = { id: 'mask', slot: 'mask', name: MASK_COPY.name, cost: MASK_DUST_COST, pay: 'dust' };
+
 /** 무기 막대 셋 — 장비 탭과 같은 값·같은 정규화(무기 전부 중 최댓값) */
 const STATS: readonly { key: 'reach' | 'lift' | 'gauge'; label: string }[] = [
   { key: 'reach', label: '사거리' },
@@ -74,6 +78,8 @@ export interface ShopInv {
   /** 평생 누적 철거 건물 수 */
   buildings: number;
   loadout: Loadout;
+  /** 도트판 그림(저장 maskArt) — 마스크 카드 그림 */
+  maskArt: string;
 }
 
 export interface ShopHandlers {
@@ -87,6 +93,8 @@ export interface ShopHandlers {
   onExchange(): void;
   /** 산 품목을 상점에서 바로 장착 */
   onEquip(slot: string, id: string): void;
+  /** 산 마스크의 「그리기」 — 도트판을 연다 */
+  onMaskEdit(): void;
 }
 
 /** 방금 「사기」를 누른 품목 — 다음 그리기에서 보유로 바뀌었으면 도장을 쿵 찍는다 */
@@ -134,6 +142,9 @@ export function paintShop(
     wazaArt(it.id, { weapon: inv.loadout.weapon, body: inv.loadout.body, blade: inv.loadout.blade }),
     `<p class="cat-desc">${escapeHtml(it.desc ?? '')}</p>`,
   )).join('');
+  // 사기 전엔 견본을 씌워 보인다. 산 뒤엔 내 그림(아직 안 그렸으면 견본 — 판 속과 같은 규칙)
+  const maskLook = hasItem(owned, MASK_ITEM.id) ? wornMask(inv.maskArt) : SAMPLE_MASK;
+  const mask = card(MASK_ITEM, maskedArt(inv.loadout, maskLook), `<p class="cat-desc">${escapeHtml(MASK_COPY.desc)}</p>`);
   const looks = LOOK_ITEMS.map((it) => card(it, lookArt(it, inv.loadout))).join('');
   // 찍기가 바꾼 졸라맨 전역 상태를 장착대로 — 뒤 화면 졸라맨이 미리보기 색을 입고 남지 않게
   restoreLook(inv.loadout);
@@ -160,6 +171,8 @@ export function paintShop(
     <p class="sec-h">필살 <small class="cur">${ICON.orbit}궤도조각</small></p>
     ${earn}
     <div class="cat-grid">${waza}</div>
+    <p class="sec-h">마스크 <small class="cur">${ICON.dust}먼지</small></p>
+    <div class="cat-list">${mask}</div>
     <p class="sec-h">꾸미기 <small class="cur">${ICON.orbit}궤도조각</small></p>
     <div class="cat-grid">${looks}</div>
     <p class="sec-h">${SCREENS.license.heading} <small>${escapeHtml(licenseTitle(inv.license))}</small></p>
@@ -167,10 +180,11 @@ export function paintShop(
     ${paths.iap ? `<p class="sec-h">결제 <small>부가세 포함</small></p><div class="list">${skuRowsHtml()}</div>` : ''}`;
 
   root.onclick = (e) => {
-    const t = (e.target as HTMLElement).closest('[data-shop-sku],[data-shop-ad],[data-orbit-id],[data-dust-id],[data-shop-exchange],[data-shop-exam],[data-equip-id]') as HTMLButtonElement | null;
+    const t = (e.target as HTMLElement).closest('[data-shop-sku],[data-shop-ad],[data-orbit-id],[data-dust-id],[data-shop-exchange],[data-shop-exam],[data-equip-id],[data-mask-edit]') as HTMLButtonElement | null;
     if (!t || t.disabled) return;
     e.preventDefault();
     if (t.hasAttribute('data-shop-exam')) { h.onExam(); return; }
+    if (t.hasAttribute('data-mask-edit')) { h.onMaskEdit(); return; }
     const eid = t.getAttribute('data-equip-id');
     const slot = t.getAttribute('data-equip-slot');
     if (eid && slot) { h.onEquip(slot, eid); return; }
@@ -212,7 +226,11 @@ function statsHtml(id: WeaponId): string {
 function footHtml(it: Item, st: CardState, main: boolean, inv: ShopInv): string {
   if (st === 'owned') {
     const on = inv.loadout[it.slot] === it.id;
-    return `<button type="button" class="cat-foot cat-equip" data-equip-slot="${it.slot}" data-equip-id="${it.id}"${on ? ' disabled' : ''}>${on ? '장착 중' : '장착'}</button>`;
+    const equip = `<button type="button" class="cat-foot cat-equip" data-equip-slot="${it.slot}" data-equip-id="${it.id}"${on ? ' disabled' : ''}>${on ? '장착 중' : '장착'}</button>`;
+    // 마스크는 띠 둘 — 「그리기」(도트판) + 장착. 벗기는 건 장비 탭
+    return it.slot === 'mask'
+      ? `<div class="cat-feet"><button type="button" class="cat-foot cat-draw" data-mask-edit="1">그리기</button>${equip}</div>`
+      : equip;
   }
   const icon = ICON[it.pay];
   if (st === 'ok') {

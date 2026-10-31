@@ -35,10 +35,14 @@
      가드: `tests/camera.test.ts`.
 8. **특별작전(기믹 판)은 시간제다** — 구역 경계·2막 문턱을 넘어도 그 구역에 머물고 난이도만 p를 따라 오른다
    (`sim.ts` stepAct1의 `s.gimmick === 'none'` 조건). 가드: `tests/gimmick.test.ts`.
+9. **마스크 그림은 칸마다 색 코드를 담는다**(`src/meta/mask.ts`, 16×16, 저장 키 `maskArt`).
+   새 판 = `m2:` + 칸 256개(`.` 빈칸 · 16진 소문자 6자리). 옛 판(256자, `0` 빈칸 · `1`~`c` = `MASK_PALETTE` 번호)도
+   계속 읽는다. 옛 저장과 `SAMPLE_MASK`가 이 번호로 색을 가리키니 `MASK_PALETTE`는 순서도 값도 바꾸지 마라.
+   도트판 기본 색 `MASK_SWATCHES`는 저장과 무관해서 마음대로 바꿔도 된다. 가드: `tests/mask.test.ts`.
 
 ## 검증
 
-- `npm test` — 428 테스트(2026-10-28 대검 이펙트 뒤 기준), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 487 테스트(2026-10-29 도트판 2판과 리뷰 고침 뒤 기준, 가지 `feat/mask-fx`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
   (원본 TTF 5개는 `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).

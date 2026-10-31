@@ -156,12 +156,12 @@ export function mountDebugMenu(getState: () => GameState | null): void {
     sv.unlockedChapters = 3;
     sv.act2Cleared = true;
     sv.butterTierReached = 3;
-    sv.owned = ['tenchi', 'ageba', 'tetsu', 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit'];
+    sv.owned = [...new Set([...sv.owned, 'tenchi', 'ageba', 'tetsu', 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit', 'mask'])]; // 산 무기는 그대로
     sv.dust = Math.max(sv.dust, 999);
     sv.orbit = Math.max(sv.orbit, 999);
     saveSave(sv);
     try { localStorage.setItem('gunbbu.devUnlock', '1'); } catch {}
-    paintStatus();
+    location.reload(); // 앱이 들고 있는 저장을 새로 읽는다 — 그대로 두면 판을 시작할 때 옛 소유 목록으로 덮는다
   });
 
   (

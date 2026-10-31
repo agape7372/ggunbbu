@@ -617,3 +617,11 @@ export const CAPTION_MS = 1200;
 
 /** 게임오버 만담 — 같은 세션 연속 사망이 이 횟수부터 사다리 */
 export const QUIP_STREAK_FROM = 3;
+
+// ── 마스크 (상점 꾸미기) ─────────────────────────────────────────
+/**
+ * 머리에 씌우는 크기 [튜닝]. SIZE = 16칸이 차지하는 논리 px — 머리 지름 10의 1.6배(큰 머리 연출).
+ * LIFT = 머리 중심보다 위로(목이 마스크 밑에서 이어지게). FLAT_SQUASH = 깔림·사망 납작 프레임에서 세로 배율.
+ * HAT_UP = 마스크 위 안전모가 마스크 중심보다 올라가는 px(윗단만 덮는다).
+ */
+export const MASK_DRAW = { SIZE: 16, LIFT: 2, FLAT_SQUASH: 0.45, HAT_UP: 5 } as const;

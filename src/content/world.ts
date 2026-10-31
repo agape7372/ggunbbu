@@ -239,6 +239,12 @@ export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   gold: { name: '황금 대검', desc: '필살이 가장 빨리 찬다. 조금 덜 띄운다.' },
 };
 
+/** 상점 마스크 — 상점 카드·장비 탭·결과 카드 다음 목표가 같은 이름을 쓴다 */
+export const MASK_COPY = {
+  name: '내 마스크',
+  desc: '도트판에 직접 찍어 얼굴에 씌운다.',
+} as const;
+
 /** 보급 상자에서 나오는 것. pop = 열릴 때 머리 위에 뜨는 말. */
 export interface ItemCopy {
   name: string;

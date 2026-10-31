@@ -39,6 +39,14 @@ export const ICON = {
   greatsword: svg('<path d="M17 3h4v4L11 17l-4-4z"/><path d="M5 11l8 8M8 16l-5 5"/>'),
   close: svg('<path d="m6 6 12 12M18 6 6 18"/>'),
   next: svg('<path d="m9 6 6 6-6 6"/>'),
+  plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  // 도트판 도구 — 단추엔 아이콘만, 이름은 단추의 aria-label
+  pen: svg('<path d="M4 20l1-5L15.5 4.5l4 4L9 19z"/><path d="m13 7 4 4"/>'),
+  eraser: svg('<path d="m14 3 7 7-10 10-7-7z"/><path d="m8 9 7 7"/><path d="M11 21h9"/>'),
+  bucket: svg('<path d="m3 11 7-7 8 8-7 7z"/><path d="M3 11h14l1 1-7 7z" fill="currentColor"/><path d="M20 14.5c-1.3 2-2 3.1-2 4a2 2 0 0 0 4 0c0-.9-.7-2-2-4z" fill="currentColor"/>'),
+  mirror: svg('<path d="M12 3v2M12 8v2M12 13v2M12 18v2" stroke-linecap="butt"/><path d="M9 6v12H3z" fill="currentColor"/><path d="M15 6v12h6z"/>'),
+  undo: svg('<path d="M9 5 4 10l5 5"/><path d="M4 10h11a5 5 0 0 1 0 10h-4"/>'),
+  trash: svg('<path d="M4 7h16M9 7V4h6v3"/><path d="m6 7 1 13h10l1-13"/><path d="M10 11v5M14 11v5"/>'),
 } as const;
 
 export type IconName = keyof typeof ICON;

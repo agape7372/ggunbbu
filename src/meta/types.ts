@@ -3,10 +3,12 @@
 // 08-30 스윕: WazaId·GimmickId는 core/types가 정본 — 이중 정의 제거, 재수출만
 import type { WazaId, GimmickId, GreatswordId, WeaponId } from '../core/types';
 export type { WazaId, GimmickId, GreatswordId, WeaponId };
-export type CosmeticSlot = 'body' | 'blade' | 'letters';
+export type CosmeticSlot = 'body' | 'blade' | 'letters' | 'mask';
 export type BodyId = 'ink' | 'amber' | 'slate';
 export type BladeId = 'wire' | 'rebar' | 'crescent';
 export type LettersId = 'flyer' | 'stamp' | 'orbit';
+/** 마스크 칸 — 그림은 저장의 maskArt 하나. 'mask' = 그 그림을 쓴다 */
+export type MaskId = 'none' | 'mask';
 
 export interface Loadout {
   waza: WazaId;
@@ -14,6 +16,7 @@ export interface Loadout {
   body: BodyId;
   blade: BladeId;
   letters: LettersId;
+  mask: MaskId;
 }
 
 export interface MissionDef {

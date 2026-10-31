@@ -4,10 +4,12 @@
 
 import { COSMETIC_COLORS, PALETTE, PLAYER } from '../config';
 import { ONOMATO } from '../content/juice';
-import type { PlayerPose } from '../core/types';
+import type { PlayerPose, WazaId } from '../core/types';
 import type { Loadout, WeaponId } from '../meta/types';
 import { drawBladeShot } from '../render/bladeFx';
-import { drawGreatsword, drawPlayer, setPlayerCosmetics, setPlayerWeapon } from '../render/sprites';
+import { drawWazaShot } from '../render/weaponFx';
+import { MASK_DRAW } from '../config';
+import { drawGreatsword, drawMask, drawPlayer, playerHead, setPlayerCosmetics, setPlayerWeapon } from '../render/sprites';
 
 export interface Look {
   weapon: WeaponId;
@@ -29,6 +31,9 @@ const SWORD_H = 60;
 const SHOT_X = 32;
 const SHOT_Y = 21;
 const SHOT_K = 0.7;
+/** 마스크 칸 — 윗몸을 2배로. 마스크 가운데가 그림 가로 가운데·위에서 BUST_Y(배율 전) */
+const BUST_K = 2;
+const BUST_Y = 15;
 const SCALE = 4; // 상점은 1.5배까지 키워 보인다 — 고밀도 화면에서 선이 뭉개지지 않게 4배로 찍는다
 const DISPLAY = '"Black Han Sans", sans-serif';
 
@@ -143,13 +148,29 @@ export function lettersArt(id: string): string {
   }, true);
 }
 
-/** 필살 그림 — 셋은 포즈·폭발이 같고 화면에 뜨는 말만 다르다. 필살 포즈 + 머리 위 그 말 */
+/** 필살 그림 — 필살 포즈 + 졸라맨 뒤에 그 필살이 터진 한 장면(셋이 다 다르다) + 머리 위 그 말 */
 export function wazaArt(id: string, look: Omit<Look, 'pose'>): string {
   const word = id === 'tetsu' ? ONOMATO.specialTetsu : id === 'ageba' ? ONOMATO.specialAgeba : ONOMATO.special;
   return snap(`w|${id}|${look.weapon}|${look.body}|${look.blade}`, WAZA_H, (ctx) => {
-    player(ctx, { ...look, pose: 'special' }, WAZA_H - (ART_H - FOOT_Y));
+    const footY = WAZA_H - (ART_H - FOOT_Y);
+    drawWazaShot(ctx, id as WazaId, ART_W / 2, footY);
+    player(ctx, { ...look, pose: 'special' }, footY);
     popText(ctx, word, ART_W / 2, 19, 16, PALETTE.YELLOW, 5, -0.08);
   }, true);
+}
+
+/** 마스크 그림 — 마스크 쓴 졸라맨(서 있는 자세)의 윗몸을 크게. 그림 문자열이 캐시 키에 들어 다시 그리면 새 그림이 찍힌다 */
+export function maskedArt(look: Omit<Look, 'pose'>, art: string): string {
+  return snap(`m|${look.weapon}|${look.body}|${look.blade}|${art}`, ART_H, (ctx) => {
+    setPlayerWeapon(look.weapon);
+    setPlayerCosmetics(colorOf('body', look.body), colorOf('blade', look.blade));
+    const [hx, hy] = playerHead('idle', 0) ?? [0, 0]; // 시트·프로시저럴마다 머리 자리가 조금 다르다 — 무기·색을 정한 뒤 읽는다
+    const fx = ART_W / 2 / BUST_K - hx;
+    const fy = BUST_Y - hy + MASK_DRAW.LIFT;
+    ctx.scale(BUST_K, BUST_K);
+    drawPlayer(ctx, 'idle', 0, fx, fy);
+    drawMask(ctx, 'idle', 0, fx, fy, art);
+  });
 }
 
 /** 찍기가 바꾼 졸라맨 전역 상태를 장착 상태로 되돌린다 */

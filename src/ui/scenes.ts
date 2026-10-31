@@ -28,7 +28,9 @@ import {
   ENDING_FULL_COMBO,
 } from '../content';
 import { introFor } from '../content/story';
-import { OPERATIONS, WEAPON_COPY } from '../content/world';
+import { MASK_COPY, OPERATIONS, WEAPON_COPY } from '../content/world';
+import { maskIsBlank } from '../meta/mask';
+import { closeMaskEditor, openMaskEditor } from './maskEditor';
 import { mountHud, ensureHudLayer } from './hud';
 import { createRunCaps, type RunCap, type RunCaps } from './runCaps';
 import {
@@ -129,7 +131,7 @@ export function createApp(
   };
   applySettingsToRuntime(save, settingsSinks);
   initRenderer();
-  applyCosmetics(save.loadout); // 코스메틱 실반영 (08-30, P1-3)
+  applyCosmetics(save.loadout, save.maskArt); // 코스메틱 실반영 (08-30, P1-3)
   armAudioUnlock();
   input.onFirstGesture(() => { initAudio(); });
 
@@ -285,6 +287,7 @@ export function createApp(
   function openShop(): void {
     overlay.showShop({
       dust: save.dust, orbit: save.orbit, license: save.license, buildings: save.stats.buildings, loadout: save.loadout,
+      maskArt: save.maskArt,
     }, ownedSet(), {
       iap: iap.available(),
       ad: ads.ready(),
@@ -413,7 +416,7 @@ export function createApp(
     resetSave();
     save = loadSave();
     applySettingsToRuntime(save, settingsSinks);
-    applyCosmetics(save.loadout);
+    applyCosmetics(save.loadout, save.maskArt);
     menuIndex = 0;
     playSfx('uiBack');
     overlay.showTitle(titleView());
@@ -471,12 +474,37 @@ export function createApp(
 
   function doEquip(slot: string, id: string): void {
     save.loadout = equip(save.loadout, slot, id, ownedSet());
-    applyCosmetics(save.loadout); // 즉시 반영 — 팔리는 물건은 실제로 바뀐다 (P1-3)
+    applyCosmetics(save.loadout, save.maskArt); // 즉시 반영 — 팔리는 물건은 실제로 바뀐다 (P1-3)
     saveSave(save);
     playSfx('stamp');
     // 상점의 「장착」 띠에서도 부른다 — 누른 화면을 그대로 다시 그린다
     if (overlay.getScreen() === 'shop') openShop();
     else openCustom();
+  }
+
+  /** 상점 마스크 「그리기」 — 산 사람만. 다시 그리기는 무료 */
+  function openMaskBoard(): void {
+    if (!save.owned.includes('mask')) { playSfx('uiDeny'); return; }
+    playSfx('uiBlip');
+    openMaskEditor(ensureOverlayLayer(), save.maskArt, {
+      onSave: saveMask,
+      onClose: () => playSfx('uiBack'),
+    });
+  }
+
+  /** 도트판 저장. 처음 그린 그림이고 아직 안 쓰고 있으면 바로 씌운다 */
+  function saveMask(art: string): void {
+    const first = maskIsBlank(save.maskArt) && !maskIsBlank(art) && save.loadout.mask !== 'mask';
+    save.maskArt = art;
+    if (first) save.loadout = equip(save.loadout, 'mask', 'mask', ownedSet());
+    applyCosmetics(save.loadout, save.maskArt);
+    saveSave(save);
+    playSfx('stamp');
+    overlay.toast(first ? '저장하고 장착했습니다.' : '저장했습니다.');
+    if (overlay.getScreen() !== 'shop') return;
+    openShop();
+    // 다시 그린 상점은 연 「그리기」 단추를 갈아 끼운다 — 초점을 새 단추로(취소·뒤로는 도트판이 돌려준다)
+    document.querySelector<HTMLElement>('[data-mask-edit]')?.focus({ preventScroll: true });
   }
 
   function startTokoton(): void {
@@ -599,6 +627,7 @@ export function createApp(
 
   /** 안드로이드 뒤로가기·Esc 공용. 창 → 하위 화면 → 타이틀 → 앱 내리기 순으로 한 칸씩 물러난다. */
   function handleBack(): void {
+    if (closeMaskEditor()) return; // 도트판이 가장 위 — 저장 없이 닫는다
     if (overlay.modalOpen()) { overlay.closeModal(); return; }
     const scr = overlay.getScreen();
     switch (scene) {
@@ -706,6 +735,7 @@ export function createApp(
     onUnlockOrbit: (id) => unlockOrbitItem(id),
     onUnlockDust: (id) => unlockDustItem(id),
     onEquip: (slot, id) => doEquip(slot, id),
+    onMaskEdit: openMaskBoard,
     onExchangeDust: doExchange,
     onHowtoDone: () => { save.howtoSeen = true; saveSave(save); },
     onResetData: resetData,
@@ -949,7 +979,9 @@ export function createApp(
 
   function gameoverView(s: GameState, prevBest: number): GameOverView {
     const goal = nextDustGoal(save.owned, save.dust);
-    const goalName = goal ? WEAPON_COPY[goal.id as keyof typeof WEAPON_COPY]?.name : undefined;
+    // 무기를 다 사면 다음 목표는 마스크 — 이름표가 따로 있다
+    const goalName = !goal ? undefined
+      : goal.id === 'mask' ? MASK_COPY.name : WEAPON_COPY[goal.id as keyof typeof WEAPON_COPY]?.name;
     const best = !runExempt && s.score > 0 && s.score > prevBest;
     // 같은 세션 연속 사망 — 한 판에서 부활해 또 죽어도 한 번. 신기록이면 흐름이 끊긴 것으로 본다 (C10)
     if (!streakCounted) { deathStreak += 1; streakCounted = true; }

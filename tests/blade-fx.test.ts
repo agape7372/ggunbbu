@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeState } from '../src/core/sim';
 import type { JuiceEvent, WeaponId } from '../src/core/types';
-import { GREATSWORD_IDS } from '../src/meta/loadout';
+import { GREATSWORD_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { bladeReact, drawBladeFx, drawBladeShot, resetBladeFx, updateBladeFx } from '../src/render/bladeFx';
 
 /** 그릴 때 고른 색과 부른 그리기를 모으는 ctx */
@@ -43,10 +43,8 @@ describe('대검 이펙트', () => {
     expect(new Set(sigs).size).toBe(GREATSWORD_IDS.length);
   });
 
-  it('철거칼엔 덧칠이 없고, 대검도 2초 뒤엔 하나도 안 남는다', () => {
-    burst('sword');
-    expect(drawn()).toBe('');
-    for (const w of GREATSWORD_IDS) {
+  it('철거칼·연장도 제 덧칠이 있고(weaponFx), 열두 무기 모두 2초 뒤엔 하나도 안 남는다', () => {
+    for (const w of WEAPON_IDS) {
       burst(w);
       expect(drawn(), w).not.toBe('');
       for (let i = 0; i < 125; i++) updateBladeFx(1 / 60);
