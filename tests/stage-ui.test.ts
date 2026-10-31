@@ -1,16 +1,13 @@
-// 작업 지시서 화면의 순수 셈 — 사유 고르기 · HUD 줄 · 진척 · 코드 자르기 · 보고서 한 장 · 붙여 넣기 판정. 그리기는 화면 검수.
+// 작업 지시서 화면의 순수 셈 — 사유 고르기 · HUD 줄 · 진척 · 보고서 한 장 · 일지 합계. 그리기는 화면 검수.
 import { describe, expect, it } from 'vitest';
 import { STAGES } from '../src/core/stages';
-import { STAGE_SIM_VERSION, stageDef, stageSeed, type StageResult } from '../src/core/stage';
-import { createRecorder, decodeReplay } from '../src/core/replay';
-import { verifyReplay } from '../src/core/stageReplay';
-import { STAGE_MODE, fmtStageTime } from '../src/content/stages';
+import { stageDef, type StageResult } from '../src/core/stage';
+import { fmtStageTime } from '../src/content/stages';
+import { runStage } from './stageBot';
 import { emptyRecord, mergeResult, stampBits } from '../src/meta/stageRecord';
 import {
-  bossName, endView, masterLine, pickReason, progressText, sealCode, stageHudLine, stampTotals, trimEvents, workProgress,
+  bossName, endView, masterLine, pickReason, progressText, stageHudLine, stampTotals, workProgress,
 } from '../src/ui/stageLogic';
-import { judgePasted } from '../src/ui/stageView';
-import { runStage } from './stageBot';
 
 const ALL = { done: true, safe: true, inTime: true, secret: true, master: true };
 
@@ -39,10 +36,9 @@ describe('반려 사유', () => {
 });
 
 describe('판 위 한 줄과 진척', () => {
-  it('「id 이름 · 시간 · 걸음」, 대본이 빈 보스판은 걸음을 뺀다, 다시 보기면 앞에 붙는다', () => {
-    expect(stageHudLine({ id: '1-1', ticks: 12 * 60, step: 3, total: 7, replaying: false })).toBe('1-1 회랑 3번지 · 0:12.00 · 3/7');
-    expect(stageHudLine({ id: '1-B', ticks: 90, step: 0, total: 0, replaying: false })).toBe('1-B 종탑 · 0:01.50');
-    expect(stageHudLine({ id: '1-1', ticks: 0, step: 0, total: 7, replaying: true })).toBe(`${STAGE_MODE.replaying} · 1-1 회랑 3번지 · 0:00.00 · 0/7`);
+  it('「id 이름 · 시간 · 걸음」, 대본이 빈 보스판은 걸음을 뺀다', () => {
+    expect(stageHudLine({ id: '1-1', ticks: 12 * 60, step: 3, total: 7 })).toBe('1-1 회랑 3번지 · 0:12.00 · 3/7');
+    expect(stageHudLine({ id: '1-B', ticks: 90, step: 0, total: 0 })).toBe('1-B 종탑 · 0:01.50');
   });
 
   it('걸음 셈은 쉼을 뺀다 — 보스 아닌 판은 총 걸음 = 봇이 깬 판의 splits 수, 1-2는 건물 9채', () => {
@@ -69,46 +65,15 @@ describe('판 위 한 줄과 진척', () => {
   });
 });
 
-describe('기록 코드 자르기', () => {
-  it('끝 틱 뒤의 사건은 자른다', () => {
-    // 틱 0 · 5 · 5+10 · 15+30에 사건
-    const ev = [0 * 8 + 1, 5 * 8 + 1, 10 * 8 + 0, 30 * 8 + 1];
-    expect(trimEvents(ev, 100)).toEqual(ev);
-    expect(trimEvents(ev, 15)).toEqual(ev.slice(0, 2));
-    expect(trimEvents(ev, 16)).toEqual(ev.slice(0, 3));
-  });
-
-  it('깬 뒤 연출 동안 누른 입력이 있어도 코드는 읽히고, 다시 돌린 값과 맞는다(보스판)', () => {
-    const run = runStage('1-B', 1);
-    expect(run.result.cleared).toBe(true);
-    const rec = createRecorder();
-    for (const f of run.frames) rec.push(f);
-    // 쓰러진 뒤에도 사람은 누른다 — 끝 틱 뒤에 사건을 덧붙인다
-    const late = createRecorder();
-    for (const f of run.frames) late.push(f);
-    for (let i = 0; i < 40; i++) late.push({ jump: false, guard: false, attack: i % 7 === 0, special: false });
-    const head = { sim: STAGE_SIM_VERSION, stage: '1-B', diff: 1, seed: stageSeed('1-B'), weapon: 'sword' as const, waza: 'tenchi' as const };
-    const code = sealCode(head, run.result, late.events);
-    const r = decodeReplay(code);
-    expect(r).not.toBeNull();
-    const v = verifyReplay(r!);
-    expect('error' in v).toBe(false);
-    if (!('error' in v)) {
-      expect(v.match).toBe(true);
-      expect(v.result.ticks).toBe(run.result.ticks);
-    }
-  });
-});
-
 describe('철거 보고서 한 장', () => {
   const rec = emptyRecord();
   const base = {
-    lifeLost: 0, finishSpecial: false, step: 7, total: 7, phase: 'done' as const, code: '', nextId: null as string | null,
+    lifeLost: 0, finishSpecial: false, step: 7, total: 7, phase: 'done' as const, nextId: null as string | null,
   };
 
   it('정규를 깨면 시간 · 도장 비트 · 전임자 줄이 서고, 뒷면은 착수 · 철거 · 첫 철거', () => {
     const r = result({ stamps: { ...ALL, secret: false } });
-    const m = mergeResult(rec, r, 'GB1.x', '2026-10-31');
+    const m = mergeResult(rec, r, '2026-10-31');
     const v = endView({ ...base, kind: 'real', result: r, news: m.news, rec: m.rec });
     expect(v.time).toBe(fmtStageTime(3000));
     expect(v.stamps).toBe(stampBits(r.stamps));
@@ -124,20 +89,18 @@ describe('철거 보고서 한 장', () => {
   it('견습 · 외주는 도장 · 전임자 줄이 없다', () => {
     for (const diff of [0, 2] as const) {
       const r = result({ diff });
-      const v = endView({ ...base, kind: 'real', result: r, news: mergeResult(rec, r, '', 'd').news, rec: null });
+      const v = endView({ ...base, kind: 'real', result: r, news: mergeResult(rec, r, 'd').news, rec: null });
       expect(v.stamps).toBe(0);
       expect(v.master).toBe('');
       expect(v.reason).toBe('');
     }
   });
 
-  it('못 깬 판: 시간 자리에 진척, 사유는 미완료, 코드 · 확인 번호 없음', () => {
+  it('못 깬 판: 시간 자리에 진척, 사유는 미완료', () => {
     const r = result({ cleared: false, ticks: 900, stamps: { done: false, safe: false, inTime: false, secret: false, master: false } });
-    const v = endView({ ...base, kind: 'real', result: r, step: 3, phase: 'script', news: mergeResult(rec, r, '', 'd').news, rec: null });
+    const v = endView({ ...base, kind: 'real', result: r, step: 3, phase: 'script', news: mergeResult(rec, r, 'd').news, rec: null });
     expect(v.time).toBe('3/7');
     expect(v.reason).toBe('사유: 미완료.');
-    expect(v.check).toBe('');
-    expect(v.share).toBe('');
   });
 
   it('보스 연습은 기록 없이 시간 · 깼나만, 퇴장 대사 없음. 보스 판을 진짜로 깼으면 대사가 선다', () => {
@@ -146,54 +109,20 @@ describe('철거 보고서 한 장', () => {
     const pr = endView({ ...base, kind: 'practice', result: r, news: null, rec: null });
     expect(pr.stamps).toBe(0);
     expect(pr.outro).toEqual([]);
-    const real = endView({ ...base, kind: 'real', result: r, news: mergeResult(rec, r, '', 'd').news, rec: null });
+    const real = endView({ ...base, kind: 'real', result: r, news: mergeResult(rec, r, 'd').news, rec: null });
     expect(real.outro.length).toBeGreaterThan(0);
     // 2판 기믹(result.extra)을 채우면 퇴장 대사가 그 줄로 바뀐다 — 연습에선 여전히 없다
     const xr = result({ id, ticks: 2800, extra: true });
-    const x = endView({ ...base, kind: 'real', result: xr, news: mergeResult(rec, xr, '', 'd').news, rec: null });
+    const x = endView({ ...base, kind: 'real', result: xr, news: mergeResult(rec, xr, 'd').news, rec: null });
     expect(x.outro).toEqual(['13시였다.']);
     expect(endView({ ...base, kind: 'practice', result: xr, news: null, rec: null }).outro).toEqual([]);
   });
-
-  it('깬 진짜 판은 확인 번호 여섯 자와 공유 글(코드는 글에 없고 따로 복사)이 선다', () => {
-    const run = runStage('2-1', 1);
-    const rc = createRecorder();
-    for (const f of run.frames) rc.push(f);
-    const head = { sim: STAGE_SIM_VERSION, stage: '2-1', diff: 1, seed: stageSeed('2-1'), weapon: 'sword' as const, waza: 'tenchi' as const };
-    const code = sealCode(head, run.result, rc.events);
-    const m = mergeResult(emptyRecord(), run.result, code, 'd');
-    const v = endView({ ...base, kind: 'real', result: run.result, news: m.news, rec: m.rec, code });
-    expect(v.check).toMatch(/^[0-9A-F]{6}$/);
-    expect(v.share).not.toContain(code);
-    expect(v.code).toBe(code);
-    expect(v.share).toContain(v.check);
-    expect(endView({ ...base, kind: 'watch', result: run.result, news: null, rec: null, code }).check).toBe('');
-  });
 });
 
-describe('현장 일지 합계 · 붙여 넣기', () => {
+describe('현장 일지 합계', () => {
   it('정규 도장 수 / 65, 전임자 확인 수 / 13', () => {
     expect(STAGES.length).toBe(13);
     const t = stampTotals({ '1-1': { ...emptyRecord(), stamps: 0b11111 }, '1-2': { ...emptyRecord(), stamps: 0b10001 } });
     expect(t).toEqual({ stamps: 7, stampMax: 65, masters: 2, masterMax: 13 });
-  });
-
-  it('붙여 넣은 글: 읽을 수 없으면 bad, 맞으면 다시 돌린 값과 확인 번호, 점수를 고친 코드는 불일치', async () => {
-    expect(judgePasted('').html).toBe('');
-    expect(judgePasted('아무 글').html).toContain(STAGE_MODE.codeErr.bad);
-    const run = runStage('2-1', 1);
-    const rc = createRecorder();
-    for (const f of run.frames) rc.push(f);
-    const head = { sim: STAGE_SIM_VERSION, stage: '2-1', diff: 1, seed: stageSeed('2-1'), weapon: 'sword' as const, waza: 'tenchi' as const };
-    const code = sealCode(head, run.result, rc.events);
-    const ok = judgePasted(`  ${code}\n`);
-    expect(ok.rep).not.toBeNull();
-    expect(ok.html).toContain(fmtStageTime(run.result.ticks));
-    expect(ok.html).not.toContain(STAGE_MODE.codeErr.mismatch);
-    const { encodeReplay } = await import('../src/core/replay');
-    const forged = encodeReplay({ ...decodeReplay(code)!, end: { ...decodeReplay(code)!.end, score: run.result.score + 1 } });
-    const bad = judgePasted(forged);
-    expect(bad.html).toContain(STAGE_MODE.codeErr.mismatch);
-    expect(bad.rep).not.toBeNull(); // 다시 돌린 값은 그래도 보인다
   });
 });

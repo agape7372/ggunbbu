@@ -2,12 +2,10 @@
 // 규칙 · 기록은 core/stage.ts · meta/stageRecord.ts가 이미 갖고 있다. 여기는 그 값을 화면에 놓을 모양으로만 바꾼다.
 
 import { BOSS_NAME } from '../content';
-import { REJECT, STAGE_MODE, STAGE_TEXT, fmtGap, fmtStageTime, stageOutro, stageShareText } from '../content/stages';
-import { decodeReplay, encodeReplay, replayCheck, type ReplayHead } from '../core/replay';
+import { REJECT, STAGE_MODE, STAGE_TEXT, fmtGap, fmtStageTime, stageOutro } from '../content/stages';
 import { LANDMARK } from '../config';
 import { lmAct } from '../core/landmark';
 import { stageDef, stageScript, type StageResult } from '../core/stage';
-import { verifyReplay } from '../core/stageReplay';
 import { STAGES } from '../core/stages';
 import type { GameState, StageDiff } from '../core/types';
 import { STAMP_KEYS, chaeBehind, hasStamp, stampBits, type RecordNews, type StageRecord } from '../meta/stageRecord';
@@ -40,11 +38,10 @@ export function workProgress(id: string, step: number): { done: number; total: n
 }
 
 /** 판 위 한 줄 — 「1-1 회랑 3번지 · 0:12.34 · 3/7」. 총 걸음이 0(대본이 빈 보스판)이면 걸음을 뺀다 */
-export function stageHudLine(o: { id: string; ticks: number; step: number; total: number; replaying: boolean }): string {
+export function stageHudLine(o: { id: string; ticks: number; step: number; total: number }): string {
   const parts = [`${o.id} ${STAGE_TEXT[o.id]?.name ?? ''}`.trim(), fmtStageTime(o.ticks)];
   if (o.total > 0) parts.push(`${Math.min(o.step, o.total)}/${o.total}`);
-  const line = parts.join(' · ');
-  return o.replaying ? `${STAGE_MODE.replaying} · ${line}` : line;
+  return parts.join(' · ');
 }
 
 /** 명물 이름 — 집행기는 자기 이름이 따로 있다 */
@@ -109,33 +106,6 @@ export function nextHint(s: GameState, run: { memo: HintMemo }): string {
   return h;
 }
 
-/** 사건 열에서 끝 틱 이후를 자른다 — 깬 뒤 연출 동안 누른 입력은 코드에 넣지 않는다(decodeReplay가 사건 합 ≤ 끝 틱을 요구) */
-export function trimEvents(events: readonly number[], ticks: number): number[] {
-  const out: number[] = [];
-  let t = 0;
-  for (const e of events) {
-    t += Math.floor(e / 8);
-    if (t >= ticks) break;
-    out.push(e);
-  }
-  return out;
-}
-
-/**
- * 판 하나의 기록 코드. 끝 틱까지만 적고, 깬 판은 한 번 다시 돌려 본다 —
- * 깬 뒤 연출 입력을 잘랐으면 점수가 달라질 수 있어서, 다시 돌린 점수를 코드에 적는다(받는 쪽도 같은 값을 낸다).
- */
-export function sealCode(head: ReplayHead, r: StageResult, events: readonly number[]): string {
-  const kept = trimEvents(events, r.ticks);
-  const build = (score: number): string => encodeReplay({ head, end: { ticks: r.ticks, score, cleared: r.cleared }, events: kept });
-  const code = build(r.score);
-  if (!r.cleared) return code;
-  const rep = decodeReplay(code);
-  const v = rep ? verifyReplay(rep) : null;
-  if (v && !('error' in v) && !v.match && v.result.ticks === r.ticks && v.result.cleared) return build(v.result.score);
-  return code;
-}
-
 /** 현장 일지 합계 — 정규 도장 찍힌 수 / 전체 · 전임자 확인 수 / 판 수 */
 export function stampTotals(recs: Readonly<Record<string, StageRecord>>): { stamps: number; stampMax: number; masters: number; masterMax: number } {
   let stamps = 0;
@@ -148,8 +118,8 @@ export function stampTotals(recs: Readonly<Record<string, StageRecord>>): { stam
   return { stamps, stampMax: STAGES.length * STAMP_KEYS.length, masters, masterMax: STAGES.length };
 }
 
-/** real = 기록하는 판 · practice = 보스 연습(기록 없음) · watch = 다시 보기(기록 합치기 없음) */
-export type StageEndKind = 'real' | 'practice' | 'watch';
+/** real = 기록하는 판 · practice = 보스 연습(기록 없음) */
+export type StageEndKind = 'real' | 'practice';
 
 /** 철거 보고서 한 장에 놓을 것 전부 — 그리기는 stageView.paintStageEnd */
 export interface StageEndView {
@@ -174,10 +144,6 @@ export interface StageEndView {
   /** 전 기록 시간 글(없으면 '') */
   prevBest: string;
   outro: readonly string[];
-  /** 확인 번호 · 코드 · 공유 글(깬 진짜 판만) */
-  check: string;
-  code: string;
-  share: string;
   /** 다음 지시서 id — 깼고 열렸을 때만 */
   nextId: string | null;
   /** 도장 줄 길게 누르면 나오는 뒷면 */
@@ -194,7 +160,6 @@ export function endView(o: {
   phase: 'script' | 'boss' | 'done';
   news: RecordNews | null;
   rec: StageRecord | null;
-  code: string;
   nextId: string | null;
 }): StageEndView {
   const r = o.result;
@@ -203,8 +168,6 @@ export function endView(o: {
   const regular = r.diff === 1 && o.kind !== 'practice';
   const bits = stampBits(r.stamps);
   const news = o.news;
-  const code = r.cleared && real ? o.code : '';
-  const check = code ? replayCheck(code) : '';
   return {
     kind: o.kind,
     id: r.id,
@@ -224,9 +187,6 @@ export function endView(o: {
     outro: def.boss && r.cleared && o.kind !== 'practice'
       ? stageOutro(r.id, { secret: r.stamps.secret, finishSpecial: o.finishSpecial, extra: r.extra })
       : [],
-    check,
-    code,
-    share: code ? stageShareText({ id: r.id, diff: r.diff, ticks: r.ticks, bits, check, cleared: r.cleared }) : '',
     nextId: o.nextId,
     flip: o.rec
       ? `${STAGE_MODE.start} ${o.rec.tries} · ${STAGE_MODE.clears} ${o.rec.clears} · ${STAGE_MODE.firstClear} ${o.rec.first || STAGE_MODE.none}`

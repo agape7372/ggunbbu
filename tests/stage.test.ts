@@ -1,13 +1,12 @@
-// 작업 지시서 — 대본 문법 · 진행 · 판정 · 재생. 봇은 tests/stageBot.ts.
+// 작업 지시서 — 대본 문법 · 진행 · 판정. 봇은 tests/stageBot.ts.
 import { describe, it, expect } from 'vitest';
 import { parseScript, scriptStats } from '../src/core/script';
 import { STAGES } from '../src/core/stages';
-import { stageDef, stageScript, stageSeed, startStage, judgeStage, STAGE_SIM_VERSION } from '../src/core/stage';
+import { stageDef, stageScript, stageSeed, startStage } from '../src/core/stage';
 import { makeState, advance } from '../src/core/sim';
 import { EMPTY_INPUT } from '../src/core/types';
 import { HAT, MAT_HP, STAGE } from '../src/config';
 import { addCombo, hurtPlayer } from '../src/core/combat';
-import { createPlayback, createRecorder, decodeReplay, encodeReplay } from '../src/core/replay';
 import { runStage, fmtTicks, stageBot, expertBot } from './stageBot';
 
 describe('대본 문법', () => {
@@ -111,27 +110,6 @@ describe('기한 · 전임자는 봇이 잰 값과 맞다(대본을 고치면 �
       expect(best <= d.master && best > d.master - 30, `${d.id} 전임자 ${d.master} · 봇 ${best}`).toBe(true);
     });
   }
-});
-
-describe('기록 코드로 다시 돌리면 같은 판', () => {
-  it('봇 판을 코드로 만들고, 풀어서 돌리면 같은 결과', () => {
-    const run = runStage('3-2', 1);
-    const rec = createRecorder();
-    for (const f of run.frames) rec.push(f);
-    const code = encodeReplay({
-      head: { sim: STAGE_SIM_VERSION, stage: '3-2', diff: 1, seed: stageSeed('3-2'), weapon: 'sword', waza: 'tenchi' },
-      end: { ticks: run.result.ticks, score: run.result.score, cleared: run.result.cleared },
-      events: [...rec.events],
-    });
-    const back = decodeReplay(code)!;
-    const s = makeState({ seed: back.head.seed });
-    startStage(s, { id: back.head.stage, diff: back.head.diff as 0 | 1 | 2, weapon: back.head.weapon, waza: back.head.waza });
-    const pb = createPlayback(back.events);
-    for (let i = 0; i < rec.ticks && !s.over; i++) { advance(s, pb.next()); s.events.length = 0; }
-    const again = judgeStage(s);
-    expect(again).toEqual(run.result);
-    console.log(`[stage] 3-2 기록 코드 ${code.length}자`);
-  });
 });
 
 describe('판정', () => {

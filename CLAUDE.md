@@ -51,16 +51,16 @@
 13. **판 이펙트도 「먹 한 획」이다**(2026-10-31 저녁, 모양 = `src/render/ink.ts`). 먹 방울 · 먹 터짐 · 엔소(붓 원) · 흰 별 「깡」으로 그린다.
     **알파로 지우지 말고 모양으로 지운다**(줄이고 꼬리부터 깎고 마르게). 노랑은 벤 순간과 엔소의 첫 12%만.
     무게는 사건 등급을 따른다. 타격 = 작은 먹 터짐 · 층 무너짐 · 가드 · 다침 = 누운 엔소 · 완파 · 필살 · 보스 격파 = 큰 엔소와 노랑 속.
-14. **작업 지시서(스테이지 모드) 시뮬은 얼린다**(2026-10-31, 정본 = `docs/STAGES_2026-10-31.md`). 기록 코드는 입력만 담고,
-    받는 쪽이 처음부터 다시 돌려 시간 · 점수를 낸다. core · config에서 스테이지 판에 닿는 것(공용 PLAYER · GUARD · WEAPON 포함)을
-    바꾸면 `STAGE_SIM_VERSION`을 올리고 굳은 코드를 다시 굽는다(`tests/stage-golden.test.ts`가 잡는다). 밸런스는 대본(`core/stages.ts`)으로
-    고치고, 고치면 기한 · 전임자를 다시 잰다(문서 §7-1). 스테이지 경로에 `Math.pow` · 삼각함수 금지(기기마다 같은 판).
+14. **작업 지시서(스테이지 모드)는 결정적이다**(2026-10-31, 정본 = `docs/STAGES_2026-10-31.md`). 같은 입력이면 같은 판이 나온다.
+    기한 · 전임자는 봇이 잰 값이다. core · config에서 스테이지 판에 닿는 것(공용 PLAYER · GUARD · WEAPON 포함)이나 대본(`core/stages.ts`)을
+    바꾸면 다시 잰다(문서 §7-1). 어긋나면 `tests/stage.test.ts`가 깨진다. 스테이지 경로에 `Math.pow` · 삼각함수 금지(기기마다 같은 판).
+    기록 코드 · 공유 · 다시 보기는 없다(2026-11-01 뺌, 되살릴 땐 커밋 `8d30fdf`).
     렌더 · 소리는 GameState를 읽기만 한다. 종은 땅에 닿으면 깨진다(빗나감, 깔지 않는다). 깬 뒤 쓰러짐 연출 중엔 안 다친다.
-    가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts` · `stage-golden.test.ts`.
+    가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts`.
 
 ## 검증
 
-- `npm test` — 765 테스트(6 건너뜀, 2026-10-31 밤 2 기준, 가지 `feat/stage-story`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 743 테스트(5 건너뜀, 2026-11-01 커뮤니티 뺌 기준, `release/1.0`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
   (원본 TTF 8개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 500/700 · 동해독도 · 고운바탕 400/700.

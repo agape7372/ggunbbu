@@ -3,7 +3,7 @@
 // 베기 · 가드 · 깔림 · 밑면 접촉 규칙을 그대로 받는다. 이 파일은 그 위에 「언제 무엇을 던지나」와
 // 「던진 것이 몸에 닿으면」만 얹는다.
 // 공통 창: 몸이 내려앉아(sit) 밑면이 머리 높이에 오면 벤다. 창 길이 = LANDMARK.SIT_TICKS[난이도].
-// 난수 없음 — 순서가 고정이라 공략이 그대로 통한다(재생 코드도).
+// 난수 없음 — 순서가 고정이라 공략이 그대로 통한다.
 
 import type { FallingStack, Floor, GameState, LandmarkId, LandmarkSt, LandmarkState, Material } from './types';
 import { LANDMARK, PLAYER, SCORE, SPECIAL, STAGE, VIEW, WEAPON, GUARD_GAUGE } from '../config';

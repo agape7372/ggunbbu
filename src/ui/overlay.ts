@@ -16,7 +16,6 @@ import { paintOps, type OpsOpts } from './opsView';
 import { createStageUi, paintStageEnd, type StageListOpts, type StageUi } from './stageView';
 import type { StageEndView } from './stageLogic';
 import { STAGE_MODE } from '../content/stages';
-import type { Replay } from '../core/replay';
 import type { StageDiff } from '../core/types';
 import { paintMissions } from './missionView';
 import { paintShop, type ShopInv } from './shopView';
@@ -174,8 +173,6 @@ export interface OverlayHandlers {
   /** 작업 지시서 */
   onOpenStages(): void;
   onStageStart(id: string, diff: StageDiff, fromBoss: boolean): void;
-  onStageWatchBest(id: string): void;
-  onStageWatchCode(r: Replay): void;
   /** 철거 보고서 단추 */
   onStageRetry(): void;
   onStageNext(): void;
@@ -622,8 +619,6 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
   const stageUi: StageUi = createStageUi($('body-stages'), $('stage-back'), {
     onStart: (id, diff, fromBoss) => h.onStageStart(id, diff, fromBoss),
-    onWatchBest: (id) => h.onStageWatchBest(id),
-    onWatchCode: (r) => h.onStageWatchCode(r),
   });
 
   // 설치된 앱이면 스토어 버전(versionName)을 보여 준다 — 웹 번들 버전은 OTA용이라 다를 수 있다
@@ -1097,7 +1092,6 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         onRetry: h.onStageRetry,
         onNext: h.onStageNext,
         onList: h.onStageList,
-        toast: (text) => api.toast(text),
       }));
     },
     showMissions(daily, achieves, adBoost): void {

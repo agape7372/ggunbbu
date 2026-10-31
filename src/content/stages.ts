@@ -1,9 +1,8 @@
-// 작업 지시서 글 — 판 이름 · 지시서 세 줄 · 수수께끼 · 퇴장 대사 · 보고서 문구 · 공유 글. 규칙 · 수치는 core/stages.ts.
+// 작업 지시서 글 — 판 이름 · 지시서 세 줄 · 수수께끼 · 퇴장 대사 · 보고서 문구. 규칙 · 수치는 core/stages.ts.
 // 톤: 짧은 평서문. 아무도 칭찬받지 않는다. 담당자는 끝까지 안 나온다(docs/STAGES_2026-10-31.md §10).
 // 화면에 보이는 말은 이 파일 한 곳에서 고친다.
 
 import { STAGES } from '../core/stages';
-import type { StageDiff } from '../core/types';
 
 export const STAGE_MODE = {
   title: '작업 지시서',
@@ -29,27 +28,11 @@ export const STAGE_MODE = {
   master: '전임자',
   myBest: '내 기록',
   none: '없음',
-  code: '기록 코드',
-  copy: '코드 복사',
-  share: '공유 글 복사',
-  paste: '코드 붙여 넣기',
-  replay: '다시 보기',
-  copied: '복사했다.',
-  checkNo: '확인 번호',
-  replaying: '다시 보는 중',
   /** 전임자 도장을 처음 찍은 날 */
   masterBeat: ['전임자보다 빨랐다.', '전임자는 어디 갔는지 모른다.'],
   /** 정규로 처음 깬 판 */
   firstClear: '첫 철거',
   newBest: '새 기록',
-  codeErr: {
-    bad: '읽을 수 없는 코드다.',
-    sim: '구판 코드다. 지금 판으로는 못 돌린다.',
-    stage: '모르는 지시서다.',
-    gear: '모르는 장비다.',
-    seed: '판이 맞지 않는다.',
-    mismatch: '기록 불일치. 다시 돌린 값이 코드와 다르다.',
-  },
   /** 자연층 — 종을 세 번 「깡」 치면 한 번 */
   bellHint: '안 베인다. 다른 손을 쓰라.',
   windHint: '날숨엔 땅에서 막는다.',
@@ -67,19 +50,15 @@ export const STAGE_MODE = {
   navStamp: '서명 없음',
   clears: '철거',
   stampTotal: '정규 도장',
-  pasteHint: '코드를 여기에 붙인다.',
   progress: '걸음',
   tie: '동률',
   ahead: '앞',
-  behind: '뒤',
   again: '다시',
   prevBest: '전 기록',
   practiceReport: '연습 · 기록 없음',
-  watchReport: '보기 전용',
   cleared: '철거 완료',
   notCleared: '미완료',
   inkSeal: '외주',
-  copyFail: '복사하지 못했다.',
 } as const;
 
 export interface RegionText {
@@ -198,26 +177,3 @@ export const REJECT = {
   inTime: (lateTicks: number) => `사유: ${fmtGap(lateTicks)}초 늦음.`,
   master: (gapTicks: number, chae: number) => (chae > 0 ? `사유: ${fmtGap(gapTicks)}초. 미처리 ${chae}건.` : `사유: ${fmtGap(gapTicks)}초.`),
 } as const;
-
-/** 공유 글 — 비밀 조건은 안 나온다(과정의 모양만, ■ 찍힘 · □ 반려) */
-export function stageShareText(o: { id: string; diff: StageDiff; ticks: number; bits: number; check: string; cleared: boolean }): string {
-  const t = STAGE_TEXT[o.id];
-  let line = fmtStageTime(o.ticks);
-  if (o.diff === 1) {
-    line += ` ${[0, 1, 2, 3, 4].map((i) => ((o.bits >> i) & 1 ? '■' : '□')).join('')}`;
-    const master = STAGES.find((x) => x.id === o.id)?.master;
-    if (o.cleared && master !== undefined) {
-      const gap = o.ticks - master;
-      // 보고서의 전임자 줄과 같은 말 — 바깥 사람은 「-0.2」를 모른다
-      line += gap === 0
-        ? ` · ${STAGE_MODE.master}와 ${STAGE_MODE.tie}`
-        : ` · ${STAGE_MODE.master}보다 ${fmtGap(Math.abs(gap))}초 ${gap < 0 ? STAGE_MODE.ahead : STAGE_MODE.behind}`;
-    }
-  }
-  // 코드는 글에 안 싣는다 — 「코드 복사」로 따로 간다
-  return [
-    `${STAGE_MODE.title} ${o.id} ${t?.name ?? ''} · ${STAGE_MODE.diffs[o.diff]}`,
-    line,
-    `${STAGE_MODE.checkNo} ${o.check}`,
-  ].join('\n');
-}

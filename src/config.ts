@@ -412,7 +412,7 @@ export const TOKOTON = {
 
 // ── 현장 일지(스테이지) ─────────────────────────────────────────
 // 대본(core/stages.ts)이 순서를 정하고, 여기 수치가 박자와 낙하를 정한다.
-// 재생 코드가 같은 판을 다시 돌리므로 이 값을 바꾸면 core/stage.ts STAGE_SIM_VERSION을 올린다.
+// 이 값을 바꾸면 core/stages.ts 기한 · 전임자를 다시 잰다(tests/stage.test.ts 봇 기록이 알려 준다).
 export const STAGE = {
   FIRST_WAIT: 90,          // 시작 후 첫 걸음까지(이름 도장 보는 시간)
   GAP: 30,                 // 앞 걸음을 다 치운 뒤 다음 걸음까지 = ▼ 예고 길이(STACK.SPAWN_CUE_TICKS, 예고음이 정확히 30에서 운다)

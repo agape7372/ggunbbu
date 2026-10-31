@@ -17,8 +17,6 @@ export interface StageRecord {
   /** 정규 최고 점수 · 최고 콤보 */
   score: number;
   combo: number;
-  /** 정규 최고 시간 판의 기록 코드 */
-  code: string;
   /** 시작 · 깬 횟수(모든 난이도) */
   tries: number;
   clears: number;
@@ -29,7 +27,7 @@ export interface StageRecord {
 export const STAMP_KEYS = ['done', 'safe', 'inTime', 'secret', 'master'] as const satisfies readonly (keyof StageStamps)[];
 
 export function emptyRecord(): StageRecord {
-  return { lamp: 0, stamps: 0, best: 0, score: 0, combo: 0, code: '', tries: 0, clears: 0, first: '' };
+  return { lamp: 0, stamps: 0, best: 0, score: 0, combo: 0, tries: 0, clears: 0, first: '' };
 }
 
 export function stampBits(st: StageStamps): number {
@@ -54,7 +52,7 @@ export interface RecordNews {
 }
 
 /** 판 하나 끝 → 새 기록. rec은 바꾸지 않는다 */
-export function mergeResult(rec: StageRecord, r: StageResult, code: string, today: string): { rec: StageRecord; news: RecordNews } {
+export function mergeResult(rec: StageRecord, r: StageResult, today: string): { rec: StageRecord; news: RecordNews } {
   const next: StageRecord = { ...rec };
   const news: RecordNews = { firstClear: false, lampUp: false, newStamps: 0, newBest: false, prevBest: rec.best };
   if (!r.cleared) return { rec: next, news };
@@ -68,7 +66,6 @@ export function mergeResult(rec: StageRecord, r: StageResult, code: string, toda
   next.stamps |= bits;
   if (!rec.best || r.ticks < rec.best) {
     next.best = r.ticks;
-    next.code = code;
     news.newBest = true;
   }
   next.score = Math.max(next.score, r.score);
@@ -103,7 +100,7 @@ export function kstDate(ms: number): string {
   return new Date(ms + 9 * 3600_000).toISOString().slice(0, 10);
 }
 
-/** 저장 원문 검증 — 알려진 판 id만, 칸마다 clamp. 깨진 칸은 빈 기록으로 */
+/** 저장 원문 검증 — 알려진 판 id만, 칸마다 clamp. 깨진 칸은 빈 기록으로. 옛 저장의 `code` 칸은 읽지 않고 버린다 */
 export function validateStageRecords(v: unknown): Record<string, StageRecord> {
   const out: Record<string, StageRecord> = {};
   if (typeof v !== 'object' || v === null || Array.isArray(v)) return out;
@@ -119,7 +116,6 @@ export function validateStageRecords(v: unknown): Record<string, StageRecord> {
       best: n(o.best, 60 * 60 * 60),
       score: n(o.score, 99_999_999),
       combo: n(o.combo, 999),
-      code: typeof o.code === 'string' && o.code.length < 20_000 ? o.code : '',
       tries: n(o.tries, 9_999_999),
       clears: n(o.clears, 9_999_999),
       first: typeof o.first === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.first) ? o.first : '',

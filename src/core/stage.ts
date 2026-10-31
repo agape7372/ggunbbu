@@ -13,12 +13,6 @@ import { spawnBolt, stepEntities } from './act2';
 import { initBoss, stepBoss } from './boss';
 import { initLandmark, stepLandmark } from './landmark';
 
-/**
- * 스테이지 시뮬 판. 재생 코드 머리에 들어간다 — 판이 다르면 같은 입력도 다른 판이 되므로 재생하지 않는다.
- * core · config에서 스테이지 판에 닿는 것을 바꾸면 올린다(tests/stage-golden.test.ts 굳은 코드가 알려 준다).
- */
-export const STAGE_SIM_VERSION = 2;
-
 const DEFS = new Map<string, StageDef>(STAGES.map((d) => [d.id, d]));
 const SCRIPTS = new Map<string, ScriptStep[]>();
 
