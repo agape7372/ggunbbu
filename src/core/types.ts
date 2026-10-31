@@ -17,7 +17,8 @@ export type Material =
   | 'weak' | 'mid' | 'hard'            // 1막 HP 1/2/3 (챕터 테마별 스킨)
   | 'butter'                           // 버터바 겹 HP1 (이벤트 스테이지 전용)
   | 'cathedral'                        // 2막 P1 HP5
-  | 'lobby' | 'office' | 'penthouse';  // 2막 P2 마천루 HP 10/1/20
+  | 'lobby' | 'office' | 'penthouse'   // 2막 P2 마천루 HP 10/1/20
+  | 'bell';                            // 작업 지시서 종탑의 종 — 안 베인다(깡). 가드로 되돌려 보낸다
 
 export interface FloorSeg { hp: number; maxHp: number; }
 
@@ -170,7 +171,104 @@ export interface BossState {
   hittable: boolean;
 }
 
-export type Mode = 'act1' | 'act2' | 'tokoton' | 'bonus';
+export type Mode = 'act1' | 'act2' | 'tokoton' | 'bonus' | 'stage';
+
+/** 작업 지시서 난이도 — 0 견습 · 1 정규 · 2 외주 */
+export type StageDiff = 0 | 1 | 2;
+
+/** 현장 일지 한 판의 진행. 대본 자체는 id로 core/stages.ts에서 다시 찾는다(상태엔 위치만) */
+export interface StageRun {
+  id: string;
+  diff: StageDiff;
+  /** 다음에 낼 대본 걸음 */
+  step: number;
+  /** 다음 걸음 대기를 이미 걸었다 */
+  armed: boolean;
+  /** 건물 없는 걸음(번개 · 화산탄 · 쉼)의 대기 틱. 건물 걸음은 stackSpawnCd가 센다(▼ 예고) */
+  wait: number;
+  phase: 'script' | 'boss' | 'done';
+  /** 지금 떨어지는 건물의 낙하 — 스폰 때 정해 stackPhysics가 읽는다(명물은 숨 · 무게로 바꾼다) */
+  fallG: number;
+  fallV: number;
+  /** 베기 띄우기 배율(바람탑 들숨) — combat.tryHitStack이 읽는다 */
+  liftMul: number;
+  /** 지금 건물이 성급한가(대본 「~」) · 최하층이 HP1로 남은 틱 */
+  hasty: boolean;
+  hastyT: number;
+  /** 끝난 틱(대본을 다 치운 틱 · 보스가 쓰러진 틱). 0 = 아직 */
+  clearTick: number;
+  tally: StageTally;
+}
+
+/** 도장 판정용 집계 — core/stage.ts가 이벤트와 개체 수 차이로 센다 */
+export interface StageTally {
+  /** 가드를 새로 누른 횟수 · 지난 틱에 누르고 있었나 */
+  guardPress: number;
+  guardHeld: boolean;
+  jumps: number;
+  specials: number;
+  /** 콤보 끊김(comboBreak 이벤트) */
+  breaks: number;
+  lifeLost: number;
+  hatBreak: number;
+  /** 땅에 꽂힌 번개 · 땅에 닿은 화산탄 · 더미 최고 */
+  strikes: number;
+  landed: number;
+  maxPile: number;
+  /** 최근 60틱 안에 없앤 화산탄 틱 · 넷을 한 번에 없앤 적이 있나 */
+  rockKills: number[];
+  quad: boolean;
+  /** 명물 셈 — 종을 벤 횟수 · 좌판 일곱 번 · 땅에 닿은 짐 */
+  bellCuts: number;
+  stall7: boolean;
+  cargoDown: number;
+  /** 2판 숨은 막 셈 — 좌판을 벤 수(장터) · 풍경 창에서 무너뜨린 층(아홉 번) · 13시 종을 받았나 · 장터가 나왔나 */
+  stallCuts: number;
+  chimeBreaks: number;
+  bell13: boolean;
+  market: boolean;
+  /** 성급한 건물이 급락한 수(대본 `~`) */
+  hastyDrops: number;
+  /** 보스(명물 · 집행기) 마지막 한 타가 필살 */
+  finishSpecial: boolean;
+  /** 걸음(건물 · 보스)마다 치운 틱 */
+  splits: number[];
+  /** 지난 틱 끝의 살아 있는 화산탄 수 — 이번 틱 격파를 센다 */
+  rocksSeen: number;
+  /** 지난 틱 끝의 번개 수 · 땅에 선 채 벤 번개 */
+  boltsSeen: number;
+  boltGround: number;
+}
+
+/** 명물 보스 — 종탑 · 바람탑 · 구층탑 · 타워크레인 (core/landmark.ts) */
+export type LandmarkId = 'bell' | 'wind' | 'pagoda' | 'crane';
+
+export type LandmarkSt = 'enter' | 'play' | 'sit' | 'slam' | 'rise' | 'down';
+
+export interface LandmarkState {
+  id: LandmarkId;
+  st: LandmarkSt;
+  /** 지금 상태에 머문 틱 */
+  t: number;
+  /** 몸(종탑 · 바람탑 · 크레인 추). 구층탑은 몸이 s.stack이라 null. 층 = 체력 */
+  body: { floors: Floor[]; y: number } | null;
+  /** 파 번호 — 종탑 시각 칸 · 바람탑 노래 박 · 크레인 짐 번호 */
+  wave: number;
+  /** 이번 파에서 던진 수 · 구층탑 남은 층 · 크레인 짐 상태(0 아직 · 1 땅에 닿음 · 2 걸림) */
+  n: number;
+  /** 종탑 이번 파 점수(공중 가드 2점) · 바람탑 장터(1 = 나옴) · 구층탑 풍경 기와까지 남은 틱 · 크레인 내리는 중엔 케이블 벤 수, 놓은 뒤엔 오르는 중(1) */
+  got: number;
+  /** 던질 차례까지 남은 틱(예고) · 구층탑 풍경 창 남은 틱 · 크레인 걸기 연속(0 처음 · 2 반창 중 · 1 반창 뒤라 다음 걸림이 온창) */
+  cue: number;
+  /** 종탑 내려찍기 판정(0 아직 · 1 지남 · 2 막음) / 바람탑 0 들숨 · 1 날숨 / 구층탑 풍경 남은 틱 / 크레인 0 내리는 중 · 1 놓음 */
+  air: number;
+  /** 종탑 파 시작부터 센 틱(정각) · 바람탑 지금 좌판을 띄운 횟수(−1 = 젖음) · 구층탑 마지막으로 층이 깨진 틱 · 크레인 갈고리 띠 아래 끝 */
+  k: number;
+  /** 종탑 공중 가드로 올린 종 · 바람탑 역풍으로 가는 중 · 구층탑 지난 틱에 크게 떠오르던 중(띄움 판정) */
+  flying: boolean;
+  /** 2판 보조 셈 — 종탑 13시(0 없음 · 1 걸림 · 2 떨어지는 중) · 바람탑 맞바람 남은 틱 · 구층탑 이어 허문 층 수 · 크레인 버릇 셈(−2~2) */
+  x: number;
+}
 
 /** 구역 작전 기믹. none = 아케이드 기본. 수치 테이블 MAT_HP 구조는 유지. */
 export type GimmickId = 'none' | 'glass' | 'ice' | 'night' | 'orbit';
@@ -288,6 +386,10 @@ export interface GameState {
   hat: boolean;
   /** 토코톤 버터바 사이클 진입 인덱스 — 히트스톱이 경계 틱을 삼켜도 소실 없게 (08-30 검증) */
   tokotonCycle: number;
+  /** 작업 지시서 진행 (mode 'stage'일 때만) */
+  stage: StageRun | null;
+  /** 명물 보스 (작업 지시서 보스전일 때만) */
+  lm: LandmarkState | null;
 }
 
 /** 프레임 입력 — input 레이어가 생성해 sim에 주입 */

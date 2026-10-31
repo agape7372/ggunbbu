@@ -11,7 +11,11 @@ export type SfxName =
   | 'zap' | 'zap2' | 'zap3'
   | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect'
   | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak' | 'hatGet'
-  | 'hitLow' | 'hitTick' | 'incoming' | 'specialCharge' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd';
+  | 'hitLow' | 'hitTick' | 'incoming' | 'specialCharge' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd'
+  // 명물 보스(작업 지시서) — 똑딱 · 댕 · 깡 · 퉁 · 휘파람 · 풍경 · 끼릭 · 철컥
+  | 'clockTick' | 'bellToss' | 'bellBody' | 'bellClang' | 'bellThud' | 'windIn' | 'windOut' | 'chime' | 'craneRatchet' | 'craneClunk'
+  // 2판 기믹 예고 — 댕댕(공중 가드 2점) · 쾅(시보) · 맑은 종(13시) · 나무 소리(구층탑) · 탁(줄 끊김)
+  | 'bellTwin' | 'bellBoom' | 'bellClear' | 'pagodaCreak' | 'craneSnap';
 
 export type BgmTrack = 'title' | 'act1' | 'act2a' | 'butter' | 'bolt' | 'boss' | 'ending';
 
@@ -235,7 +239,43 @@ function playZap(
 
 // ─── SFX 프리셋 테이블 ──────────────────────────────────────────
 
-type SfxPreset = (ctx: AudioContext, dest: AudioNode, t: number, rate: number) => void;
+/** dur = 부르는 쪽이 정한 길이(초). 길이가 뜻인 소리(바람탑 휘파람 음 길이)만 읽는다 */
+type SfxPreset = (ctx: AudioContext, dest: AudioNode, t: number, rate: number, dur?: number) => void;
+
+/** 청동 종 울림 — 안 맞는 배음(1 · 2 · 2.4 · 3 · 4.2)이 길이마다 다르게 가라앉는다 */
+function bellRing(ctx: AudioContext, dest: AudioNode, t: number, rate: number, f: number, dur: number, peak: number): void {
+  [[1, 1, 1], [2, 0.5, 0.7], [2.4, 0.32, 0.5], [3, 0.2, 0.35], [4.2, 0.12, 0.2]].forEach(([k, a, d]) => {
+    playOsc(ctx, dest, t, 'sine', f * k, dur * d, peak * a, rate, { attack: 0.002 });
+  });
+}
+
+/** 바람탑 휘파람 한 음 — 사인 + 숨소리. dir +1 들숨(오르는 음) · −1 날숨(내리는 음), dur = 노래 박 길이 */
+function whistle(ctx: AudioContext, dest: AudioNode, t: number, rate: number, dur: number, dir: 1 | -1): void {
+  const d = Math.min(3.6, Math.max(0.2, dur));
+  const f0 = 660 * rate;
+  const o = ctx.createOscillator();
+  const lfo = ctx.createOscillator();
+  const lg = ctx.createGain();
+  const g = ctx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(f0 * (dir > 0 ? 0.84 : 1.19), t);
+  o.frequency.exponentialRampToValueAtTime(f0, t + Math.min(0.12, d * 0.4)); // 음 머리에서 제 음으로 올라붙는다
+  lfo.frequency.setValueAtTime(5.5, t);
+  lg.gain.setValueAtTime(f0 * 0.012, t);
+  lfo.connect(lg);
+  lg.connect(o.frequency);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.28, t + 0.04);
+  g.gain.setValueAtTime(0.28, t + d * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g);
+  g.connect(dest);
+  o.start(t);
+  lfo.start(t);
+  o.stop(t + d + 0.02);
+  lfo.stop(t + d + 0.02);
+  playNoise(ctx, dest, t, d, 0.05, { filterType: 'bandpass', freqStart: f0 * 2, freqEnd: f0 * 2, q: 4, attack: 0.04 });
+}
 
 export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   hit: (ctx, dest, t, rate) => {
@@ -642,6 +682,102 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
     playOsc(ctx, dest, t + 0.004, 'sine', 2637, 0.2, 0.07, rate, { attack: 0.002 });
     playOsc(ctx, dest, t + 0.05, 'sine', 1975.5, 0.18, 0.06, rate, { attack: 0.003 });
     playNoise(ctx, dest, t, 0.05, 0.08, { filterType: 'highpass', freqStart: 6500 });
+  },
+
+  // ── 명물 보스 ──
+  // 종탑 시계 초침 — 마른 똑. 부르는 쪽이 피치를 2도 낮춰 번갈아 똑·딱
+  clockTick: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.018, 0.3, { filterType: 'highpass', freqStart: 3200 * rate });
+    playOsc(ctx, dest, t, 'square', 1900, 0.014, 0.12, rate, { attack: 0.001 });
+    playOsc(ctx, dest, t, 'sine', 420, 0.03, 0.14, rate, { freqEnd: 260, attack: 0.001 });
+  },
+
+  // 댕 — 종이 탑에서 빠져 던져지는 순간. 맑게 한 번
+  bellToss: (ctx, dest, t, rate) => {
+    bellRing(ctx, dest, t, rate, 392, 0.9, 0.24);
+  },
+
+  // 되돌린 종이 몸을 칠 때 — 던질 때보다 낮고 크고 길다(탑이 같이 운다)
+  bellBody: (ctx, dest, t, rate) => {
+    bellRing(ctx, dest, t, rate, 262, 1.6, 0.34);
+    playOsc(ctx, dest, t, 'sine', 110, 0.3, 0.5, rate, { freqEnd: 48, attack: 0.002 });
+    playNoise(ctx, dest, t, 0.08, 0.3, { filterType: 'lowpass', freqStart: 2200, freqEnd: 300 });
+  },
+
+  // 깡 — 종을 벴을 때. 쇠가 튕기는 짧은 금속음
+  bellClang: (ctx, dest, t, rate) => {
+    [[1, 0.3], [2.76, 0.2], [5.4, 0.12]].forEach(([k, a]) => {
+      playOsc(ctx, dest, t, 'triangle', 760 * k, 0.2, a, rate, { attack: 0.001 });
+    });
+    playNoise(ctx, dest, t, 0.03, 0.34, { filterType: 'highpass', freqStart: 4500 });
+    playOsc(ctx, dest, t, 'sine', 170, 0.05, 0.25, rate, { freqEnd: 100, attack: 0.001 });
+  },
+
+  // 퉁 — 종이 땅에 떨어져 깨짐. 둔하고 짧다
+  bellThud: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 150, 0.12, 0.5, rate, { freqEnd: 60, attack: 0.002 });
+    playNoise(ctx, dest, t, 0.06, 0.22, { filterType: 'lowpass', freqStart: 700, freqEnd: 200 });
+  },
+
+  windIn: (ctx, dest, t, rate, dur = 0.8) => whistle(ctx, dest, t, rate, dur, 1),
+  windOut: (ctx, dest, t, rate, dur = 0.8) => whistle(ctx, dest, t, rate, dur, -1),
+
+  // 구층탑 풍경 — 높고 작은 방울 셋이 어긋나 운다
+  chime: (ctx, dest, t, rate) => {
+    [[2093, 0], [2637, 0.07], [1976, 0.15]].forEach(([f, at]) => {
+      playOsc(ctx, dest, t + at, 'sine', f, 0.55, 0.14, rate, { attack: 0.002 });
+      playOsc(ctx, dest, t + at, 'sine', f * 2.76, 0.25, 0.05, rate, { attack: 0.002 });
+    });
+  },
+
+  // 크레인 끼릭 — 톱니 한 칸. 부르는 쪽이 반복한다
+  craneRatchet: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sawtooth', 520, 0.03, 0.16, rate, { freqEnd: 330, attack: 0.001 });
+    playNoise(ctx, dest, t, 0.02, 0.18, { filterType: 'bandpass', freqStart: 2600, q: 2 });
+  },
+
+  // 철컥 — 갈고리가 짐을 놓는다
+  craneClunk: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'square', 140, 0.08, 0.3, rate, { freqEnd: 70, attack: 0.001 });
+    playNoise(ctx, dest, t, 0.05, 0.3, { filterType: 'bandpass', freqStart: 1800, q: 1.5 });
+    playOsc(ctx, dest, t + 0.06, 'square', 200, 0.06, 0.22, rate, { freqEnd: 90, attack: 0.001 });
+    playNoise(ctx, dest, t + 0.06, 0.05, 0.24, { filterType: 'bandpass', freqStart: 2400, q: 1.5 });
+  },
+
+  // 댕댕 — 공중 가드로 올린 종이 꽂혔다(2점). 몸 울림 위에 한 음 높은 둘째 울림이 겹친다
+  bellTwin: (ctx, dest, t, rate) => {
+    [[392, 0], [494, 0.11]].forEach(([f, at]) => {
+      playOsc(ctx, dest, t + at, 'sine', f, 0.9, 0.2, rate, { attack: 0.002 });
+      playOsc(ctx, dest, t + at, 'sine', f * 2.4, 0.4, 0.07, rate, { attack: 0.002 });
+    });
+  },
+
+  // 쾅 — 3막 시보. 댕 대신 낮고 마른 한 방(종 울림은 꼬리에만)
+  bellBoom: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 95, 0.36, 0.6, rate, { freqEnd: 40, attack: 0.002 });
+    playNoise(ctx, dest, t, 0.14, 0.34, { filterType: 'lowpass', freqStart: 1800, freqEnd: 180 });
+    playOsc(ctx, dest, t + 0.02, 'sine', 196, 0.7, 0.16, rate, { attack: 0.004 });
+  },
+
+  // 맑은 종소리 — 13시 종을 받았다. 높고 길게 한 번
+  bellClear: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 880, 1.8, 0.22, rate, { attack: 0.003 });
+    playOsc(ctx, dest, t, 'sine', 880 * 2.76, 0.7, 0.07, rate, { attack: 0.003 });
+    playOsc(ctx, dest, t + 0.05, 'sine', 1320, 1.2, 0.1, rate, { attack: 0.003 });
+  },
+
+  // 구층탑 나무 소리 — 낮은 나무가 비틀리는 소리. 부르는 쪽이 피치를 내려 무게를 준다
+  pagodaCreak: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sawtooth', 140, 0.34, 0.1, rate, { freqEnd: 92, attack: 0.07 });
+    playNoise(ctx, dest, t, 0.3, 0.1, { filterType: 'bandpass', freqStart: 420 * rate, freqEnd: 260 * rate, q: 6, attack: 0.06 });
+    playOsc(ctx, dest, t + 0.16, 'square', 190, 0.1, 0.06, rate, { freqEnd: 120, attack: 0.01 });
+  },
+
+  // 탁 — 크레인 줄이 끊긴다. 짧은 채찍 + 튕기는 선 소리
+  craneSnap: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'square', 320, 0.04, 0.28, rate, { freqEnd: 120, attack: 0.001 });
+    playNoise(ctx, dest, t, 0.04, 0.3, { filterType: 'highpass', freqStart: 3200 });
+    playOsc(ctx, dest, t + 0.01, 'sine', 720, 0.16, 0.1, rate, { freqEnd: 300, attack: 0.001 });
   },
 };
 

@@ -7,10 +7,12 @@ import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carr
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { absorbWithHat, onBuildingDown } from './items';
 import { specialHitBoss } from './boss';
+import { stepStage } from './stage';
+import { specialHitLandmark } from './landmark';
 
 export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): GameState {
   return {
@@ -47,6 +49,8 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     drops: 0,
     hat: false,
     tokotonCycle: 0,
+    stage: null,
+    lm: null,
   };
 }
 
@@ -149,6 +153,7 @@ export function advance(s: GameState, input: InputFrame): void {
   else if (s.mode === 'tokoton') stepTokoton(s);
   else if (s.mode === 'bonus') stepBonus(s);
   else if (s.mode === 'act2') stepAct2(s);
+  else if (s.mode === 'stage') stepStage(s, input, evStart);
 
   // ── 보급 상자 (완파 수) ── 완파 경로가 여럿(타격·필살·깔림 Z)이라 이벤트로 모아 센다
   if (countsDrops) {
@@ -187,7 +192,7 @@ function stepDebris(s: GameState): void {
 // ── 필살기 ──────────────────────────────────────────────────────
 /** 필살이 의미를 갖는 대상이 하나라도 있는가 — 없으면 발동 자체를 거부한다 (08-30, P1-4) */
 function hasSpecialTarget(s: GameState): boolean {
-  if (s.stack || s.boss || s.groundRocks > 0) return true;
+  if (s.stack || s.boss || s.lm || s.groundRocks > 0) return true;
   for (const e of s.entities) {
     if (e.kind === 'rock' || e.kind === 'bolt' || e.kind === 'shot') return true;
   }
@@ -226,6 +231,7 @@ function triggerSpecial(s: GameState): void {
     if (cleared > 0) addScore(s, cleared * SCORE.FLOOR_BONUS);
   }
   if (s.boss) specialHitBoss(s);
+  if (s.lm) specialHitLandmark(s);
 }
 
 function applyTetsu(s: GameState): void {
@@ -432,6 +438,15 @@ function onStackGrounded(s: GameState): void {
   if (!stack) return;
   stack.vy = 0;
   stack.resting = true;
+
+  // 작업 지시서 종탑: 종은 땅에 닿으면 깨진다(빗나감) — 깔지 않는다. 빗나간 수는 landmark.ts가 파 끝에 센다
+  if (stack.floors[0]?.mat === 'bell') {
+    s.events.push({ kind: 'floorCollapse', y: 0, mat: 'bell' });
+    s.stack = null;
+    // 외주: 깨진 종은 더미로 남는다(안전모가 없어서 그 위 착지 = 깔림)
+    if (s.stage?.diff === 2 && s.lm && s.lm.st !== 'down' && s.groundRocks < ACT2.ROCK_STACK_MAX) s.groundRocks += 1;
+    return;
+  }
 
   if (s.player.invulnTicks > 0 || s.player.pose === 'special') return; // 무적 중 접지 무시
 

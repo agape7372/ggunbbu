@@ -13,6 +13,11 @@ import { FLASH_LABEL, SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
 import { nativeAppVersion } from '../platform/native';
 import { paintOps, type OpsOpts } from './opsView';
+import { createStageUi, paintStageEnd, type StageListOpts, type StageUi } from './stageView';
+import type { StageEndView } from './stageLogic';
+import { STAGE_MODE } from '../content/stages';
+import type { Replay } from '../core/replay';
+import type { StageDiff } from '../core/types';
 import { paintMissions } from './missionView';
 import { paintShop, type ShopInv } from './shopView';
 import { bookPopup, paintBook, type BookMask } from './bookView';
@@ -37,6 +42,8 @@ export type OverlayScreen =
   | 'opsend'
   | 'ending'
   | 'ops'
+  | 'stages'
+  | 'stageend'
   | 'missions'
   | 'shop'
   | 'book';
@@ -164,6 +171,15 @@ export interface OverlayHandlers {
   onLogoTap(): void;
   onOpsPick(id: string): void;
   onOpenOps(): void;
+  /** 작업 지시서 */
+  onOpenStages(): void;
+  onStageStart(id: string, diff: StageDiff, fromBoss: boolean): void;
+  onStageWatchBest(id: string): void;
+  onStageWatchCode(r: Replay): void;
+  /** 철거 보고서 단추 */
+  onStageRetry(): void;
+  onStageNext(): void;
+  onStageList(): void;
   onOpenMissions(): void;
   onOpenShop(): void;
   onOpenBook(): void;
@@ -194,6 +210,11 @@ export interface OverlayApi {
   showOpsEnd(v: OpsEndView): void;
   showEnding(v: EndingView): void;
   showOps(opts: OpsOpts): void;
+  /** 작업 지시서 목록. detail = 지시서 한 장으로 바로 */
+  showStages(opts: StageListOpts, detail?: string): void;
+  /** 지시서 화면 안에서 한 칸 물러난다. 이미 목록이면 false */
+  stagesBack(): boolean;
+  showStageEnd(v: StageEndView): void;
   showMissions(daily: DailyState, achieves: MissionProgress[], adBoost: boolean): void;
   showShop(inv: ShopInv, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
   /** 도감. masks = 가진 가면들(없으면 저장된 가면 그림 하나) */
@@ -220,8 +241,8 @@ const HERO_SLASH: PlayerPose = 'attack';
 const HERO_DOWN: PlayerPose = 'dead';
 const HERO_IDLE_MS = 6000;
 
-const RESULTS: ReadonlySet<OverlayScreen> = new Set(['gameover', 'opsend', 'ending']);
-const METAS: ReadonlySet<OverlayScreen> = new Set(['shop', 'missions', 'settings', 'book']);
+const RESULTS: ReadonlySet<OverlayScreen> = new Set(['gameover', 'opsend', 'ending', 'stageend']);
+const METAS: ReadonlySet<OverlayScreen> = new Set(['shop', 'missions', 'settings', 'book', 'stages']);
 
 /** 어느 화면에서 어느 화면으로 가면 어느 쪽으로 베나. null = 베지 않고 바로(일시정지 · 판 ↔ 이야기) */
 function cutDir(from: OverlayScreen, to: OverlayScreen): CutDir | null {
@@ -402,6 +423,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
             <button type="button" class="stroke s1" style="--i:0" data-act="tokoton" data-el="tokoton"><b></b><span></span></button>
             <button type="button" class="stroke s2" style="--i:1" data-act="butter" data-el="butter"><b></b><span></span></button>
             <button type="button" class="stroke s3" style="--i:2" data-act="ops" data-el="ops"><b></b><span></span></button>
+            <button type="button" class="stroke s4" style="--i:3" data-act="stage" data-el="stage"><b></b><span></span></button>
           </div>
           <div class="h-start">
             <button type="button" class="seal seal-start" data-act="arcade" data-el="arcade" aria-label="${m.arcade}"><small>아케이드</small><b>시작</b></button>
@@ -545,6 +567,18 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     </div>
 
     ${metaScreen('ops', frameSvg(8, 4, 5.5, 10), '현장 배정', '<span></span>')}
+
+    <div class="ov-screen ov-meta" data-screen="stages" hidden>
+      ${frameSvg(9, 3.5, 5.5, 10)}
+      <div class="ov-body" data-el="body-stages"></div>
+      <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="stage-back" data-el="stage-back">${STAGE_MODE.home}</button><span class="nav-stamp">${STAGE_MODE.navStamp}</span><span></span></nav>
+    </div>
+
+    <div class="ov-screen ov-meta ov-stage-end" data-screen="stageend" hidden>
+      ${frameSvg(10, 4, 5, 9)}
+      <div class="ov-body" data-el="body-stageend"></div>
+      <div class="st-acts" data-el="acts-stageend"></div>
+    </div>
     ${metaScreen('missions', frameSvg(9, 4.5, 5, 9), '출근 도장', navPair(toShop, toBook))}
     ${metaScreen('shop', frameSvg(8, 4.5, 6, 10), '환불 없음', navPair(toMissions, toBook))}
     ${metaScreen('book', frameSvg(9, 4, 5.5, 10), '모은 만큼', navPair(toShop, toMissions))}
@@ -585,6 +619,12 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   const $ = (name: string): HTMLElement => root.querySelector(`[data-el="${name}"]`) as HTMLElement;
   const screenEl = (name: OverlayScreen): HTMLElement | null =>
     name === 'none' ? null : root.querySelector<HTMLElement>(`[data-screen="${name}"]`);
+
+  const stageUi: StageUi = createStageUi($('body-stages'), $('stage-back'), {
+    onStart: (id, diff, fromBoss) => h.onStageStart(id, diff, fromBoss),
+    onWatchBest: (id) => h.onStageWatchBest(id),
+    onWatchCode: (r) => h.onStageWatchCode(r),
+  });
 
   // 설치된 앱이면 스토어 버전(versionName)을 보여 준다 — 웹 번들 버전은 OTA용이라 다를 수 있다
   void nativeAppVersion().then((v) => { if (v) $('ver').textContent = `v${v}`; });
@@ -703,6 +743,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     setMode('tokoton', m.tokoton, v.tokotonOpen ? m.tokotonSub : m.tokotonLocked, v.tokotonOpen);
     setMode('butter', m.butter, v.butterTier > 0 ? m.butterSub(v.butterTier) : m.butterLocked, v.butterTier > 0);
     setMode('ops', m.ops, '', true);
+    setMode('stage', STAGE_MODE.title, '', true);
     $('stats').innerHTML =
       `<span class="cur">${glyph('dust')}${SCREENS.title.dust} <b>${fmt(v.dust)}</b></span>`
       + `<span class="cur">${glyph('orb')}${SCREENS.title.orbit} <b>${fmt(v.orbit)}</b></span>`
@@ -720,7 +761,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
   function setTitleSelected(index: number): void {
     if (titleView) titleView.selected = index;
-    ['arcade', 'tokoton', 'butter', 'ops'].forEach((act, i) => $(act).classList.toggle('selected', i === index));
+    ['arcade', 'tokoton', 'butter', 'ops', 'stage'].forEach((act, i) => $(act).classList.toggle('selected', i === index));
   }
 
   /* ── 설정 ── */
@@ -916,6 +957,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'butter-3': h.onButterRound(3); break;
       case 'butter-back': h.onButterBack(); break;
       case 'ops': h.onOpenOps(); break;
+      case 'stage': h.onOpenStages(); break;
+      case 'stage-back': if (!stageUi.back()) h.onMetaBack(); break;
       case 'meta-back': h.onMetaBack(); break;
       case 'go-revive': h.onGameOverRevive(); break;
       case 'go-continue': h.onGameOverContinue(); break;
@@ -1044,6 +1087,18 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     },
     showOps(opts): void {
       enter('ops', () => paintOps($('body-ops'), opts, (id) => h.onOpsPick(id)));
+    },
+    showStages(opts, detail): void {
+      enter('stages', () => stageUi.show(opts, detail));
+    },
+    stagesBack: () => screen === 'stages' && stageUi.back(),
+    showStageEnd(v): void {
+      enter('stageend', () => paintStageEnd(screenEl('stageend') as HTMLElement, v, {
+        onRetry: h.onStageRetry,
+        onNext: h.onStageNext,
+        onList: h.onStageList,
+        toast: (text) => api.toast(text),
+      }));
     },
     showMissions(daily, achieves, adBoost): void {
       enter('missions', () => paintMissions($('body-missions'), daily, DAILY_POOL, achieves, ACHIEVES, adBoost,

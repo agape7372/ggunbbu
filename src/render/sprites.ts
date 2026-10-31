@@ -134,6 +134,8 @@ const SPECIAL_COLORS: Record<Exclude<Material, Tier>, TierColors> = {
   lobby: { base: '#989A9D', dark: '#808184', light: '#a4a6aa', accent: '#545556' },
   office: { base: '#C0BEB8', dark: '#a1a09b', light: '#cfcdc7', accent: '#6a6965' },
   penthouse: { base: '#989A9D', dark: '#808184', light: '#1A1A20', accent: '#545556' },
+  // 작업 지시서 종탑의 종 — 청동 먹색. 안 베이는 쇠라는 걸 색이 먼저 말한다
+  bell: { base: '#8A6F3E', dark: '#6B5530', light: '#A88A52', accent: '#3E3020' },
 };
 
 function fillBase(c: CanvasRenderingContext2D, w: number, h: number, t: TierColors): void {

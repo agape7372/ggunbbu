@@ -3,9 +3,13 @@
 // core는 씬을 모른다 — 씬이 advance 호출 여부·상태 전이를 관장한다.
 // 타이틀·HUD·일시정지·결과는 DOM(overlay/hud). 캔버스는 필드만.
 
-import type { GameState, GimmickId } from '../core/types';
+import type { GameState, GimmickId, InputFrame, StageDiff } from '../core/types';
 import { makeState, advance, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
+import { STAGE_SIM_VERSION, judgeStage, stageScript, stageSeed, startStage } from '../core/stage';
+import { startReplay } from '../core/stageReplay';
+import { STAGES } from '../core/stages';
+import { createRecorder, decodeReplay, type Replay, type ReplayRecorder } from '../core/replay';
 import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, TEACH, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
@@ -28,6 +32,9 @@ import {
   ENDING_FULL_COMBO,
 } from '../content';
 import { introFor } from '../content/story';
+import { STAGE_MODE, STAGE_TEXT } from '../content/stages';
+import { diffUnlocked, kstDate, mergeResult, recordOf, stageUnlocked, type RecordNews, type StageRecord } from '../meta/stageRecord';
+import { bossName, endView, newHintMemo, nextHint, sealCode, stageHudLine, workProgress, type HintMemo, type StageEndView } from './stageLogic';
 import { MASK_COPY, OPERATIONS, WEAPON_COPY, regionOf } from '../content/world';
 import { MASK_MAX, adoptLegacyMask, createMask, deleteMask, ownedMasks, updateMask, wearMask, wornMaskId } from '../meta/mask';
 import { closeMaskEditor, openMaskEditor } from './maskEditor';
@@ -58,11 +65,11 @@ import {
   DEBUG_TITLE_TAPS,
 } from './debugMenu';
 
-type SceneName = 'boot' | 'title' | 'play' | 'story' | 'ending' | 'gameover' | 'opsend' | 'pause';
+type SceneName = 'boot' | 'title' | 'play' | 'story' | 'ending' | 'gameover' | 'opsend' | 'stageend' | 'pause';
 type Chrome = 'boot' | 'title' | 'playing' | 'paused' | 'story' | 'gameover' | 'ending';
 
 const CHROME: readonly Chrome[] = ['boot', 'title', 'playing', 'paused', 'story', 'gameover', 'ending'];
-const MENU_LEN = 4;
+const MENU_LEN = 5;
 
 export interface App {
   update(dt: number): void;
@@ -110,6 +117,14 @@ export function createApp(
   let runHatBreaks = 0; // 이번 판에 안전모가 깨진 횟수
   // 특별작전 한 판: 어느 작전인지 + 지금까지 부순 건물 수. null = 작전 아님
   let opRun: { id: OpId; buildings: number } | null = null;
+  // 작업 지시서 한 판: rec = 입력 기록기(진짜 판만) · next = 다시 보기 입력(있으면 사용자 입력은 무시). null = 지시서 판 아님
+  let stageRun: {
+    id: string; diff: StageDiff; fromBoss: boolean;
+    rec: ReplayRecorder | null; next: (() => InputFrame) | null;
+    memo: HintMemo; bossShown: boolean;
+  } | null = null;
+  let pendingStage: StageEndView | null = null; // 철거 보고서 — 게임오버 카드와 같은 박자로 늦춘다
+  let stageEnd: StageEndView | null = null; // 떠 있는 보고서(단추가 읽는다)
   let scoreBase = 0; // 작전이 시작 진행으로 주입한 점수 — 카드·만담은 이 판에 번 점수만 본다
   let runCaps: RunCaps = createRunCaps({ prevBest: 0, countsRecord: false });
   // 가드 가르치기: 평생 첫 목숨 손실 때 판을 잠깐 세우고 가드 키를 맥동시킨다 (C1)
@@ -167,6 +182,8 @@ export function createApp(
     runHatBreaks = 0;
     butterRoundNo = 0;
     opRun = null;
+    stageRun = null;
+    stageEnd = null;
     scoreBase = 0;
     streakCounted = false;
     endTeach();
@@ -224,6 +241,7 @@ export function createApp(
     gameoverDelay = 0;
     pendingOver = null;
     pendingOps = null;
+    pendingStage = null;
     scene = 'play';
     overlay.hide();
     setChrome('playing');
@@ -234,6 +252,9 @@ export function createApp(
     gameoverDelay = 0;
     pendingOver = null;
     pendingOps = null;
+    pendingStage = null;
+    stageEnd = null;
+    stageRun = null;
     opRun = null;
     endTeach();
     state = null;
@@ -333,6 +354,120 @@ export function createApp(
     butterChallenge = false;
     armCaps('op');
     goPlay();
+  }
+
+  // ── 작업 지시서 ─────────────────────────────────────────────
+  function stageOpts() {
+    return { recs: save.stages, allOpen: debugOpen() };
+  }
+
+  /** 홈을 거치지 않고 지시서 목록(또는 그 판의 지시서 한 장)으로 — 베는 칼이 보고서에서 바로 넘어가게 */
+  function toStageList(detail?: string): void {
+    goTitle(false);
+    overlay.showStages(stageOpts(), detail);
+  }
+
+  /** 지시서 한 판. fromBoss = 보스 연습(기록 없음). 진짜 판은 시작 때 착수 +1 */
+  function startStageRun(id: string, diff: StageDiff, fromBoss: boolean): void {
+    const rec = recordOf(save.stages, id);
+    const dev = debugOpen();
+    if (!STAGES.some((d) => d.id === id) || !(dev || stageUnlocked(save.stages, id)) || !(dev || diffUnlocked(rec, diff))) {
+      playSfx('uiDeny');
+      return;
+    }
+    lastRun = () => startStageRun(id, diff, fromBoss);
+    runLabel = STAGE_MODE.title;
+    runExempt = true; // 아케이드 영구 기록(최고 점수 · 구역 · 최고 콤보)은 안 건드린다. 재화 지급만 유지
+    if (!fromBoss) {
+      save.stages[id] = { ...rec, tries: rec.tries + 1 };
+      saveSave(save);
+    }
+    state = makeState({ seed: stageSeed(id) });
+    applyRunMeta(state);
+    butterChallenge = false;
+    armCaps('op');
+    startStage(state, { id, diff, weapon: save.loadout.weapon, waza: save.loadout.waza, fromBoss }); // 마지막
+    stageRun = { id, diff, fromBoss, rec: fromBoss ? null : createRecorder(), next: null, memo: newHintMemo(), bossShown: false };
+    goPlay();
+    if (!fromBoss) hud.note(`${id} ${stageName(id)}`);
+  }
+
+  const stageName = (id: string): string => STAGE_TEXT[id]?.name ?? '';
+
+  /** 기록 코드 다시 보기 — 저장 · 먼지 · 미션 · 가르치기를 건드리지 않는다 */
+  function startWatch(r: Replay): void {
+    const run = startReplay(r);
+    if ('error' in run) {
+      overlay.toast(STAGE_MODE.codeErr[run.error]);
+      playSfx('uiDeny');
+      return;
+    }
+    lastRun = () => startWatch(r);
+    runLabel = STAGE_MODE.title;
+    runExempt = true;
+    state = run.s;
+    butterChallenge = false;
+    opRun = null;
+    endTeach();
+    const id = r.head.stage;
+    stageRun = { id, diff: state.stage!.diff, fromBoss: false, rec: null, next: run.next, memo: newHintMemo(), bossShown: false };
+    stageEnd = null;
+    goPlay();
+    hud.note(`${id} ${stageName(id)}`);
+  }
+
+  /** 한 틱마다 — 판 이름 · 명물 이름 도장, 종 힌트(판을 세우지 않는 자막) */
+  function stageTick(s: GameState, run: NonNullable<typeof stageRun>): void {
+    const st = s.stage;
+    if (!st) return;
+    const hint = nextHint(s, run); // 메모는 매 틱 갱신한다 — 자막마다 한 판에 한 번
+    if (hint) hud.note(hint);
+    if (!run.bossShown && st.phase === 'boss') {
+      run.bossShown = true;
+      // 대본이 없는 판은 시작 도장이 이미 명물 이름이다
+      if (run.fromBoss || stageScript(run.id).length > 0) hud.note(bossName(run.id));
+    }
+  }
+
+  /** 지시서 판이 끝나는 순간인가 — 아케이드 엔딩 · 게임오버 카드 · 광고 부활이 이 판에 절대 타지 않게 맨 앞에서 가로챈다 */
+  function endStageIfDue(s: GameState): boolean {
+    const run = stageRun;
+    if (s.mode !== 'stage' || !run) return false;
+    if (!s.over) return true;
+    const st = s.stage!;
+    const result = judgeStage(s);
+    const kind = run.next ? 'watch' : run.fromBoss ? 'practice' : 'real';
+    let code = '';
+    let news: RecordNews | null = null;
+    let rec: StageRecord | null = null;
+    if (run.rec && result.cleared) {
+      code = sealCode({
+        sim: STAGE_SIM_VERSION, stage: run.id, diff: run.diff, seed: stageSeed(run.id),
+        weapon: save.loadout.weapon, waza: save.loadout.waza,
+      }, result, run.rec.events);
+    }
+    if (kind === 'real') {
+      const m = mergeResult(recordOf(save.stages, run.id), result, code, kstDate(Date.now()));
+      save.stages[run.id] = m.rec;
+      saveSave(save);
+      news = m.news;
+      rec = m.rec;
+    }
+    const i = STAGES.findIndex((d) => d.id === run.id);
+    const nx = STAGES[i + 1];
+    const w = workProgress(run.id, st.step);
+    pendingStage = endView({
+      kind, result, lifeLost: st.tally.lifeLost, finishSpecial: st.tally.finishSpecial,
+      step: w.done, total: w.total, phase: st.phase, news, rec, code,
+      nextId: kind === 'real' && result.cleared && nx && (debugOpen() || stageUnlocked(save.stages, nx.id)) ? nx.id : null,
+    });
+    bgm(null);
+    playSfx(result.cleared ? 'stamp' : 'runEnd', { delay: result.cleared ? 0 : AUDIO.RUN_END_DELAY });
+    scene = 'gameover'; // 카드가 뜰 때까지의 박자는 게임오버와 같다. 카드가 뜨면 stageend
+    setChrome('gameover');
+    gameoverDelay = result.cleared ? 6 : UI_FLOW.GAMEOVER_CARD_DELAY;
+    overlayTicks = 0;
+    return true;
   }
 
   /** 철거 자격 응시 — 조건과 응시료는 economy.ts 한 곳 */
@@ -677,9 +812,14 @@ export function createApp(
         return;
       case 'story': skipStory(true); return;
       case 'gameover':
+        playSfx('uiBack');
+        if (pendingStage) toStageList(); else goTitle();
+        return;
+      case 'stageend': playSfx('uiBack'); toStageList(); return;
       case 'opsend':
       case 'ending': playSfx('uiBack'); goTitle(); return;
       case 'title':
+        if (scr === 'stages' && overlay.stagesBack()) { playSfx('uiBack'); return; } // 지시서 안에서는 한 칸씩
         if (scr !== 'title') { playSfx('uiBack'); overlay.showTitle(titleView()); return; }
         minimizeApp();
         return;
@@ -716,7 +856,8 @@ export function createApp(
       const tier = debugOpen() ? Math.max(3, save.butterTierReached) : save.butterTierReached;
       if (tier === 1) startButterChallenge(1);
       else overlay.showButterPick(tier);
-    } else { playSfx('uiOk'); overlay.showOps(opsOpts()); }
+    } else if (menuIndex === 3) { playSfx('uiOk'); overlay.showOps(opsOpts()); }
+    else { playSfx('uiOk'); overlay.showStages(stageOpts()); }
   }
 
   const hud = mountHud(ensureHudLayer(), { onPause: () => { playSfx('uiBlip'); enterPause(); } });
@@ -733,7 +874,11 @@ export function createApp(
     onOpenSettings: () => { playSfx('uiBlip'); openSettings(); },
     onStorySkip: () => skipStory(true),
     onPauseResume: () => { playSfx('uiBlip'); resumePause(); },
-    onPauseQuit: () => { playSfx('uiBack'); persist(); goTitle(); },
+    onPauseQuit: () => {
+      playSfx('uiBack');
+      persist();
+      if (stageRun) toStageList(); else goTitle();
+    },
     onSettingsBack: () => { playSfx('uiBack'); backFromSettings(); },
     onSettingsPatch: applySettingsPatch,
     onLayoutEdit: openLayoutBoard,
@@ -766,6 +911,18 @@ export function createApp(
     },
     onOpsPick: (id) => { playSfx('uiOk'); startOp(id); },
     onOpenOps: () => { playSfx('uiBlip'); overlay.showOps(opsOpts()); },
+    onOpenStages: () => { playSfx('uiOk'); overlay.showStages(stageOpts()); },
+    onStageStart: (id, diff, fromBoss) => { playSfx('uiOk'); startStageRun(id, diff, fromBoss); },
+    onStageWatchBest: (id) => {
+      const r = decodeReplay(recordOf(save.stages, id).code);
+      if (!r) { playSfx('uiDeny'); return; }
+      playSfx('uiOk');
+      startWatch(r);
+    },
+    onStageWatchCode: (r) => { playSfx('uiOk'); startWatch(r); },
+    onStageRetry: afterLock(() => { playSfx('uiOk'); lastRun(); }),
+    onStageNext: afterLock(() => { playSfx('uiBlip'); toStageList(stageEnd?.nextId ?? undefined); }),
+    onStageList: afterLock(() => { playSfx('uiBack'); toStageList(); }),
     onOpenMissions: () => { playSfx('uiBlip'); openMissions(); },
     onOpenShop: () => { playSfx('uiBlip'); openShop(); },
     onOpenBook: () => { playSfx('uiBlip'); openBook(); },
@@ -874,12 +1031,17 @@ export function createApp(
           teachPulse -= 1;
           if (f.guard || teachPulse === 0) { teachPulse = 0; touch?.setGuardHint(false); } // 눌러 봤으면 충분
         }
-        if (debug) tickDebug(s, f);
+        const run = stageRun;
+        if (debug && !run) tickDebug(s, f);
         const wasMode = s.mode;
         const wasPhase = s.act2Phase;
-        advance(s, f);
-        if (debug) settleDebug(s);
-        noteMissions(s);
+        // 지시서 판: 기록기에는 advance에 넘긴 바로 그 프레임을 넣는다(멈춤 · 가르치기 정지로 advance를 안 부른 틱은 위에서 빠졌다)
+        const fr = run?.next ? run.next() : f;
+        advance(s, fr);
+        run?.rec?.push(fr);
+        if (debug && !run) settleDebug(s);
+        if (!run?.next) noteMissions(s); // 다시 보기는 저장 · 먼지 · 미션 · 가르치기를 건드리지 않는다
+        if (run) stageTick(s, run);
         consumeAudio(s);
         consumeEvents(s);
         handleTransitions(s, wasMode, wasPhase);
@@ -910,6 +1072,14 @@ export function createApp(
         else if (f.special) { playSfx('uiBack'); goTitle(); }
         break;
       }
+      case 'stageend': {
+        bgm(null);
+        // 보고서: 재제출(공격) · 목록(필살). 보기 전용과 연습도 같은 자리. 직전 연타가 새어 나오지 않게 잠깐 잠근다.
+        if (overlayTicks > 0) { overlayTicks -= 1; break; }
+        if (f.attack) { playSfx('uiOk'); if (stageEnd?.kind === 'watch') toStageList(); else lastRun(); }
+        else if (f.special) { playSfx('uiBack'); toStageList(); }
+        break;
+      }
       case 'gameover': {
         bgm(null);
         if (gameoverDelay > 0) {
@@ -917,6 +1087,12 @@ export function createApp(
           if (gameoverDelay === 0 && pendingOver) {
             overlay.showGameOver(pendingOver);
             pendingOver = null;
+            overlayTicks = UI_FLOW.GAMEOVER_LOCK;
+          } else if (gameoverDelay === 0 && pendingStage) {
+            stageEnd = pendingStage;
+            overlay.showStageEnd(pendingStage);
+            pendingStage = null;
+            scene = 'stageend';
             overlayTicks = UI_FLOW.GAMEOVER_LOCK;
           } else if (gameoverDelay === 0 && pendingOps) {
             overlay.showOpsEnd(pendingOps);
@@ -956,6 +1132,7 @@ export function createApp(
   }
 
   function bgmFor(s: GameState): BgmTrack {
+    if (s.mode === 'stage') return s.lm || s.boss ? 'boss' : 'act1';
     if (s.mode === 'bonus') return 'butter';
     if (s.act2Phase === 'moon') return 'boss';
     if (s.act2Phase === 'bolt' || s.act2Phase === 'rock') return 'bolt';
@@ -1010,6 +1187,12 @@ export function createApp(
 
   /** 판 도중 HUD 한 줄 — 작전이 아니면 '' */
   function opHud(s: GameState): string {
+    if (stageRun && s.stage) {
+      const w = workProgress(stageRun.id, s.stage.step);
+      return stageHudLine({
+        id: stageRun.id, ticks: s.stage.clearTick || s.tick, step: w.done, total: w.total, replaying: !!stageRun.next,
+      });
+    }
     if (!opRun) return '';
     const remain = Math.max(0, Math.ceil((opLimitTicks(opRun.id) - s.tick) / 60));
     return SCREENS.ops.hud(opRun.id, remain, opNow(s));
@@ -1107,6 +1290,7 @@ export function createApp(
 
   function handleTransitions(s: GameState, wasMode: GameState['mode'], wasPhase: GameState['act2Phase']): void {
     const wipe = { wipeTicks: UI_FLOW.WIPE_TICKS };
+    if (endStageIfDue(s)) return; // 지시서 판은 아케이드 엔딩 · 게임오버 카드 · 부활을 절대 안 탄다
     if (endOpIfDue(s)) return;
     // 버터바를 지나 새 구역으로 돌아왔다 — 구역 이름을 한 번 자막으로 (C11)
     if (wasMode === 'bonus' && s.mode === 'act1' && !butterChallenge && !opRun) {
@@ -1195,7 +1379,7 @@ export function createApp(
     ctx.fillStyle = PALETTE.BG;
     ctx.fillRect(0, 0, VIEW.W, VIEW.H);
 
-    if (state && (scene === 'play' || scene === 'pause' || scene === 'story' || scene === 'gameover' || scene === 'opsend' || scene === 'ending')) {
+    if (state && (scene === 'play' || scene === 'pause' || scene === 'story' || scene === 'gameover' || scene === 'opsend' || scene === 'stageend' || scene === 'ending')) {
       drawGame(ctx, state);
       if (scene === 'play' || scene === 'pause') hud.sync(state, opHud(state));
     }

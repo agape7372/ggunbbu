@@ -232,7 +232,11 @@ export const MAT_HP: Record<string, number> = {
   butter: 1,
   cathedral: 5,
   lobby: 10, office: 1, penthouse: 20,
+  bell: 999,               // 안 깎인다(building.damageStack) — 깔림 Z 탈출도 실패한다
 };
+
+/** 베기 띄우기 재질 배율 — 없으면 1. 종은 연타로 띄워 저글링한다(작업 지시서 종탑) */
+export const MAT_LIFT: Readonly<Record<string, number>> = { bell: 3 };
 
 // ── 1막 곡선 ────────────────────────────────────────────────────
 export const ACT1 = {
@@ -404,6 +408,110 @@ export const TOKOTON = {
   P_PER_MIN: 0.1,
   P_MAX: 2,
   CHAPTER_CYCLE_TICKS: 7200,  // 해금 챕터 2분 순환
+} as const;
+
+// ── 현장 일지(스테이지) ─────────────────────────────────────────
+// 대본(core/stages.ts)이 순서를 정하고, 여기 수치가 박자와 낙하를 정한다.
+// 재생 코드가 같은 판을 다시 돌리므로 이 값을 바꾸면 core/stage.ts STAGE_SIM_VERSION을 올린다.
+export const STAGE = {
+  FIRST_WAIT: 90,          // 시작 후 첫 걸음까지(이름 도장 보는 시간)
+  GAP: 30,                 // 앞 걸음을 다 치운 뒤 다음 걸음까지 = ▼ 예고 길이(STACK.SPAWN_CUE_TICKS, 예고음이 정확히 30에서 운다)
+  JOINED_GAP: 8,           // 대본 「>」 — 붙어 오기
+  BEAT: 30,                // 대본의 쉼 「.」 한 박
+  HASTY_TICKS: 45,         // 대본 「~」 — 최하층이 HP1로 이만큼 남으면 급락
+  HASTY_FALL: 3,           // 급락 낙하 배율(G · Vterm)
+  // 낙하 단계 speed 0~1 → 1막 곡선의 양 끝(p 0 · p 1)을 선형으로 잇는다. pow를 안 써서 기기마다 같은 값이 나온다
+  G: [1530, 3400] as const,
+  VTERM: [238, 714] as const,
+  SPAWN_VY: -70,           // 1막 기본 초속
+  FAST_SPAWN_VY: -120,     // 대본 「!」 = 궤도 직하 초속 + 한 단계 빠르게
+  FAST_SPEED_ADD: 0.25,
+  ROCK_SPACING: 150,       // 「R4」 화산탄 사이 높이 간격(px) — 같이 떨어지되 한 대씩 벨 틈
+  BOLT_STAGGER: 12,        // 「Z3」 번개 큐 시차(틱) — 보스 riseBolt9와 같은 박
+  /** 난이도 0 견습 · 1 정규 · 2 외주. gap·fall은 배율, cue는 번개 예고에 더하는 틱 */
+  DIFF: [
+    { gap: 1.5, fall: 0.85, cue: 12, hat: true },
+    { gap: 1, fall: 1, cue: 0, hat: true },
+    { gap: 1, fall: 1.12, cue: -6, hat: false },
+  ] as const,
+} as const;
+
+// ── 명물 보스 (core/landmark.ts · docs/STAGES_2026-10-31.md §6) ─────
+// 체력 = 몸의 층. 창 = 몸이 내려앉아 밑면이 머리 높이에 온 시간(모든 무기 사거리 안).
+export const LANDMARK = {
+  ENTER_TICKS: 120,        // 위에서 내려와 자리 잡기(이름 도장 보는 시간)
+  SIT_Y: 56,               // 창: 몸 밑면 = 머리 위(PLAYER.H 55) — 가장 짧은 사거리(60)도 닿는다
+  SIT_TICKS: [270, 180, 180] as const, // 창 길이 견습 · 정규 · 외주(인장 먹이 마르는 시간)
+  EASE: 0.14,              // 몸이 목표 높이로 다가가는 비율(틱당)
+  RISE_TICKS: 50,
+  DOWN_TICKS: 150,         // 쓰러지는 연출 → 끝(시간은 쓰러진 틱에서 멈춘다)
+  DEFLECT_V: -240,         // 몸에 튕겨 나온 던진 것(꽂힘이 아닐 때)
+  // ── 2판 기믹 (docs/STAGES_2026-10-31.md §6 2판) ──
+  /** 막 = 남은 층. [이 층 수 이하면 2막, 이 층 수 이하면 3막]. 구층탑은 몸이 s.stack */
+  ACT: { bell: [2, 1], wind: [3, 1], pagoda: [6, 3], crane: [3, 1] } as const,
+  COUNTER_TICKS: [60, 45, 45] as const, // 종탑 반격 창: 막은 내려찍기 뒤 몸이 땅에 머무는 틱(견습 · 정규 · 외주)
+  DOWN_MAX: 600,           // 숨은 막(13시 종 · 장터)이 남아 있어도 쓰러진 뒤 이 틱이면 끝
+  BELL: {
+    FLOORS: 4, HP: 15, HOVER_Y: 420,
+    HOURS: [3, 6, 9, 12] as const,          // 시각 = 그 파의 종 수
+    TELL: [44, 36, 30, 24] as const,        // 종 사이 예고(틱) — 똑딱 뒤 댕
+    TELL_OUTSOURCE_12: 6,                   // 외주 12시는 간격 없이
+    G: 1200, VTERM: 520,
+    SLAM_TICKS: 24,          // 내려찍기: 몸이 땅까지
+    SLAM_HIT_H: 272,         // 내려찍는 몸에 닿는 높이(4층) — 이보다 높이 떠 있으면 피한다
+    AIR_POINTS: 2,           // 공중 가드로 올린 종이 꽂히면 2점. 1 · 2막은 점수가 종 수에 닿으면 파가 끝난다
+    BLOCK_PACE: 107,         // 2막 정각: 파 시작부터 종 수 × 이 틱이 지나면 남은 종이 한 덩이로 [실측: 정규 기본 봇이 2막에서 종 하나에 쓰는 틱 최대 85.1/시 × 1.25]
+    ACT3_WAVE: 3,            // 3막은 12시(HOURS 칸 3)로 고정
+    BELL13_T: 20,            // 13시: 쓰러진 뒤 이 틱에 화면 꼭대기에서 종 하나
+  },
+  WIND: {
+    FLOORS: 5, HP: 16, HOVER_Y: 460,
+    SPEED: 0.25,             // 좌판 기준 낙하 단계(STAGE.G · VTERM 위의 자리)
+    IN: { g: 0.5, v: 0.5, lift: 2 },        // 들숨: 둥실, 베면 두 배로 뜬다
+    OUT: { g: 2, v: 2, lift: 1 },           // 날숨: 내려찍기
+    /** 숨 노래 [0 들숨 · 1 날숨, 박(STAGE.BEAT)]. 고정 순서라 외우면 두 박 앞을 안다 */
+    SONG: [[0, 6], [1, 3], [0, 6], [1, 3], [0, 4], [1, 2], [0, 4], [1, 4]] as const,
+    /** 외주: 같은 노래, 박만 흔들린다 */
+    SONG_OUTSOURCE: [[0, 5], [1, 4], [0, 7], [1, 2], [0, 3], [1, 3], [0, 5], [1, 3]] as const,
+    STALLS: ['wm', 'mw', 'wmw', 'mm', 'wwm', 'mwm'] as const,
+    STALL_GAP: 30,
+    BLOW_V: 1300,            // 역풍 띄움(지면 가드 1190보다 세게 — 탑까지 간다)
+    STALL7: 7,               // 특기 사항: 좌판 하나를 땅에 안 닿게 띄운 횟수
+    LIGHT: [6, 7, 9] as const, // 가벼운 좌판: 이만큼 띄운 좌판의 다음 가드는 숨과 상관없이 역풍(견습 · 정규 · 외주)
+    RETURN_TICKS: 90,        // 2막 맞바람: 탑에 튕겨 나온 좌판이 날숨을 타는 틱
+    BREATH_SIT_DY: 64,       // 3막 마지막 숨: 들숨엔 앉은 몸 밑면이 SIT_Y + 이만큼(점프 베기만 닿는다)
+    MARKET_G: 300, MARKET_V: 120, // 장터(좌판 여섯 = 14층)가 둥실 내려와 SIT_Y에서 멈춘다
+  },
+  PAGODA: {
+    FLOORS: 9, HP: 8,
+    START_Y: 330, ENTER_FROM: 820,
+    G: 3000, VTERM: 4, VTERM_OUTSOURCE: 4.8, // 무겁고 느리다 — 90초 안팎에 땅에 닿는다. 외주 ×1.2(2막 당김과 겹쳐서 ×1.5에서 내렸다)
+    TILES: [3, 3, 4, 4, 5, 5, 6, 6, 0] as const, // 몇 번째 층이 깨지면 기와 몇 장
+    TILE_SPACING: 70,
+    MERGE_TICKS: 60,         // 앞 층이 깨진 지 이 안에 다음 층이 깨지면 기와 비가 안 온다(이어 허물기)
+    CHIME_EVERY: 300, CHIME_WINDOW: 30, CHIME_MUL: 3,
+    LIFT_V: 400,             // 탑이 이보다 빨리 떠오르기 시작하면 「띄움」(가드 680~1190 · 탈출 850. 베기 띄움 ≤ 98은 아니다)
+    LIFT_TILES: [0, 3, 4] as const, // 띄우면 쏟아지는 기와(견습 공짜)
+    CHAIN_CLEAR: 3,          // 이어 허문 층이 이만큼이면 떠 있던 기와가 부서진다
+    CHIME_TILES: 2, CHIME_TILE_DELAY: 6, // 3막 풍경 기와(정규): 딸랑 뒤 6틱에 둘
+    TILE_BOUNCE_V: 300,      // 외주: 가드로 받은 기와가 쌓이지 않고 튕긴다
+  },
+  CRANE: {
+    FLOORS: 5, HP: 20, HOVER_Y: 520,
+    /** 짐 [층, 갈고리 띠 아래 끝]. 짐 꼭대기가 띠 안에서 멈추면 걸린다.
+     *  지면 가드 정점(꼭대기) = 받은 높이(0~66) + 226 + 68×층. 일찍 막으면 ≈ 288+68n, 끝에 막으면 ≈ 236+68n.
+     *  그래서 「한 층 덜고 일찍」과 「그대로 두고 늦게」가 같은 띠에 든다(늦게 막기 = 한 층 덜기). 띠는 둘뿐 — 336 · 404 */
+    CARGO: [['mm', 404], ['mmm', 404], ['hm', 336], ['wmm', 404], ['mmm', 336], ['hhm', 336], ['mmmm', 404], ['wm', 336]] as const,
+    BAND_H: [100, 80, 40] as const,          // 띠 두께 견습 · 정규 · 외주(외주는 늦게 막기가 한 틱 창)
+    LOWER_TOP: 520, LOWER_TO: 150, LOWER_V: 150, // 짐 꼭대기가 운전석 밑(520)에서 내려와 밑면 150에서 놓는다
+    G: 3000, VTERM: 520,
+    NEXT_GAP: 40,
+    BAND_LO: 336, BAND_HI: 404, // 띠 둘(읽는 띠 · 외주 바뀜이 고른다)
+    TETSU_SIT: 90,           // 철벽 즉시 걸기 = 미끄러진 걸림(창 90틱)
+    READ_SPLIT: 33, READ_MAX: 2, // 읽는 띠: 받은 높이 < 33 = 늦게(+1) · 이상 = 일찍(−1), ±2로 자른다
+    HALF_Y: 300, HALF_TICKS: 60, // 3막 첫 걸림: 팔이 반만 꺾여 추가 300까지(점프 베기만 닿는다)
+    CABLE_HITS: 3,           // 내리는 중 짐을 이만큼 베면 줄이 끊겨 바로 떨어진다
+  },
 } as const;
 
 // ── 타격감 (JUICE 매트릭스 — 계획 §타격감) ──────────────────────

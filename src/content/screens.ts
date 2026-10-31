@@ -3,6 +3,7 @@
 import { OPERATION, QUIP_STREAK_FROM } from '../config';
 import { opNeed, opShort, type OpId } from '../meta/ops';
 import { BOSS_NAME, HERO } from './world';
+import type { Mode } from '../core/types';
 
 /** 버티기 작전(값 = 버틴 초)인가, 건물 작전(값 = 부순 채 수)인가 */
 const isSeconds = (id: OpId): boolean => OPERATION[id].metric === 'seconds';
@@ -179,7 +180,7 @@ export interface QuipCtx {
   /** 이번 판에 안전모가 깨졌나 */
   hatBroke: boolean;
   chapter: number;
-  mode: 'act1' | 'act2' | 'tokoton' | 'bonus';
+  mode: Mode;
   /** 집행기 앞에서 죽었나 */
   boss: boolean;
   /** 같은 세션 연속 사망 횟수 (이번 판 포함) */

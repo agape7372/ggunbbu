@@ -200,7 +200,7 @@ export function pulseDuckBgm(level: number = AUDIO.DUCK_PULSE, holdS: number = A
 
 // ─── SFX ───────────────────────────────────────────────────
 
-export function playSfx(name: SfxName, opts?: { pitchSemitones?: number; delay?: number; pan?: number }): void {
+export function playSfx(name: SfxName, opts?: { pitchSemitones?: number; delay?: number; pan?: number; dur?: number }): void {
   if (!ctx || !mix || !soundOn || !sfxOn) return;
   const c = ctx;
   const bus = mix.sfx;
@@ -220,7 +220,7 @@ export function playSfx(name: SfxName, opts?: { pitchSemitones?: number; delay?:
       p.connect(bus);
       dest = p;
     }
-    preset(c, dest, c.currentTime + delay, rate);
+    preset(c, dest, c.currentTime + delay, rate, opts?.dur);
   };
 
   // 언락 관용구: running이 아니면 resume().then 후 재생. 대기 중 쌓인 호출은 최신 1건만 남는다.

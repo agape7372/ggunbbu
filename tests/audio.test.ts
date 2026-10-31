@@ -189,6 +189,7 @@ describe('파괴 소리 레시피 — CPU 예산', () => {
     'hit', 'hitLow', 'hitTick', 'hitStrong', 'hitHammer', 'hitBar', 'hitGrind',
     'floorCollapse', 'destroy', 'gorogoro', 'special', 'specialCharge', 'incoming',
     'hitFlame', 'hitFrost', 'hitOnyx', 'hitGold',
+    'bellTwin', 'bellBoom', 'bellClear', 'pagodaCreak', 'craneSnap', // 명물 2판 기믹 예고
   ];
   it('소리 하나당 노드 14개 이하, 예약값은 모두 유한·양수', () => {
     for (const n of names) {

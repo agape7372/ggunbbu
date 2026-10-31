@@ -5,8 +5,9 @@ import type { GameState, Lane } from './types';
 import { makeFloor, makeStack } from './building';
 import { registerHit, hurtPlayer, addScore, addGauge, addCombo, hitGauge } from './combat';
 import { guardActive, makePlayer } from './player';
-import { ACT2, GUARD_GAUGE, PLAYER, SCORE, STACK, TICK, VIEW, WEAPON } from '../config';
+import { ACT2, GUARD_GAUGE, LANDMARK, PLAYER, SCORE, STACK, TICK, VIEW, WEAPON } from '../config';
 import { initBoss, stepBoss, tryHitBoss } from './boss';
+import { tryHitLandmark } from './landmark';
 
 export function enterAct2(s: GameState): void {
   s.mode = 'act2';
@@ -173,6 +174,10 @@ export function stepEntities(s: GameState): void {
       if (e.y <= 0) {
         if (e.remnant) {
           remove.push(i); // 격파 잔해: 착지 무해, 적재 없음
+        } else if (s.mode === 'stage' && s.lm?.id === 'pagoda' && s.stage?.diff === 2 && guardActive(s.player)) {
+          // 구층탑 외주: 가드로 받은 기와는 쌓이지 않고 튕겨 다시 떨어진다 — 공중에서 베어야 끝난다
+          e.y = 0;
+          e.vy = LANDMARK.PAGODA.TILE_BOUNCE_V;
         } else {
           // 가드 중·공중·깔림 중이면 무해하게 적재 [원작 공략 재현]
           // pinned 면제는 08-30 검증 발견: 깔림 진입이 무적 0이라 후속 돌이 직격해
@@ -260,6 +265,7 @@ export function tryHitAct2Targets(s: GameState): boolean {
   }
   // 4) 보스 본체 / 드론 / 대포
   if (s.boss && tryHitBoss(s, lo, hi)) return true;
+  if (s.lm && tryHitLandmark(s)) return true;
   // 5) 바닥 화산탄 더미 파밍 [정본: 반복 점수. 콤보는 플래그(기본 off)]
   if (s.groundRocks > 0 && lo <= s.groundRocks * ACT2.ROCK_PILE_H) {
     if (SCORE.GROUND_ROCK_COMBO) {

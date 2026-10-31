@@ -4,6 +4,8 @@ import type { GameState, JuiceEvent, JuiceKind, Material, WeaponId } from '../co
 import { AUDIO, BOSS, HAT_FX, JUICE, STACK, TPS } from '../config';
 import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
+import { landmarkSounds, snapOf, type LmSnap } from './landmarkSfx';
+import { lmAct } from '../core/landmark';
 
 const STRONG_MAT: ReadonlySet<Material> = new Set(['hard', 'cathedral', 'lobby', 'penthouse']);
 
@@ -83,6 +85,24 @@ export function consumeAudio(s: GameState): void {
   const cue = !s.over && s.stack === null && s.stackSpawnCd === STACK.SPAWN_CUE_TICKS;
   if (cue && !incomingFired) playSfx('incoming');
   incomingFired = cue;
+
+  playLandmark(s);
+}
+
+// 명물 소리 — 이벤트가 없는 것(똑딱 · 댕 · 휘파람 · 풍경 · 끼릭 · 철컥)은 직전 틱과의 차이로 낸다.
+// 판이 바뀌거나(다른 state) 틱이 되감기면 비운다. 상태는 읽기만 한다.
+let lmPrev: LmSnap | null = null;
+let lmOwner: GameState | null = null;
+
+function playLandmark(s: GameState): void {
+  const cur = snapOf(s);
+  if (lmOwner !== s || (lmPrev && cur && cur.tick < lmPrev.tick)) lmPrev = null;
+  lmOwner = s;
+  if (!cur) { lmPrev = null; return; }
+  for (const snd of landmarkSounds(lmPrev, cur)) {
+    playSfx(snd.name, { pitchSemitones: snd.semis, dur: snd.dur, delay: snd.delay });
+  }
+  if (!lmPrev || cur.tick !== lmPrev.tick) lmPrev = cur; // 같은 틱(히트스톱)은 직전 장면을 지킨다
 }
 
 export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): SfxName[] | null {
@@ -90,6 +110,7 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
     case 'slash':
       return ['whiff'];
     case 'hit': {
+      if (e.mat === 'bell') return ['bellClang']; // 종은 안 깎인다 — 깡
       if (!e.mat && s.boss?.pattern === 'rabbits') return ['cancel'];
       const own = WEAPON_HIT[s.weapon];
       if (own) return [own];
@@ -103,6 +124,7 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
     case 'hatGet':
       return ['hatGet'];
     case 'floorCollapse': {
+      if (e.mat === 'bell') return ['bellThud']; // 종이 땅에서 깨졌다 — 퉁
       const own = GREAT_OWN[s.weapon];
       return own ? ['floorCollapse', own] : ['floorCollapse'];
     }
@@ -121,10 +143,18 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
     case 'guardAirBounce':
       return ['guardAir'];
     case 'bossHit':
+      // 종탑: 되돌린 종이 몸에 꽂힐 때(play 중) — 던질 때의 댕보다 크고 길게. 창 중 필살 타격은 그대로
+      // 3막(몸 한 층)은 시보라 꽂힘이 곧 대미지 — 울림 대신 쾅
+      // 점수가 종 수에 닿아 파가 바로 끝나는 꽂힘은 같은 틱에 sit이 된다(t 0) — 그것도 꽂힘이다
+      if (s.lm?.id === 'bell' && (s.lm.st === 'play' || (s.lm.st === 'sit' && s.lm.t === 0))) {
+        return [s.lm.body && lmAct(s) === 3 ? 'bellBoom' : 'bellBody'];
+      }
       return ['bossHit'];
     case 'bossDefeat':
       return ['bossDefeat'];
     case 'boltCue':
+      // 종탑 종 던지기 · 크레인 놓기도 이 이벤트를 쓴다 — 댕 · 철컥은 landmarkSounds가 따로 낸다
+      if (s.lm?.id === 'bell' || s.lm?.id === 'crane') return null;
       return [mapBoltCue(s)];
     case 'boltStrike':
       return [mapBoltStrike(s)];

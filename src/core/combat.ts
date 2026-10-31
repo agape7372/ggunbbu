@@ -11,7 +11,7 @@
 
 import type { GameState, Lane } from './types';
 import { damageStack } from './building';
-import { DEBRIS, GIMMICK, GUARD_GAUGE, HAT, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
+import { DEBRIS, GIMMICK, GUARD_GAUGE, HAT, MAT_LIFT, STAGE, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
 import { VIEW } from '../config';
 import { rand } from './rng';
 
@@ -23,7 +23,9 @@ export function addCombo(s: GameState): void {
   if (s.combo < SCORE.COMBO_CAP) s.combo += 1;
   // 999 카운터스톱: 이벤트는 타격 지점이 발행한다 (여기서 중복 발행 금지)
   // 안전모 = 콤보 고비 상. 2막은 벗고 들어가니 주지 않는다. 같은 틱 뒤의 깔림도 바로 막는다
-  if (!s.hat && s.mode !== 'act2' && HAT.COMBO_AT.includes(s.combo)) {
+  // 작업 지시서 외주는 안전모가 없다
+  const hatOk = s.mode !== 'act2' && !(s.stage && !STAGE.DIFF[s.stage.diff].hat);
+  if (!s.hat && hatOk && HAT.COMBO_AT.includes(s.combo)) {
     s.hat = true;
     s.events.push({ kind: 'hatGet', combo: s.combo, y: s.player.y + PLAYER.H });
   }
@@ -77,7 +79,8 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   const res = damageStack(stack, lane, lo, hi, 1);
   if (res === 'miss') return false;
 
-  stack.vy = Math.max(stack.vy, weapon.lift);
+  // 종은 세게 밀린다(저글링) · 바람탑 들숨은 두 배 — 아케이드 재질은 배율 1
+  stack.vy = Math.max(stack.vy, weapon.lift * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
   stack.resting = false;
 
   if (res === 'collapse') {
@@ -176,7 +179,8 @@ export function tryGuardBounce(
 /** 플레이어 피격 공통 처리 (무적 중이면 무시) */
 export function hurtPlayer(s: GameState): boolean {
   const p = s.player;
-  if (p.invulnTicks > 0 || p.pose === 'special') return false;
+  // 작업 지시서를 깬 뒤(보스 쓰러짐 연출)엔 안 다친다 — 날아오던 철근에 깬 판이 「미완료」가 되지 않게
+  if (p.invulnTicks > 0 || p.pose === 'special' || s.stage?.phase === 'done') return false;
   s.lives -= 1;
   p.invulnTicks = PLAYER.HIT_IFRAMES;
   breakCombo(s);

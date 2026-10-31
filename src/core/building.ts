@@ -44,6 +44,7 @@ export function makeStack(o: StackOpts): FallingStack {
 /** 페이즈별 낙하 물리 파라미터 */
 export function stackPhysics(s: GameState): { g: number; vterm: number } {
   if (s.mode === 'bonus') return { g: STACK.BUTTER_G, vterm: STACK.BUTTER_VTERM };
+  if (s.mode === 'stage' && s.stage) return { g: s.stage.fallG, vterm: s.stage.fallV };
   if (s.mode === 'act2') {
     if (s.act2Phase === 'cathedral') return { g: STACK.CATHEDRAL_G, vterm: STACK.CATHEDRAL_VTERM };
     if (s.act2Phase === 'tower') return { g: STACK.TOWER_G, vterm: STACK.TOWER_VTERM };
@@ -94,6 +95,7 @@ export function damageStack(
     if (b > hi) return 'miss';
     const f = stack.floors[i];
     void lane; // 단일 레인 — 세그먼트는 항상 1개
+    if (f.mat === 'bell') return 'hit'; // 종은 안 베인다 — 맞은 것(깡)이지 깎인 게 아니다
     f.segs[0].hp -= dmg;
     if (f.segs[0].hp <= 0) {
       stack.floors.splice(i, 1);

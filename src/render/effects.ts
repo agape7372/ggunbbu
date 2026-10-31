@@ -853,6 +853,30 @@ export function updateEffects(dt: number): void {
   }
 }
 
+const BRONZE = ['#8A6F3E', '#6B5530', '#A88A52'] as const; // sprites.ts 종 재질 색
+
+/** 종 「깡」 — 안 깎이니 금은 없다. 흰 별 · 놋쇠 불꽃 · 퍼지는 엔소 한 고리 (x, y = 월드 캔버스 좌표) */
+export function spawnBellClang(x: number, y: number): void {
+  clang(x, y, 20, 0.14);
+  ensoAt(x, y, 14, 70, 0.26, 5, 0.5);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + n01() * 0.4;
+    const sp = 380 + n01() * 260;
+    fill('spark', x + Math.cos(a) * 10, y + Math.sin(a) * 8, Math.cos(a) * sp, Math.sin(a) * sp - 60, 0,
+      0.09 + n01() * 0.08, 4 + n01() * 3, BRONZE[2]);
+  }
+}
+
+/** 땅에서 깨진 종 — 놋쇠 조각이 튀고 눕는 엔소 하나(퉁). x, y = 월드 캔버스 좌표(지면) */
+export function spawnBellShatter(x: number, y: number): void {
+  for (let i = 0; i < 14; i++) {
+    fill('shard', x + signed() * 40, y - 8 - n01() * 30, signed() * 260, -(120 + n01() * 260), 980,
+      0.5 + n01() * 0.4, 4 + n01() * 5, BRONZE[i % 3], { rot: signed() * Math.PI, spin: signed() * 10 });
+  }
+  puffs(x, y - 4, 3, 50, 10, 120, 0.4);
+  ensoAt(x, y + 2, 14, 80, 0.26, 5, 0.28);
+}
+
 /**
  * consumeEvents 루프용. 캔버스 좌표로 변환한 뒤 spawnHitParticles에 위임.
  * 병렬 renderer가 이 이름을 이미 import하므로 유지한다.

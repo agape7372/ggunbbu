@@ -253,7 +253,7 @@ function stepRabbits(s: GameState): void {
         const py = s.player.y + 24;
         const dx = px - e.x;
         const dy = py - e.y;
-        const len = Math.hypot(dx, dy) || 1;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
         s.entities.push({
           kind: 'shot', lane: s.player.lane,
           x: e.x, y: e.y,

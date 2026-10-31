@@ -10,9 +10,13 @@ export interface BackdropInput {
   act2Phase: Act2Phase | null;
   /** 구역작전 기믹 — night면 스카이라인 창을 잉크로 채운 배경을 쓴다. 생략 = none */
   gimmick?: GimmickId;
+  /** 작업 지시서 판(GameState.stage의 id만 읽는다) · 보스(집행기) 등장 여부 */
+  stage?: { id: string } | null;
+  boss?: object | null;
 }
 
 export function backdropKey(s: BackdropInput): string {
+  if (s.stage?.id === 'HQ' && s.boss) return 'bg-executor'; // 본사 집행기 국면 — 아케이드 달 국면과 같은 배경
   if (s.mode === 'bonus') return 'bg-bonus';
   if (s.mode === 'act2') return s.act2Phase === 'moon' ? 'bg-executor' : 'bg-act2';
   const theme = ACT1.CHAPTER_THEMES[((s.chapter % 4) + 4) % 4];

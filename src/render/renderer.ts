@@ -20,8 +20,11 @@ import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
 import { vibrate } from '../platform/native';
 import {
-  drawBackEffects, drawEffects, resetEffects, setSlashColor, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,
+  drawBackEffects, drawEffects, resetEffects, setSlashColor, spawnBellClang, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,
 } from './effects';
+import {
+  drawBell, drawLandmarkBack, drawLandmarkFront, hastyShakeX, isBellStack, noteBellBreak, resetLandmarkFx, shatterBody,
+} from './landmarkFx';
 import { bladeAura, drawBladeFx } from './bladeFx';
 import { bossBodyHit, introFloorTop, resetBossFx, stepBossFx } from './executor';
 import { addTrauma, defeatSlow, kickPx, pickHaptic, shakePx, shakeSample, stackScale, type HapticCounters } from './feel';
@@ -121,6 +124,7 @@ function resetRunState(): void {
   resetEffects();
   fx.resetScreenFx();
   resetBossFx();
+  resetLandmarkFx();
   trauma = 0;
   kickY = 0;
   kickV = 0;
@@ -333,7 +337,12 @@ function react(s: GameState, e: JuiceEvent): void {
   reactImpact(s, e);
   // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
   spawnFromEvent(s, e);
-  if (e.kind === 'floorCollapse') shatterFloor(s, e);
+  // 작업 지시서 명물: 종은 안 깎여 금이 없다(깡) · 땅에 떨어지면 금 가며 깨진다 · 몸 층은 그 층 그림으로 조각난다
+  if (e.kind === 'hit' && e.mat === 'bell') spawnBellClang(VIEW.LANE_X[0], VIEW.GROUND_Y - (e.y ?? s.player.y + PLAYER.H));
+  if (e.kind === 'floorCollapse') {
+    if (e.mat === 'bell') noteBellBreak();
+    else if (!shatterBody(s, e)) shatterFloor(s, e);
+  }
   // 콤보 도장 — 콤보를 올린 타격만(층 붕괴는 타격일 때만 combo가 실린다 · 보스 타격은 combo 없이 온다)
   const hitCombo = e.kind === 'hit' || e.kind === 'bossHit' ? e.combo ?? s.combo
     : e.kind === 'floorCollapse' || e.kind === 'butterCollapse' ? e.combo : undefined;
@@ -531,12 +540,22 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   drawOrbitBeam(ctx, s, cam);
 
   const g = VIEW.GROUND_Y;
+  drawLandmarkBack(ctx, s, g, hitFlashAlpha()); // 명물 몸 · 장식 — 던진 것 뒤
   if (s.stack) {
     drawStackShadow(ctx, s.stack, g);
     drawDropStreaks(ctx, s.stack, g, cam);
-    drawStack(ctx, s.stack, g, s.gimmick);
-    drawHitFlash(ctx, s.stack, g);
+    if (isBellStack(s.stack)) drawBell(ctx, s.stack, g, hitFlashAlpha()); // 종탑의 종 — 층 블록이 아니라 종 모양
+    else {
+      // 급한 집(대본 「~」) — 최하층 HP 1이 쌓이는 동안 가로로 떨린다(급락 예고)
+      const hx = hastyShakeX(s);
+      ctx.save();
+      if (hx !== 0) ctx.translate(hx, 0);
+      drawStack(ctx, s.stack, g, s.gimmick);
+      drawHitFlash(ctx, s.stack, g);
+      ctx.restore();
+    }
   }
+  drawLandmarkFront(ctx, s, g); // 구층탑 처마 · 풍경, 땅에서 깨지는 종
   if (prelude?.ghost) {
     // 사라진 건물의 유령 — 정지된 동안 점점 옅어진다
     ctx.save();
@@ -640,11 +659,15 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   lastStack = s.stack ? { ...s.stack, floors: s.stack.floors.slice() } : null;
 }
 
+/** 맞은 층 흰 번쩍 세기 0..HIT_FLASH_A — 번쩍임 설정을 탄다 */
+function hitFlashAlpha(): number {
+  return hitFlashT <= 0 ? 0 : JUICE_SYS.HIT_FLASH_A * (hitFlashT / JUICE_SYS.HIT_FLASH_TICKS) * fx.flashK();
+}
+
 /** 맞은 맨 아래층만 하얗게 — 화면 전체 번쩍 대신(연타 장면이 번쩍이면 눈이 아프다). 번쩍임 설정을 탄다. */
 function drawHitFlash(ctx: CanvasRenderingContext2D, st: FallingStack, g: number): void {
-  if (hitFlashT <= 0) return;
   const f = st.floors[0];
-  const a = JUICE_SYS.HIT_FLASH_A * (hitFlashT / JUICE_SYS.HIT_FLASH_TICKS) * fx.flashK();
+  const a = hitFlashAlpha();
   if (!f || a < 0.02) return;
   const w = st.variant === 'butterbar' ? VIEW.BUTTER_W : VIEW.LANE_W;
   ctx.save();
@@ -715,7 +738,7 @@ function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number
 
 function bgColor(s: GameState): string {
   if (s.mode === 'bonus') return '#FFF8DC';
-  if (s.act2Phase === 'moon') return '#E4E0D6';
+  if (s.act2Phase === 'moon' || (s.stage?.id === 'HQ' && s.boss)) return '#E4E0D6'; // 본사 집행기도 달 국면과 같은 바탕
   if (s.mode === 'act2') return '#EAE6DA';
   const by = ['#F4F1E8', '#F0EEE4', '#F2EDE2', '#EFEDE6'];
   return by[s.chapter % 4];
@@ -728,6 +751,8 @@ function bgColor(s: GameState): string {
  */
 function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
   if (s.stack || s.over) return;
+  // 명물 보스는 창 · 올라가기 · 등장 · 쓰러짐 동안 대기 값이 멈춰 있어(바람탑 STALL_GAP) ▼가 맥박만 친다 — 그리지 않는다
+  if (s.lm && s.lm.st !== 'play' && s.lm.st !== 'slam') return;
   const cd = s.stackSpawnCd;
   if (cd <= 0 || cd > STACK.SPAWN_CUE_TICKS) return;
 

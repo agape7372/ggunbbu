@@ -8,6 +8,7 @@ import { LICENSE_EXAMS } from './meta/economy';
 import { emptyMask, isMaskArt, loadMaskBook } from './meta/mask';
 import type { MaskEntry } from './meta/types';
 import { isOpGrade, isOpId, type OpGrade, type OpId } from './meta/ops';
+import { validateStageRecords, type StageRecord } from './meta/stageRecord';
 
 export interface SaveSettings {
   sound: boolean;
@@ -46,6 +47,7 @@ export interface SaveData {
   maskArt: string; // 고른 가면의 그림(파생) — 형식은 meta/mask.ts 머리 주석 (무버전 추가 키)
   masks: MaskEntry[]; // 내 가면 목록(최대 8장). 옛 저장은 loadMaskBook이 maskArt에서 옮긴다 (무버전 추가 키)
   maskId: string; // 고른 가면 id — 쓰는지는 loadout.mask (무버전 추가 키)
+  stages: Record<string, StageRecord>; // 작업 지시서 판마다 기록 — meta/stageRecord.ts (무버전 추가 키)
 }
 
 export const DEFAULT_SAVE: SaveData = {
@@ -81,6 +83,7 @@ export const DEFAULT_SAVE: SaveData = {
   maskArt: emptyMask(),
   masks: [],
   maskId: '',
+  stages: {},
 };
 
 const BAK_KEY = `${SAVE_KEY}.bak`;
@@ -156,6 +159,7 @@ function normalize(raw: Record<string, unknown>): SaveData {
     license: num(data.license, 0, LICENSE_EXAMS.length),
     opsGrade: validateOpsGrade(data.opsGrade),
     ...book,
+    stages: validateStageRecords(data.stages),
   };
 }
 

@@ -6,7 +6,7 @@
 //
 // 렌더(src/render/**) 미연결 — 사용 예시는 파일 하단 주석.
 
-import type { Act2Phase } from '../core/types';
+import type { Act2Phase, Mode } from '../core/types';
 import { ACT2_INTRO, CHAPTER_LINES, chapterLines, ENDING_FULL_COMBO, ENDING_LINES } from './story';
 import {
   ACT2_PHASES,
@@ -87,7 +87,7 @@ export function phaseName(phase: Act2Phase): string {
 
 /** HUD 모드 한 줄. GameState.mode / chapter / act2Phase 훅. */
 export function hudModeLabel(
-  mode: 'act1' | 'act2' | 'tokoton' | 'bonus',
+  mode: Mode,
   chapter: number,
   phase: Act2Phase | null,
 ): string {
