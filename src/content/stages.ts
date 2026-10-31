@@ -44,6 +44,9 @@ export const STAGE_MODE = {
   craneDoubleHint: '한 번 더 걸어라.',
   /** 보스 지시서 밑 한 줄의 머리말 */
   note: '참고',
+  /** 보스가 있는 판 — 목록 카드 인장. 판 위 진행 막대 끝엔 보스 이름, 보스 없는 판은 barEnd */
+  bossTag: '보스',
+  barEnd: '끝',
   /** 화면 이름표 — ui/stageView.ts */
   home: '홈',
   back: '목록',

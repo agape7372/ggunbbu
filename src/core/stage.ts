@@ -153,7 +153,7 @@ function stepScript(s: GameState): void {
   st.armed = false;
 }
 
-/** 성급한 건물: 최하층을 HP1로 남겨 두면 세다가 급락한다(정석 「HP1 남기고 점프 가드」를 한 번 깬다) */
+/** 성급한 건물: 최하층을 HP1로 남겨 두면 세다가 급락한다(정석 「HP1 남기고 점프 가드」를 한 번 깬다). 급락은 건물당 한 번 — 층마다 겹치면 ×9가 된다 */
 function stepHasty(s: GameState): void {
   const st = s.stage!;
   if (!st.hasty) return;
@@ -162,6 +162,8 @@ function stepHasty(s: GameState): void {
   if (bottom.segs[0].hp !== 1) { st.hastyT = 0; return; }
   st.hastyT += 1;
   if (st.hastyT === STAGE.HASTY_TICKS) {
+    st.hasty = false;
+    st.hastyT = 0;
     st.fallG *= STAGE.HASTY_FALL;
     st.fallV *= STAGE.HASTY_FALL;
     st.tally.hastyDrops += 1;

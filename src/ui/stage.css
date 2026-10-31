@@ -53,6 +53,9 @@
 .st-card:active:not(:disabled) { scale: 0.96; }
 .st-card:disabled { color: var(--ink2); border-color: var(--ink3); box-shadow: 4px 5px 0 var(--ink3); }
 .st-id { grid-area: id; font: 700 14px/1 var(--body); color: var(--ink2); }
+/* 보스가 있는 판 = 번호 옆 먹 인장(램프 이름표는 테두리라 겹쳐 읽히지 않는다) */
+.st-boss { margin-left: 4px; padding: 2px 4px 1px; background: var(--ink); color: var(--paper); font: 700 11px/1 var(--body); font-style: normal; vertical-align: 1px; }
+.st-card:disabled .st-boss { background: var(--ink2); }
 .st-name { grid-area: name; font: 700 16px/1.25 var(--body); }
 /* 난이도 이름표 — 보고서 머리(.st-rname small)와 같은 작은 테두리 상자. 아직 안 깬 판엔 없다 */
 .st-lamp { grid-area: lamp; padding: 3px 6px 2px; border: 2px solid var(--ink); font: 700 13px/1 var(--body); white-space: nowrap; }

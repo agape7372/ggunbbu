@@ -64,6 +64,11 @@ describe('진행', () => {
     for (let i = 0; i < STAGE.HASTY_TICKS; i++) advance(s, EMPTY_INPUT);
     expect(s.stage!.fallG).toBeCloseTo(g0 * STAGE.HASTY_FALL);
     expect(s.stage!.tally.hastyDrops).toBe(1); // 2-2 특기 사항(급락 0회)이 이 셈을 읽는다
+    // 급락은 건물당 한 번 — 다음 층이 또 HP1로 남아도 더 빨라지지 않는다(겹치면 ×9였다)
+    s.stack!.floors[0].segs[0].hp = 1;
+    for (let i = 0; i < STAGE.HASTY_TICKS; i++) advance(s, EMPTY_INPUT);
+    expect(s.stage!.fallG).toBeCloseTo(g0 * STAGE.HASTY_FALL);
+    expect(s.stage!.tally.hastyDrops).toBe(1);
   });
 
   it('2-2 특기 사항 = 급락 0회', () => {

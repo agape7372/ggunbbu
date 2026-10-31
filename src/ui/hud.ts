@@ -3,10 +3,11 @@
 // 매 프레임 부르지만 값이 바뀐 칸만 쓴다. 거친 붓 필터는 안 바뀌는 칸(밑줄·일시정지 인장)에만 걸려 있다(style.css).
 
 import type { GameState } from '../core/types';
-import { ACT2, BOSS, CAPTION_MS } from '../config';
+import { ACT2, CAPTION_MS } from '../config';
 import { ACT2_PHASES, BOSS_NAME, CAPTIONS, hudModeLabel, SCREENS } from '../content';
 import { ICON } from './icons';
 import { fmt } from './ink';
+import { executorBar, stageBar, type HudBar } from './stageLogic';
 
 export interface HudApi {
   /** op = 특별작전 한 줄(남은 시간 · 다음 도장). 작전이 아니면 생략 */
@@ -45,7 +46,10 @@ export function mountHud(
       <div class="hud-op" data-el="op" hidden></div>
       <div class="hud-boss" data-el="boss" hidden>
         <span class="hud-boss-label" data-el="boss-label">${BOSS_NAME}</span>
-        <div class="boss-bar"><i class="fill" data-el="boss-fill"></i><svg viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true"><path d="M1 1.5 L99 1 L99.5 13 L.5 13.4 Z"/></svg></div>
+        <div class="boss-row">
+          <div class="boss-bar" data-el="boss-bar"><i class="fill" data-el="boss-fill"></i><svg viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true"><path d="M1 1.5 L99 1 L99.5 13 L.5 13.4 Z"/></svg></div>
+          <b class="boss-end" data-el="boss-end" hidden></b>
+        </div>
       </div>
       <div class="hud-bonus" data-el="bonus" hidden></div>
       <div class="hud-cap" data-el="cap" hidden></div>
@@ -64,6 +68,8 @@ export function mountHud(
   const bossWrap = el('boss');
   const bossFill = el('boss-fill');
   const bossLabel = el('boss-label');
+  const bossBar = el('boss-bar');
+  const bossEnd = el('boss-end');
   const bonusEl = el('bonus');
   const capEl = el('cap');
   const pinEl = el('pin');
@@ -166,17 +172,22 @@ export function mountHud(
         capEl.hidden = !cap;
       }
 
-      if (s.boss && s.act2Phase === 'moon') {
-        const key = `${s.boss.hp}`;
-        if (lastBoss !== key) {
-          lastBoss = key;
-          bossWrap.hidden = false;
-          bossLabel.textContent = `${BOSS_NAME} ${s.boss.hp}`;
-          bossFill.style.transform = `scaleX(${Math.max(0, s.boss.hp) / BOSS.HP})`;
+      // 위 막대 — 스테이지는 진행(대본 칸 · 보스 남은 몸), 아케이드는 2막 달의 집행기 체력
+      let bar: HudBar | null = null;
+      if (s.stage) bar = stageBar(s);
+      else if (s.boss && s.act2Phase === 'moon') bar = executorBar(s.boss.hp);
+      const barKey = bar ? `${bar.label}|${bar.fill}|${bar.n}|${bar.end}` : '';
+      if (barKey !== lastBoss) {
+        lastBoss = barKey;
+        bossWrap.hidden = !bar; // 막대가 서면 작전 한 줄이 그 밑으로 내려간다(style.css :has)
+        if (bar) {
+          bossLabel.textContent = bar.label;
+          bossFill.style.transform = `scaleX(${bar.fill})`;
+          bossBar.classList.toggle('notched', bar.n > 1);
+          bossBar.style.setProperty('--n', String(bar.n));
+          bossEnd.hidden = !bar.end;
+          bossEnd.textContent = bar.end;
         }
-      } else if (!bossWrap.hidden) {
-        bossWrap.hidden = true;
-        lastBoss = '';
       }
 
       if (s.mode === 'bonus' && s.bonus) {

@@ -17,15 +17,15 @@ function clone(s: GameState): GameState {
   return structuredClone(s);
 }
 
-/** first를 누르고 then을 따르면 HORIZON 동안 목숨 · 안전모를 지키나 */
-function safe(s0: GameState, first: InputFrame, then: InputFrame): boolean {
+/** first를 누르고 (wait틱 손을 놓았다가) then을 따르면 HORIZON 동안 목숨 · 안전모를 지키나 */
+function safe(s0: GameState, first: InputFrame, then: InputFrame, wait = 0): boolean {
   const c = clone(s0);
   const lives = c.lives;
   const hat = c.hat;
   advance(c, first);
   c.events.length = 0;
-  for (let t = 1; t < HORIZON && !c.over; t++) {
-    advance(c, c.player.pose === 'pinned' ? GUARD : then);
+  for (let t = 1; t < HORIZON + wait && !c.over; t++) {
+    advance(c, c.player.pose === 'pinned' ? GUARD : t <= wait ? EMPTY_INPUT : then);
     c.events.length = 0;
   }
   return c.lives === lives && c.hat === hat && c.player.pose !== 'pinned' && c.over !== 'gameover';
@@ -38,13 +38,13 @@ function threat(s: GameState): boolean {
   return s.entities.some((e) => (e.kind === 'rock' && !e.remnant && e.y < 360) || (e.kind === 'bolt' && e.cueTicks <= 0) || e.kind === 'shot');
 }
 
-/** 베고 나서 막을 수 있으면 벤다 → 지금 막아야 하면 막는다 → 계속 베야 살면 벤다 */
-function generic(s: GameState): InputFrame {
+/** 베고 나서 막을 수 있으면 벤다 → 지금 막아야 하면 막는다 → 계속 베야 살면 벤다. wait = 막기까지 걸리는 반응 여유(사람 대역) */
+function generic(s: GameState, wait = 0): InputFrame {
   const pose = s.player.pose;
   // 베는 중 · 필살 중 · 가드 깨짐은 입력이 안 먹는다 — 다음 결정은 풀린 틱에
   if (pose === 'attack' || pose === 'special' || pose === 'guardBreak') return EMPTY_INPUT;
   if (!threat(s)) return ATTACK;
-  if (safe(s, ATTACK, GUARD)) return ATTACK;
+  if (safe(s, ATTACK, GUARD, wait)) return ATTACK;
   if (safe(s, GUARD, GUARD)) return GUARD;
   if (safe(s, ATTACK, ATTACK)) return ATTACK;
   return s.stack && s.stack.y < 80 ? GUARD : ATTACK;
@@ -100,6 +100,22 @@ function planCrane(s: GameState): Plan | null {
   return null;
 }
 
+/** 짐 하나에 땅 가드로 거는 창 — 층을 c개 덜고 g틱 뒤 막아 걸리는 g를 모은다(사람이 맞출 틈이 몇 틱인가) */
+export function craneWindows(s: GameState): string {
+  const n = s.stack!.floors.length;
+  const out: string[] = [];
+  for (let cuts = 0; cuts < n; cuts++) {
+    const ok: number[] = [];
+    for (let g = 0; g <= 70; g++) if (tryCrane(s, cuts, g, -1)) ok.push(g);
+    if (ok.length) out.push(`${cuts}층 덜고 ${ok.length}틱(${ok[0]}~${ok[ok.length - 1]})`);
+    // 점프하자마자 가드를 쥐고 있는 사람 — 뛰는 틱 j의 틈
+    const jok: number[] = [];
+    for (let j = 0; j <= 50; j++) if (tryCrane(s, cuts, j + 1, j)) jok.push(j);
+    if (jok.length) out.push(`${cuts}층 덜고 점프 ${jok.length}틱(${jok[0]}~${jok[jok.length - 1]})`);
+  }
+  return out.join(' · ') || '없음';
+}
+
 // ── 종탑 고수 길: 종마다 「공중 가드로 꽂기」 계획을 복제로 찾는다 ──
 let bellPlan: { stack: unknown; start: number; inputs: InputFrame[] | null } | null = null;
 
@@ -140,7 +156,7 @@ function bellExpert(s: GameState): InputFrame {
 /** 크레인 계획 기록 — 짐마다 몇 층 베고 언제 막았나(공략 자료) */
 export const craneLog: string[] = [];
 
-export function stageBot(s: GameState): InputFrame {
+export function stageBot(s: GameState, wait = 0): InputFrame {
   const p = s.player;
   if (p.pose === 'pinned') return GUARD;
   const lm = s.lm;
@@ -150,7 +166,7 @@ export function stageBot(s: GameState): InputFrame {
     if (lm.st === 'slam') return GUARD;
     if (lm.st === 'sit') return ATTACK;
     // 종은 안 벤다(특기 사항) — 늦기 전에 지면 가드로 쳐 올린다
-    if (st && st.vy < 0 && !safe(s, EMPTY_INPUT, GUARD)) return GUARD;
+    if (st && st.vy < 0 && !safe(s, EMPTY_INPUT, GUARD, wait)) return GUARD;
     if (st && st.vy < 0 && st.y <= 56 && p.y <= 0) return GUARD;
     return EMPTY_INPUT;
   }
@@ -158,7 +174,7 @@ export function stageBot(s: GameState): InputFrame {
     // 마지막 숨(3막): 들숨엔 앉은 몸 밑면이 땅 사거리 밖이다. 기본 봇은 뛰지 않고 날숨에 내려온 몸만 벤다(뛰어 베기는 체공이 길어 오히려 느리다 — 실측. 숙련 봇도 바람탑에선 같은 봇이다)
     if (lm.st === 'sit') return ATTACK;
     // 좌판은 안 벤다 — 낮게 오면 받는다. 날숨이면 역풍, 들숨이면 탑에 튕겨 다시 온다
-    if (st && st.vy < 0 && !safe(s, EMPTY_INPUT, GUARD)) return GUARD;
+    if (st && st.vy < 0 && !safe(s, EMPTY_INPUT, GUARD, wait)) return GUARD;
     if (st && p.y <= 0 && st.vy < 0 && st.y <= 56) return GUARD;
     return EMPTY_INPUT;
   }
@@ -173,7 +189,7 @@ export function stageBot(s: GameState): InputFrame {
       const sd = s.stage!.diff;
       craneLog.push(`${['견습', '정규', '외주'][sd]} 짐${lm.wave}(${st.floors.length}층): ${plan ? plan.how : '해법 없음'}`);
     }
-    return cranePlan.inputs?.[s.tick - cranePlan.start] ?? generic(s);
+    return cranePlan.inputs?.[s.tick - cranePlan.start] ?? generic(s, wait);
   }
 
   if (lm?.id === 'pagoda' && st) {
@@ -182,11 +198,11 @@ export function stageBot(s: GameState): InputFrame {
     // 땅의 더미는 필살로 치운다(2막 당김) — 더미가 있으면 뛰지 않는다(착지 = 깔림)
     if (s.groundRocks > 0 && s.wazaGauge >= WAZA_GAUGE.COST && p.pose !== 'special') return SPECIAL;
     if (!tiles && p.y <= 0 && st.y > 70 && s.groundRocks === 0) return JUMP;
-    if (tiles) return generic(s);
+    if (tiles) return generic(s, wait);
     return ATTACK;
   }
 
-  return generic(s);
+  return generic(s, wait);
 }
 
 /** 숙련 봇 — 떨어지는 건물을 점프로 마중 나가 공중에서 벤다. 전임자 기록의 근거(보스판은 기본 봇과 같다) */
@@ -201,6 +217,40 @@ export function expertBot(s: GameState): InputFrame {
   if (!hazards && st && !st.resting && p.y <= 0 && pose === 'idle' && st.y > 90 && st.y < 480 && safe(s, JUMP, ATTACK)) return JUMP;
   if (p.y > 0 && !hazards) return safe(s, ATTACK, GUARD) || !safe(s, GUARD, GUARD) ? ATTACK : GUARD;
   return generic(s);
+}
+
+/**
+ * 사람 대역 — delay틱 전 모습을 보고 기본 봇처럼 고른다(반응 지연). 베기는 tap틱에 한 번까지.
+ * 깔리면 보지 않고 가드를 누른다. 「몇 틱 늦게 봐도 깨나」로 판마다 사람에게 맞는 어려움을 잰다(기한과는 다른 자).
+ * 가드는 누른 결과가 보일 때까지(delay틱) 떼지 않고, 그 뒤에도 가까이 내려오는 건물 · 기와가 보이면 계속 누른다.
+ * 기본 봇은 막기 직전까지 베는 욕심쟁이다. 사람은 늦게 보는 만큼 일찍 막는다 — 「베고 margin틱 뒤에 막아도 사나」로 고른다.
+ * 내 몸은 늦지 않게 안다 — 베는 중이면 기다리고, 다 벤 뒤엔 옛 화면 속 내 몸도 풀린 것으로 본다.
+ */
+export function humanBot(delay: number, tap = 8, margin = delay): (s: GameState) => InputFrame {
+  const seen: GameState[] = [];
+  let lastAttack = -Infinity;
+  let guardFrom = -Infinity;
+  return (s) => {
+    seen.push(clone(s));
+    if (seen.length > delay + 1) seen.shift();
+    const p = s.player;
+    if (p.pose === 'pinned') return GUARD;
+    if (p.pose === 'attack' || p.pose === 'special' || p.pose === 'guardBreak') return EMPTY_INPUT;
+    let old = seen[0];
+    if (old.player.pose === 'attack') { old = clone(old); old.player.pose = 'idle'; old.player.poseTick = 0; }
+    const near = (old.stack && old.stack.vy <= 0 && old.stack.y < 120)
+      || old.entities.some((e) => e.kind === 'rock' && !e.remnant && e.y < 240);
+    if (s.tick - guardFrom < delay || (p.pose === 'guardG' && near)) return GUARD;
+    // 집행기 돌진은 예고를 보면 미리 쥐고 기다린다
+    const st = old.boss?.st;
+    if (st === 'telegraph' || st === 'descend' || st === 'charging') return GUARD;
+    const f = stageBot(old, margin);
+    if (f.guard) { guardFrom = s.tick; return f; }
+    if (!f.attack) return f;
+    if (s.tick - lastAttack < tap) return EMPTY_INPUT;
+    lastAttack = s.tick;
+    return f;
+  };
 }
 
 export interface BotRun {

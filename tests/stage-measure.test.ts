@@ -10,9 +10,9 @@ import type { GameState, InputFrame } from '../src/core/types';
 import { makeState, advance } from '../src/core/sim';
 import { stageSeed, startStage, judgeStage, stageScript } from '../src/core/stage';
 import { STAGES } from '../src/core/stages';
-import { LANDMARK } from '../src/config';
+import { LANDMARK, STAGE } from '../src/config';
 import { lmAct } from '../src/core/landmark';
-import { craneLog, expertBot, fmtTicks, runStage, stageBot } from './stageBot';
+import { craneLog, craneWindows, expertBot, fmtTicks, humanBot, runStage, stageBot } from './stageBot';
 
 function cause(s: GameState): string {
   const ev = s.events;
@@ -23,30 +23,96 @@ function cause(s: GameState): string {
   return s.player.pose;
 }
 
+/** TWEAK='{"2-1":{"speed":0.1},"STAGE":{"FAST_SPEED_ADD":0.15}}' — 판 데이터 · STAGE 상수를 이 실행에서만 바꿔 본다(대본은 첫 판을 돌리기 전에만) */
+function tweak(): void {
+  const t = JSON.parse(process.env.TWEAK ?? '{}') as Record<string, object>;
+  for (const [k, v] of Object.entries(t)) Object.assign(k === 'STAGE' ? STAGE : STAGES.find((d) => d.id === k)!, v);
+}
+
 describe.skipIf(!process.env.TRACE)('추적', () => {
   it(String(process.env.TRACE), { timeout: 600_000 }, () => {
+    tweak();
     const id = String(process.env.TRACE);
     const diff = Number(process.env.DIFF ?? 1) as 0 | 1 | 2;
     const s = makeState({ seed: stageSeed(id) });
-    startStage(s, { id, diff, weapon: 'sword', waza: 'tenchi' });
+    startStage(s, { id, diff, weapon: 'sword', waza: 'tenchi', fromBoss: !!process.env.FROMBOSS });
+    // DELAY=12 TAP=8 → 사람 대역으로 따라간다
+    const policy = process.env.DELAY ? humanBot(Number(process.env.DELAY), Number(process.env.TAP ?? 8)) : stageBot;
     const out: string[] = [];
     let last = '';
     while (!s.over && s.tick < Number(process.env.TICKS ?? 1500)) {
-      const f = stageBot(s);
+      const f = policy(s);
       advance(s, f);
       const st = s.stack;
       const top = st ? st.y + st.floors.reduce((a, x) => a + x.h, 0) : 0;
       const lm = s.lm;
-      const key = `${lm?.st}/${lm?.air}/${st ? st.floors.length : '-'}/${s.player.pose}`;
+      const key = `${lm?.st}/${lm?.air}/${st ? st.floors.map((x) => x.segs[0].hp).join('') : '-'}/${s.player.pose}`;
       const ev = s.events.map((e) => e.kind).filter((k) => k !== 'slash').join(',');
       if (key !== last || ev) {
-        out.push(`${s.tick} ${key} y${st?.y.toFixed(0)} vy${st?.vy.toFixed(0)} top${top.toFixed(0)} k${lm?.k} w${lm?.wave}/f${lm?.body?.floors.length ?? "-"}/n${lm?.n}/g${lm?.got}/x${lm?.x} p${s.player.y.toFixed(0)} g${s.guardGauge.toFixed(0)} in${f.attack ? 'A' : ''}${f.guard ? 'G' : ''}${f.jump ? 'J' : ''} ${ev}`);
+        out.push(`${s.tick} 걸음${s.stage?.step} ${key} y${st?.y.toFixed(0)} vy${st?.vy.toFixed(0)} top${top.toFixed(0)} k${lm?.k} w${lm?.wave}/f${lm?.body?.floors.length ?? "-"}/n${lm?.n}/g${lm?.got}/x${lm?.x} p${s.player.y.toFixed(0)} g${s.guardGauge.toFixed(0)} in${f.attack ? 'A' : ''}${f.guard ? 'G' : ''}${f.jump ? 'J' : ''} ${ev}`);
         last = key;
       }
       s.events.length = 0;
     }
     console.log(out.slice(0, Number(process.env.LINES ?? 200)).join('\n'));
     console.log(craneLog.join('\n'));
+  });
+});
+
+// 크레인 창 — 짐마다 땅 가드로 걸 수 있는 틈(틱). 사람은 몇 틱짜리 틈을 맞추나:
+//   CRANE=1 DIFFS=0,1 npx vitest run tests/stage-measure.test.ts -t 크레인
+describe.skipIf(!process.env.CRANE)('크레인 창', () => {
+  it('짐마다 거는 틈', { timeout: 600_000 }, () => {
+    for (const diff of (process.env.DIFFS ?? '0,1,2').split(',').map(Number) as (0 | 1 | 2)[]) {
+      let wave = -1;
+      runStage('4-B', diff, {
+        policy: (s) => {
+          const lm = s.lm;
+          if (lm?.id === 'crane' && s.stack && lm.air !== 0 && lm.wave !== wave) {
+            wave = lm.wave;
+            console.log(`${['견습', '정규', '외주'][diff]} ${lmAct(s)}막 짐${wave}(${s.stack.floors.length}층): ${craneWindows(s)}`);
+          }
+          return stageBot(s);
+        },
+      });
+    }
+  });
+});
+
+// 사람 대역 — 반응 지연(틱) × 베기 간격(틱)을 바꿔 가며 몇 번 깨나. 봇 하나의 한 판은 박자 운이 커서 비율로 본다.
+//   HUMAN=1 DIFFS=0,1 npx vitest run tests/stage-measure.test.ts -t 사람   (ONLY · DELAYS=6,8,10,12,14,16 · TAPS=8,10,12 · MARGIN=1 = 막기 여유 ÷ 지연 · FROMBOSS=1 = 보스 연습)
+//   TWEAK=… 로 값을 바꿔 본다(tweak 주석)
+describe.skipIf(!process.env.HUMAN)('사람 대역', () => {
+  it('사람 대역이 깨는 비율', { timeout: 3_600_000 }, () => {
+    tweak();
+    const only = process.env.ONLY?.split(',');
+    const diffs = (process.env.DIFFS ?? '1').split(',').map(Number) as (0 | 1 | 2)[];
+    const delays = (process.env.DELAYS ?? '6,8,10,12,14,16').split(',').map(Number);
+    const taps = (process.env.TAPS ?? '8,10,12').split(',').map(Number);
+    for (const d of STAGES) {
+      if (only && !only.includes(d.id)) continue;
+      for (const diff of diffs) {
+        const total = stageScript(d.id).length;
+        let ok = 0;
+        let lost = 0;
+        const fails = new Map<string, number>();
+        for (const delay of delays) {
+          for (const tap of taps) {
+            const r = runStage(d.id, diff, { policy: humanBot(delay, tap, Math.round(delay * Number(process.env.MARGIN ?? 1))), fromBoss: !!process.env.FROMBOSS });
+            const st = r.s.stage!;
+            if (r.result.cleared) { ok += 1; lost += st.tally.lifeLost; continue; }
+            const at = `${st.phase === 'boss' ? '보스' : `${st.step}/${total}`}${r.s.over === 'gameover' ? '' : ' 시간'}`;
+            fails.set(at, (fails.get(at) ?? 0) + 1);
+          }
+        }
+        const n = delays.length * taps.length;
+        const top = [...fails].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, c]) => `${k}×${c}`).join(' ');
+        const line = `${d.id.padEnd(3)} ${['견습', '정규', '외주'][diff]} ${String(ok).padStart(2)}/${n}`
+          + (ok ? ` 사고 ${(lost / ok).toFixed(1)}` : '') + (top ? ` | 실패 ${top}` : '');
+        console.log(line);
+        if (process.env.OUT) appendFileSync(process.env.OUT, line + '\n');
+      }
+    }
   });
 });
 

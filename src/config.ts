@@ -419,13 +419,13 @@ export const STAGE = {
   JOINED_GAP: 8,           // 대본 「>」 — 붙어 오기
   BEAT: 30,                // 대본의 쉼 「.」 한 박
   HASTY_TICKS: 45,         // 대본 「~」 — 최하층이 HP1로 이만큼 남으면 급락
-  HASTY_FALL: 3,           // 급락 낙하 배율(G · Vterm)
+  HASTY_FALL: 2,           // 급락 낙하 배율(G · Vterm), 건물당 한 번. 3이면 꼭대기에서 0.4초 만에 닿아 사람이 못 받았다(11-01)
   // 낙하 단계 speed 0~1 → 1막 곡선의 양 끝(p 0 · p 1)을 선형으로 잇는다. pow를 안 써서 기기마다 같은 값이 나온다
   G: [1530, 3400] as const,
   VTERM: [238, 714] as const,
   SPAWN_VY: -70,           // 1막 기본 초속
   FAST_SPAWN_VY: -120,     // 대본 「!」 = 궤도 직하 초속 + 한 단계 빠르게
-  FAST_SPEED_ADD: 0.25,
+  FAST_SPEED_ADD: 0.1,     // 「!」 한 단계. 0.25면 2-1이 1-2의 다섯 배 속도(0.1 → 0.5)로 뛰었다(11-01)
   ROCK_SPACING: 150,       // 「R4」 화산탄 사이 높이 간격(px) — 같이 떨어지되 한 대씩 벨 틈
   BOLT_STAGGER: 12,        // 「Z3」 번개 큐 시차(틱) — 보스 riseBolt9와 같은 박
   /** 난이도 0 견습 · 1 정규 · 2 외주. gap·fall은 배율, cue는 번개 예고에 더하는 틱 */

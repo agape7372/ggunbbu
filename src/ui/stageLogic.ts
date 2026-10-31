@@ -3,7 +3,7 @@
 
 import { BOSS_NAME } from '../content';
 import { REJECT, STAGE_MODE, STAGE_TEXT, fmtGap, fmtStageTime, stageOutro } from '../content/stages';
-import { LANDMARK } from '../config';
+import { BOSS, LANDMARK } from '../config';
 import { lmAct } from '../core/landmark';
 import { stageDef, stageScript, type StageResult } from '../core/stage';
 import { STAGES } from '../core/stages';
@@ -37,16 +37,48 @@ export function workProgress(id: string, step: number): { done: number; total: n
   return { done: steps.slice(0, step).filter(isWork).length, total: steps.filter(isWork).length };
 }
 
-/** 판 위 한 줄 — 「1-1 회랑 3번지 · 0:12.34 · 3/7」. 총 걸음이 0(대본이 빈 보스판)이면 걸음을 뺀다 */
-export function stageHudLine(o: { id: string; ticks: number; step: number; total: number }): string {
-  const parts = [`${o.id} ${STAGE_TEXT[o.id]?.name ?? ''}`.trim(), fmtStageTime(o.ticks)];
-  if (o.total > 0) parts.push(`${Math.min(o.step, o.total)}/${o.total}`);
-  return parts.join(' · ');
+/** 판 위 한 줄 — 「1-1 회랑 3번지 · 0:12.34」. 걸음 수는 진행 막대(stageBar)가 보인다 */
+export function stageHudLine(o: { id: string; ticks: number }): string {
+  const head = `${o.id} ${STAGE_TEXT[o.id]?.name ?? ''}`.trim();
+  return `${head} · ${fmtStageTime(o.ticks)}`;
 }
 
 /** 명물 이름 — 집행기는 자기 이름이 따로 있다 */
 export function bossName(id: string): string {
   return stageDef(id).boss === 'executor' ? BOSS_NAME : (STAGE_TEXT[id]?.name ?? '');
+}
+
+/** 위 막대 한 칸 — n = 금 그을 칸 수(0이면 통 막대), end = 막대 끝 이름표(없으면 '') */
+export interface HudBar { label: string; fill: number; n: number; end: string }
+
+const BODY = { bell: LANDMARK.BELL, wind: LANDMARK.WIND, pagoda: LANDMARK.PAGODA, crane: LANDMARK.CRANE } as const;
+
+/** 집행기 체력 막대 — 아케이드 2막 달과 본사 보스 단계가 같이 쓴다 */
+export function executorBar(hp: number): HudBar {
+  return { label: `${BOSS_NAME} ${hp}`, fill: Math.max(0, hp) / BOSS.HP, n: 0, end: '' };
+}
+
+/**
+ * 판 위 진행 막대 — 대본 중엔 나온 걸음이 칸으로 차고, 끝 이름표가 다음에 올 것을 알린다(보스 이름 · 끝).
+ * 보스 중엔 남은 몸이 준다: 명물은 층 칸 위 남은 내구, 집행기는 체력.
+ */
+export function stageBar(s: GameState): HudBar | null {
+  const st = s.stage;
+  if (!st) return null;
+  if (st.phase === 'script') {
+    const w = workProgress(st.id, st.step);
+    if (w.total === 0) return null;
+    const end = stageDef(st.id).boss ? bossName(st.id) : STAGE_MODE.barEnd;
+    return { label: `${w.done}/${w.total}`, fill: w.done / w.total, n: w.total, end };
+  }
+  if (st.phase !== 'boss') return null;
+  if (s.boss) return executorBar(s.boss.hp);
+  const lm = s.lm;
+  const body = lm?.body ?? s.stack; // 구층탑은 몸이 s.stack이다
+  if (!lm || !body) return null;
+  const { FLOORS, HP } = BODY[lm.id];
+  const left = body.floors.reduce((a, f) => a + Math.max(0, f.segs[0]?.hp ?? 0), 0);
+  return { label: bossName(st.id), fill: Math.min(1, left / (FLOORS * HP)), n: FLOORS, end: '' };
 }
 
 /** 못 깬 판의 진척 — 대본 중이면 걸음, 명물 앞이면 명물 이름 */

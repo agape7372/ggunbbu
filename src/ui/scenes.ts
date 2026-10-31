@@ -1142,12 +1142,7 @@ export function createApp(
 
   /** 판 도중 HUD 한 줄 — 작전이 아니면 '' */
   function opHud(s: GameState): string {
-    if (stageRun && s.stage) {
-      const w = workProgress(stageRun.id, s.stage.step);
-      return stageHudLine({
-        id: stageRun.id, ticks: s.stage.clearTick || s.tick, step: w.done, total: w.total,
-      });
-    }
+    if (stageRun && s.stage) return stageHudLine({ id: stageRun.id, ticks: s.stage.clearTick || s.tick });
     if (!opRun) return '';
     const remain = Math.max(0, Math.ceil((opLimitTicks(opRun.id) - s.tick) / 60));
     return SCREENS.ops.hud(opRun.id, remain, opNow(s));

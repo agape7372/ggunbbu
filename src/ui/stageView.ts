@@ -4,7 +4,7 @@
 
 import './stage.css';
 import { REGIONS, STAGE_MODE, STAGE_TEXT, fmtStageTime } from '../content/stages';
-import { STAGES } from '../core/stages';
+import { STAGES, type StageDef } from '../core/stages';
 import type { StageDiff } from '../core/types';
 import { STAMP_KEYS, diffUnlocked, hasStamp, recordOf, stageUnlocked, type StageRecord } from '../meta/stageRecord';
 import { escapeHtml as esc } from './html';
@@ -49,7 +49,8 @@ function pips(bits: number): string {
     STAMP_KEYS.map((k) => `<i${hasStamp(bits, k) ? ' class="on"' : ''}></i>`).join('')}</span>`;
 }
 
-function cardHtml(o: StageListOpts, id: string, i: number): string {
+function cardHtml(o: StageListOpts, d: StageDef, i: number): string {
+  const id = d.id;
   const rec = recordOf(o.recs, id);
   const open = isOpen(o, id);
   const name = STAGE_TEXT[id]?.name ?? '';
@@ -57,7 +58,7 @@ function cardHtml(o: StageListOpts, id: string, i: number): string {
     ? `${pips(rec.stamps)}${rec.best > 0 ? `<b class="st-best">${fmtStageTime(rec.best)}</b>` : ''}`
     : `<small class="st-lock">${STAGE_MODE.locked}</small>`;
   return `<button type="button" class="st-card" data-st="open" data-id="${id}" style="--i:${i}"${open ? '' : ' disabled'}>
-    <span class="st-id">${esc(id)}</span><b class="st-name">${esc(name)}</b>${open ? lampTag(rec.lamp) : ''}
+    <span class="st-id">${esc(id)}${d.boss ? ` <i class="st-boss">${STAGE_MODE.bossTag}</i>` : ''}</span><b class="st-name">${esc(name)}</b>${open ? lampTag(rec.lamp) : ''}
     <span class="st-sub">${bottom}</span>
   </button>`;
 }
@@ -70,7 +71,7 @@ function listHtml(o: StageListOpts): string {
     const last = defs[defs.length - 1];
     // 명물 판을 깼으면 목록이 바뀐 세계를 비춘다
     const lines = last && recordOf(o.recs, last.id).lamp > 0 ? rg.after : rg.start;
-    const cards = defs.map((d) => cardHtml(o, d.id, i++)).join('');
+    const cards = defs.map((d) => cardHtml(o, d, i++)).join('');
     return `<section class="st-region"><h3 class="op-h st-rh">${esc(rg.name)}</h3>
       <p class="st-lines">${dropName(lines, rg.name).map((l) => `<span>${esc(l)}</span>`).join('')}</p>
       <div class="st-cards">${cards}</div></section>`;

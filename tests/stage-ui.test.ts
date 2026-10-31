@@ -1,12 +1,15 @@
 // 작업 지시서 화면의 순수 셈 — 사유 고르기 · HUD 줄 · 진척 · 보고서 한 장 · 일지 합계. 그리기는 화면 검수.
 import { describe, expect, it } from 'vitest';
 import { STAGES } from '../src/core/stages';
-import { stageDef, type StageResult } from '../src/core/stage';
+import { stageDef, startStage, type StageResult } from '../src/core/stage';
+import { advance, makeState } from '../src/core/sim';
+import { EMPTY_INPUT, type GameState } from '../src/core/types';
+import { BOSS, LANDMARK, STAGE } from '../src/config';
 import { fmtStageTime } from '../src/content/stages';
 import { runStage } from './stageBot';
 import { emptyRecord, mergeResult, stampBits } from '../src/meta/stageRecord';
 import {
-  bossName, endView, masterLine, pickReason, progressText, stageHudLine, stampTotals, workProgress,
+  bossName, endView, masterLine, pickReason, progressText, stageBar, stageHudLine, stampTotals, workProgress,
 } from '../src/ui/stageLogic';
 
 const ALL = { done: true, safe: true, inTime: true, secret: true, master: true };
@@ -36,9 +39,25 @@ describe('반려 사유', () => {
 });
 
 describe('판 위 한 줄과 진척', () => {
-  it('「id 이름 · 시간 · 걸음」, 대본이 빈 보스판은 걸음을 뺀다', () => {
-    expect(stageHudLine({ id: '1-1', ticks: 12 * 60, step: 3, total: 7 })).toBe('1-1 회랑 3번지 · 0:12.00 · 3/7');
-    expect(stageHudLine({ id: '1-B', ticks: 90, step: 0, total: 0 })).toBe('1-B 종탑 · 0:01.50');
+  it('「id 이름 · 시간」 — 걸음 수는 진행 막대가 보인다', () => {
+    expect(stageHudLine({ id: '1-1', ticks: 12 * 60 })).toBe('1-1 회랑 3번지 · 0:12.00');
+    expect(stageHudLine({ id: '1-B', ticks: 90 })).toBe('1-B 종탑 · 0:01.50');
+  });
+
+  it('진행 막대: 대본 중엔 걸음 칸이 차고 끝 이름표가 다음을 알린다, 보스 중엔 남은 몸이 준다', () => {
+    const at = (id: string, fromBoss = false, ticks = 0): GameState => {
+      const s = makeState({ seed: 1 });
+      startStage(s, { id, diff: 1, weapon: 'sword', waza: 'tenchi', fromBoss });
+      for (let i = 0; i < ticks; i++) advance(s, EMPTY_INPUT);
+      return s;
+    };
+    const total = workProgress('2-1', 0).total;
+    expect(stageBar(at('2-1'))).toEqual({ label: `0/${total}`, fill: 0, n: total, end: '끝' });
+    expect(stageBar(at('2-1', false, STAGE.FIRST_WAIT + 2))?.label).toBe(`1/${total}`); // 첫 건물이 나오면 한 칸
+    expect(stageBar(at('HQ'))?.end).toBe(bossName('HQ')); // 본사는 끝에 집행기가 있다
+    const bell = stageBar(at('1-B', false, 2))!;
+    expect(bell).toMatchObject({ label: '종탑', fill: 1, n: LANDMARK.BELL.FLOORS, end: '' });
+    expect(stageBar(at('HQ', true, 2))).toMatchObject({ label: `${bossName('HQ')} ${BOSS.HP}`, fill: 1, n: 0 });
   });
 
   it('걸음 셈은 쉼을 뺀다 — 보스 아닌 판은 총 걸음 = 봇이 깬 판의 splits 수, 1-2는 건물 9채', () => {
