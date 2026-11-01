@@ -9,7 +9,7 @@ import type { DebrisPiece, FallingStack, GameState, JuiceEvent } from '../core/t
 import {
   AUDIO, BOSS, CAMERA, COMBO_MARK, COSMETIC_COLORS, DEBRIS, HAT_FX, JUICE, JUICE_SYS, PALETTE, PLAYER, SCORE, SEAL_INK, STACK, VIEW, WEAPON,
 } from '../config';
-import { brushLine, enso, inkDrop } from './ink';
+import { brushLine, enso, inkDrop, PRESS } from './ink';
 import { onomatoFor, ITEM_COPY, destroyedCaption } from '../content';
 import {
   initSprites, drawPlayer, drawHat, drawMask, drawStack, drawBoss, drawEntity, hardHat, hatSpot,
@@ -21,13 +21,15 @@ import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
 import { vibrate } from '../platform/native';
 import {
-  drawBackEffects, drawEffects, resetEffects, setSlashColor, spawnBellClang, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,
+  drawBackEffects, drawEffects, pointInk, resetEffects, setSlashColor, spawnBellClang, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,
 } from './effects';
 import {
   drawBell, drawLandmarkBack, drawLandmarkFront, hastyShakeX, isBellStack, noteBellBreak, resetLandmarkFx, shatterBody,
 } from './landmarkFx';
 import { bladeAura, drawBladeFx } from './bladeFx';
-import { drawWazaTitle, drawWazaWorld, resetWazaShow, startWazaShow, stepWazaShow, wazaShowEvent, wazaShowState } from './wazaShow';
+import {
+  drawWazaBack, drawWazaMid, drawWazaTitle, drawWazaWorld, resetWazaShow, startWazaShow, stepWazaShow, takeWazaJolt, wazaShowEvent, wazaShowState,
+} from './wazaShow';
 import { bossBodyHit, introFloorTop, resetBossFx, stepBossFx } from './executor';
 import { addTrauma, defeatSlow, kickPx, pickHaptic, shakePx, shakeSample, type HapticCounters } from './feel';
 import * as fx from './screenfx';
@@ -89,7 +91,8 @@ let popupSeed = 0;
  * 고비(COMBO_MARK.STEPS)마다 효과가 하나씩 는다. 자리는 월드 좌표로 쥐고 그릴 때 카메라를 더한다.
  * age = 마지막 타격 뒤 틱(HOLD + EXIT를 넘기면 접혀서 다음 타격을 기다린다) · burst = 고비 연출 나이(−1 = 없음)
  */
-interface ComboMark { n: number; x: number; y: number; tx: number; ty: number; age: number; burst: number; step: number }
+/** ink = 친 무기의 포인트 색(100부터 붓판 속) */
+interface ComboMark { n: number; x: number; y: number; tx: number; ty: number; age: number; burst: number; step: number; ink: string }
 let mark: ComboMark | null = null;
 const MARK_GONE = COMBO_MARK.HOLD + COMBO_MARK.EXIT;
 /** 끊긴 콤보 — 두 동강 나 떨어지는 숫자. 새 콤보 도장과 따로 논다(끊기자마자 다시 쳐도 끝까지 떨어진다) */
@@ -174,9 +177,12 @@ function reactFlash(e: JuiceEvent): void {
     case 'lifeLost':
       if ((e.n ?? 1) <= 0) onDeath();
       return;
-    case 'special': // 화면을 칠하지 않는다 — 필살의 무게는 wazaShow의 획 · 히트스톱 · 흔들림이 진다(11-01)
+    case 'special': // 필살 번쩍 · 반전 프레임은 wazaShow 박자(wazaCue)가 건다
     case 'wazaHit':
     case 'wazaBurst':
+      return;
+    case 'bossDefeat': // 아이보리 12틱 감쇠(옛 판) — 반전이 같이 서면 반전이 대신한다
+      fx.flash({ color: PALETTE.BG, a: 0.85, ticks: 12 });
       return;
     case 'phaseClear': // 티어 포효 — 공사 테이프 두 줄(번쩍 없이)
       if ((e.n ?? 0) >= 100) fx.startTape();
@@ -237,27 +243,37 @@ function shatterFloor(s: GameState, e: JuiceEvent): void {
   }
 }
 
-/** 완파 붓글씨 — 판 없는 먹 붓글씨 「N층」 + 작은 점수(screenfx). 집중선 · 반전은 11-01 먹 개편으로 걷었다 */
-function reactImpact(e: JuiceEvent): void {
-  if (e.kind !== 'stackDestroy') return;
-  // 버터바(보너스)는 겹 수로 점수가 따로 붙는다 — 일반 건물만 층수·완파 점수 자막.
-  // 모드로는 못 가린다: 마지막 버터바를 부순 틱에 core가 같은 틱 안에서 본편으로 돌아간다
-  const gone = releasing ? releasing.ghost ?? releasing.before : lastStack;
-  if (gone?.variant !== 'butterbar') fx.startCaption(destroyedCaption(e.n ?? 0), `+${SCORE.DESTROY_BONUS.toLocaleString('en-US')}`);
+/** 큰 한 방의 화면 반응(옛 판, 11-01 (5)에 되돌림) — 집중선(완파 · 격파) · 반전(큰 완파 · 격파) · 완파 자막 판. 필살은 wazaShow가 따로 건다 */
+function reactImpact(s: GameState, e: JuiceEvent): void {
+  const headY = VIEW.GROUND_Y - s.player.y - PLAYER.H + smoothCam; // 화면 좌표
+  switch (e.kind) {
+    case 'stackDestroy': {
+      const n = e.n ?? 0;
+      fx.startImpact(VIEW.LANE_X[0], headY, n >= JUICE_SYS.IMPACT_FLOORS);
+      // 버터바(보너스)는 겹 수로 점수가 따로 붙는다 — 일반 건물만 층수·완파 점수 자막.
+      // 모드로는 못 가린다: 마지막 버터바를 부순 틱에 core가 같은 틱 안에서 본편으로 돌아간다
+      const gone = releasing ? releasing.ghost ?? releasing.before : lastStack;
+      if (gone?.variant !== 'butterbar') fx.startCaption(destroyedCaption(n), `+${SCORE.DESTROY_BONUS.toLocaleString('en-US')}`);
+      return;
+    }
+    case 'bossDefeat': fx.startImpact(VIEW.W / 2, VIEW.FIELD_TOP + (VIEW.FIELD_H - VIEW.FIELD_TOP) * 0.45, true); return;
+    default:
+  }
 }
 
 /**
  * 콤보 도장에 타격 하나 — y = 맞은 자리(건물 밑면) 고도. 고비를 넘는 타격이면 그 칸 연출을 켠다.
  * 콤보 100 · 500 밈 자막은 HUD(runCaps)가 판당 한 번 맡는다 — 여기선 판 위 도장만.
  */
-function markHit(n: number, y: number): void {
+function markHit(n: number, y: number, ink: string): void {
   const C = COMBO_MARK;
   n = Math.min(n, SCORE.COMBO_CAP);
   const tx = VIEW.LANE_X[0] + C.DX;
   const ty = VIEW.GROUND_Y - y + C.DY;
   // 보스 입장은 끊김 이벤트 없이 콤보를 0으로 돌린다 — 작아진 수는 새 도장
-  if (!mark || n < mark.n) mark = { n: 0, x: tx, y: ty, tx, ty, age: MARK_GONE, burst: -1, step: -1 };
+  if (!mark || n < mark.n) mark = { n: 0, x: tx, y: ty, tx, ty, age: MARK_GONE, burst: -1, step: -1, ink };
   const m = mark;
+  m.ink = ink;
   if (m.age >= MARK_GONE) { m.x = tx; m.y = ty; } // 접혀 있던 도장은 맞은 자리에서 다시 편다
   m.tx = tx;
   m.ty = ty;
@@ -271,7 +287,7 @@ function markHit(n: number, y: number): void {
     if (prev >= C.STEPS[i].at || n < C.STEPS[i].at) continue;
     m.burst = 0;
     m.step = i;
-    if (i >= 3 && !reduceMotion) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - 4); // 100부터 내리꽂기 — 화면도 툭
+    if (!reduceMotion) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - (2 + 1.5 * i)); // 고비마다 화면도 툭(위로 갈수록 세게)
     return;
   }
 }
@@ -293,7 +309,7 @@ function react(s: GameState, e: JuiceEvent): void {
   if (kick > 0) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - kick);
   reactFlash(e);
   reactBody(e);
-  reactImpact(e);
+  reactImpact(s, e);
   wazaShowEvent(s, e, lastStack);
   // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
   // 필살 한 타 · 터짐은 wazaShow가 그린다(파티클 없음). 필살이 부순 완파도 wazaShow가 갈라 터뜨리니 발밑 공통 완파(조각 · 엔소 · 방울)를 겹치지 않는다
@@ -308,7 +324,7 @@ function react(s: GameState, e: JuiceEvent): void {
   // 콤보 도장 — 콤보를 올린 타격만(층 붕괴는 타격일 때만 combo가 실린다 · 보스 타격은 combo 없이 온다)
   const hitCombo = e.kind === 'hit' || e.kind === 'bossHit' || e.kind === 'wazaHit' ? e.combo ?? s.combo
     : e.kind === 'floorCollapse' || e.kind === 'butterCollapse' ? e.combo : undefined;
-  if (hitCombo !== undefined && hitCombo > 0) markHit(hitCombo, e.y ?? s.player.y + PLAYER.H);
+  if (hitCombo !== undefined && hitCombo > 0) markHit(hitCombo, e.y ?? s.player.y + PLAYER.H, pointInk(s.weapon));
   if (e.kind === 'comboBreak') markBreak(e.combo ?? 0);
   if (e.kind === 'hatGet') hatFx = { t: 0, n: e.combo ?? s.combo };
   // 글자 팝업 (동시 3개 상한) — 먹 붓글씨, 테 · 노랑 · 그림자 없이(불변 13 · 글자 딱지 없음)
@@ -411,6 +427,10 @@ export function consumeEvents(s: GameState): void {
     if (!prelude && evs.some((e) => e.kind === 'special')) beginPrelude(s, evs);
     else playEvents(s, evs);
   }
+  // 필살 박자의 흔들림 · 킥(wazaShow가 쌓아 둔 것)
+  const jolt = takeWazaJolt();
+  if (jolt.shake > 0) trauma = addTrauma(trauma, jolt.shake);
+  if (jolt.kick > 0 && !reduceMotion) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - jolt.kick);
   // 보스 입장은 끊김 이벤트 없이 콤보를 0으로 돌린다 — 떠 있던 수를 조용히 거둔다
   if (s.combo === 0) mark = null;
 }
@@ -494,6 +514,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   drawChapterBackdrop(ctx, s);
   ctx.restore();
   ctx.translate(0, cam);
+  drawWazaBack(ctx, cam); // 필살 암전 — 하늘만(땅은 아래에서 다시 칠한다)
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
   fx.drawGroundLine(ctx);
@@ -539,6 +560,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 접촉 피드백은 core가 발행하는 headBonk 이벤트(먼지·소리·진동)가 진다.
   // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2).
   // 필살 무적이 그 구간으로 내려와도 필살 연출이 도는 동안은 통짜(긴 필살의 터짐 순간에 졸라맨이 꺼지지 않게)
+  drawWazaMid(ctx); // 필살 달 — 건물 위, 졸라맨 아래(졸라맨이 달을 등지고 선다)
   const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES && !wazaShowState();
   setPlayerWeapon(s.weapon);
   bladeAura(s); // 대검 칼 기운 — 지금 포즈의 칼날에서
@@ -757,9 +779,9 @@ const LABEL_FONT = `700 ${COMBO_MARK.LABEL_PX - 2}px "Gunbbu Mono", "Gunbbu Sans
 const markPx = (n: number): number => COMBO_MARK.PX * (1 + (COMBO_MARK.GROW * Math.min(n, 500)) / 500);
 /** 지나온 고비 수 — 10부터 기울고 30부터 먹 그림자 */
 const markTier = (n: number): number => COMBO_MARK.STEPS.filter((st) => n >= st.at).length;
-/** 도장 높이(화면) — 필드 위아래 끝에 걸리면 안으로 민다(밑엔 이름표 자리까지) */
+/** 도장 높이(화면) — 위는 HUD 막대 줄 밑, 아래는 이름표 자리까지 안으로 민다 */
 const markScreenY = (y: number, cam: number, px: number): number =>
-  Math.max(VIEW.FIELD_TOP + px * 0.5 + 6, Math.min(VIEW.FIELD_H - px * 0.5 - COMBO_MARK.LABEL_PX - 10, y + cam));
+  Math.max(COMBO_MARK.TOP + px * 0.5, Math.min(VIEW.FIELD_H - px * 0.5 - COMBO_MARK.LABEL_PX - 10, y + cam));
 const hatFlying = (): boolean => !reduceMotion && hatFx !== null && hatFx.t < HAT_FX.LAND;
 
 /**
@@ -816,8 +838,22 @@ function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
   }
   if (k >= 0) drawBurstBack(ctx, k, t, x, y, px);
   ctx.translate(x + jx, y + dy);
+  if (!reduceMotion) ctx.rotate((m.n % 2 ? 1 : -1) * C.TILT * pu); // 칠 때마다 번갈아 기울었다 선다
   ctx.scale(sc, sc);
   const seal = m.n >= 500;
+  // 붓판 — 10부터 숫자 밑 붓 한 획, 50부터 숫자 뒤 굵은 먹 획(숫자는 한지색), 100부터 그 속에 무기 포인트 색. 칠 때마다 3틱에 다시 긋는다
+  const board = !seal && tier >= 3;
+  if (!seal && tier >= 1) {
+    const bw = w + 34;
+    const s1 = Math.min(1, (m.age + 1) / 3);
+    ctx.fillStyle = PALETTE.INK;
+    if (board) brushLine(ctx, -bw / 2, 3, bw / 2, -3, px * 0.92, 0, s1, 0.45, m.n % 7, 3, PRESS.yi);
+    else brushLine(ctx, -bw / 2, px * 0.44, bw / 2, px * 0.38, px * 0.17, 0, s1, 0.5, m.n % 7, 2, PRESS.yi);
+    if (board && tier >= 4) {
+      ctx.fillStyle = m.ink;
+      brushLine(ctx, -bw / 2 + 6, px * 0.24, bw / 2 - 4, px * 0.2, px * 0.22, 0, s1, 0.3, m.n % 5, 2, PRESS.yi);
+    }
+  }
   if (seal) {
     // 500부터 주홍 낙관 — 숫자를 한지색으로 뺀다(500 고비엔 숫자와 같이 내리꽂힌다). 테 없이 인주 면만
     const sw = w + 16;
@@ -837,7 +873,7 @@ function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
   ctx.letterSpacing = '0px';
   ctx.font = fx.brushFont(px);
   if (tier >= 1) ctx.transform(1, 0, -0.2, 1, 0, 0); // 앞으로 기운다
-  inkText(ctx, txt, 0, 0, seal ? PALETTE.WHITE : lettersColor, !seal);
+  inkText(ctx, txt, 0, 0, seal || board ? PALETTE.WHITE : lettersColor, !seal && !board);
   ctx.restore();
   if (k >= 0) drawBurstFront(ctx, k, t, x, y, px);
   m.age += 1;
@@ -870,10 +906,12 @@ function slashStroke(ctx: CanvasRenderingContext2D, x: number, y: number, ang: n
 function drawBurstFront(ctx: CanvasRenderingContext2D, k: number, t: number, x: number, y: number, px: number): void {
   const C = COMBO_MARK;
   ctx.save();
-  if (k >= 5 && !reduceMotion && t < 24) {
+  if (k >= 2 && !reduceMotion && t < 24) {
+    // 50부터 숫자 둘레로 먹 방울이 튄다(고비가 클수록 많이)
     ctx.fillStyle = PALETTE.INK;
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + 0.4;
+    const nd = 6 + 2 * k;
+    for (let i = 0; i < nd; i++) {
+      const a = (i / nd) * Math.PI * 2 + 0.4;
       const sp = 3 + (i % 3);
       const d = px * 0.55 + sp * t; // 숫자 가장자리에서 튄다 — 숫자에 묻지 않게
       const f = 1 - t / 24;
@@ -882,7 +920,7 @@ function drawBurstFront(ctx: CanvasRenderingContext2D, k: number, t: number, x: 
     }
   }
   const word = C.STEPS[k].word;
-  const wpx = 26 + 2 * k; // 붓글씨는 25px 이상
+  const wpx = 40 + 4 * k; // 붓글씨는 25px 이상 — 11-01 (5) 크게(40 ~ 68)
   ctx.font = fx.brushFont(wpx);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -891,7 +929,7 @@ function drawBurstFront(ctx: CanvasRenderingContext2D, k: number, t: number, x: 
   const out = Math.max(0, (t - (C.BURST - 8)) / 8);
   ctx.translate(
     Math.max(ww / 2 + 6, Math.min(VIEW.W - ww / 2 - 6, x - 4)),
-    Math.max(VIEW.FIELD_TOP + wpx, y - px * 0.5 - wpx * 0.5 - 10),
+    Math.max(C.TOP + wpx * 0.5, y - px * 0.5 - wpx * 0.5 - 10),
   );
   ctx.rotate(-0.1);
   const wsc = (1 + 0.5 * inU * inU) * (1 - out * out);

@@ -457,7 +457,7 @@ export function createApp(
     if (id === 'skin_letters') add('stamp');
     if (id === 'waza_unlock') {
       if (!save.owned.includes('ageba')) add('ageba');
-      else add('tetsu');
+      else add('baram');
     }
   }
 
@@ -531,7 +531,7 @@ export function createApp(
     const sku = SKUS.find((s) => s.id === id);
     if (!sku || sku.krw > 1900) return;
     // 이미 전부 보유한 SKU는 결제 자체를 막는다 — 지급 0 실과금 사고 방지 (08-30, P1-4)
-    if (id === 'waza_unlock' && save.owned.includes('ageba') && save.owned.includes('tetsu')) {
+    if (id === 'waza_unlock' && save.owned.includes('ageba') && save.owned.includes('baram')) {
       playSfx('uiDeny');
       return;
     }

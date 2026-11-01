@@ -7,9 +7,9 @@
 // 조각 Kind는 bladeFx 목록의 이름을 빌려 뜻만 바꿔 쓴다 — hook = 붓 획 · disc = 먹 튐 · chunk = 나는 먹 · nail = 불티 분수 · arc = 끊긴 붓 고리.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
-import { PALETTE, TICK, VIEW, WEAPON_INK } from '../config';
+import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
-  N, keepBits, n01, pool, put, sgn, tierK, vel, type Bit,
+  N, keepBits, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
 } from './bladeFx';
 import { PRESS, brushArc, brushLine, inkDrop, inkSplat, popScale, spatter } from './ink';
 
@@ -282,17 +282,18 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
   const t = TOOLS[s.weapon];
   if (!t) return b;
   const k = tierK(e.combo ?? s.combo);
+  const y = GROUND - (e.y ?? s.player.y);
   switch (e.kind) {
     case 'hit':
     case 'bossHit':
     case 'butterCollapse':
-      t.hit(x, GROUND - (e.y ?? s.player.y), b, k);
+      scaled(x, y, WEAPON_FX.SIZE, () => t.hit(x, y, b, k));
       break;
     case 'floorCollapse':
-      t.floor(x, GROUND - (e.y ?? s.player.y), b, k);
+      scaled(x, y, WEAPON_FX.SIZE, () => t.floor(x, y, b, k));
       break;
     case 'stackDestroy':
-      t.destroy(x, footY - 70, k);
+      scaled(x, footY - 70, WEAPON_FX.SIZE, () => t.destroy(x, footY - 70, k));
       break;
     case 'slash':
       t.whiff(footX, footY);
@@ -300,6 +301,14 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
     default:
   }
   return b;
+}
+
+/** 필살 박자 — 그 연장의 타격 · 층 깨기 · 완파 그림 하나(줄 끝 가로 박자 · 콤보 단 1.5). 키우기 · 지키기는 bladeFx.weaponBurst가 */
+export function toolBurst(w: WeaponId, x: number, y: number, power: 'hit' | 'floor' | 'destroy'): void {
+  const t = TOOLS[w];
+  if (!t) return;
+  if (power === 'destroy') t.destroy(x, y, 1.5);
+  else t[power](x, y, BEATS[2], 1.5);
 }
 
 /** resetBladeFx가 부른다 — 연타 줄을 처음부터. 마스크 색은 장착이라 그대로 둔다 */
@@ -343,7 +352,7 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       const dy = Math.sin(p.rot);
       const x0 = p.x - (dx * L) / 2;
       const y0 = py - (dy * L) / 2;
-      const core = u < 0.15 && p.c2 !== p.c1;
+      const core = u < 0.35 && p.c2 !== p.c1;
       if (mode === 1 || mode === -1) {
         // 감기 — 곧은 몸(앞 72%) 끝에서 mode 쪽으로 작은 호가 감겨 튕겨 나간다. 몸 굵기 그대로 호로 이어진다
         const B = 0.72;

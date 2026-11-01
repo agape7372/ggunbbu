@@ -4,12 +4,14 @@ import { STAGES } from '../src/core/stages';
 import { stageDef, startStage, type StageResult } from '../src/core/stage';
 import { advance, makeState } from '../src/core/sim';
 import { EMPTY_INPUT, type GameState } from '../src/core/types';
-import { BOSS, LANDMARK, STAGE } from '../src/config';
+import { ACT1, BOSS, LANDMARK, STAGE } from '../src/config';
+import { BOSS_NAME } from '../src/content';
+import { enterAct2Phase } from '../src/core/act2';
 import { fmtStageTime } from '../src/content/stages';
 import { runStage } from './stageBot';
 import { emptyRecord, mergeResult, stampBits } from '../src/meta/stageRecord';
 import {
-  bossName, endView, masterLine, pickReason, progressText, stageBar, stageHudLine, stampTotals, workProgress,
+  arcadeBar, bossName, endView, masterLine, pickReason, progressText, stageBar, stageHudLine, stampTotals, workProgress,
 } from '../src/ui/stageLogic';
 
 const ALL = { done: true, safe: true, inTime: true, secret: true, master: true };
@@ -44,7 +46,7 @@ describe('판 위 한 줄과 진척', () => {
     expect(stageHudLine({ id: '1-B', ticks: 90 })).toBe('1-B 종탑 · 0:01.50');
   });
 
-  it('진행 막대: 대본 중엔 걸음 칸이 차고 끝 이름표가 다음을 알린다, 보스 중엔 남은 몸이 준다', () => {
+  it('진행 막대: 대본 중엔 치운 걸음 칸이 차고 끝 이름표가 다음을 알린다, 보스 중엔 남은 몸이 준다', () => {
     const at = (id: string, fromBoss = false, ticks = 0): GameState => {
       const s = makeState({ seed: 1 });
       startStage(s, { id, diff: 1, weapon: 'sword', waza: 'tenchi', fromBoss });
@@ -52,12 +54,33 @@ describe('판 위 한 줄과 진척', () => {
       return s;
     };
     const total = workProgress('2-1', 0).total;
-    expect(stageBar(at('2-1'))).toEqual({ label: `0/${total}`, fill: 0, n: total, end: '끝' });
-    expect(stageBar(at('2-1', false, STAGE.FIRST_WAIT + 2))?.label).toBe(`1/${total}`); // 첫 건물이 나오면 한 칸
+    expect(stageBar(at('2-1'))).toEqual({ label: `남은 ${total}`, fill: 0, n: total, end: '끝' });
+    const first = at('2-1', false, STAGE.FIRST_WAIT + 2);
+    expect(first.stack).not.toBeNull();
+    expect(stageBar(first)?.label).toBe(`남은 ${total}`); // 서 있는 건물은 아직 남은 셈
+    first.stage!.tally.splits.push(first.tick);
+    expect(stageBar(first)).toMatchObject({ label: `남은 ${total - 1}`, fill: 1 / total }); // 치우면 한 칸
     expect(stageBar(at('HQ'))?.end).toBe(bossName('HQ')); // 본사는 끝에 집행기가 있다
     const bell = stageBar(at('1-B', false, 2))!;
     expect(bell).toMatchObject({ label: '종탑', fill: 1, n: LANDMARK.BELL.FLOORS, end: '' });
     expect(stageBar(at('HQ', true, 2))).toMatchObject({ label: `${bossName('HQ')} ${BOSS.HP}`, fill: 1, n: 0 });
+  });
+
+  it('아케이드 막대: 1막은 장 네 칸 끝 「2막」, 2막은 남은 단계 끝 집행기, 특별작전 · 버터바엔 없다', () => {
+    const s = makeState({ seed: 1 });
+    expect(arcadeBar(s)).toEqual({ label: '남은 100%', fill: 0, n: ACT1.CHAPTER_BOUNDS.length + 1, end: '2막' });
+    s.p = 0.375;
+    expect(arcadeBar(s)?.label).toBe('남은 63%');
+    enterAct2Phase(s, 'cathedral');
+    expect(arcadeBar(s)).toEqual({ label: '남은 4', fill: 0, n: 4, end: BOSS_NAME });
+    enterAct2Phase(s, 'rock');
+    expect(arcadeBar(s)).toMatchObject({ label: '남은 1', fill: 0.75 });
+    s.gimmick = 'glass';
+    s.mode = 'act1';
+    expect(arcadeBar(s)).toBeNull(); // 특별작전엔 2막이 없다
+    s.gimmick = 'none';
+    s.mode = 'bonus';
+    expect(arcadeBar(s)).toBeNull();
   });
 
   it('걸음 셈은 쉼을 뺀다 — 보스 아닌 판은 총 걸음 = 봇이 깬 판의 splits 수, 1-2는 건물 9채', () => {

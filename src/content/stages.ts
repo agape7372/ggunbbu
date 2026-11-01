@@ -47,6 +47,9 @@ export const STAGE_MODE = {
   /** 보스가 있는 판 — 목록 카드 인장. 판 위 진행 막대 끝엔 보스 이름, 보스 없는 판은 barEnd */
   bossTag: '보스',
   barEnd: '끝',
+  /** 진행 막대 머리 「남은 5」 · 아케이드 1막 막대 끝 인장(그 뒤 2막 끝에 집행기) */
+  barLeft: '남은',
+  barAct2: '2막',
   /** 화면 이름표 — ui/stageView.ts */
   home: '홈',
   back: '목록',

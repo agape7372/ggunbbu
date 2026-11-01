@@ -9,7 +9,6 @@ export const ONOMATO = {
   butterCollapse: '팟!',
   special: '천지개벽!!!',
   specialAgeba: '올려베기!!',
-  specialTetsu: '철벽!!',
   bossDefeat: '작전성공',
   guardAirBounce: '탁!',
   hatBreak: '깡!',
@@ -26,7 +25,7 @@ export const CAPTIONS = {
 } as const;
 
 /** 완파 붓글씨 — 몇 층을 무너뜨렸는지가 정보다(판 없는 먹 붓글씨, 11-01). */
-export const destroyedCaption = (floors: number): string => `${floors}층`;
+export const destroyedCaption = (floors: number): string => `${floors}층 철거!`;
 
 export function onomatoFor(kind: string, combo: number): string | null {
   switch (kind) {
@@ -36,7 +35,6 @@ export function onomatoFor(kind: string, combo: number): string | null {
     case 'butterCollapse': return ONOMATO.butterCollapse;
     case 'special': return ONOMATO.special;
     case 'specialAgeba': return ONOMATO.specialAgeba;
-    case 'specialTetsu': return ONOMATO.specialTetsu;
     case 'bossDefeat': return ONOMATO.bossDefeat;
     case 'guardAirBounce': return ONOMATO.guardAirBounce;
     case 'hatBreak': return ONOMATO.hatBreak;

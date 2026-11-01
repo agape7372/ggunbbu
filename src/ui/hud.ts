@@ -7,7 +7,7 @@ import { ACT2, CAPTION_MS } from '../config';
 import { ACT2_PHASES, BOSS_NAME, CAPTIONS, hudModeLabel, SCREENS } from '../content';
 import { ICON } from './icons';
 import { fmt } from './ink';
-import { executorBar, stageBar, type HudBar } from './stageLogic';
+import { arcadeBar, stageBar, type HudBar } from './stageLogic';
 
 export interface HudApi {
   /** op = 특별작전 한 줄(남은 시간 · 다음 도장). 작전이 아니면 생략 */
@@ -172,10 +172,10 @@ export function mountHud(
         capEl.hidden = !cap;
       }
 
-      // 위 막대 — 스테이지는 진행(대본 칸 · 보스 남은 몸), 아케이드는 2막 달의 집행기 체력
+      // 위 막대 — 스테이지는 진행(대본 칸 · 보스 남은 몸), 아케이드는 1막 진행 · 2막 남은 단계 · 집행기 체력
       let bar: HudBar | null = null;
       if (s.stage) bar = stageBar(s);
-      else if (s.boss && s.act2Phase === 'moon') bar = executorBar(s.boss.hp);
+      else bar = arcadeBar(s);
       const barKey = bar ? `${bar.label}|${bar.fill}|${bar.n}|${bar.end}` : '';
       if (barKey !== lastBoss) {
         lastBoss = barKey;

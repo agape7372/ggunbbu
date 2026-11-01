@@ -274,7 +274,7 @@ export interface LandmarkState {
 export type GimmickId = 'none' | 'glass' | 'ice' | 'night' | 'orbit';
 
 /** 장착 필살. 체크포인트 타격 수에 영향을 주면 안 된다. */
-export type WazaId = 'tenchi' | 'ageba' | 'tetsu' | 'mukjul' | 'dalmuri' | 'nakgwan' | 'baram';
+export type WazaId = 'tenchi' | 'ageba' | 'mukjul' | 'dalmuri' | 'nakgwan' | 'baram';
 
 /**
  * 장착 무기. 대미지는 전부 1이다 — 2막 체크포인트가 층 HP 합(=타격 수)이라 대미지를 바꾸면

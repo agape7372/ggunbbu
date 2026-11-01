@@ -180,20 +180,10 @@ export function tryHitLandmark(s: GameState): boolean {
   return true;
 }
 
-/** 필살 — 창에 앉은 몸엔 집행기와 같은 10. 크레인 짐에 철벽이면 바로 걸린다 */
+/** 필살 — 창에 앉은 몸엔 집행기와 같은 10 */
 export function specialHitLandmark(s: GameState, dmg: number = SPECIAL.MOON_DMG): void {
   const lm = s.lm;
   if (!lm || lm.st === 'down') return;
-  if (lm.id === 'crane' && s.waza === 'tetsu' && s.stack && lm.air === 1) {
-    // 철벽 즉시 걸기 — 미끄러진 걸림이라 창이 짧고, 두 번 걸기 셈은 건너뛴다
-    impact(s, lm);
-    setSt(lm, 'sit');
-    lm.t = L.SIT_TICKS[diffOf(s)] - L.CRANE.TETSU_SIT;
-    lm.cue = 0;
-    lm.n = 2;
-    s.stackSpawnCd = L.CRANE.NEXT_GAP;
-    return;
-  }
   const b = lm.body;
   if (!b || lm.st !== 'sit' || b.floors.length === 0) return;
   const mat = b.floors[0].mat;

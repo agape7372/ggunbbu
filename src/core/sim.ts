@@ -224,27 +224,23 @@ function triggerSpecial(s: GameState): void {
     // 시간차 필살 — 지금은 베어 두기만 한다. 깔려 있었으면 건물을 머리 위로 밀어 두고 멈춘다
     if (wasPinned && s.stack) { s.stack.y = Math.max(s.stack.y, PLAYER.H + 4); s.stack.resting = false; }
     s.wazaRun = { id: s.waza, t: 0, stack: s.stack };
-  } else if (s.waza === 'tetsu') {
-    applyTetsu(s);
   } else if (s.waza === 'ageba') {
     applyAgeba(s);
   } else {
     applyTenchi(s);
   }
 
-  // 철벽은 방패만 — 건물·화산탄을 지우지 않는다. 먹바람은 하늘의 번개 · 포탄까지 쓸어 낸다.
-  if (s.waza !== 'tetsu') {
-    let cleared = 0;
-    const sweep = s.waza === 'baram';
-    s.entities = s.entities.filter((e) => {
-      if (e.kind === 'rock') { cleared += 1; return false; }
-      if (sweep && (e.kind === 'bolt' || e.kind === 'shot')) return false;
-      return true;
-    });
-    cleared += s.groundRocks;
-    s.groundRocks = 0;
-    if (cleared > 0) addScore(s, cleared * SCORE.FLOOR_BONUS);
-  }
+  // 화산탄은 어느 필살이든 지운다. 용오름(baram)은 하늘의 번개 · 포탄까지 쓸어 낸다.
+  let cleared = 0;
+  const sweep = s.waza === 'baram';
+  s.entities = s.entities.filter((e) => {
+    if (e.kind === 'rock') { cleared += 1; return false; }
+    if (sweep && (e.kind === 'bolt' || e.kind === 'shot')) return false;
+    return true;
+  });
+  cleared += s.groundRocks;
+  s.groundRocks = 0;
+  if (cleared > 0) addScore(s, cleared * SCORE.FLOOR_BONUS);
   if (run) return; // 보스 · 명물 대미지는 터질 때(검풍은 한 번마다)
   s.wazaHitTick = s.tick;
   if (s.boss) specialHitBoss(s);
@@ -317,14 +313,6 @@ function wazaBurst(s: GameState, r: NonNullable<GameState['wazaRun']>, floorMul:
   s.wazaHitTick = s.tick;
   if (s.boss) specialHitBoss(s, bossDmg);
   if (s.lm) specialHitLandmark(s, bossDmg);
-}
-
-function applyTetsu(s: GameState): void {
-  const stack = s.stack;
-  if (!stack) return;
-  stack.resting = false;
-  stack.vy = Math.max(stack.vy, SPECIAL.TETSU_V);
-  stack.y = Math.max(stack.y, 0.001);
 }
 
 function applyAgeba(s: GameState): void {

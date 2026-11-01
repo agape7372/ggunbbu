@@ -161,7 +161,7 @@ describe('소유 목록 대조 (BL-13)', () => {
   it('미소유 장착 칸은 기본값으로 되돌린다', () => {
     store.set(SAVE_KEY, JSON.stringify({
       v: 1, owned: ['hammer'],
-      loadout: { waza: 'tetsu', weapon: 'grinder', body: 'amber', blade: 'wire', letters: 'flyer' },
+      loadout: { waza: 'ageba', weapon: 'grinder', body: 'amber', blade: 'wire', letters: 'flyer' },
     }));
     const l = loadSave().loadout;
     expect(l.waza).toBe('tenchi');

@@ -33,7 +33,7 @@ function runTo(s: GameState, t: number, evs: JuiceEvent[]): void {
 }
 
 describe('시간차 필살', () => {
-  it('먹줄치기 — 발동 틱엔 아무것도 안 부수고, 멈췄다가 burst 틱에 통째로 · 층 점수 두 배', () => {
+  it('무음일섬(mukjul) — 발동 틱엔 아무것도 안 부수고, 멈췄다가 burst 틱에 통째로 · 층 점수 두 배', () => {
     const { s, evs } = fire('mukjul');
     const st = s.stack!;
     expect(st.floors.length).toBe(8);
@@ -51,7 +51,7 @@ describe('시간차 필살', () => {
     expect(s.score - before).toBe(8 * SCORE.FLOOR_BONUS * 2 + SCORE.DESTROY_BONUS);
   });
 
-  it('낙관 — 열두 타가 콤보를 하나씩 올리고 게이지는 안 채운다, 도장이 남은 층을 부순다', () => {
+  it('십이연참(nakgwan) — 열두 타가 콤보를 하나씩 올리고 게이지는 안 채운다, 도장이 남은 층을 부순다', () => {
     const { s, evs } = fire('nakgwan', tower(20, 'hard'));
     runTo(s, WAZA_RUN.nakgwan.burst, evs);
     expect(s.combo).toBe(WAZA_RUN.nakgwan.hits.length);
@@ -67,7 +67,7 @@ describe('시간차 필살', () => {
     expect(evs.filter((e) => e.kind === 'wazaHit' || e.kind === 'floorCollapse')).toHaveLength(2);
   });
 
-  it('먹바람 — 건물을 부수지 않고 세 번 치며 띄운다, 번개 · 포탄을 쓸어 낸다', () => {
+  it('용오름(baram) — 건물을 부수지 않고 세 번 치며 띄운다, 번개 · 포탄을 쓸어 낸다', () => {
     const s0 = tower(8, 'hard', 300);
     const s = makeState();
     s.waza = 'baram';
@@ -84,12 +84,21 @@ describe('시간차 필살', () => {
     expect(evs.some((e) => e.kind === 'wazaBurst')).toBe(false);
   });
 
-  it('달무리 — 보스 · 명물이 없으면 터질 때 건물만, 터지는 틱이 가장 늦다', () => {
+  it('월하난무(dalmuri) — 보스 · 명물이 없으면 터질 때 건물만. 무음일섬이 가장 늦게 터진다(참철도 정적 1.6초)', () => {
     const ids = Object.keys(WAZA_RUN) as (keyof typeof WAZA_RUN)[];
     const last = ids.reduce((a, b) => (WAZA_RUN[a].burst >= WAZA_RUN[b].burst ? a : b));
-    expect(last).toBe('dalmuri');
+    expect(last).toBe('mukjul');
     const { s, evs } = fire('dalmuri');
     runTo(s, WAZA_RUN.dalmuri.burst, evs);
+    expect(s.stack).toBeNull();
+  });
+
+  it('월하난무(dalmuri) — 다섯 칼(투두두두)이 벤 건물 맨 아래층을 하나씩 치고 콤보를 올린 뒤 터진다', () => {
+    const { s, evs } = fire('dalmuri', tower(10, 'hard'));
+    runTo(s, WAZA_RUN.dalmuri.burst, evs);
+    expect(evs.filter((e) => e.kind === 'wazaSwing')).toHaveLength(WAZA_RUN.dalmuri.hits.length);
+    expect(evs.filter((e) => e.kind === 'wazaHit' || e.kind === 'floorCollapse')).toHaveLength(WAZA_RUN.dalmuri.hits.length);
+    expect(Math.max(...WAZA_RUN.dalmuri.hits)).toBeLessThan(WAZA_RUN.dalmuri.burst); // 숨 한 번 뒤에 터진다
     expect(s.stack).toBeNull();
   });
 

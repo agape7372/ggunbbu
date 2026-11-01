@@ -13,7 +13,7 @@ import { runStage, fmtTicks, stageBot } from './stageBot';
 const GUARD: InputFrame = { ...EMPTY_INPUT, guard: true };
 const ATTACK: InputFrame = { ...EMPTY_INPUT, attack: true };
 
-function bossStage(id: string, diff: 0 | 1 | 2 = 1, waza: 'tenchi' | 'ageba' | 'tetsu' = 'tenchi'): GameState {
+function bossStage(id: string, diff: 0 | 1 | 2 = 1, waza: 'tenchi' | 'ageba' = 'tenchi'): GameState {
   const s = makeState({ seed: stageSeed(id) });
   startStage(s, { id, diff, weapon: 'sword', waza });
   return s;
@@ -221,16 +221,6 @@ describe('타워크레인', () => {
       sat = s.lm!.st === 'sit';
     }
     expect(sat).toBe(true);
-  });
-
-  it('철벽 필살은 놓인 짐을 바로 건다', () => {
-    const s = bossStage('4-B', 1, 'tetsu');
-    skipEnter(s);
-    for (let i = 0; i < 2000 && !(s.stack && s.lm!.air === 1); i++) advance(s, EMPTY_INPUT);
-    expect(s.lm!.air).toBe(1);
-    s.wazaGauge = WAZA_GAUGE.MAX;
-    advance(s, { ...EMPTY_INPUT, special: true });
-    expect(s.lm!.st).toBe('sit');
   });
 
   it('짐이 땅에 닿으면 특기 사항이 깨진다', () => {
@@ -924,21 +914,6 @@ describe('타워크레인 2판', () => {
     s.stack!.vy = -1;
     step(s);
   };
-
-  it('철벽 필살은 짐을 바로 걸지만 창은 90틱이다(두 번 걸기 셈은 건너뛴다)', () => {
-    for (const floors of [5, 1]) {
-      const s = bossStage('4-B', 1, 'tetsu');
-      skipEnter(s);
-      setFloors(s, floors);
-      released(s);
-      s.wazaGauge = WAZA_GAUGE.MAX;
-      step(s, { ...EMPTY_INPUT, special: true });
-      expect(s.lm!.st).toBe('sit');
-      expect(s.lm!.t - 1).toBe(LANDMARK.SIT_TICKS[1] - LANDMARK.CRANE.TETSU_SIT); // 이 틱을 빼고 남은 창 = 90
-      expect(s.lm!.cue, `${floors}층`).toBe(0);
-      expect(s.lm!.n).toBe(2);
-    }
-  });
 
   it('읽는 띠(2막 정규 · 외주): 늦게 받으면 높은 띠(404), 일찍 받으면 낮은 띠(336) — 1막 · 견습은 짐의 띠', () => {
     const next = (diff: 0 | 1 | 2, floors: number, wave: number, y: number) => {

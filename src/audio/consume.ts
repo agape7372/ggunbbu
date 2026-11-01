@@ -60,7 +60,7 @@ export function consumeAudio(s: GameState): void {
         if (name === 'special' && e.kind === 'special') {
           playSfx('specialCharge'); // 휘익은 지금, 폭발은 히트스톱이 풀릴 때
           playSfx(name, { delay: JUICE.special.hitstop / TPS });
-        } else if (name === 'inkSnap') playSfx(name, { delay: 4 / TPS }); // 먹줄이 튕기는 프레임(wazaShow)
+        } else if (name === 'inkSnap' && e.kind === 'special') playSfx(name, { delay: JUICE.special.hitstop / TPS }); // 무음일섬 — 한 줄을 뽑는 프레임(wazaShow)
         else if (name === 'sheathe') playSfx(name, { delay: (JUICE.special.hitstop + WAZA_RUN.mukjul.burst - 8) / TPS }); // 터지기 여덟 틱 전
         else if (name === 'hatGet') playSfx(name, { delay: HAT_FX.LAND / TPS }); // 고비 소리는 지금, 「팅」은 머리에 씌워질 때
         else playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
@@ -137,12 +137,13 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
     case 'butterCollapse':
       return ['butterPop'];
     case 'special':
-      // 시간차 필살은 휘익만 — 폭발은 터지는 틱(wazaBurst)에. 먹줄치기는 줄 튕김 · 칼 거둠을 미리 걸어 둔다
+      // 시간차 필살은 휘익만 — 폭발은 터지는 틱(wazaBurst)에. 무음일섬은 뽑는 소리 · 칼 거둠을 미리 걸어 둔다
       if (s.waza === 'mukjul') return ['whiff', 'specialCharge', 'inkSnap', 'sheathe'];
       if (s.waza in WAZA_RUN) return ['whiff', 'specialCharge'];
       return ['whiff', 'special']; // 입력 틱 = 휘두름, 폭발음은 consumeAudio가 늦춘다
-    case 'wazaSwing':
-      return [s.waza === 'baram' ? 'gust' : 'whiff'];
+    case 'wazaSwing': // 용오름 = 바람 · 월하난무 = 칼마다 끊어 치는 소리 · 십이연참 = 휘익
+      if (s.waza === 'baram') return ['gust'];
+      return [s.waza === 'dalmuri' ? 'inkSnap' : 'whiff'];
     case 'wazaHit': {
       const own = WEAPON_HIT[s.weapon];
       return [own ?? HIT_VARIANTS[hitRR++ % HIT_VARIANTS.length]];

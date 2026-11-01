@@ -11,11 +11,11 @@
 // 연장 넷·필살 셋·게이지 참·콤보 끊김·깔림 탈출·마스크 도트와 연타 줄 박자는 weaponFx.ts — 이 풀과 뿌리개를 빌려 쓴다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
-import { PALETTE, TICK, VIEW, WEAPON_INK } from '../config';
+import { PALETTE, SEAL_INK, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import { comboMilestone } from '../audio/consume';
 import { brushArc, brushLine, brushPath, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter } from './ink';
 import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites';
-import { drawWeaponBit, resetWeaponFx, weaponReact } from './weaponFx';
+import { drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
 
 /** 먹 조각: stroke 곧은 붓 획 · sweep 호 붓 획 · zig 꺾은 획(철골 · 지그재그 · 얼음 금) · dots 리벳 점 줄 · spat 먹 튐 · drop 먹 방울(땅에 닿으면 번짐) ·
  *  dust 마른 가루 · leaf 금박 · cut · ghost 옛 자국 · 잔상(이제 뿌리지 않는다, weapon-fx 시험이 이름을 쓴다)
@@ -110,6 +110,23 @@ export function keepBits(draw: () => void): void {
   }
 }
 
+/** v가 굵기인 조각 — 키울 때 같이 굵어진다(나머지는 v가 개수 · 납작 배율) */
+const WIDE: ReadonlySet<Kind> = new Set<Kind>(['cut', 'stroke', 'sweep', 'zig', 'ghost', 'hook', 'arc']);
+let big: { k: number; x: number; y: number } | null = null;
+/**
+ * 크게 — 이 안에서 뿌린 조각은 (x, y)를 축으로 k배(자리 · 크기 · 굵기 · 속도 · 무게)이고 WEAPON_FX.LIFE배 오래 산다. 땅 밑으로는 안 간다.
+ * 친 자리 그림만 이 안에서 뿌린다 — 칼 잔상은 칼 길이 그대로라 밖에서 긋는다
+ */
+export function scaled(x: number, y: number, k: number, draw: () => void): void {
+  const was = big;
+  big = { k, x, y };
+  try {
+    draw();
+  } finally {
+    big = was;
+  }
+}
+
 interface Opt {
   life: number; size: number; c1: string; c2?: string;
   vx?: number; vy?: number; g?: number; drag?: number; rot?: number; spin?: number;
@@ -119,21 +136,26 @@ interface Opt {
 
 export function put(k: Kind, x: number, y: number, o: Opt): void {
   const p = take();
+  const K = big ? big.k : 1;
+  if (big && K !== 1) {
+    x = big.x + (x - big.x) * K;
+    y = Math.min(GROUND - 1, big.y + (y - big.y) * K);
+  }
   p.k = k;
   p.x = x;
   p.y = y;
-  p.vx = o.vx ?? 0;
-  p.vy = o.vy ?? 0;
-  p.g = o.g ?? 0;
+  p.vx = (o.vx ?? 0) * K;
+  p.vy = (o.vy ?? 0) * K;
+  p.g = (o.g ?? 0) * K;
   p.drag = o.drag ?? 0;
-  p.life = o.life;
-  p.max = o.life;
-  p.size = o.size;
+  p.life = o.life * (K !== 1 ? WEAPON_FX.LIFE : 1);
+  p.max = p.life;
+  p.size = o.size * K;
   p.rot = o.rot ?? 0;
   p.spin = o.spin ?? 0;
   p.c1 = o.c1;
   p.c2 = o.c2 ?? o.c1;
-  p.v = o.v ?? 0;
+  p.v = (o.v ?? 0) * (WIDE.has(k) ? K : 1);
   p.a = o.a ?? 0;
   p.bounce = o.bounce ?? 0;
   p.dry = o.dry ?? 0;
@@ -142,7 +164,7 @@ export function put(k: Kind, x: number, y: number, o: Opt): void {
   p.gr = o.gr ?? 0;
   p.st = o.st ?? 0;
   p.hold = o.hold ?? 0;
-  p.pts = o.pts ?? NO_PTS;
+  p.pts = o.pts ? (K !== 1 ? o.pts.map((q) => q * K) : o.pts) : NO_PTS;
   p.seed = n01() * 1000;
 }
 
@@ -516,7 +538,7 @@ function flare(r: Recipe, g: GreatLook, c: number, x: number, y: number, footX: 
   if (m === null) return;
   if (g.shape === 'beam') bentTrail(footX, footY, r.trail.w * 1.4, col, 0.42);
   else trail(footX, footY, r.trail.w * 1.4, col, { life: 0.42, dry: r.trail.dry }, 0.12, 1.25);
-  r.hit(x, y, 2.2, col);
+  scaled(x, y, WEAPON_FX.SIZE, () => r.hit(x, y, 2.2, col));
 }
 
 /** effects.spawnFromEvent가 이벤트마다 부른다 — 무기·필살 공통은 weaponFx가 먼저, 아래는 대검일 때만 */
@@ -552,31 +574,63 @@ export function bladeReact(s: GameState, e: JuiceEvent): void {
       if (swing) swish(r.trail.w * b.k, 0.26, col, b.turn, b.k);
       const a = b.ang + sgn() * 0.08; // 내려베기 → 올려베기 → 가로
       const len = (44 + 8 * k) * b.k;
-      stroke(x + sgn() * 6, y, a, len, 4.5 * b.k, col, { life: 0.2, stripes, dry: r.trail.dry * 0.5 });
-      if (c >= 100) stroke(x + sgn() * 8, y + 8, a + 0.07, len * 0.75, 3, '', { life: 0.2, dry: 0.4 }); // 겹 베기
-      spat(x, y, 3.2 * k * b.k, -Math.PI / 2 + sgn() * 0.4, col, '', 0.12, 3); // 벤 순간 — 포인트 색 튐
-      r.hit(x, y, k, col);
+      scaled(x, y, WEAPON_FX.SIZE, () => {
+        stroke(x + sgn() * 6, y, a, len, 4.5 * b.k, col, { life: 0.2, stripes, dry: r.trail.dry * 0.5 });
+        if (c >= 100) stroke(x + sgn() * 8, y + 8, a + 0.07, len * 0.75, 3, '', { life: 0.2, dry: 0.4 }); // 겹 베기
+        spat(x, y, 3.2 * k * b.k, -Math.PI / 2 + sgn() * 0.4, col, '', 0.12, 3); // 벤 순간 — 포인트 색 튐
+        r.hit(x, y, k, col);
+      });
       flare(r, g, c, x, y, footX, footY, col);
       return;
     }
     case 'floorCollapse': {
       const y = GROUND - (e.y ?? s.player.y);
       if (swing) swish(r.trail.w, 0.3, col);
-      stroke(x, y, 0.3, 96 + 10 * k, 8, col, { life: 0.26, stripes, dry: r.trail.dry * 0.5 }); // 한 사건 = 한 획
-      r.floor(x, y, k, col);
+      scaled(x, y, WEAPON_FX.SIZE, () => {
+        stroke(x, y, 0.3, 96 + 10 * k, 8, col, { life: 0.26, stripes, dry: r.trail.dry * 0.5 }); // 한 사건 = 한 획
+        r.floor(x, y, k, col);
+      });
       flare(r, g, c, x, y, footX, footY, col);
       return;
     }
     case 'stackDestroy': {
       const y = footY - 70; // 이벤트 y가 없다 — 마지막 층이 있던 머리 위
       const kk = Math.max(k, 1.25);
-      stroke(x, y, 0.22, 230, 14, col, { life: 0.32, dry: 0.3, stripes });
-      r.destroy(x, y, kk, col);
-      if (r.tint) r.floor(x + sgn() * 40, y - 46, kk, col); // 완파 물들임 — 모티프 한 번 더(화면은 칠하지 않는다)
+      scaled(x, y, WEAPON_FX.SIZE, () => {
+        stroke(x, y, 0.22, 230, 14, col, { life: 0.32, dry: 0.3, stripes });
+        r.destroy(x, y, kk, col);
+        if (r.tint) r.floor(x + sgn() * 40, y - 46, kk, col); // 완파 물들임 — 모티프 한 번 더(화면은 칠하지 않는다)
+      });
       return;
     }
     default:
   }
+}
+
+/**
+ * 필살 박자마다 그 무기 그림을 크게(WEAPON_FX.WAZA배) — 연장 넷은 weaponFx 연장 그림, 대검은 포인트 색 큰 획 + 그 칼 그림.
+ * wazaShow가 부른다. 필살 그림이라 풀이 넘쳐도 덮이지 않는다
+ */
+export function weaponBurst(w: WeaponId, x: number, y: number, power: 'hit' | 'floor' | 'destroy'): void {
+  keepBits(() => scaled(x, y, WEAPON_FX.WAZA, () => {
+    const g = greatLook(w);
+    if (!g) {
+      toolBurst(w, x, y, power);
+      return;
+    }
+    const col = inkOf(w);
+    const whole = power === 'destroy';
+    stroke(x, y, power === 'hit' ? sgn() * 0.6 : 0.3, whole ? 170 : 96, whole ? 13 : 8, col, { life: 0.3, stripes: g.shape === 'stripe' ? 1 : 0, dry: 0.2 });
+    RECIPES[g.shape][power](x, y, 1.5, col);
+  }));
+}
+
+/** 피 — 인주 방울 부채(땅에 닿으면 번진다) + 터진 자리 인주 튐. wazaShow가 부른다(무음일섬 · 월하난무) */
+export function bloodSpray(x: number, y: number, ang: number, spread: number, n: number, spd = 420): void {
+  keepBits(() => {
+    drops(x, y, n, ang - spread, ang + spread, spd * 0.45, spd, 3.4, SEAL_INK, 900);
+    spat(x, y, 9, ang, SEAL_INK, '', 0.3, 6);
+  });
 }
 
 /** renderer.drawGame이 플레이어를 그릴 때마다 부른다 — 칼 기운(1200부터) */
@@ -645,6 +699,7 @@ export function updateBladeFx(dt: number): void {
         p.vx = 0;
         p.vy = 0;
         p.g = 0;
+        if (1 - p.life / p.max >= 0.4) p.c1 = INK; // 공중에서 이미 마른 방울은 번져도 마른 채로(나이를 새로 세면 포인트 색이 되살아난다)
         p.life = Math.min(p.life, 0.35);
         p.max = p.life;
       }
@@ -705,7 +760,7 @@ function drawBrush(ctx: CanvasRenderingContext2D, p: Bit, py: number, u: number)
   };
   ctx.fillStyle = p.c1;
   paint(p.v, s0, s1, dry);
-  if (!p.c2 || p.c2 === p.c1 || u >= (p.hold || (p.st ? 0.55 : 0.18))) return;
+  if (!p.c2 || p.c2 === p.c1 || u >= (p.hold || (p.st ? 0.55 : 0.4))) return;
   const c0 = Math.max(s0, 0.06);
   const c1 = Math.max(c0, s1 * 0.8);
   if (c1 - c0 < 0.02 || p.v * 0.45 < 0.6) return;
@@ -734,8 +789,8 @@ function drawBrush(ctx: CanvasRenderingContext2D, p: Bit, py: number, u: number)
   ctx.restore();
 }
 
-/** 튐 · 방울 · 가루의 포인트 색은 벤 순간(삶의 앞 4분의 1)뿐 — 그 뒤엔 먹으로 마른다(불씨는 재, 톱밥은 먼지) */
-const dried = (p: Bit, u: number): string => (u < 0.25 ? p.c1 : INK);
+/** 튐 · 방울 · 가루의 포인트 색은 벤 순간(삶의 앞 4할)뿐 — 그 뒤엔 먹으로 마른다(불씨는 재, 톱밥은 먼지) */
+const dried = (p: Bit, u: number): string => (u < 0.4 ? p.c1 : INK);
 
 function drawBit(ctx: CanvasRenderingContext2D, p: Bit, py: number): void {
   const t = Math.max(0, p.life / p.max); // 1 → 0

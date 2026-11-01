@@ -152,7 +152,7 @@ export function wazaArt(id: string, look: Omit<Look, 'pose'>): string {
   return snap(`w|${id}|${look.weapon}|${look.body}|${look.blade}`, WAZA_H, (ctx) => {
     setPlayerWeapon(look.weapon);
     setPlayerCosmetics(colorOf('body', look.body), colorOf('blade', look.blade));
-    drawWazaShot(ctx, id as WazaId, ART_W / 2, WAZA_H - 4, 0.24);
+    drawWazaShot(ctx, id as WazaId, ART_W / 2, WAZA_H - 4, 0.24, look.weapon);
   });
 }
 

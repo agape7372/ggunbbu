@@ -519,22 +519,24 @@ img { display: block; -webkit-user-drag: none; }
 /* 집행기 체력 = 붓 획 게이지(가로) */
 .hud-boss { position: absolute; left: 58px; right: 70px; top: 60px; display: flex; flex-direction: column; gap: 3px; }
 #stage[data-wide="1"] .hud-boss { left: 14px; right: 14px; }
-.hud-boss-label { font: 400 24px/1 var(--brush); text-shadow: var(--halo); }
-.boss-bar { position: relative; height: 14px; }
-.boss-bar .fill { position: absolute; left: 2px; top: 2px; bottom: 2px; right: 2px; background: var(--ink); transform-origin: 0 50%; will-change: transform; }
+.hud-boss-label { font: 400 30px/1 var(--brush); text-shadow: var(--halo); }
+/* 11-01 (5) 「보스까지 얼마나 남았는지 안 보여」 — 14 → 22px, 빈 칸도 한지색으로 건물 위에서 읽힌다, 칸이 찰 때 툭 */
+.boss-bar { position: relative; height: 22px; background: var(--paper); }
+.boss-bar .fill { position: absolute; left: 3px; top: 3px; bottom: 3px; right: 3px; background: var(--ink); transform-origin: 0 50%; will-change: transform; transition: transform .28s cubic-bezier(.2, 1, .4, 1); }
 .boss-bar svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: url(#rough2); }
-.boss-bar svg path { fill: none; stroke: var(--ink); stroke-width: 2.4; vector-effect: non-scaling-stroke; }
+.boss-bar svg path { fill: none; stroke: var(--ink); stroke-width: 3; vector-effect: non-scaling-stroke; }
 /* 같은 자리의 스테이지 진행 막대 — 칸(--n) = 걸음 · 명물 층, 끝 인장 = 다음에 올 것(보스 이름 · 끝) */
 .boss-row { display: flex; align-items: center; gap: 6px; }
 .boss-row .boss-bar { flex: 1; }
 .boss-bar.notched::after {
   content: '';
   position: absolute;
-  inset: 2px;
-  background: repeating-linear-gradient(90deg, transparent 0 calc(100% / var(--n) - 2px), var(--paper) calc(100% / var(--n) - 2px) calc(100% / var(--n)));
+  inset: 3px;
+  /* 칸 금 = 한지 틈 속 먹 실선 — 찬 칸에선 틈으로, 빈 칸에선 실선으로 보인다 */
+  background: repeating-linear-gradient(90deg, transparent 0 calc(100% / var(--n) - 4px), var(--paper) 0 calc(100% / var(--n) - 3px), var(--ink) 0 calc(100% / var(--n) - 1px), var(--paper) 0 calc(100% / var(--n)));
 }
-.boss-end { flex: none; padding: 3px 5px 2px; background: var(--ink); color: var(--paper); font: 700 13px/1 var(--body); white-space: nowrap; rotate: -2deg; }
-#stage .hud:has(.hud-boss:not([hidden])) .hud-op { top: 108px; }
+.boss-end { flex: none; padding: 5px 8px 4px; background: var(--ink); color: var(--paper); font: 700 17px/1 var(--body); white-space: nowrap; rotate: -3deg; }
+#stage .hud:has(.hud-boss:not([hidden])) .hud-op { top: 124px; }
 
 /* 버터바 · 작전 한 줄 · 자막 — 판 위 붓글씨, 한지 띠로 읽히게 */
 .hud-bonus { position: absolute; left: 0; right: 0; top: 64px; text-align: center; font: 400 36px/1 var(--brush); rotate: -3deg; text-shadow: var(--halo); }
