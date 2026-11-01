@@ -7,7 +7,7 @@
 import './shop.css';
 import { WEAPON } from '../config';
 import {
-  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, GREATSWORD_IDS, MASK_DUST_COST, ORBIT_PER_AD, WAZA_ORBIT_COST,
+  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, GREATSWORD_IDS, MASK_DUST_COST, ORBIT_COSTS, ORBIT_PER_AD, WAZA_IDS, WAZA_ORBIT_COST,
   WEAPON_DUST_COST, WEAPON_IDS, examStatus, licenseTitle, nextDustGoal, nextExam,
 } from '../meta';
 import type { Loadout, WeaponId } from '../meta';
@@ -47,8 +47,8 @@ const WEAPONS: readonly Item[] = WEAPON_IDS.map((id) => ({
   pay: 'dust',
 }));
 
-const WAZA: readonly Item[] = (['tenchi', 'ageba', 'tetsu'] as const).map((id) => ({
-  id, slot: 'waza', name: WAZA_COPY[id].name, cost: WAZA_ORBIT_COST, pay: 'orbit',
+const WAZA: readonly Item[] = WAZA_IDS.map((id) => ({
+  id, slot: 'waza', name: WAZA_COPY[id].name, cost: ORBIT_COSTS[id] ?? WAZA_ORBIT_COST, pay: 'orbit',
 }));
 
 /** 가면 공방 — 한 번 열면(3000 먼지) 새 가면은 공짜. 안 열었을 때만 이 칸이 보인다 */

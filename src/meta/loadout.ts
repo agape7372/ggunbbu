@@ -14,7 +14,7 @@ export type StickSkinId = BodyId;
 
 export const WAZA_UNLOCK_DEFAULT: readonly WazaId[] = ['tenchi'];
 
-export const WAZA_IDS: readonly WazaId[] = ['tenchi', 'ageba', 'tetsu'];
+export const WAZA_IDS: readonly WazaId[] = ['tenchi', 'ageba', 'tetsu', 'baram', 'mukjul', 'nakgwan', 'dalmuri'];
 /** 대검 — 상점은 이 순서(값 오름차순)로 판다 */
 export const GREATSWORD_IDS: readonly GreatswordId[] = ['iron', 'saw', 'hazard', 'beam', 'flame', 'frost', 'onyx', 'gold'];
 export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', ...GREATSWORD_IDS];
@@ -58,6 +58,10 @@ export const WAZA_CATALOG: Record<WazaId, { name: string; blurb: string; unlocke
     blurb: '부수지 않는다. 튕기고 버틴다.',
     unlockedByDefault: false,
   },
+  mukjul: { name: '먹줄치기', blurb: '건물을 멈춰 두고 통째로 가른다.', unlockedByDefault: false },
+  dalmuri: { name: '달무리', blurb: '오래 멈췄다가 세로로 가른다.', unlockedByDefault: false },
+  nakgwan: { name: '낙관', blurb: '열두 번 휘갈기고 도장을 찍는다.', unlockedByDefault: false },
+  baram: { name: '먹바람', blurb: '검풍 셋으로 치고 띄운다.', unlockedByDefault: false },
 };
 
 /** 기본 소유 복사본. 호출측이 mutate해도 모듈 상수는 안 변한다. */

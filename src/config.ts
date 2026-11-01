@@ -296,6 +296,25 @@ export const SPECIAL = {
   TETSU_V: 1190,          // 철벽: 지면 가드와 같은 띄움. 파괴 없음
 } as const;
 
+/**
+ * 시간차 필살 넷(2026-11-01, docs/INK_FX_2026-11-01.md §5) — 베어 두고 나중에 터진다. 틱은 발동 히트스톱이 끝난 뒤부터 센다.
+ * freeze = 벤 건물이 터질 때까지 그 자리에 멈춘다(졸라맨은 필살 자세라 손을 못 쓴다) · burst = 남은 층을 통째로 부수는 틱(0 = 안 부순다)
+ * · floorMul = 터질 때 층 점수 배율 · bossDmg = 보스 · 명물에 주는 대미지(터질 때, 검풍은 한 번마다)
+ * · hits = 연참 · 검풍 한 타 틱(맨 아래층에 1대미지, 콤보 +1, 게이지는 안 찬다) · lift = 한 타마다 건물을 띄운다.
+ * 천지개벽 · 올려베기 · 철벽은 발동 틱에 끝난다(스테이지 봇이 천지개벽을 쓴다 — 바꾸면 3-B를 다시 잰다).
+ */
+export const WAZA_RUN = {
+  /** 먹줄치기 — 먹줄 한 줄을 튕겨 두고 칼을 거두면 갈라진다 */
+  mukjul: { freeze: true, burst: 40, floorMul: 2, bossDmg: 10, hits: [] as readonly number[], lift: false },
+  /** 달무리 — 오래 멈췄다가 달을 세로로 가른다. 보스 · 명물에 가장 세다 */
+  dalmuri: { freeze: true, burst: 56, floorMul: 1, bossDmg: 25, hits: [] as readonly number[], lift: false },
+  /** 낙관 — 열두 번 휘갈기고 곧바로 도장을 찍는다(마지막 타 뒤 네 틱) */
+  nakgwan: { freeze: true, burst: 30, floorMul: 1, bossDmg: 10, hits: [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26] as readonly number[], lift: false },
+  /** 먹바람 — 검풍 셋이 건물을 치고 띄운다. 부수지 않고, 하늘의 번개 · 포탄까지 쓸어 낸다 */
+  baram: { freeze: false, burst: 0, floorMul: 0, bossDmg: 4, hits: [6, 18, 30] as readonly number[], lift: true },
+} as const;
+export type WazaRunId = keyof typeof WAZA_RUN;
+
 // ── 구역 작전 기믹 (아케이드 gimmick='none' 이면 미적용) ────────
 export const GIMMICK = {
   ICE_BOUNCE_GROUND: 0.7,
@@ -531,6 +550,10 @@ export const JUICE: Record<string, JuiceSpec> = {
   stackDestroy:   { hitstop: 6, shake: 8, flash: 0, particles: 24 },
   butterCollapse: { hitstop: 2, shake: 3, flash: 2, particles: 8 },
   special:        { hitstop: 10, shake: 16, flash: 4, particles: 32 },
+  // 시간차 필살 — 연참 · 검풍 한 타는 평타보다 가볍게(열두 번 이어진다), 터짐은 완파 위
+  wazaSwing:      { hitstop: 0, shake: 0, flash: 0, particles: 0 }, // 한 타의 박자(맞든 안 맞든) — 그림 · 소리용
+  wazaHit:        { hitstop: 1, shake: 2, flash: 0, particles: 4 },
+  wazaBurst:      { hitstop: 8, shake: 16, flash: 0, particles: 32 },
   hurt:           { hitstop: 4, shake: 8, flash: 3, particles: 4 },
   // 밑면 충돌 — 막혔다는 걸 손에 알리되 타격보다 약하게(적을 친 게 아니다)
   headBonk:       { hitstop: 1, shake: 2, flash: 0, particles: 4 },
@@ -561,7 +584,7 @@ export const JUICE_SYS = {
   PITCH_STEP_PER_10_COMBO: 1, // 반음
   // 완파 규모 k = clamp(BASE + 층수 × PER_FLOOR, BASE, MAX) — 흔들림·파편·엔소·팝업을 k배
   STACK_K_BASE: 0.8, STACK_K_PER_FLOOR: 0.1, STACK_K_MAX: 1.8,
-  STACK_RING_FLOORS: 3,   // 이 층수 이상이면 노랑 엔소 한 획 추가
+  STACK_RING_FLOORS: 3,   // 이 층수 이상이면 큰 먹 엔소 한 획 추가(속은 무기 포인트 색)
   // 번쩍 강도(설정 flashLevel 0 끔 · 1 약 · 2 기본) — 알파에 곱한다
   FLASH_LEVEL_MUL: [0, 0.5, 1] as const,
   // 몸 반응(발 기준 눌림) — 착지는 세로, 점프는 가로
@@ -678,6 +701,22 @@ export const PALETTE = {
   WHITE: '#F4F1E8',
   RUBBLE: '#9A958C',     // 잔해 채움 [튜닝] — 구 #3A3A42 는 INK와 명도가 붙어 캐릭터를 삼켰다
 } as const;
+
+/**
+ * 무기 포인트 색 — 판 이펙트는 먹 + 이 색 하나(2026-11-01 「먹 한 획」 2판, docs/INK_FX_2026-11-01.md §4).
+ * 벤 순간(획의 속 · 맞은 자리)에만 쓰고 먹으로 마른다. 한지(BG) 위에서 형광이 아니게 밝기 L* 45~72로 골랐다.
+ */
+export const WEAPON_INK = {
+  sword: '#E3A21A', hammer: '#8C877D', crowbar: '#2F5C9A', grinder: '#E8701E',
+  iron: '#5D7183', saw: '#9A4F2C', hazard: '#E9B21A', beam: '#C0532E',
+  flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
+} as const;
+/** 옛 칼빛 설정값(저장값은 그대로) → 먹에 맞는 포인트 색. 철거칼 획 속(effects · weaponFx · sprites 참격 호) */
+export const SLASH_INK: Readonly<Record<string, string>> = {
+  '#FFD200': WEAPON_INK.sword, '#E5302E': WEAPON_INK.flame, '#4FD8E8': WEAPON_INK.frost,
+};
+/** 도장 색 — 낙관 · 인장. 무기와 상관없이 하나(UI 주홍 인장과 같은 뜻) */
+export const SEAL_INK = '#C4301E'; // style.css --seal 과 같은 색
 
 // ── 저장 ────────────────────────────────────────────────────────
 export const SAVE_KEY = 'gunbbu.v1';

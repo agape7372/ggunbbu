@@ -1,11 +1,13 @@
-// 연장·필살·작은 순간 이펙트(weaponFx) — 연장 넷과 필살 셋이 서로 다른 조각으로 터지고, 한 이벤트의 조각 수는 상한 안이고,
-// 연타 줄은 박자마다 자국 각이 바뀌고, 마스크를 쓰면 필살·완파에 그 색 도트가 흩어진다. 다 터진 뒤엔 하나도 안 남는다.
+// 연장·작은 순간 이펙트(weaponFx) — 연장 넷이 서로 다른 조각으로 터지고, 한 이벤트의 조각 수는 상한 안이고,
+// 연타 줄은 박자마다 획 각이 바뀌고, 마스크를 쓰면 필살·완파에 그 색 도트가 흩어진다. 다 터진 뒤엔 하나도 안 남는다.
+// 판 위 필살 그림은 wazaShow가 맡는다(11-01) — 여기선 필살 때 마스크 도트만 본다.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { makeState } from '../src/core/sim';
 import type { GameState, JuiceEvent, JuiceKind, WazaId, WeaponId } from '../src/core/types';
 import { WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
-import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx } from '../src/render/bladeFx';
-import { drawWazaShot, liveBits, setFxMask } from '../src/render/weaponFx';
+import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx, type Bit } from '../src/render/bladeFx';
+import { liveBits, setFxMask } from '../src/render/weaponFx';
+import { drawWazaShot } from '../src/render/wazaShow';
 
 const TOOL_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder'];
 const STRIKES = ['hit', 'floorCollapse', 'stackDestroy', 'slash'] as const;
@@ -18,20 +20,6 @@ const CAP: Partial<Record<JuiceKind, number>> = {
 /** 아무 그리기나 받는 ctx — 그리다 던지지 않는지만 본다 */
 const sink = new Proxy({}, { get: () => () => undefined, set: () => true }) as unknown as CanvasRenderingContext2D;
 
-/** 그릴 때 고른 색과 부른 그리기를 모으는 ctx(blade-fx 시험과 같은 방식) */
-function drawn(draw: (c: CanvasRenderingContext2D) => void): string {
-  const seen = new Set<string>();
-  const ctx = new Proxy({} as Record<string, unknown>, {
-    get: (_t, k) => () => seen.add(String(k)),
-    set: (_t, k, v) => {
-      if (k === 'fillStyle' || k === 'strokeStyle') seen.add(String(v));
-      return true;
-    },
-  }) as unknown as CanvasRenderingContext2D;
-  draw(ctx);
-  return [...seen].sort().join(' ');
-}
-
 function state(w: WeaponId, waza: WazaId = 'tenchi'): GameState {
   const s = makeState();
   s.weapon = w;
@@ -40,10 +28,26 @@ function state(w: WeaponId, waza: WazaId = 'tenchi'): GameState {
   return s;
 }
 
+/** 그린 순서 그대로 — 메서드 이름 + 반올림한 인자 + 색 */
+function traced(draw: (c: CanvasRenderingContext2D) => void): string {
+  const log: string[] = [];
+  const ctx = new Proxy({} as Record<string, unknown>, {
+    get: (_t, k) => (...a: unknown[]) => { log.push(`${String(k)}(${a.map((v) => (typeof v === 'number' ? Math.round(v) : v)).join(',')})`); },
+    set: (_t, k, v) => {
+      if (k === 'fillStyle' || k === 'strokeStyle') log.push(String(v));
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  draw(ctx);
+  return log.join(' ');
+}
+
 const ev = (kind: JuiceKind, combo = 10): JuiceEvent => ({ kind, lane: 0, y: 120, combo, n: 4 });
 
 /** 자국(베기 자국·잔상)을 뺀 조각 수 — 톱날 대검 평타는 기존 그대로 자국 포함 11개라 상한은 조각으로 잰다 */
 const pieces = (): number => liveBits().filter((p) => p.k !== 'cut' && p.k !== 'ghost').length;
+/** 붓 획 · 베기 자국 — 연장은 hook, 대검은 stroke(먹 붓 획) · cut(옛 렌즈 자국) */
+const strokes = (): Bit[] => liveBits().filter((p) => p.k === 'cut' || p.k === 'hook' || p.k === 'stroke');
 const kinds = (): string => [...new Set(liveBits().map((p) => p.k))].sort().join(' ');
 
 /** 다 흘려 보낸다 — 2초 */
@@ -110,15 +114,6 @@ describe('연장·필살 이펙트', () => {
     expect(new Set(sigs).size).toBe(TOOL_IDS.length);
   });
 
-  it('필살 셋은 서로 다른 그림이다', () => {
-    const sigs = WAZA_IDS.map((waza) => {
-      resetBladeFx();
-      bladeReact(state('sword', waza), { kind: 'special', lane: 0 });
-      return kinds();
-    });
-    expect(new Set(sigs).size).toBe(WAZA_IDS.length);
-  });
-
   it('연타 줄 — 1·2·3타 자국이 내려베기 → 올려베기 → 가로로 돌고 3타째가 크다. 0.6초 넘게 쉬면 다시 1타', () => {
     for (const w of ['sword', 'iron'] as const) {
       resetBladeFx();
@@ -127,7 +122,7 @@ describe('연장·필살 이펙트', () => {
         settle(); // 앞 타격 조각은 흘려 보낸다 — 박자는 시뮬 틱으로 센다
         s.tick = tick;
         bladeReact(s, ev('hit'));
-        return liveBits().filter((p) => p.k === 'cut').sort((a, b) => b.size - a.size)[0];
+        return strokes().sort((a, b) => b.size - a.size)[0];
       });
       const [down, up, flat, again] = cuts;
       expect(down.rot, w).toBeGreaterThan(0.15);
@@ -170,7 +165,7 @@ describe('연장·필살 이펙트', () => {
     settle();
     s.tick = 20;
     bladeReact(s, ev('hit'));
-    const cut = liveBits().filter((p) => p.k === 'cut').sort((a, b) => b.size - a.size)[0];
+    const cut = strokes().sort((a, b) => b.size - a.size)[0];
     expect(cut.rot).toBeLessThan(-0.25); // 2타(올려베기) — 같은 틱 둘을 따로 셌다면 3타(가로)
   });
 
@@ -181,7 +176,7 @@ describe('연장·필살 이펙트', () => {
       const s = state(w, 'ageba');
       bladeReact(s, { kind: 'special', lane: 0 });
       const mine = liveBits().length;
-      for (let i = 0; i < 6; i++) bladeReact(s, { kind: 'floorCollapse', lane: 0, y: 120 + i * 40, combo: 250, n: 4 });
+      for (let i = 0; i < 40; i++) bladeReact(s, { kind: 'floorCollapse', lane: 0, y: 120 + i * 40, combo: 250, n: 4 });
       bladeReact(s, { kind: 'stackDestroy', lane: 0, combo: 250, n: 4 });
       expect(liveBits().length, w).toBe(192); // 넘쳤다
       expect(liveBits().filter((p) => p.keep).length, w).toBe(mine);
@@ -198,31 +193,6 @@ describe('연장·필살 이펙트', () => {
     }
   });
 
-  it('공중에서 쓴 철벽 방패는 떨어지는 몸을 따라간다', () => {
-    const s = state('sword', 'tetsu');
-    s.player.y = 300; // 공중
-    bladeReact(s, { kind: 'special', lane: 0 });
-    /** 그린 육각형(닫힌 6점 경로)의 가운데 */
-    const hexes = (): number[][] => {
-      const out: number[][] = [];
-      let pts: number[][] = [];
-      const ctx = new Proxy({} as Record<string, unknown>, {
-        get: (_t, k) => (...a: number[]) => {
-          if (k === 'beginPath') pts = [];
-          else if (k === 'lineTo') pts.push(a);
-          else if (k === 'closePath' && pts.length === 6) out.push([0, 1].map((i) => pts.reduce((t, p) => t + p[i], 0) / 6));
-        },
-        set: () => true,
-      }) as unknown as CanvasRenderingContext2D;
-      drawBladeFx(ctx, 0);
-      return out;
-    };
-    const before = hexes();
-    s.player.y = 100; // 200 떨어졌다 — 화면에선 200 아래
-    const after = hexes();
-    expect(before.some(([x, y]) => after.some(([x2, y2]) => Math.abs(x2 - x) < 0.01 && Math.abs(y2 - y - 200) < 0.01))).toBe(true);
-  });
-
   it('resetBladeFx는 조각도 연타 줄도 다 비운다', () => {
     const s = state('sword');
     s.tick = 0;
@@ -235,14 +205,14 @@ describe('연장·필살 이펙트', () => {
     expect(liveBits()).toHaveLength(0);
     s.tick = 20; // 줄이 이어졌다면 3타(가로)였다
     bladeReact(s, ev('hit'));
-    expect(liveBits().find((p) => p.k === 'cut')!.rot).toBeGreaterThan(0.15);
+    expect(strokes()[0].rot).toBeGreaterThan(0.15);
   });
 
   it('상점 필살 칸 그림은 필살마다 다르고, 마스크 도트는 없고, 빌린 판 풀은 비워 둔다', () => {
     const purple = '#7A44B8';
     setFxMask([purple]);
     const sigs = WAZA_IDS.map((waza) => {
-      const sig = drawn((c) => drawWazaShot(c, waza, 40, 74));
+      const sig = traced((c) => drawWazaShot(c, waza, 40, 74)); // 먹 연출은 같은 색 · 같은 메서드라 좌표까지 본다
       expect(sig, waza).not.toBe('');
       expect(sig, waza).not.toContain(purple);
       expect(liveBits(), waza).toHaveLength(0);

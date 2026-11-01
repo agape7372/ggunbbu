@@ -5,9 +5,10 @@
 import type { GameState, InputFrame } from './types';
 import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carryUnderStack } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
-import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore } from './combat';
+import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, registerHit } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN } from '../config';
+import type { WazaRunId } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { absorbWithHat, onBuildingDown } from './items';
 import { specialHitBoss } from './boss';
@@ -51,6 +52,8 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     tokotonCycle: 0,
     stage: null,
     lm: null,
+    wazaRun: null,
+    wazaHitTick: -1,
   };
 }
 
@@ -71,7 +74,8 @@ export function advance(s: GameState, input: InputFrame): void {
 
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
   if (input.special && s.player.pose !== 'dead' && s.player.pose !== 'special') {
-    if (s.wazaGauge < WAZA_GAUGE.COST || !hasSpecialTarget(s)) {
+    // 시간차 필살이 아직 안 터졌으면 새 필살은 거부 — 베어 둔 건물이 사라지지 않게
+    if (s.wazaGauge < WAZA_GAUGE.COST || !hasSpecialTarget(s) || s.wazaRun) {
       // 조용한 무반응 금지 (08-30, D-5·P1-4): 게이지 부족·허공 발동은 거부음으로 알린다.
       // 허공(대상 0)에 게이지 100을 태우던 경로도 여기서 봉인 — 소모 없이 거부.
       s.events.push({ kind: 'guardDenied' });
@@ -115,10 +119,14 @@ export function advance(s: GameState, input: InputFrame): void {
     s.guardGauge = Math.min(GUARD_GAUGE.MAX, s.guardGauge + GUARD_GAUGE.REGEN_PER_S * TICK);
   }
 
-  // ── 스택 물리 + 접지 ──
+  // ── 시간차 필살 (연참 · 검풍 · 터짐) ──
+  if (s.wazaRun) stepWazaRun(s);
+
+  // ── 스택 물리 + 접지 ── 시간차 필살이 벤 건물은 터질 때까지 멈춘다(물리 · 가드 바운스 없음)
   const stack = s.stack;
+  const frozen = stack !== null && isFrozen(s, stack);
   let prevStackY = 0;
-  if (stack) {
+  if (stack && !frozen) {
     prevStackY = stack.y;
     const { g, vterm } = stackPhysics(s);
     const grounded = stepStack(stack, g, vterm, TICK);
@@ -132,7 +140,7 @@ export function advance(s: GameState, input: InputFrame): void {
   carryUnderStack(s, TICK);
 
   // ── 가드 바운스 (비접지 프레임) ──
-  if (s.stack && !s.stack.resting) {
+  if (s.stack && !s.stack.resting && !frozen) {
     tryGuardBounce(s, guardActive(s.player), s.player.y, prevStackY);
   }
 
@@ -211,7 +219,12 @@ function triggerSpecial(s: GameState): void {
   s.events.push({ kind: 'special', lane: p.lane });
   if (wasPinned) s.events.push({ kind: 'pinEscape' }); // 필살은 깔림에서도 나간다 [정본]
 
-  if (s.waza === 'tetsu') {
+  const run = runOf(s.waza);
+  if (run) {
+    // 시간차 필살 — 지금은 베어 두기만 한다. 깔려 있었으면 건물을 머리 위로 밀어 두고 멈춘다
+    if (wasPinned && s.stack) { s.stack.y = Math.max(s.stack.y, PLAYER.H + 4); s.stack.resting = false; }
+    s.wazaRun = { id: s.waza, t: 0, stack: s.stack };
+  } else if (s.waza === 'tetsu') {
     applyTetsu(s);
   } else if (s.waza === 'ageba') {
     applyAgeba(s);
@@ -219,19 +232,91 @@ function triggerSpecial(s: GameState): void {
     applyTenchi(s);
   }
 
-  // 철벽은 방패만 — 건물·화산탄을 지우지 않는다.
+  // 철벽은 방패만 — 건물·화산탄을 지우지 않는다. 먹바람은 하늘의 번개 · 포탄까지 쓸어 낸다.
   if (s.waza !== 'tetsu') {
     let cleared = 0;
+    const sweep = s.waza === 'baram';
     s.entities = s.entities.filter((e) => {
       if (e.kind === 'rock') { cleared += 1; return false; }
+      if (sweep && (e.kind === 'bolt' || e.kind === 'shot')) return false;
       return true;
     });
     cleared += s.groundRocks;
     s.groundRocks = 0;
     if (cleared > 0) addScore(s, cleared * SCORE.FLOOR_BONUS);
   }
+  if (run) return; // 보스 · 명물 대미지는 터질 때(검풍은 한 번마다)
+  s.wazaHitTick = s.tick;
   if (s.boss) specialHitBoss(s);
   if (s.lm) specialHitLandmark(s);
+}
+
+const runOf = (w: GameState['waza']) => (w in WAZA_RUN ? WAZA_RUN[w as WazaRunId] : null);
+
+function isFrozen(s: GameState, stack: NonNullable<GameState['stack']>): boolean {
+  const r = s.wazaRun;
+  return r !== null && r.stack === stack && runOf(r.id)!.freeze;
+}
+
+/** 시간차 필살 한 틱 — 연참 · 검풍 한 타, 터짐, 끝. 히트스톱 동안은 advance가 먼저 돌아가서 안 센다 */
+function stepWazaRun(s: GameState): void {
+  const r = s.wazaRun!;
+  const cfg = runOf(r.id)!;
+  r.t += 1;
+  if (cfg.hits.includes(r.t)) {
+    s.events.push({ kind: 'wazaSwing', lane: s.player.lane }); // 맞든 안 맞든 휘두른 박자 — 획 · 휘두름 소리가 탄다
+    wazaHit(s, r, cfg.lift, cfg.bossDmg);
+  }
+  if (r.t === cfg.burst) wazaBurst(s, r, cfg.floorMul, cfg.bossDmg);
+  const end = Math.max(cfg.burst, cfg.hits[cfg.hits.length - 1] ?? 0);
+  if (r.t >= end) s.wazaRun = null;
+}
+
+/** 연참 · 검풍 한 타 — 벤 건물의 맨 아래층에 1대미지(높이와 상관없이), 콤보 +1, 게이지는 안 찬다 */
+function wazaHit(s: GameState, r: NonNullable<GameState['wazaRun']>, lift: boolean, bossDmg: number): void {
+  if (lift) {
+    // 검풍은 보스 · 명물도 친다
+    if (s.boss || s.lm) s.wazaHitTick = s.tick;
+    if (s.boss) specialHitBoss(s, bossDmg);
+    if (s.lm) specialHitLandmark(s, bossDmg);
+  }
+  const st = s.stack;
+  // 멈춘 필살(낙관)은 벤 그 건물만, 검풍은 지금 떨어지는 건물을 친다
+  if (!st || st.floors.length === 0 || (!lift && st !== r.stack)) return;
+  const mat = st.floors[0].mat;
+  const yHit = st.y;
+  const res = damageStack(st, s.player.lane, st.y - 1, st.y + 1, 1);
+  if (res === 'miss') return;
+  if (lift) {
+    st.vy = Math.max(st.vy, STACK.GUARD_GROUND_V);
+    st.resting = false;
+  }
+  if (res === 'collapse') {
+    s.events.push({ kind: 'floorCollapse', lane: s.player.lane, y: yHit, mat, combo: s.combo + 1 });
+    registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, noGauge: true });
+    if (st.floors.length === 0) destroyStack(s);
+  } else {
+    s.events.push({ kind: 'wazaHit', lane: s.player.lane, y: yHit, mat, combo: s.combo + 1 });
+    registerHit(s, { noGauge: true });
+  }
+}
+
+/** 터짐 — 벤 건물이 아직 있으면 통째로(면역 건물은 맨 아래층만) + 보스 · 명물 대미지 */
+function wazaBurst(s: GameState, r: NonNullable<GameState['wazaRun']>, floorMul: number, bossDmg: number): void {
+  const st = s.stack;
+  let n = 0;
+  if (st && st === r.stack) {
+    if (st.specialImmune) applyImmuneChip(s);
+    else {
+      n = st.totalFloors;
+      addScore(s, st.floors.length * SCORE.FLOOR_BONUS * floorMul);
+      destroyStack(s);
+    }
+  }
+  s.events.push({ kind: 'wazaBurst', lane: s.player.lane, n });
+  s.wazaHitTick = s.tick;
+  if (s.boss) specialHitBoss(s, bossDmg);
+  if (s.lm) specialHitLandmark(s, bossDmg);
 }
 
 function applyTetsu(s: GameState): void {

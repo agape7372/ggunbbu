@@ -351,11 +351,11 @@ export function tryHitBoss(s: GameState, lo: number, hi: number): boolean {
 }
 
 /** 필살기가 보스에 닿을 때 (sim 호출) */
-export function specialHitBoss(s: GameState): void {
+export function specialHitBoss(s: GameState, dmg: number = SPECIAL.MOON_DMG): void {
   const b = s.boss;
   if (!b || b.st === 'defeated' || b.st === 'enter') return;
-  b.hp -= SPECIAL.MOON_DMG;
-  b.dmg += SPECIAL.MOON_DMG;
+  b.hp -= dmg;
+  b.dmg += dmg;
   s.events.push({ kind: 'bossHit', y: b.y - BOSS.BODY_BOTTOM, n: b.hp });
   if (b.hp <= 0) defeatBoss(s);
 }

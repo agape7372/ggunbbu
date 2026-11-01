@@ -11,7 +11,7 @@ import { FX_SLOT_COPY, ITEM_COPY, MASK_COPY, TIER_COPY, WAZA_COPY, WEAPON_COPY }
 import { LORE } from '../content/lore';
 import type { ItemId } from '../core/types';
 import {
-  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, GREATSWORD_IDS, MASK_DUST_COST, WAZA_IDS, WAZA_ORBIT_COST, WEAPON_DUST_COST,
+  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, GREATSWORD_IDS, MASK_DUST_COST, ORBIT_COSTS, WAZA_IDS, WAZA_ORBIT_COST, WEAPON_DUST_COST,
 } from '../meta';
 import type { Loadout, WeaponId } from '../meta';
 import { BLADE_IDS, BODY_IDS, LETTERS_IDS, isOwned } from '../meta/loadout';
@@ -83,7 +83,7 @@ function howOf(slot: BookSlot, id: string): string {
   if (DEFAULT_OWNED_IDS.includes(id)) return '기본';
   if (slot === 'weapon') return `먼지 ${fmt(WEAPON_DUST_COST[id] ?? 0)}`;
   if (slot === 'mask') return `먼지 ${fmt(MASK_DUST_COST)}`;
-  if (slot === 'waza') return `궤도조각 ${WAZA_ORBIT_COST}`;
+  if (slot === 'waza') return `궤도조각 ${ORBIT_COSTS[id] ?? WAZA_ORBIT_COST}`;
   return `궤도조각 ${COSMETIC_ORBIT_COST}`;
 }
 

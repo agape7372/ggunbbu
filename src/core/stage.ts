@@ -241,7 +241,7 @@ function stepStageBoss(s: GameState, evStart: number): void {
 
 /** 보스가 쓰러진 틱 — 마지막 한 타가 필살인가(이 틱에 필살이 터졌으면 그렇다). 퇴장 대사 · HQ 특기 사항이 읽는다 */
 function finishBoss(s: GameState): void {
-  s.stage!.tally.finishSpecial = s.player.pose === 'special' && s.player.poseTick <= 1;
+  s.stage!.tally.finishSpecial = s.wazaHitTick === s.tick;
   clearStage(s);
 }
 

@@ -58,20 +58,12 @@ describe('파티클 월드 좌표', () => {
     b.ys.forEach((y, i) => expect(first[i] - y).toBeCloseTo(130));
   });
 
-  it('필살 중앙 폭발만 화면 고정(카메라를 안 탄다), 플레이어 쪽 폭발은 월드', () => {
-    const s = state();
-    spawnFromEvent(s, { kind: 'special', lane: 0 });
+  it('필살은 effects가 그리지 않는다 — 판 위 필살 그림은 wazaShow가 맡는다(화면 고정 파티클도 없다)', () => {
+    spawnFromEvent(state(), { kind: 'special', lane: 0 });
     const a = recorder();
     drawEffects(a.ctx, 0);
-    const b = recorder();
-    drawEffects(b.ctx, 100);
-    const moved = b.ys.filter((y, i) => Math.abs(y - a.ys[i] - 100) < 1e-6).length;
-    const fixed = b.ys.filter((y, i) => Math.abs(y - a.ys[i]) < 1e-6).length;
-    expect(moved).toBeGreaterThan(0);
-    expect(fixed).toBeGreaterThan(0);
-    expect(moved + fixed).toBe(a.ys.length);
+    expect(a.ys).toHaveLength(0);
   });
-
   it('보급 상자도 월드 좌표 — 그릴 때 한 번 카메라 이동(translate)이 걸린다', () => {
     const s = state();
     spawnFromEvent(s, { kind: 'supply', item: 'hat', y: 100 });

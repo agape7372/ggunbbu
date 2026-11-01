@@ -181,7 +181,7 @@ export function tryHitLandmark(s: GameState): boolean {
 }
 
 /** 필살 — 창에 앉은 몸엔 집행기와 같은 10. 크레인 짐에 철벽이면 바로 걸린다 */
-export function specialHitLandmark(s: GameState): void {
+export function specialHitLandmark(s: GameState, dmg: number = SPECIAL.MOON_DMG): void {
   const lm = s.lm;
   if (!lm || lm.st === 'down') return;
   if (lm.id === 'crane' && s.waza === 'tetsu' && s.stack && lm.air === 1) {
@@ -197,7 +197,7 @@ export function specialHitLandmark(s: GameState): void {
   const b = lm.body;
   if (!b || lm.st !== 'sit' || b.floors.length === 0) return;
   const mat = b.floors[0].mat;
-  if (damageBody(s, lm, SPECIAL.MOON_DMG)) s.events.push({ kind: 'floorCollapse', y: b.y, mat });
+  if (damageBody(s, lm, dmg)) s.events.push({ kind: 'floorCollapse', y: b.y, mat });
   else s.events.push({ kind: 'bossHit', y: b.y });
 }
 

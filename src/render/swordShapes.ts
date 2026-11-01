@@ -13,16 +13,11 @@ const GRIP = '<path d="M53 228 L67 228 Q70 262 66 292 L56 294 Q50 262 53 228 Z"/
 const LICKS = '<path d="M64 96 C78 86 90 70 86 40 C96 66 92 94 70 110 Z"/><path d="M62 58 C72 50 80 40 76 18 C86 40 82 60 66 68 Z"/><path d="M68 136 C84 126 90 112 84 92 C94 112 90 138 72 150 Z"/><path d="M56 84 C40 74 34 56 40 30 C34 58 40 82 52 96 Z"/><path d="M58 42 C50 34 46 24 50 8 C44 26 48 42 56 50 Z"/><path d="M52 122 C38 112 32 96 36 76 C30 100 36 124 48 136 Z"/>';
 /** 불꽃 혀 끝의 참격 노랑 — 혀 여섯을 끝점 기준 0.55로 줄인 같은 모양(먹 혀 안에 든다) */
 const LICKY = '<path class="y" d="M73.9 70.8 C81.6 65.3 88.2 56.5 86 40 C91.5 54.3 89.3 69.7 77.2 78.5 Z"/><path class="y" d="M68.3 40 C73.8 35.6 78.2 30.1 76 18 C81.5 30.1 79.3 41.1 70.5 45.5 Z"/><path class="y" d="M75.2 116.2 C84 110.7 87.3 103 84 92 C89.5 103 87.3 117.3 77.4 123.9 Z"/><path class="y" d="M48.8 59.7 C40 54.2 36.7 44.3 40 30 C36.7 45.4 40 58.6 46.6 66.3 Z"/><path class="y" d="M54.4 26.7 C50 22.3 47.8 16.8 50 8 C46.7 17.9 48.9 26.7 53.3 31.1 Z"/><path class="y" d="M44.8 101.3 C37.1 95.8 33.8 87 36 76 C32.7 89.2 36 102.4 42.6 109 Z"/>';
-/** 그라인더 원판 톱니 8 */
-const TEETH = (() => {
-  let s = '';
-  const r = 44, cx = 60, cy = 72;
+/** 그라인더 반달 안전 덮개 — 원판 뒤쪽(손잡이 쪽) 반을 감싸는 초승달. 원판과 한지색 틈(r 44~48)을 두고 떠 있다 */
+const GUARD_ARC = (() => {
+  const cx = 60, cy = 72, R = 55, r = 48, a0 = (12 * Math.PI) / 180, a1 = (168 * Math.PI) / 180;
   const p = (ra: number, ang: number): string => `${(cx + ra * Math.cos(ang)).toFixed(1)} ${(cy + ra * Math.sin(ang)).toFixed(1)}`;
-  for (let k = 0; k < 8; k++) {
-    const a = ((k * 45 + 22) * Math.PI) / 180;
-    s += `<path d="M${p(r, a - 0.16)} L${p(r + 17, a + 0.05)} L${p(r, a + 0.16)} Z"/>`;
-  }
-  return s;
+  return `<path d="M${p(R, a0)} A${R} ${R} 0 0 1 ${p(R, a1)} L${p(r, a1)} A${r} ${r} 0 0 0 ${p(r, a0)} Z"/>`;
 })();
 
 /** 품목 id(무기 열둘 + mask) → 칼 그림 속(120×300). 모르는 id는 철거칼 */
@@ -39,8 +34,8 @@ export const SWORDS: Readonly<Record<string, string>> = {
   hammer: '<path d="M14 36 L106 32 Q112 34 110 60 L108 98 Q106 104 98 102 L16 100 Q10 98 10 80 Z"/><path class="p" d="M22 48 L40 46 L40 54 L22 56 Z"/><path d="M53 102 L67 102 Q71 200 66 294 L56 296 Q49 200 53 102 Z"/>',
   /** 빠루 = 굵은 지렛대 + 끝이 갈라진 갈고리 + 납작한 발 */
   crowbar: '<path d="M44 292 L44 86 Q44 42 70 32 Q96 24 108 48 L112 66 L98 70 L94 56 Q86 44 74 48 Q60 54 60 86 L60 292 Z"/><path class="p" d="M100 44 L118 58 L108 72 Z"/><path d="M36 288 L70 288 L74 300 L34 300 Z"/>',
-  /** 그라인더 = 톱니 8 원판 + 가운데 축 + 아래 손잡이 + 옆 손잡이 */
-  grinder: TEETH + '<circle cx="60" cy="72" r="44"/><circle class="p" cx="60" cy="72" r="11"/><path d="M52 114 L68 114 L70 294 L50 294 Z"/><path d="M66 150 L110 140 L112 154 L68 164 Z"/>',
+  /** 그라인더 = 톱니 없는 매끈한 원판 + 가운데 축 + 반달 덮개 + 아래 손잡이 + 옆 손잡이 */
+  grinder: '<circle cx="60" cy="72" r="44"/><circle class="p" cx="60" cy="72" r="11"/>' + GUARD_ARC + '<path d="M52 114 L68 114 L70 294 L50 294 Z"/><path d="M66 150 L110 140 L112 154 L68 164 Z"/>',
   /** 마스크 = 도트 얼굴 가면 + 양쪽 끈. 칸 아래쪽 절반에 둔다 */
   mask: '<g transform="translate(0 130)"><path d="M22 50 Q60 28 98 50 L100 122 Q60 152 20 122 Z"/><path class="p" d="M30 58 Q60 42 90 58 L92 116 Q60 140 28 116 Z"/><rect x="40" y="70" width="12" height="12"/><rect x="68" y="70" width="12" height="12"/><rect x="44" y="100" width="8" height="8"/><rect x="52" y="106" width="8" height="8"/><rect x="60" y="106" width="8" height="8"/><rect x="68" y="100" width="8" height="8"/><path d="M22 90 L2 72 L7 66 L26 82 Z"/><path d="M98 90 L118 72 L113 66 L94 82 Z"/></g>',
 };

@@ -140,6 +140,10 @@ export const COSMETIC_ORBIT_COST = 40;
 export const ORBIT_COSTS: Readonly<Record<string, number>> = {
   ageba: WAZA_ORBIT_COST,
   tetsu: WAZA_ORBIT_COST,
+  baram: WAZA_ORBIT_COST,
+  mukjul: 120,
+  nakgwan: 120,
+  dalmuri: 160,
   tenchi: 0,
   ink: 0,
   amber: COSMETIC_ORBIT_COST,

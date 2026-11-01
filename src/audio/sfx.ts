@@ -11,7 +11,7 @@ export type SfxName =
   | 'zap' | 'zap2' | 'zap3'
   | 'bossHit' | 'bossRoar' | 'bossDefeat' | 'uiBlip' | 'uiDeny' | 'perfect'
   | 'hitHammer' | 'hitBar' | 'hitGrind' | 'supply' | 'hatBreak' | 'hatGet'
-  | 'hitLow' | 'hitTick' | 'incoming' | 'specialCharge' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd'
+  | 'hitLow' | 'hitTick' | 'incoming' | 'specialCharge' | 'inkSnap' | 'sheathe' | 'gust' | 'uiOk' | 'uiBack' | 'coin' | 'stamp' | 'milestone' | 'checkpoint' | 'runEnd'
   // 명물 보스(작업 지시서) — 똑딱 · 댕 · 깡 · 퉁 · 휘파람 · 풍경 · 끼릭 · 철컥
   | 'clockTick' | 'bellToss' | 'bellBody' | 'bellClang' | 'bellThud' | 'windIn' | 'windOut' | 'chime' | 'craneRatchet' | 'craneClunk'
   // 2판 기믹 예고 — 댕댕(공중 가드 2점) · 쾅(시보) · 맑은 종(13시) · 나무 소리(구층탑) · 탁(줄 끊김)
@@ -467,6 +467,24 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   specialCharge: (ctx, dest, t, rate) => {
     playNoise(ctx, dest, t, 0.17, 0.3, { filterType: 'bandpass', freqStart: 400, freqEnd: 3800, q: 3, attack: 0.15 });
     playOsc(ctx, dest, t, 'sawtooth', 160, 0.17, 0.12, rate, { freqEnd: 900, attack: 0.15 });
+  },
+
+  // 시간차 필살(11-01) — 먹줄이 팽팽하게 튕긴다(낮은 현 한 번, 떨림이 잦아든다)
+  inkSnap: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'triangle', 196, 0.32, 0.42, rate, { freqEnd: 188, attack: 0.001 });
+    playOsc(ctx, dest, t, 'sine', 392, 0.18, 0.16, rate, { freqEnd: 380, attack: 0.001 });
+    playNoise(ctx, dest, t, 0.025, 0.22, { filterType: 'highpass', freqStart: 2600 });
+  },
+  // 칼을 거둔다 — 칼집을 스치는 쇳소리 + 맨 끝 「착」
+  sheathe: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.14, 0.16, { filterType: 'bandpass', freqStart: 4200, freqEnd: 1800, q: 6, attack: 0.02 });
+    playOsc(ctx, dest, t + 0.15, 'square', 1500, 0.018, 0.2, rate, { attack: 0.001 });
+    playOsc(ctx, dest, t + 0.15, 'sine', 180, 0.07, 0.3, rate, { freqEnd: 90, attack: 0.001 });
+  },
+  // 검풍 — 아래에서 위로 짧게 쓸고 가는 바람
+  gust: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.26, 0.34, { filterType: 'bandpass', freqStart: 500, freqEnd: 2600, q: 2.2, attack: 0.05 });
+    playOsc(ctx, dest, t, 'sine', 240, 0.2, 0.08, rate, { freqEnd: 520, attack: 0.04 });
   },
 
   // 다음 건물이 떨어지기 직전 — 작은 하강 휘파람

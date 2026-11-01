@@ -7,7 +7,8 @@ import type {
   PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
   FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId, GreatswordId,
 } from '../core/types';
-import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS, MASK_DRAW } from '../config';
+import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS, MASK_DRAW, SLASH_INK, WEAPON_INK } from '../config';
+import { PRESS, brushPath } from './ink';
 import { drawAsset, drawAssetHalo, hasAsset } from './assets';
 import { drawHalo, haloFor } from './halo';
 import { drawExecutor } from './executor';
@@ -566,7 +567,6 @@ export interface GreatLook {
   hi: string;     // 날 위 빛줄
   guard: string;  // 코등이·자루 끝
   w: number;      // 칼날 반폭(논리 px)
-  glow?: string;  // 칼날 뒤로 번지는 기운
   edge?: string;  // 붉은 날 선(흑철) · 보석(황금)
 }
 const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
@@ -574,8 +574,8 @@ const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
   saw: { shape: 'saw', blade: '#98A3AB', hi: '#E3E9ED', guard: '#3E4549', w: 2.6 },
   hazard: { shape: 'stripe', blade: PALETTE.YELLOW, hi: '#FFF0A0', guard: PALETTE.INK, w: 3 },
   beam: { shape: 'beam', blade: '#C2552D', hi: '#EA9068', guard: '#5A2A18', w: 3.3 },
-  flame: { shape: 'wave', blade: '#E0401E', hi: '#FFB46B', guard: '#3A1A12', w: 2.8, glow: '#FF8A1F' },
-  frost: { shape: 'crystal', blade: '#BDE6F6', hi: '#FFFFFF', guard: '#3D6E8C', w: 2.9, glow: '#7FD3FF' },
+  flame: { shape: 'wave', blade: '#E0401E', hi: '#FFB46B', guard: '#3A1A12', w: 2.8 },
+  frost: { shape: 'crystal', blade: '#BDE6F6', hi: '#FFFFFF', guard: '#3D6E8C', w: 2.9 },
   onyx: { shape: 'jag', blade: '#2E2D34', hi: '#625F6D', guard: PALETTE.INK, w: 3, edge: '#D2332C' },
   gold: { shape: 'royal', blade: '#E2B43A', hi: '#FFF1B8', guard: '#8A5A12', w: 3.2, edge: PALETTE.RED },
 };
@@ -583,15 +583,6 @@ const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
 /** 대검이면 그 모양·색 — 베기 파편(effects)도 같은 색을 쓴다 */
 export function greatLook(w: WeaponId): GreatLook | undefined {
   return (GREAT_LOOK as Partial<Record<WeaponId, GreatLook>>)[w];
-}
-
-function seg(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, color: string, w: number): void {
-  c.strokeStyle = color;
-  c.lineWidth = w;
-  c.beginPath();
-  c.moveTo(x0, y0);
-  c.lineTo(x1, y1);
-  c.stroke();
 }
 
 /** 칼 몸 그림 한 조각 — 상점 실루엣(swordShapes)의 path를 Path2D로 풀어 둔 것 */
@@ -631,24 +622,10 @@ function swordBody(c: CanvasRenderingContext2D, id: string, hx: number, hy: numb
   c.restore();
 }
 
-/** 대검 — 손(hx,hy)에서 칼끝(tx,ty)까지가 칼날. 몸은 상점 그림, 칼날 뒤로 번지는 기운(glow)만 여기서 깐다 */
-function greatsword(c: CanvasRenderingContext2D, id: string, g: GreatLook, hx: number, hy: number, tx: number, ty: number): void {
-  if (g.glow) {
-    c.save();
-    c.translate(hx, hy);
-    c.rotate(Math.atan2(ty - hy, tx - hx));
-    c.lineCap = 'round';
-    c.globalAlpha = 0.35;
-    seg(c, 4.4, 0, Math.hypot(tx - hx, ty - hy) - 2, 0, g.glow, g.w * 2 + 5);
-    c.restore();
-  }
-  swordBody(c, id, hx, hy, tx, ty);
-}
-
-/** 대검 하나만 — 상점 그림. 판 속 칼과 같은 그리기에 손·칼끝만 받는다. 대검이 아니면 false */
+/** 대검 하나만 — 상점 그림. 판 속 칼과 같은 그리기에 손·칼끝만 받는다. 대검이 아니면 false(반투명 기운은 11-01 먹 2판에서 뺐다 — 칼 기운은 bladeAura가 먹 획으로) */
 export function drawGreatsword(c: CanvasRenderingContext2D, w: WeaponId, hx: number, hy: number, tx: number, ty: number): boolean {
   const g = greatLook(w);
-  if (g) greatsword(c, w, g, hx, hy, tx, ty);
+  if (g) swordBody(c, w, hx, hy, tx, ty);
   return g !== undefined;
 }
 
@@ -661,7 +638,7 @@ function weapon(
   const g = greatLook(playerWeapon);
   if (g) {
     const [gx, gy, gtx, gty] = great ?? [hx, hy, tx, ty];
-    greatsword(c, playerWeapon, g, gx, gy, gtx, gty);
+    swordBody(c, playerWeapon, gx, gy, gtx, gty);
     bakedBlade = [gx, gy, gtx, gty];
     return;
   }
@@ -706,149 +683,118 @@ function arcBand(
   c.closePath();
 }
 
-/** 네 갈래 반짝 별 — 황금 호·베기 파편. 잉크 테두리라 밝은 바탕에서도 보인다 */
-export function twinkleStar(c: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string): void {
-  c.beginPath();
-  for (let k = 0; k < 8; k++) {
-    const a = (k * Math.PI) / 4 - Math.PI / 2;
-    const rr = k % 2 ? r * 0.32 : r;
-    c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-  }
-  c.closePath();
-  c.fillStyle = fill;
-  c.fill();
-  c.strokeStyle = PALETTE.INK;
-  c.lineWidth = 0.7;
-  c.stroke();
-}
-
-/** 대검 참격 호 — 칼마다 모양·덧칠이 다르고 몸통은 칼빛 */
+/**
+ * 대검 참격 호 — 먹 띠 + 그 칼의 포인트 색 속(config WEAPON_INK, 「먹 한 획」 2판 11-01).
+ * 칼끝 쪽(t 0)이 두껍고, 휘두르기 시작한 꼬리(t → 1)는 붓털이 갈라진 비백으로 빠진다. 칼마다 붓 결만 다르다 —
+ * 톱날은 갈래가 많은 거친 꼬리, 철골은 각진 띠, 서리는 일곱 마디로 꺾인 띠, 공사중은 노랑 속을 먹 빗금이 가른다.
+ */
 function greatArc(c: CanvasRenderingContext2D, g: GreatLook): void {
-  const crescent = (T: number): void => arcBand(c, (t) => T * 0.3 * smear(t), (t) => T * 0.7 * smear(t));
-  const base = c.globalAlpha; // 잔상(drawGreatArc)은 옅게 그린다 — 덧칠 알파는 그 위에 곱한다
-  const paint = (color: string, a = 1): void => {
-    c.globalAlpha = base * a;
+  const core = WEAPON_INK[playerWeapon as keyof typeof WEAPON_INK] ?? ARC;
+  const band = (T: number, color: string, n = 24, t0 = 0, t1 = 0.86): void => {
+    arcBand(c, (t) => T * 0.36 * smear(t), (t) => T * 0.64 * smear(t), n, t0, t1);
     c.fillStyle = color;
     c.fill();
-    c.globalAlpha = base;
   };
-  const line = (color: string, w: number): void => {
-    c.strokeStyle = color;
-    c.lineWidth = w;
-    c.stroke();
+  /** 비백 꼬리 — 가는 갈래 k개가 t0부터 벌어지며 끝으로 뾰족해진다 */
+  const bristles = (k: number, T: number, t0: number): void => {
+    c.fillStyle = PALETTE.INK;
+    for (let j = 0; j < k; j++) {
+      const o = (j - (k - 1) / 2) * T * 0.34;
+      const h = T * (0.16 + 0.06 * ((j * 7) % 3));
+      const t1 = 1 - 0.04 * ((j * 5) % 4);
+      const taper = (t: number): number => h * Math.max(0, 1 - (t - t0) / (t1 - t0)) ** 0.7;
+      const spread = (t: number): number => o * (0.4 + 0.6 * (t - t0) / (1 - t0));
+      arcBand(c, (t) => spread(t) + taper(t), (t) => taper(t) - spread(t), 12, t0, t1);
+      c.fill();
+    }
   };
   c.save();
   c.lineJoin = 'round';
   c.lineCap = 'round';
   switch (g.shape) {
-    case 'saw': // 바깥 날이 톱니
-      arcBand(c, (t, i) => (i % 2 ? 4.8 : 2.2) * smear(t), (t) => 5 * smear(t));
-      paint(ARC);
-      line(PALETTE.INK, 0.8);
+    case 'saw': // 거친 붓 — 갈래가 많고 일찍 갈라진다(톱질 자국)
+      band(8, PALETTE.INK, 24, 0, 0.6);
+      bristles(5, 8, 0.38);
+      band(3, core, 24, 0.04, 0.4);
       break;
-    case 'stripe': // 차단봉 빗금 띠
-      crescent(9);
-      paint(ARC);
+    case 'stripe': // 노랑 속을 먹 빗금이 가른다
+      band(10, PALETTE.INK);
+      bristles(3, 9, 0.62);
+      band(5, core, 24, 0.04, 0.62);
       c.save();
       c.clip();
-      c.beginPath();
-      for (let k = -70; k < 90; k += 6.5) {
-        c.moveTo(k, -20);
-        c.lineTo(k + 80, 60);
-      }
-      line(PALETTE.INK, 2.4);
-      c.restore();
-      crescent(9);
-      line(PALETTE.INK, 0.8);
-      break;
-    case 'beam': // 뭉툭하고 굵은 철골 토막 + 리벳 — 짧게 끊는다
-      arcBand(c, () => 7.5, () => 7.5, 16, 0, 0.8);
-      paint(ARC, 0.22);
-      arcBand(c, () => 4.5, () => 4.5, 16, 0.03, 0.7);
-      paint(ARC);
-      line(PALETTE.INK, 1);
       c.fillStyle = PALETTE.INK;
-      for (const t of [0.13, 0.28, 0.43, 0.58]) {
-        const [x, y] = arcAt(t, 0);
+      for (let k = -70; k < 90; k += 7) {
         c.beginPath();
-        c.arc(x, y, 1.1, 0, Math.PI * 2);
+        c.moveTo(k, -20);
+        c.lineTo(k + 2.4, -20);
+        c.lineTo(k + 82.4, 60);
+        c.lineTo(k + 80, 60);
+        c.closePath();
+        c.fill();
+      }
+      c.restore();
+      break;
+    case 'beam': // 각진 띠 — 세 마디, 짧게 끊는다
+      arcBand(c, () => 4.2, () => 4.2, 3, 0, 0.78);
+      c.fillStyle = PALETTE.INK;
+      c.fill();
+      arcBand(c, () => 1.4, () => 1.4, 3, 0.04, 0.62);
+      c.fillStyle = core;
+      c.fill();
+      break;
+    case 'crystal': // 일곱 마디로 꺾인 띠
+      band(8, PALETTE.INK, 7);
+      bristles(3, 7, 0.66);
+      band(3, core, 7, 0.04, 0.6);
+      break;
+    case 'jag': // 가장 짙고 넓은 먹, 바깥 날에만 자주 한 줄
+      band(12, PALETTE.INK);
+      bristles(4, 10, 0.6);
+      c.beginPath();
+      arcPath(c, (t) => 4 * smear(t), 24, 0.04, 0.6);
+      c.strokeStyle = core;
+      c.lineWidth = 1.5;
+      c.stroke();
+      break;
+    case 'wave': // 먹 띠 + 바깥으로 말려 오르는 불 혀 셋
+      band(8, PALETTE.INK);
+      bristles(3, 7, 0.64);
+      band(3, core, 24, 0.04, 0.55);
+      c.fillStyle = PALETTE.INK;
+      for (const t of [0.2, 0.38, 0.56]) {
+        const s = smear(t);
+        const [ax, ay] = arcAt(t - 0.04, 2.6 * s);
+        const [bx, by] = arcAt(t + 0.07, 9 * s);
+        const [cx, cy] = arcAt(t + 0.04, 2.6 * s);
+        c.beginPath();
+        c.moveTo(ax, ay);
+        c.quadraticCurveTo(bx - 3, by + 3, bx, by);
+        c.quadraticCurveTo(bx - 1, by + 4, cx, cy);
+        c.closePath();
         c.fill();
       }
       break;
-    case 'wave': // 바깥으로 날름이는 불혀(뾰족한 끝 = 1 − |sin|), 속은 칼빛
-      arcBand(c, (t) => (2.5 + 3.5 * (1 - Math.abs(Math.sin(t * 16)))) * smear(t), (t) => 6 * smear(t), 40);
-      paint(g.glow ?? g.blade, 0.9);
-      arcBand(c, (t) => 1.2 * smear(t), (t) => 4.4 * smear(t));
-      paint(ARC);
-      break;
-    case 'crystal': { // 각진 얼음 + 흰 결 + 떨어져 나간 조각 셋
-      const out = (t: number): number => 3 * smear(t);
-      const inn = (t: number): number => 5.5 * smear(t);
-      arcBand(c, out, inn, 7);
-      paint(ARC);
-      c.beginPath();
-      for (let i = 1; i < 7; i++) {
-        const [ax, ay] = arcAt(i / 7, out(i / 7));
-        const [bx, by] = arcAt((i + 1) / 7, -inn((i + 1) / 7));
-        c.moveTo(ax, ay);
-        c.lineTo(bx, by);
-      }
-      line(g.hi, 0.8);
-      arcBand(c, out, inn, 7);
-      line(PALETTE.INK, 0.8);
-      for (const [t, r] of [[0.18, 2.6], [0.4, 2.2], [0.62, 1.8]] as const) {
-        const [x, y] = arcAt(t, out(t) + 3.5 + r);
+    case 'royal': // 금 속 + 먹 띠에 박힌 금박 셋(띠 밖에 떠 있으면 스티커로 읽힌다)
+      band(9, PALETTE.INK);
+      bristles(3, 8, 0.62);
+      band(4, core, 24, 0.04, 0.6);
+      for (const [t, r] of [[0.14, 2.6], [0.36, 2.1], [0.58, 1.7]] as const) {
+        const [x, y] = arcAt(t, 4.5 * smear(t));
         c.beginPath();
-        c.moveTo(x, y - r);
-        c.lineTo(x + r * 0.9, y + r * 0.7);
-        c.lineTo(x - r * 0.8, y + r * 0.5);
+        c.moveTo(x - r, y - r * 0.5);
+        c.lineTo(x + r * 0.7, y - r);
+        c.lineTo(x + r, y + r * 0.6);
+        c.lineTo(x - r * 0.6, y + r * 0.8);
         c.closePath();
-        paint(g.blade);
-        line(PALETTE.INK, 0.7);
+        c.fillStyle = core;
+        c.fill();
       }
       break;
-    }
-    case 'jag': // 검은 기운에 싸인 초승달 — 바깥은 붉은 날, 몸 쪽으로 미늘
-      arcBand(c, (t) => 4.5 * smear(t), (t) => 8.5 * smear(t));
-      paint(PALETTE.INK, 0.9);
-      c.beginPath();
-      for (const t of [0.22, 0.42, 0.62]) {
-        const s = smear(t);
-        const [ax, ay] = arcAt(t - 0.05, -8 * s);
-        const [bx, by] = arcAt(t + 0.01, -11.5 * s);
-        const [cx, cy] = arcAt(t + 0.06, -8 * s);
-        c.moveTo(ax, ay);
-        c.lineTo(bx, by);
-        c.lineTo(cx, cy);
-      }
-      paint(PALETTE.INK, 0.9);
-      crescent(7);
-      paint(ARC);
-      c.beginPath();
-      arcPath(c, (t) => 4.5 * smear(t));
-      line(g.edge ?? PALETTE.RED, 1.4);
-      break;
-    case 'royal': // 금테 두른 초승달 + 반짝 별 셋
-      crescent(9);
-      paint(ARC);
-      c.beginPath();
-      arcPath(c, (t) => 2.7 * smear(t));
-      line(g.blade, 1.8);
-      crescent(9);
-      line(PALETTE.INK, 0.6);
-      for (const [t, r] of [[0.12, 4.2], [0.5, 3.2], [0.85, 2.4]] as const) {
-        const [x, y] = arcAt(t, 2.7 * smear(t));
-        twinkleStar(c, x, y, r, g.hi);
-      }
-      break;
-    default: // 무쇠 — 군더더기 없는 두꺼운 초승달 + 옅은 잔상, 바깥 날만 잉크
-      crescent(15);
-      paint(ARC, 0.25);
-      crescent(8);
-      paint(ARC);
-      c.beginPath();
-      arcPath(c, (t) => 2.4 * smear(t));
-      line(PALETTE.INK, 0.9);
+    default: // 무쇠 — 가장 넓은 붓, 군더더기 없음
+      band(13, PALETTE.INK);
+      bristles(4, 11, 0.6);
+      band(4, core, 24, 0.04, 0.55);
   }
   c.restore();
 }
@@ -860,41 +806,27 @@ function slashArc(c: CanvasRenderingContext2D): void {
     greatArc(c, g);
     return;
   }
-  c.strokeStyle = ARC;
-  c.lineCap = 'round';
-  c.beginPath();
-  switch (playerWeapon) {
-    case 'hammer':   // 짧고 굵게
-      c.lineWidth = 5.5;
-      c.moveTo(WCX + 31, 50);
-      c.quadraticCurveTo(WCX + 36, 38, WCX + 28, 28);
-      break;
-    case 'crowbar':  // 위로 더 길게
-      c.lineWidth = 3;
-      c.moveTo(WCX + 31, 52);
-      c.quadraticCurveTo(WCX + 42, 20, WCX + 14, -4);
-      break;
-    case 'grinder':  // 원판에서 시작
-      c.lineWidth = 3;
-      c.moveTo(WCX + 29, 40);
-      c.quadraticCurveTo(WCX + 34, 22, WCX + 18, 10);
-      break;
-    default:         // 칼끝에서 시작해 위로 휘어지는 호
-      c.lineWidth = 3;
-      c.moveTo(WCX + 30, 50);
-      c.quadraticCurveTo(WCX + 34, 26, WCX + 18, 10);
+  // 연장 — 휘두른 자리에서 댄 데가 굵고 끝이 빠지는 먹 한 획 + 앞쪽 획 속만 그 연장 포인트 색(먹 한 획 2판)
+  const [x0, y0, qx, qy, x1, y1, w] = TOOL_ARC[playerWeapon as keyof typeof TOOL_ARC] ?? TOOL_ARC.sword;
+  const pts: number[] = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    const u = 1 - t;
+    pts.push(WCX + u * u * x0 + 2 * u * t * qx + t * t * x1, u * u * y0 + 2 * u * t * qy + t * t * y1);
   }
-  c.stroke();
-  if (playerWeapon === 'grinder') {
-    // 원판에서 튀는 불꽃 틱 3개
-    c.lineWidth = 1.5;
-    c.beginPath();
-    c.moveTo(WCX + 31, 46); c.lineTo(WCX + 35, 48);
-    c.moveTo(WCX + 31, 43); c.lineTo(WCX + 36, 42);
-    c.moveTo(WCX + 29, 49); c.lineTo(WCX + 32, 52);
-    c.stroke();
-  }
+  c.fillStyle = PALETTE.INK;
+  brushPath(c, pts, w, 0, 1, 0.45, 7, PRESS.flick);
+  c.fillStyle = playerWeapon === 'sword' ? SLASH_INK[ARC.toUpperCase()] ?? ARC : WEAPON_INK[playerWeapon as keyof typeof WEAPON_INK];
+  brushPath(c, pts, w * 0.36, 0.04, 0.55, 0, 7, PRESS.flick);
 }
+
+/** 연장 참격 호 — [시작 x, y, 굽이 x, y, 끝 x, y](x는 WCX 기준) + 붓 굵기. 오함마 짧고 굵게 · 빠루 위로 길게 · 그라인더 원판에서 */
+const TOOL_ARC = {
+  sword: [30, 50, 34, 26, 18, 10, 5.5],
+  hammer: [31, 50, 36, 38, 28, 28, 8],
+  crowbar: [31, 52, 42, 20, 14, -4, 5],
+  grinder: [29, 40, 34, 22, 18, 10, 5],
+} as const;
 
 function buildIdle(): PFrame {
   const { cv, c } = mkFrame(STAND_W, STAND_H);
@@ -1437,10 +1369,18 @@ export function drawPlayer(
   ctx.restore();
 }
 
-/** 대검 참격 호 위의 점(발 기준) — t 0 칼끝 쪽 · 1 휘두르기 시작한 쪽, off = 바깥으로 */
-export function greatArcPoint(t: number, off = 0): [number, number] {
+/**
+ * 대검 참격 호 위의 점(발 기준) — t 0 칼끝 쪽 · 1 휘두르기 시작한 쪽, off = 바깥으로.
+ * turn · grow = 어깨를 축으로 더 돌고 커진 호(연타 줄 박자의 붓 잔상 — bladeFx trail)
+ */
+export function greatArcPoint(t: number, off = 0, turn = 0, grow = 1): [number, number] {
   const [x, y] = arcAt(t, off);
-  return [x - WCX, y - FOOT_Y];
+  if (turn === 0 && grow === 1) return [x - WCX, y - FOOT_Y];
+  const dx = (x - WCX - 10) * grow;
+  const dy = (y - SHOULDER_Y) * grow;
+  const c = Math.cos(turn);
+  const sn = Math.sin(turn);
+  return [10 + dx * c - dy * sn, SHOULDER_Y - FOOT_Y + dx * sn + dy * c];
 }
 
 /** 지금 프레임의 대검 칼날 — 발 기준 [손x, 손y, 칼끝x, 칼끝y](숨쉬기 포함). 대검이 아니거나 칼이 없는 포즈면 null */
@@ -1449,22 +1389,6 @@ export function playerBlade(pose: PlayerPose, animTick: number): Seg | null {
   const b = pickPlayerFrame(pose, animTick).blade;
   const bob = playerBob(pose, animTick);
   return b && [b[0], b[1] + bob, b[2], b[3] + bob];
-}
-
-/** 대검 참격 호를 발 자리에 다시 그린다(잔상) — 어깨를 축으로 turn만큼 더 돌고 grow배로 커진다 */
-export function drawGreatArc(
-  ctx: CanvasRenderingContext2D, w: WeaponId, footX: number, footY: number, alpha: number, turn = 0, grow = 1,
-): void {
-  const g = greatLook(w);
-  if (!g || alpha <= 0.01) return;
-  ctx.save();
-  ctx.globalAlpha *= alpha;
-  ctx.translate(footX + 10, footY - (FOOT_Y - SHOULDER_Y));
-  ctx.rotate(turn);
-  ctx.scale(grow, grow);
-  ctx.translate(-(WCX + 10), -SHOULDER_Y);
-  greatArc(ctx, g);
-  ctx.restore();
 }
 
 /** groundY = 캔버스상 지면 y. floors[0]=최하층이 stack.y(물리, 지면0·위+)에서 시작해 위로 쌓임.

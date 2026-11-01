@@ -2,7 +2,7 @@
 // 수치/페이즈 id는 config·core가 정본. 여기는 표시용 문자열만.
 // 멸망해가는 지구. 하늘이 건물을 뽑아 던지고, 자격 없는 졸라맨이 벤다.
 
-import type { Act2Phase, ItemId, Theme, WeaponId } from '../core/types';
+import type { Act2Phase, ItemId, Theme, WazaId, WeaponId } from '../core/types';
 import type { FxSlot, Tier } from '../meta/tier';
 
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
@@ -189,7 +189,7 @@ export const OPERATIONS: readonly OperationCopy[] = [
 ];
 
 /** 장착 필살 1종. 효과 수치는 config·core 정본 — 문구만. */
-export type WazaCopyId = 'tenchi' | 'ageba' | 'tetsu';
+export type WazaCopyId = WazaId;
 
 export interface WazaCopy {
   id: WazaCopyId;
@@ -216,6 +216,30 @@ export const WAZA_COPY: Record<WazaCopyId, WazaCopy> = {
     name: '철벽',
     desc: '부수지 않는다. 튕기고 버틴다.',
     blurb: '부수지 않는다. 튕기고 버틴다.',
+  },
+  mukjul: {
+    id: 'mukjul',
+    name: '먹줄치기',
+    desc: '건물을 멈춰 두고 통째로 가른다. 층 점수 두 배.',
+    blurb: '먹줄을 튕겨 두고, 칼을 거두면 갈라진다.',
+  },
+  dalmuri: {
+    id: 'dalmuri',
+    name: '달무리',
+    desc: '오래 멈췄다가 세로로 가른다. 보스에 가장 세다.',
+    blurb: '달을 그려 두고, 한가운데를 가른다.',
+  },
+  nakgwan: {
+    id: 'nakgwan',
+    name: '낙관',
+    desc: '열두 번 휘갈기고 도장을 찍는다. 콤보가 오른다.',
+    blurb: '열두 군데 서명하고, 마지막에 도장.',
+  },
+  baram: {
+    id: 'baram',
+    name: '먹바람',
+    desc: '검풍 셋으로 치고 띄운다. 번개와 포탄을 쓸어 낸다.',
+    blurb: '부수지 않고, 하늘을 쓸어 낸다.',
   },
 };
 

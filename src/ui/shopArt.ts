@@ -3,11 +3,10 @@
 // drawPlayer는 sprites의 전역 상태(무기·몸 색·칼빛)를 쓰므로, 찍고 나면 restoreLook으로 장착 상태로 되돌린다.
 
 import { COSMETIC_COLORS, PALETTE, PLAYER } from '../config';
-import { ONOMATO } from '../content/juice';
 import type { PlayerPose, WazaId } from '../core/types';
 import type { Loadout, WeaponId } from '../meta/types';
 import { drawBladeShot } from '../render/bladeFx';
-import { drawWazaShot } from '../render/weaponFx';
+import { drawWazaShot } from '../render/wazaShow';
 import { MASK_DRAW } from '../config';
 import { drawGreatsword, drawMask, drawPlayer, playerHead, setPlayerCosmetics, setPlayerWeapon } from '../render/sprites';
 
@@ -23,7 +22,7 @@ export interface Look {
 const ART_W = 80;
 const ART_H = 79;
 const FOOT_Y = 74;
-/** 필살 칸 — 판에서처럼 의성어가 머리 위에 뜬다. 그 한 줄(약 24)만큼 위로 길다 */
+/** 필살 칸 — 필살 연출이 머리 위로 솟는다(낙뢰 · 쳐올림). 그만큼 위로 길다 */
 const WAZA_H = 96;
 /** 대검 칸 — 칼만 눕혀 그려 가로로 길다 */
 const SWORD_H = 60;
@@ -148,15 +147,13 @@ export function lettersArt(id: string): string {
   }, true);
 }
 
-/** 필살 그림 — 필살 포즈 + 졸라맨 뒤에 그 필살이 터진 한 장면(셋이 다 다르다) + 머리 위 그 말 */
+/** 필살 그림 — 판 화면을 줄인 한 장면: 건물 · 필살 자세 졸라맨(장착한 칼 · 색) · 그 필살의 먹 연출(일곱이 다 다르다). 글자 딱지 없음(11-01) */
 export function wazaArt(id: string, look: Omit<Look, 'pose'>): string {
-  const word = id === 'tetsu' ? ONOMATO.specialTetsu : id === 'ageba' ? ONOMATO.specialAgeba : ONOMATO.special;
   return snap(`w|${id}|${look.weapon}|${look.body}|${look.blade}`, WAZA_H, (ctx) => {
-    const footY = WAZA_H - (ART_H - FOOT_Y);
-    drawWazaShot(ctx, id as WazaId, ART_W / 2, footY);
-    player(ctx, { ...look, pose: 'special' }, footY);
-    popText(ctx, word, ART_W / 2, 19, 16, PALETTE.YELLOW, 5, -0.08);
-  }, true);
+    setPlayerWeapon(look.weapon);
+    setPlayerCosmetics(colorOf('body', look.body), colorOf('blade', look.blade));
+    drawWazaShot(ctx, id as WazaId, ART_W / 2, WAZA_H - 4, 0.24);
+  });
 }
 
 /** 마스크 그림 — 마스크 쓴 졸라맨(서 있는 자세)의 윗몸을 크게. 그림 문자열이 캐시 키에 들어 다시 그리면 새 그림이 찍힌다 */

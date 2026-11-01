@@ -7,7 +7,7 @@ import { enterBonus } from '../core/sim';
 import { enterAct2Phase } from '../core/act2';
 import { GUARD_GAUGE, PLAYER, SCORE, TICK, WAZA_GAUGE } from '../config';
 import { freezeSaves, loadSave, saveSave } from '../storage';
-import { WEAPON_IDS } from '../meta/loadout';
+import { WAZA_IDS, WEAPON_IDS } from '../meta/loadout';
 import { phaseName } from '../content';
 import { playSfx } from '../audio/audio';
 
@@ -159,7 +159,7 @@ export function mountDebugMenu(getState: () => GameState | null, open = true): v
     sv.act2Cleared = true;
     sv.butterTierReached = 3;
     // 무기 열둘까지 전부 — 시험판에서 상점 · 도감을 끝까지 보려고(10-31 사용자 「내 계정은 테스트용, 다 풀어줘」)
-    sv.owned = [...new Set([...sv.owned, ...WEAPON_IDS, 'tenchi', 'ageba', 'tetsu', 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit', 'mask'])];
+    sv.owned = [...new Set([...sv.owned, ...WEAPON_IDS, ...WAZA_IDS, 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit', 'mask'])];
     sv.dust = Math.max(sv.dust, 999);
     sv.orbit = Math.max(sv.orbit, 999);
     saveSave(sv);
