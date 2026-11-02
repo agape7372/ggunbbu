@@ -18,9 +18,29 @@ export const WAZA_IDS: readonly WazaId[] = ['tenchi', 'ageba', 'tetsu'];
 /** 대검 — 상점은 이 순서(값 오름차순)로 판다 */
 export const GREATSWORD_IDS: readonly GreatswordId[] = ['iron', 'saw', 'hazard', 'beam', 'flame', 'frost', 'onyx', 'gold'];
 export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', ...GREATSWORD_IDS];
-export const BODY_IDS: readonly BodyId[] = ['ink', 'amber', 'slate'];
-export const BLADE_IDS: readonly BladeId[] = ['wire', 'rebar', 'crescent'];
-export const LETTERS_IDS: readonly LettersId[] = ['flyer', 'stamp', 'orbit'];
+export const BODY_IDS: readonly BodyId[] = ['ink', 'amber', 'slate', 'coverall', 'crown', 'ash', 'apron', 's_night', 's_powder', 's_high'];
+export const BLADE_IDS: readonly BladeId[] = ['wire', 'rebar', 'crescent', 'arc', 'royal', 'ember', 'inju', 's_moon', 's_fuse', 's_steel'];
+export const LETTERS_IDS: readonly LettersId[] = ['flyer', 'stamp', 'orbit', 'rivet', 'gilt', 'sprout'];
+/** 상점에서 안 파는 꾸미기 — 꾸러미 · 실적으로만 들어오고, 가진 뒤에만 상점 장착 칸에 보인다 */
+export const LOOK_EARNED: Readonly<Record<string, { name: string; how: string }>> = {
+  coverall: { name: '작업복', how: '신입 꾸러미' },
+  crown: { name: '철거왕', how: '철거왕 세트' },
+  ash: { name: '잿빛', how: '도감 25칸' },
+  arc: { name: '용접불', how: '기사 세트' },
+  royal: { name: '왕실', how: '철거왕 세트' },
+  ember: { name: '불씨', how: '도감 20칸' },
+  rivet: { name: '리벳', how: '기사 세트' },
+  gilt: { name: '금박', how: '철거왕 세트' },
+  sprout: { name: '새싹', how: '신입 졸업' },
+  inju: { name: '인주', how: '첫 결제 선물' },
+  apron: { name: '단골 앞치마', how: '단골 도장 10칸' },
+  s_night: { name: '밤샘', how: '야간 철거 특근 15칸' },
+  s_moon: { name: '달빛', how: '야간 철거 특근 30칸' },
+  s_powder: { name: '화약', how: '폭파 해체 특근 15칸' },
+  s_fuse: { name: '도화선', how: '폭파 해체 특근 30칸' },
+  s_high: { name: '안전띠', how: '고공 철거 특근 15칸' },
+  s_steel: { name: '강철', how: '고공 철거 특근 30칸' },
+};
 export const MASK_IDS: readonly MaskId[] = ['none', 'mask'];
 
 const WAZA_SET: ReadonlySet<string> = new Set(WAZA_IDS);

@@ -1,5 +1,6 @@
 // 마스크(가면) — 사용자가 도트판에 찍은 16×16 그림. 저장 = 가면 목록 save.masks(최대 8장, 장마다 id · 이름 · 그림 문자열).
-// 「가면 공방」(owned 'mask', 먼지 3000)을 연 뒤엔 새 가면을 공짜로 더 만든다. 쓰는 가면 = loadout.mask('mask'면 쓴다) + save.maskId.
+// 새 가면은 한 장마다 값이 든다 — save.blanks(먼지 · 꾸러미 · 출근부로 얻는다)를 하나 쓴다. 있던 장은 몇 번이고 다시 그린다.
+// 첫 장을 만들면 owned에 'mask'가 들어간다. 쓰는 가면 = loadout.mask('mask'면 쓴다) + save.maskId.
 // save.maskArt = 고른 가면의 그림(파생) — 렌더 · 타이틀 · 도감이 아직 이 문자열 하나를 읽는다. 바꾸는 길은 아래 함수들만(syncMaskArt가 맞춘다).
 // 옛 저장(masks 없음): 'mask'를 가졌으면 maskArt가 [{ id: 'm1', name: '내 가면', art }] 한 장이 된다(loadMaskBook).
 // 새 판 = `m2:` 뒤에 칸마다 `.`(빈칸) 또는 색 여섯 자리(16진 소문자). 「색 만들기」로 만든 색도 그대로 담는다.
@@ -199,7 +200,7 @@ export function wornMask(art: string): string {
 // ── 가면 목록 ─────────────────────────────────────────────────────────────
 
 /** 가면 최대 장수 · 이름 최대 글자 수(유니코드 글자 단위) */
-export const MASK_MAX = 8;
+export const MASK_MAX = 100;
 export const MASK_NAME_MAX = 10;
 /** 옛 저장 한 장이 받는 이름 */
 export const MASK_OLD_NAME = '내 마스크';
@@ -216,7 +217,7 @@ export function cleanMaskName(raw: unknown, no: number): string {
   return s || `마스크 ${no}`;
 }
 
-/** 저장에서 읽은 가면 목록 — 모양이 틀린 장은 버리고, id가 겹치면 앞 장만, 8장까지. 그림이 깨진 장은 빈 판으로 살린다 */
+/** 저장에서 읽은 가면 목록 — 모양이 틀린 장은 버리고, id가 겹치면 앞 장만, 상한까지. 그림이 깨진 장은 빈 판으로 살린다 */
 export function validMasks(v: unknown): MaskEntry[] {
   if (!Array.isArray(v)) return [];
   const out: MaskEntry[] = [];
@@ -253,6 +254,7 @@ export interface MaskSave {
   masks: MaskEntry[];
   maskId: string;
   maskArt: string;
+  blanks: number;
   owned: string[];
   loadout: Loadout;
 }
@@ -268,16 +270,11 @@ function syncMaskArt(s: MaskSave): void {
   if (m) s.maskArt = m.art;
 }
 
-/** 공방을 막 열었을 때 — 목록이 비어 있고 옛 그림이 남아 있으면 그 그림이 첫 장이 된다 */
-export function adoptLegacyMask(s: MaskSave): void {
-  if (s.masks.length || maskIsBlank(s.maskArt)) return;
-  s.masks = [{ id: 'm1', name: MASK_OLD_NAME, art: s.maskArt }];
-  s.maskId = 'm1';
-}
-
-/** 새 가면 한 장(공짜) — 공방이 열려 있고 8장 미만일 때만. 그림이 있으면 고르고 바로 쓴다. 못 만들면 null */
+/** 새 가면 한 장 — blanks를 하나 쓴다. 그림이 있으면 고르고 바로 쓴다. 못 만들면 null */
 export function createMask(s: MaskSave, name: unknown, art: string): MaskEntry | null {
-  if (!s.owned.includes('mask') || s.masks.length >= MASK_MAX) return null;
+  if (s.blanks <= 0 || s.masks.length >= MASK_MAX) return null;
+  s.blanks -= 1;
+  if (!s.owned.includes('mask')) s.owned = [...s.owned, 'mask'];
   const no = Math.max(0, ...s.masks.map((m) => idNo(m.id))) + 1;
   const m: MaskEntry = { id: `m${no}`, name: cleanMaskName(name, no), art };
   s.masks = [...s.masks, m];
@@ -299,7 +296,7 @@ export function updateMask(s: MaskSave, id: string, name: unknown, art: string):
   return true;
 }
 
-/** 지우기 — 쓰던 가면이면 벗는다(장착 'none'). 고른 가면이 지워지면 남은 첫 장이 고른 가면 */
+/** 지우기 — 그 장은 없어진다(blanks로 돌려주지 않는다). 쓰던 가면이면 벗는다(장착 'none'). 고른 가면이 지워지면 남은 첫 장이 고른 가면 */
 export function deleteMask(s: MaskSave, id: string): boolean {
   if (!s.masks.some((m) => m.id === id)) return false;
   const worn = wornMaskId(s) === id;
@@ -311,7 +308,7 @@ export function deleteMask(s: MaskSave, id: string): boolean {
   return true;
 }
 
-/** 쓰기 — id = 가면 id 또는 'none'(벗기). 안 산 공방 · 없는 id면 false */
+/** 쓰기 — id = 가면 id 또는 'none'(벗기). 없는 id면 false */
 export function wearMask(s: MaskSave, id: string): boolean {
   if (id === 'none') {
     s.loadout = { ...s.loadout, mask: 'none' };

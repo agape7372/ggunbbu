@@ -17,14 +17,19 @@ import { createStageUi, paintStageEnd, type StageListOpts, type StageUi } from '
 import type { StageEndView } from './stageLogic';
 import { STAGE_MODE } from '../content/stages';
 import type { StageDiff } from '../core/types';
-import { paintMissions } from './missionView';
-import { paintShop, type ShopInv } from './shopView';
-import { bookPopup, paintBook, type BookMask } from './bookView';
+import { paintMissions, type MissionView, type TakeKind } from './missionView';
+import { setRewardHost } from './rewardFx';
+import { paintShop, type ShopInv, type ShopPaths, type ShopTab } from './shopView';
+import { bookPopup, paintBook, type BookGo, type BookMask, type RecordView } from './bookView';
+import { kitHtml, type KitView } from './kitView';
+import { goods } from './goodsArt';
+import type { PackView } from './packView';
+import { kitDef, type KitId, type KitPick } from '../meta/kit';
 import type { OpGrade } from '../meta/ops';
-import { ACHIEVES, DAILY_POOL, dailyDone, licenseTitle } from '../meta';
+import { dailyDone, licenseTitle } from '../meta';
 import { APP_VERSION } from '../version';
-import type { DailyState, Loadout, MissionProgress } from '../meta/types';
-import { escapeHtml } from './html';
+import type { Loadout } from '../meta/types';
+import { escapeHtml, infoHtml } from './html';
 import { countTo, fmt, frameSvg, glyph, installInkVars, reduceMotion, replay, swordSvg } from './ink';
 import { CUT, cutFrom, type CutDir } from './cut';
 import { paintHero } from './heroArt';
@@ -72,6 +77,8 @@ export interface TitleView {
   maskArt: string;
   /** 홈 건물 그림 = 가장 멀리 연 구역의 층(public/img/floors/<theme>.png) */
   theme: string;
+  /** 홈 한 줄 — 받을 것 · 살아 있는 특가 · 다음 과제 중 하나 */
+  note: { text: string; to: 'shop' | 'missions' } | null;
 }
 
 export interface GameOverView {
@@ -85,6 +92,8 @@ export interface GameOverView {
   goal: string;
   /** 다음 목표가 무기·마스크면 그 id(칼 그림) */
   goalId?: string;
+  /** 다음 목표가 미션 탭에 있다 — 옆 도장이 미션으로 간다 */
+  goalMissions?: boolean;
   canContinue: boolean;
   canRevive: boolean;
   /** 광고 경로 실재 여부 — false(웹)면 광고 문구 없는 "일어나기" (08-30, P0-2) */
@@ -160,6 +169,7 @@ export interface OverlayHandlers {
   onGameOverRevive(): void;
   /** 결과 카드의 상점 도장 — 다음 목표를 사러 */
   onGameOverShop(): void;
+  onGameOverMissions(): void;
   onOpsEndList(): void;
   /** 철거 자격 응시 */
   onExam(): void;
@@ -167,6 +177,8 @@ export interface OverlayHandlers {
   onEndingRetry(): void;
   /** 지금 받을 수 있는 미션 수 — 미션 도장의 먹 점 */
   missionBadge(): number;
+  /** 상점 칸 점 — 오늘 공짜 커피가 남았나 */
+  shopBadge(): boolean;
   onLogoTap(): void;
   onOpsPick(id: string): void;
   onOpenOps(): void;
@@ -179,9 +191,19 @@ export interface OverlayHandlers {
   onStageList(): void;
   onOpenMissions(): void;
   onOpenShop(): void;
+  /** 상점 꾸러미 탭으로 바로 */
+  onOpenPack(): void;
   onOpenBook(): void;
   onMetaBack(): void;
   onClaimMission(id: string, boost: boolean): void;
+  /** 출근부 · 일당 · 월급 · 신입 과제 받기 */
+  onTake(kind: TakeKind): void;
+  /** 실적 낙관 칸 */
+  onAchieve(line: string): void;
+  onCoffee(): void;
+  onRegular(): void;
+  /** 도감에서 얻는 곳으로 간다 */
+  onBookGo(go: BookGo): void;
   onBuySku(id: string): void;
   onAdOrbit(): void;
   onUnlockOrbit(id: string): void;
@@ -190,9 +212,14 @@ export interface OverlayHandlers {
   onEquip(slot: string, id: string): void;
   /** 상점 마스크 「그리기」 — 도트판은 씬이 연다 */
   onMaskEdit(): void;
+  onKitBuy(id: string): void;
+  onRestore(): void;
   onHowtoDone(): void;
   onResetData(): void;
 }
+
+/** 창 머리 색 — navy 출근 · green 보상 · seal 특가 · brown 시작 장비 · gold 구매 확인 · ink 나머지 */
+export type ModalTone = 'navy' | 'green' | 'seal' | 'brown' | 'gold' | 'ink';
 
 export interface OverlayApi {
   getScreen(): OverlayScreen;
@@ -212,10 +239,23 @@ export interface OverlayApi {
   /** 지시서 화면 안에서 한 칸 물러난다. 이미 목록이면 false */
   stagesBack(): boolean;
   showStageEnd(v: StageEndView): void;
-  showMissions(daily: DailyState, achieves: MissionProgress[], adBoost: boolean): void;
-  showShop(inv: ShopInv, owned: ReadonlySet<string>, paths: { iap: boolean; ad: boolean }): void;
+  showMissions(v: MissionView): void;
+  /** tab을 주면 그 칸으로 연다. 없으면 보던 칸 그대로 */
+  showShop(inv: ShopInv, owned: ReadonlySet<string>, paths: ShopPaths, pack: PackView, tab?: ShopTab): void;
   /** 도감. masks = 가진 가면들(없으면 저장된 가면 그림 하나) */
-  showBook(inv: { loadout: Loadout; maskArt: string }, owned: ReadonlySet<string>, masks?: readonly BookMask[]): void;
+  showBook(inv: { loadout: Loadout; maskArt: string }, owned: ReadonlySet<string>, masks: readonly BookMask[] | undefined, record: RecordView): void;
+  /** 시작 장비 시트. buy는 산 뒤의 지갑을 돌려준다(못 사면 null) */
+  showKit(v: KitView, start: (pick: KitPick) => void, buy: (id: KitId) => KitView | null): void;
+  /** 예 · 아니오 창 */
+  ask(o: {
+    meta: string; title: string; lines?: readonly string[]; fine?: readonly string[]; html?: string; yes: string; no?: string;
+    /** 창 머리 색 — 창 종류마다 다르다 */
+    tone?: ModalTone;
+    /** 창 머리 그림(goods) */
+    art?: string;
+    /** 돈을 내는 단추 */
+    pay?: boolean;
+  }, ok: () => void): void;
   /** 조작 안내 창. first = 첫 실행(닫으면 onHowtoDone) */
   showHowto(first: boolean): void;
   /** 확인 창이 떠 있나 — 뒤로가기가 창부터 닫는다 */
@@ -379,7 +419,7 @@ function metaScreen(name: string, frame: string, stamp: string, right: string): 
 }
 
 const toMissions = '<button type="button" class="inkseal" data-act="tab-missions" data-badge-host>미션<b class="dot" data-badge hidden></b></button>';
-const toShop = '<button type="button" class="inkseal" data-act="tab-shop">상점</button>';
+const toShop = '<button type="button" class="inkseal" data-act="tab-shop">상점<b class="dot" data-shop-dot hidden></b></button>';
 const toBook = '<button type="button" class="inkseal" data-act="tab-book">도감</button>';
 /** 가는 길 줄 오른쪽 도장 둘 */
 const navPair = (a: string, b: string): string => `<span class="nav-pair">${a}${b}</span>`;
@@ -392,6 +432,7 @@ const HOWTO_ROWS: readonly { key: string; name: string; desc: string }[] = [
 ];
 
 export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi {
+  setRewardHost(root);
   installInkVars();
   const m = SCREENS.menu;
   root.innerHTML = `
@@ -429,10 +470,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           </div>
         </div>
         <div class="h-stats" data-el="stats"></div>
+        <button type="button" class="h-note" data-act="home-note" data-el="home-note" hidden></button>
         <p class="h-buddha" data-el="buddha" hidden>${SCREENS.title.buddha}</p>
         <nav class="h-nav" aria-label="가는 길">
           <button type="button" class="inkseal" style="--i:0" data-act="tab-missions" data-badge-host>미션<i data-el="nav-today"></i><b class="dot" data-badge hidden></b></button>
-          <button type="button" class="inkseal" style="--i:1" data-act="tab-shop">상점</button>
+          <button type="button" class="inkseal" style="--i:1" data-act="tab-shop">상점<b class="dot" data-shop-dot hidden></b></button>
           <button type="button" class="inkseal" style="--i:2" data-act="tab-book">도감</button>
           <button type="button" class="inkseal" style="--i:3" data-act="tab-more">설정</button>
         </nav>
@@ -577,15 +619,16 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <div class="st-acts" data-el="acts-stageend"></div>
     </div>
     ${metaScreen('missions', frameSvg(9, 4.5, 5, 9), '출근 도장', navPair(toShop, toBook))}
-    ${metaScreen('shop', frameSvg(8, 4.5, 6, 10), '환불 없음', navPair(toMissions, toBook))}
+    ${metaScreen('shop', frameSvg(8, 4.5, 6, 10), '현장 매점', navPair(toMissions, toBook))}
     ${metaScreen('book', frameSvg(9, 4, 5.5, 10), '모은 만큼', navPair(toShop, toMissions))}
 
     <div class="ov-modal" data-el="modal" hidden>
       <div class="m-card" role="dialog" aria-modal="true" aria-labelledby="modal-title-text" tabindex="-1" data-el="modal-card">
-        ${frameSvg(7, 3, 4.5, 8)}
-        <div class="m-head"><p class="m-meta" data-el="modal-meta"></p>
-          <button type="button" class="m-x" data-act="modal-close" data-el="modal-x" aria-label="닫기">${CLOSE_SVG}</button></div>
-        <h2 class="m-title" id="modal-title-text" data-el="modal-title"></h2>
+        <div class="m-band">
+          <span class="m-art" data-el="modal-art"></span>
+          <div class="m-hd"><p class="m-meta" data-el="modal-meta"></p><h2 class="m-title" id="modal-title-text" data-el="modal-title"></h2></div>
+          <button type="button" class="m-x" data-act="modal-close" data-el="modal-x" aria-label="닫기">${CLOSE_SVG}</button>
+        </div>
         <div class="m-body" data-el="modal-body"></div>
         <div class="m-actions" data-el="modal-actions"></div>
       </div>
@@ -606,6 +649,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   let resetArmed = false;
   let howtoFirst = false;
   let scoreToken = 0;
+  // 지금 떠 있는 시작 장비 시트 · 예 · 아니오 창의 할 일
+  let kit: { view: KitView; sel: KitPick; start: (pick: KitPick) => void; buy: (id: KitId) => KitView | null } | null = null;
+  let askOk: (() => void) | null = null;
   // 홈 뿌뿌 누르기 사다리(1 껑충 · 2 벤다 · 3 「그만」 · 4~ 뻗음) + 6초 가만두면 하품
   let heroTaps = 0;
   let heroCur: PlayerPose = HERO_IDLE;
@@ -625,6 +671,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   void nativeAppVersion().then((v) => { if (v) $('ver').textContent = `v${v}`; });
 
   function paintBadges(): void {
+    const coffee = h.shopBadge();
+    root.querySelectorAll<HTMLElement>('[data-shop-dot]').forEach((d) => { d.hidden = !coffee; });
     const n = h.missionBadge();
     root.querySelectorAll<HTMLElement>('[data-badge]').forEach((d) => { d.hidden = n <= 0; });
     root.querySelectorAll<HTMLElement>('[data-badge-host]').forEach((b) => {
@@ -742,10 +790,13 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     $('stats').innerHTML =
       `<span class="cur">${glyph('dust')}${SCREENS.title.dust} <b>${fmt(v.dust)}</b></span>`
       + `<span class="cur">${glyph('orb')}${SCREENS.title.orbit} <b>${fmt(v.orbit)}</b></span>`
-      + `<span class="cur">최고 <b>${fmt(v.bestArcade)}</b></span>`;
+      + (v.note ? '' : `<span class="cur">최고 <b>${fmt(v.bestArcade)}</b></span>`); // 한 줄 쪽지가 있으면 그 자리를 내준다
     const today = $('nav-today');
     today.textContent = v.todayTotal > 0 ? `${v.todayDone}/${v.todayTotal}` : '';
     today.hidden = v.todayTotal <= 0;
+    const note = $('home-note');
+    note.hidden = !v.note;
+    note.textContent = v.note?.text ?? '';
     $('buddha').hidden = !v.buddhaMode;
     $('title-rank').textContent = `${SCREENS.license.heading} · ${v.rank}`;
     const bld = $('title-bld') as HTMLImageElement;
@@ -792,16 +843,17 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   }
 
   /* ── 확인 창 ── */
-  interface ModalAction { label: string; act: string; kind?: 'cta' | 'btn' | 'quiet' | 'danger' }
-  function openModal(o: { meta: string; title: string; html: string; actions: readonly ModalAction[]; closable?: boolean }): void {
+  interface ModalAction { label: string; act: string; kind?: 'cta' | 'btn' | 'quiet' | 'danger' | 'pay' }
+  function openModal(o: { meta: string; title: string; html: string; actions: readonly ModalAction[]; closable?: boolean; tone?: ModalTone; art?: string }): void {
+    $('modal-card').dataset.tone = o.tone ?? 'ink';
+    $('modal-art').innerHTML = o.art ?? '';
     $('modal-meta').textContent = o.meta;
     $('modal-title').textContent = o.title;
     $('modal-body').innerHTML = o.html;
     $('modal-x').hidden = o.closable === false;
-    // 누를 것(시작 · 지우기)은 주홍 인장, 나머지는 먹 획
-    $('modal-actions').innerHTML = o.actions.map((a) => (a.kind === 'cta' || a.kind === 'danger'
-      ? `<button type="button" class="seal" data-act="${a.act}"><b>${a.label}</b></button>`
-      : `<button type="button" class="stroke s3" data-act="${a.act}"><b>${a.label}</b></button>`)).join('');
+    // 누를 것(시작 · 지우기)은 주홍, 돈을 내는 것은 금, 나머지는 테두리. 닫는 길도 같은 크기다
+    const cls = (k: ModalAction['kind']): string => (k === 'cta' || k === 'danger' ? ' cta' : k === 'pay' ? ' pay' : '');
+    $('modal-actions').innerHTML = o.actions.map((a) => `<button type="button" class="btn${cls(a.kind)}" data-act="${a.act}">${a.label}</button>`).join('');
     $('modal').hidden = false;
     root.classList.add('is-open'); // 플레이 중(오버레이 닫힘)에도 뜰 수 있게
     $('modal-card').focus({ preventScroll: true }); // 화면 낭독·키보드가 창 안에서 시작하게
@@ -811,9 +863,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     const md = $('modal');
     if (md.hidden) return;
     md.hidden = true;
-    $('modal-card').classList.remove('bk-card');
+    $('modal-card').classList.remove('bk-card', 'kit');
     $('modal-body').innerHTML = ''; // iframe 정리
     resetArmed = false;
+    kit = null;
+    askOk = null;
     if (screen === 'none') root.classList.remove('is-open');
     if (howtoFirst) { howtoFirst = false; h.onHowtoDone(); }
   }
@@ -829,6 +883,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
 
   /** 도감 팝업 — 도감 한 쪽. 이전 · 다음 단추가 번호순으로 칸을 넘긴다 */
   const bookNav: { prev: string | null; next: string | null } = { prev: null, next: null };
+  let bookGo: BookGo | null = null;
   function openBookPage(key: string): void {
     const p = bookPopup(key);
     if (!p) return;
@@ -837,9 +892,31 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     openModal({ meta: p.meta, title: p.title, html: p.html, actions: [] });
     $('modal-card').classList.add('bk-card');
     $('modal-actions').innerHTML =
-      `<button type="button" class="stroke s3" data-act="book-prev"${p.prev ? '' : ' disabled'}><b>이전</b></button>`
-      + `<button type="button" class="stroke s3" data-act="book-next"${p.next ? '' : ' disabled'}><b>다음</b></button>`
-      + '<button type="button" class="stroke s3" data-act="modal-close"><b>닫기</b></button>';
+      `<button type="button" class="btn" data-act="book-prev"${p.prev ? '' : ' disabled'}>이전</button>`
+      + `<button type="button" class="btn" data-act="book-next"${p.next ? '' : ' disabled'}>다음</button>`
+      + '<button type="button" class="btn" data-act="modal-close">닫기</button>';
+    bookGo = p.go ?? null;
+    if (p.go) $('modal-actions').insertAdjacentHTML('afterbegin', `<button type="button" class="btn cta sm" data-act="book-go">${p.go === 'season' ? '현장 보기' : '상점 보기'}</button>`);
+  }
+
+  /** 시트 안 누름 — 보유와 한 판 상한 안에서만 움직이고, 궤도조각으로 산 것은 바로 체크한다 */
+  function kitAct(act: string, id: KitId): void {
+    const def = kitDef(id);
+    if (!kit || !def) return;
+    const n = kit.sel[id] ?? 0;
+    const max = Math.min(def.max, kit.view.items[id]);
+    if (act === 'kit-buy') {
+      const v = kit.buy(id);
+      if (!v) return;
+      kit.view = v;
+      kit.sel = { ...kit.sel, [id]: 1 };
+    } else if (act === 'kit-toggle') kit.sel = { ...kit.sel, [id]: n > 0 ? 0 : 1 };
+    else kit.sel = { ...kit.sel, [id]: Math.min(max, Math.max(0, n + (act === 'kit-plus' ? 1 : -1))) };
+    $('modal-body').innerHTML = kitHtml(kit.view, kit.sel);
+    // 다시 그리면 초점이 날아간다 — 같은 자리로 돌려놓는다(사라진 단추면 시작으로)
+    const back = $('modal-body').querySelector<HTMLButtonElement>(`[data-act="${act}"][data-kit="${id}"]:not(:disabled)`)
+      ?? root.querySelector<HTMLButtonElement>('[data-act="kit-start"]');
+    back?.focus({ preventScroll: true });
   }
 
   function showHowto(first: boolean): void {
@@ -892,6 +969,12 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       ],
     });
   }
+
+  // 구입 안내를 펴면 글이 화면 밖으로 숨지 않게
+  root.addEventListener('toggle', (e) => {
+    const d = e.target as HTMLDetailsElement;
+    if (d.open) d.scrollIntoView({ block: 'nearest' });
+  }, true);
 
   root.addEventListener('click', (e) => {
     const t = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
@@ -947,6 +1030,27 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         if (resetArmed) { closeModal(); h.onResetData(); }
         break;
       case 'modal-close': closeModal(); break;
+      case 'book-go': closeModal(); if (bookGo) h.onBookGo(bookGo); break;
+      case 'kit-toggle':
+      case 'kit-plus':
+      case 'kit-minus':
+      case 'kit-buy': kitAct(act, t.getAttribute('data-kit') as KitId); break;
+      case 'kit-start': {
+        const k = kit;
+        closeModal();
+        k?.start(k.sel);
+        break;
+      }
+      case 'ask-yes': {
+        const ok = askOk;
+        closeModal();
+        ok?.();
+        break;
+      }
+      case 'home-note':
+        if (titleView?.note?.to === 'shop') h.onOpenPack();
+        else h.onOpenMissions();
+        break;
       case 'butter-1': h.onButterRound(1); break;
       case 'butter-2': h.onButterRound(2); break;
       case 'butter-3': h.onButterRound(3); break;
@@ -960,6 +1064,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'go-retry': h.onGameOverRetry(); break;
       case 'go-title': h.onGameOverTitle(); break;
       case 'go-shop': h.onGameOverShop(); break;
+      case 'go-missions': h.onGameOverMissions(); break;
       case 'ops-retry': h.onGameOverRetry(); break;
       case 'ops-list': h.onOpsEndList(); break;
       case 'ops-title': h.onGameOverTitle(); break;
@@ -1056,7 +1161,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         const strokes = rest.map((a, i) =>
           `<button type="button" class="stroke s2" style="--i:${i}" data-act="${a.act}"><b>${a.stroke}</b>${a.sub ? `<span>${escapeHtml(a.sub)}</span>` : ''}</button>`);
         strokes.push(`<button type="button" class="stroke s3" style="--i:${rest.length}" data-act="go-title"><b>타이틀로</b></button>`);
-        const next = `<div class="g-next"><button type="button" class="inkseal" data-act="go-shop">상점</button>`
+        const next = `<div class="g-next"><button type="button" class="inkseal" data-act="${v.goalMissions ? 'go-missions' : 'go-shop'}">${v.goalMissions ? '미션' : '상점'}</button>`
           + `${v.goalId ? swordSvg(v.goalId) : ''}<span>${escapeHtml(v.goal)}</span></div>`;
         $('go-left').innerHTML = strokes.join('') + next;
       });
@@ -1094,12 +1199,11 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         onList: h.onStageList,
       }));
     },
-    showMissions(daily, achieves, adBoost): void {
-      enter('missions', () => paintMissions($('body-missions'), daily, DAILY_POOL, achieves, ACHIEVES, adBoost,
-        (id, boost) => h.onClaimMission(id, boost)));
+    showMissions(v): void {
+      enter('missions', () => paintMissions($('body-missions'), v, (id, boost) => h.onClaimMission(id, boost), (kind) => h.onTake(kind), (line) => h.onAchieve(line)));
     },
-    showShop(inv, owned, paths): void {
-      enter('shop', () => paintShop($('body-shop'), inv, owned, paths, {
+    showShop(inv, owned, paths, pack, tab): void {
+      enter('shop', () => paintShop($('body-shop'), inv, owned, paths, pack, {
         onBuy: (id) => h.onBuySku(id),
         onAdPack: () => h.onAdOrbit(),
         onOrbit: (id) => h.onUnlockOrbit(id),
@@ -1108,10 +1212,42 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         onExam: () => h.onExam(),
         onEquip: (slot, id) => h.onEquip(slot, id),
         onMaskEdit: () => h.onMaskEdit(),
-      }));
+        onKitBuy: (id) => h.onKitBuy(id),
+        onRestore: () => h.onRestore(),
+        onCoffee: () => h.onCoffee(),
+        onRegular: () => h.onRegular(),
+      }, tab));
     },
-    showBook(inv, owned, masks): void {
-      enter('book', () => paintBook($('body-book'), inv, owned, openBookPage, masks));
+    showBook(inv, owned, masks, record): void {
+      enter('book', () => paintBook($('body-book'), inv, owned, openBookPage, masks, record));
+    },
+    showKit(v, start, buy): void {
+      openModal({
+        tone: 'brown',
+        art: goods('toolbox'),
+        meta: '시작 장비',
+        title: '들고 갈 것',
+        html: kitHtml(v, {}),
+        actions: [{ label: '그만두기', act: 'modal-close', kind: 'quiet' }, { label: '시작', act: 'kit-start', kind: 'cta' }],
+      });
+      kit = { view: v, sel: {}, start, buy };
+      $('modal-card').classList.add('kit');
+      toastEl.classList.remove('on'); // 방금 받은 보상 알림이 시작 단추를 가리지 않게
+      root.querySelector<HTMLButtonElement>('[data-act="kit-start"]')?.focus({ preventScroll: true });
+    },
+    ask(o, ok): void {
+      openModal({
+        tone: o.tone,
+        art: o.art,
+        meta: o.meta,
+        title: o.title,
+        html: (o.html ?? '') + (o.lines ?? []).map((ln) => `<p>${escapeHtml(ln)}</p>`).join('') + (o.fine?.length ? infoHtml(o.fine) : ''),
+        actions: [
+          ...(o.no ? [{ label: o.no, act: 'modal-close', kind: 'quiet' as const }] : []),
+          { label: o.yes, act: 'ask-yes', kind: o.pay ? 'pay' as const : 'cta' as const },
+        ],
+      });
+      askOk = ok;
     },
     showEnding(v: EndingView): void {
       enter('ending', () => {
@@ -1160,5 +1296,6 @@ export function titleViewFromSave(save: SaveData, selected: number, debugOpen = 
     loadout: save.loadout,
     maskArt: save.maskArt,
     theme: regionOf(Math.min(3, chapters)).theme,
+    note: null,
   };
 }

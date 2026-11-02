@@ -162,6 +162,7 @@ export function mountDebugMenu(getState: () => GameState | null, open = true): v
     sv.owned = [...new Set([...sv.owned, ...WEAPON_IDS, 'tenchi', 'ageba', 'tetsu', 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit', 'mask'])];
     sv.dust = Math.max(sv.dust, 999);
     sv.orbit = Math.max(sv.orbit, 999);
+    sv.blanks = Math.max(sv.blanks, 20);
     saveSave(sv);
     try { localStorage.setItem('gunbbu.devUnlock', '1'); } catch {}
     // 새로고침하며 페이지가 숨겨질 때 앱이 든 옛 저장을 쓴다(scenes onLifecycle) — 얼리지 않으면 방금 푼 게 그걸로 덮였다(10-31 시험판 실측)

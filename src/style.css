@@ -2,8 +2,10 @@
    모든 화면은 붓으로 그은 만화 컷이고, 넘어갈 때 칼이 화면을 사선으로 갈라 두 쪽이 떨어진다(ui/cut.ts).
    색: 한지 · 먹(연먹·옅은 먹은 같은 먹의 밝기 단계) · 주홍 = 「지금 누를 것」 화면당 하나 · 참격 노랑 = 베는 순간만.
    도장 문법: 주홍(안쪽 한지 테두리) = 누를 것 · 먹 채움 = 판정·상태(누를 수 없음) · 먹 테두리만 = 가는 길 · 옅은 먹 = 아직 못 함.
-   섞기 0 — 그라데이션·blur·반투명·blend 없음. 깊이는 단단한 먹 그림자. 거친 가장자리 = index.html 필터 #rough · #rough2.
-   상점 = ui/shop.css · 미션·작전 = ui/meta.css · 도트판 = ui/maskEditor.css. 판 위(HUD·조작 키)는 필터를 아껴 쓴다 — 매 프레임 바뀌는 칸엔 없다. */
+   섞기 0 — 그라데이션·blur·blend 없음, 반투명은 창 뒤 먹 막 하나뿐. 칸은 그림자 없이 거친 먹 사각으로 만든다. 거친 가장자리 = index.html 필터 #rough · #rough2 · 또는 clip-path(작은 칸 --sealclip · 큰 칸 --cutclip · 띠 --bandclip).
+   메타 화면(미션 · 상점 · 도감) = 먹 틀 안에 화면 폭 색 붓 띠(미션 초록 · 상점 먹 · 도감 고동). 창(.m-card) = 먹 테두리 거친 사각 + 같은 색 붓 띠 머리(출근 남색 · 보상 초록 · 특가 주홍 · 시작 장비 고동).
+   단추(.btn) = 붓 획(ink.ts 획 그림 sA~sC: 먹 · 주홍 s · 금 g · 옅은 먹 3). 둥근 모서리 · 그림자 없음.
+   상점 = ui/shop.css · 미션·작전·출근 창·시작 장비 = ui/meta.css · 도트판 = ui/maskEditor.css. 판 위(HUD·조작 키)는 필터를 아껴 쓴다 — 매 프레임 바뀌는 칸엔 없다. */
 
 @font-face {
   font-family: 'East Sea Dokdo';
@@ -60,13 +62,23 @@
   --ink3: #A9A7AE;    /* 옅은 먹 — 못 사는 품목 그림 · 잃은 목숨 · 「부족」 바닥. 글자엔 안 쓴다 */
   --seal: #C4301E;    /* 주홍 인주 — 지금 누를 것 하나뿐 */
   --slash: #FFD200;   /* 참격 — 베는 순간 · 불길. 글자·누를 것엔 안 쓴다 */
-  --paper-2: #E8E3D5; /* 한 톤 낮은 한지 — 도트판 칸 바탕 */
+  --paper-2: #E8E3D5; /* 한 톤 낮은 한지 — 도트판 칸 바탕 · 메타 화면 바닥 */
+  --card: #FBF8F0;    /* 밝은 판 — 그림자 없이 바탕 차이로 칸을 나눈다. 순백 아님 */
+  --navy: #2C4A74;    /* 출근 */
+  --green: #2F6B52;   /* 보상 · 미션 */
+  --brown: #6E4B2A;   /* 시작 장비 */
+  --gold: #E3A82B;    /* 돈을 내는 것 — 결제 단추 · 구매 확인 창 머리 · 소유물 칸 테두리 */
 
   --brush: 'East Sea Dokdo', 'Gowun Batang', serif;  /* 25px 이상에만 */
   --body: 'Gowun Batang', 'Apple SD Gothic Neo', 'Malgun Gothic', serif;
+  --sans: 'Gunbbu Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; /* 메타 화면의 읽는 글자 */
+  --black: 'Black Han Sans', var(--sans);  /* 상품 이름 · 가격 · 큰 수 */
 
   --sealclip: polygon(2% 4%, 28% 0%, 52% 3%, 76% 1%, 98% 5%, 100% 30%, 97% 55%, 100% 78%, 98% 98%, 74% 100%, 50% 97%, 26% 100%, 3% 97%, 0% 72%, 2% 48%, 0% 24%);
   --sealclip2: polygon(0% 3%, 24% 1%, 50% 4%, 74% 0%, 97% 3%, 100% 26%, 98% 50%, 100% 74%, 97% 100%, 72% 98%, 48% 100%, 22% 97%, 2% 100%, 0% 76%, 3% 52%, 1% 28%);
+  /* 색 붓 띠 — 위는 곧고 아래 가장자리만 붓이 지나간 듯 거칠다(화면 머리 · 창 머리) */
+  --cutclip: polygon(0 4px, 24% 0, 52% 5px, 76% 1px, 100% 4px, calc(100% - 3px) 34%, 100% 68%, calc(100% - 2px) calc(100% - 4px), 74% 100%, 48% calc(100% - 4px), 22% calc(100% - 1px), 0 calc(100% - 5px), 3px 66%, 0 32%); /* 큰 칸 — 픽셀 고정이라 키가 커도 가장자리가 같게 거칠다 */
+  --bandclip: polygon(0 0, 100% 0, 100% 90%, 95% 97%, 88% 91%, 80% 98%, 71% 92%, 63% 100%, 54% 93%, 46% 99%, 37% 92%, 29% 98%, 21% 91%, 13% 97%, 6% 92%, 0 96%);
   /* 글자 둘레 한지 띠(흐림 0) — 판 위 붓글씨가 건물 그림 위에서도 읽히게 */
   --halo: 2px 0 0 var(--paper), -2px 0 0 var(--paper), 0 2px 0 var(--paper), 0 -2px 0 var(--paper),
     2px 2px 0 var(--paper), -2px 2px 0 var(--paper), 2px -2px 0 var(--paper), -2px -2px 0 var(--paper),
@@ -256,15 +268,15 @@ img { display: block; -webkit-user-drag: none; }
 /* 가는 길 = 먹 테두리 4px 만 있는 한지 도장 */
 .inkseal {
   position: relative;
-  width: 60px;
-  height: 60px;
+  width: 54px;
+  height: 54px;
   flex: none;
   color: var(--ink);
   filter: url(#rough2);
   display: grid;
   place-content: center;
   text-align: center;
-  font: 400 27px/1 var(--brush);
+  font: 400 25px/1 var(--brush);
   white-space: nowrap;
 }
 
@@ -278,8 +290,8 @@ img { display: block; -webkit-user-drag: none; }
 
 .inkseal::before { inset: 0; background: var(--ink); }
 .inkseal::after { inset: 4px; background: var(--paper); }
-.inkseal i { display: block; font: 700 12.5px/1 var(--body); font-style: normal; margin-top: 3px; }
-.inkseal.one { font-size: 32px; }
+.inkseal i { display: block; font: 700 13.5px/1 var(--body); font-style: normal; margin-top: 2px; }
+.inkseal.one { font-size: 29px; }
 /* 받을 것이 있다 — 먹 점 하나(주홍은 그 화면의 누를 것 하나에만 쓴다) */
 .inkseal .dot { position: absolute; right: 2px; top: 2px; width: 13px; height: 13px; background: var(--ink); clip-path: var(--sealclip2); }
 
@@ -315,9 +327,7 @@ img { display: block; -webkit-user-drag: none; }
 
 /* 손으로 그린 작은 글리프(먼지 · 궤도조각) + 수치 */
 .cur { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.gl { width: 18px; height: 18px; overflow: visible; flex: none; }
-.gl path, .gl circle { stroke: var(--ink); stroke-width: 1.8; stroke-linejoin: round; fill: none; }
-.gl .f { fill: var(--ink); stroke: none; }
+.coin { flex: none; width: 22px; height: 22px; }
 
 /* 칼 그림(붓 획 채움) — 120×300 칸, 날은 위. .p = 갈필·홈(한지색) · .y = 불꽃 혀 끝 참격 노랑 */
 .sw { overflow: visible; filter: url(#rough2); }
@@ -481,6 +491,7 @@ img { display: block; -webkit-user-drag: none; }
 /* 잃은 목숨 = 옅은 먹 졸라맨 위에 사선 한 획 */
 .hud-lives .lost * { stroke: var(--ink3); }
 .hud-lives .lost .xx { stroke: var(--ink); stroke-width: 2.8; }
+.hud-bank { font: 700 12.5px/1 var(--body); white-space: nowrap; }
 .hud-hat { display: block; width: 16px; height: 16px; }
 .hud-hat svg { width: 16px; height: 16px; }
 
@@ -606,7 +617,7 @@ img { display: block; -webkit-user-drag: none; }
 .h-top { position: relative; container-type: size; z-index: 1; }
 .h-cap { position: absolute; left: 20px; top: 20px; z-index: 7; font: 700 14px/1 var(--body); padding: 7px 9px; border: 2.5px solid var(--ink); background: var(--paper); rotate: -1.5deg; white-space: nowrap; }
 /* 건물 = 가장 멀리 연 구역의 층 그림 + 먹 윤곽 5px + 단단한 먹 그림자. 아래 왼쪽 모서리에서 갈필 세 가닥이 흘러내린다 */
-.h-bld { position: absolute; top: -9cqh; right: -10cqw; width: min(46cqw, 58cqh); rotate: 5deg; transform-origin: 50% 0; box-shadow: 7px 9px 0 var(--ink); z-index: 6; }
+.h-bld { position: absolute; top: -9cqh; right: -10cqw; width: min(46cqw, 58cqh); rotate: 5deg; transform-origin: 50% 0; z-index: 6; }
 .h-bld img { width: 100%; border: 5px solid var(--ink); filter: url(#rough); background: var(--paper); }
 .h-bld svg { position: absolute; left: -2px; bottom: -54px; width: 72px; height: 60px; overflow: visible; filter: url(#rough2); }
 .h-bld svg path { fill: var(--ink); }
@@ -654,10 +665,12 @@ img { display: block; -webkit-user-drag: none; }
 .seal-start { width: 136px; height: 136px; rotate: -4deg; }
 .seal-start small { font: 700 15px/1 var(--body); letter-spacing: 0.06em; }
 .seal-start b { font-size: 60px; line-height: 0.95; margin-top: 3px; }
-.h-sub { font: 700 13px/1 var(--body); color: var(--ink2); white-space: nowrap; letter-spacing: 0.02em; }
+.h-sub { font: 700 13.5px/1 var(--body); color: var(--ink2); white-space: nowrap; letter-spacing: 0.02em; }
 .h-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font: 400 15px/1.2 var(--body); }
 .h-stats b { font-size: 17px; }
-.h-buddha { font: 700 13px var(--body); color: var(--ink2); }
+.h-note { position: relative; align-self: flex-start; padding: 0 2px 2px; border-bottom: 2.5px solid var(--ink); font: 700 14px/1.2 var(--body); color: var(--ink); text-align: left; white-space: nowrap; }
+.h-note::after { content: ''; position: absolute; inset: -16px -8px -11px; } /* 누르는 칸은 글줄보다 넓게(높이 48) */
+.h-buddha { font: 700 13.5px var(--body); color: var(--ink2); }
 .h-nav { display: flex; justify-content: space-between; align-items: center; }
 .h-nav .inkseal:nth-child(1) { rotate: -3deg; }
 .h-nav .inkseal:nth-child(2) { rotate: 2deg; }
@@ -700,7 +713,6 @@ img { display: block; -webkit-user-drag: none; }
   width: 296px;
   padding: 28px 24px 22px 28px;
   background: var(--paper);
-  box-shadow: 8px 10px 0 var(--ink);
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -761,14 +773,14 @@ img { display: block; -webkit-user-drag: none; }
 .ov-result > :not(.frame) { width: 100%; max-width: 470px; justify-self: center; }
 .g-scene { position: relative; container-type: size; overflow: visible; }
 /* 떨어진 건물 조각은 오른쪽 위, 그 밑에 깔린 뿌뿌(직접 그은 먹 선 졸라맨) + 뭉게 먼지 + 다리 위 작은 조각 */
-.g-piece { position: absolute; right: 0; top: 2cqh; width: min(62cqw, 300px); aspect-ratio: 5 / 3; background: var(--paper) 50% 16% / 100% auto no-repeat; border: 4px solid var(--ink); rotate: 7deg; transform-origin: 50% 100%; box-shadow: 7px 8px 0 var(--ink); z-index: 2; }
+.g-piece { position: absolute; right: 0; top: 2cqh; width: min(62cqw, 300px); aspect-ratio: 5 / 3; background: var(--paper) 50% 16% / 100% auto no-repeat; border: 4px solid var(--ink); rotate: 7deg; transform-origin: 50% 100%; z-index: 2; }
 .g-fall { position: absolute; right: 4cqw; bottom: 22cqh; width: min(78cqw, 340px); aspect-ratio: 300 / 130; z-index: 1; }
 .g-man { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: url(#rough2); }
 .g-man .ln * { fill: none; stroke: var(--ink); stroke-width: 6; stroke-linecap: round; }
 .g-man .bl { fill: var(--ink); }
 .g-cloud { position: absolute; left: 8%; bottom: 8%; width: 34%; aspect-ratio: 110 / 64; overflow: visible; z-index: 2; filter: url(#rough2); }
 .g-cloud path { fill: var(--paper); stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
-.g-frag { position: absolute; right: -2%; bottom: 14%; width: 40%; aspect-ratio: 5 / 3; background: var(--paper) 50% 44% / 100% auto no-repeat; border: 4px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); rotate: 8deg; transform-origin: 50% 100%; z-index: 3; }
+.g-frag { position: absolute; right: -2%; bottom: 14%; width: 40%; aspect-ratio: 5 / 3; background: var(--paper) 50% 44% / 100% auto no-repeat; border: 4px solid var(--ink); rotate: 8deg; transform-origin: 50% 100%; z-index: 3; }
 /* 수치 넷 — 조각 옆에 크기를 달리해 흩어 둔다(벤 건물이 가장 크다) */
 .g-st { position: absolute; white-space: nowrap; z-index: 4; }
 .g-st span { display: block; font: 700 13.5px/1 var(--body); color: var(--ink2); }
@@ -832,37 +844,71 @@ img { display: block; -webkit-user-drag: none; }
 .e-sub { font: 400 30px/1.15 var(--brush); max-width: 60%; rotate: -2deg; }
 .e-note { font: 700 15px/1.5 var(--body); color: var(--ink2); max-width: 64%; }
 
+/* ── 메타 화면 단추 — 붓 획(ink.ts 획 그림, 오른쪽 끝은 갈필). 먹 = 기본 · 주홍 = 지금 누를 것 하나 · 금 = 돈을 낸다 · 옅은 먹 = 못 누름 ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 0 28px 4px 20px; /* 오른쪽이 넓다 — 갈필 쐐기가 글자를 먹지 않게 */
+  background: var(--sB) center / 100% 100% no-repeat;
+  color: var(--paper);
+  font: 400 26px/1 var(--brush);
+  text-align: center;
+  white-space: nowrap;
+}
+.btn.cta { background-image: var(--sBs); }
+.btn.pay { background-image: var(--sBg); padding: 0 26px 4px 12px; color: var(--ink); font: 400 18px/1 var(--black); }
+.btn:disabled { background-image: var(--sB3); color: var(--ink); }
+.btn:active:not(:disabled) { scale: 0.95; }
+
 /* ── 확인 창 — 작은 컷이 위에서 쾅 떨어진다 ─────────────── */
 /* 칸을 화면 높이로 못 박아 둔다 — 그래야 .m-card max-height: 100%가 먹고 긴 글은 창 안에서 민다 */
-.ov-modal { position: absolute; inset: 0; z-index: 20; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; padding: 24px; pointer-events: auto; }
+.ov-modal { position: absolute; inset: 0; z-index: 20; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; padding: 20px; background: rgba(26, 26, 32, 0.76); pointer-events: auto; }
 .m-card {
   position: relative;
   width: 100%;
-  max-width: 360px;
+  max-width: 372px;
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 22px 22px 20px 26px;
-  background: var(--paper);
-  box-shadow: 8px 10px 0 var(--ink);
+  padding: 6px;
+  isolation: isolate;
   animation: dropin 0.42s cubic-bezier(0.3, 1.3, 0.5, 1) both;
 }
+/* 바깥 = 먹 테두리 거친 사각(탭바 칸과 같은 만드는 법: 먹 바탕 + 안쪽 한지 파냄) */
+.m-card::before,
+.m-card::after { content: ''; position: absolute; z-index: -1; }
+/* 둘이 같은 모양이어야 테두리 두께가 고르다 — 다르면 한쪽으로 삐져나와 그림자처럼 보인다 */
+.m-card::before { inset: 0; background: var(--ink); clip-path: var(--cutclip); }
+.m-card::after { inset: 6px; background: var(--paper); clip-path: var(--cutclip); }
 .m-card:focus { outline: none; }
-.m-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.m-meta { font: 700 13px/1 var(--body); color: var(--ink2); padding-top: 4px; }
-.m-x { width: 52px; height: 52px; margin: -16px -14px -10px 0; display: grid; place-items: center; }
-.m-x svg { width: 24px; height: 24px; overflow: visible; filter: url(#rough2); }
-.m-x path { fill: none; stroke: var(--ink); stroke-width: 4.5; stroke-linecap: round; }
-.m-title { font: 400 42px/1 var(--brush); rotate: -2deg; transform-origin: 0 100%; text-wrap: balance; }
-.m-body { min-height: 0; overflow-y: auto; font: 400 15.5px/1.6 var(--body); display: flex; flex-direction: column; gap: 10px; touch-action: pan-y; }
+/* 창 머리 — 거친 가장자리 색 붓 띠 하나로 창 종류를 말한다 */
+.m-band { flex: none; display: flex; align-items: center; gap: 12px; min-height: 80px; padding: 10px 6px 20px 14px; background: var(--band, var(--ink)); color: var(--paper); clip-path: var(--bandclip); }
+.m-card[data-tone='navy'] { --band: var(--navy); }
+.m-card[data-tone='green'] { --band: var(--green); }
+.m-card[data-tone='seal'] { --band: var(--seal); }
+.m-card[data-tone='brown'] { --band: var(--brown); }
+.m-card[data-tone='gold'] { --band: var(--gold); } /* 돈을 내는 창 — 금 띠엔 먹 글씨 */
+.m-card[data-tone='gold'] .m-band { color: var(--ink); }
+.m-card[data-tone='gold'] .m-x path { stroke: var(--ink); }
+/* 그림은 먹 선이라 색 띠 위에 바로 놓으면 묻힌다 — 한지 쪽지를 받친다 */
+.m-art { flex: none; width: 60px; height: 60px; padding: 5px; background: var(--paper); clip-path: var(--sealclip2); }
+.m-art:empty { display: none; }
+.m-art .gd { display: block; width: 100%; height: 100%; }
+.m-hd { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.m-meta { font: 700 14px/1.2 var(--sans); }
+.m-meta:empty { display: none; }
+.m-title { font: 400 34px/1 var(--brush); text-wrap: balance; }
+.m-x { flex: none; align-self: flex-start; width: 48px; height: 48px; display: grid; place-items: center; }
+.m-x svg { width: 22px; height: 22px; overflow: visible; }
+.m-x path { fill: none; stroke: var(--paper); stroke-width: 4.5; stroke-linecap: round; }
+.m-body { min-height: 0; overflow-y: auto; padding: 14px 14px; font: 500 16px/1.5 var(--sans); display: flex; flex-direction: column; gap: 12px; touch-action: pan-y; }
 .m-body b { font-weight: 700; }
-.m-body .muted { color: var(--ink2); }
-.m-actions { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; justify-content: flex-end; margin-top: 4px; }
-.m-actions .seal { width: 104px; height: 104px; rotate: -4deg; }
-.m-actions .seal b { font-size: 40px; }
-.m-actions .stroke { flex: 0 1 auto; min-width: 150px; }
-.m-actions .stroke b { font-size: 28px; }
+.m-body .muted { font-size: 14.5px; color: var(--ink2); }
+.m-actions { flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; padding: 0 14px 18px; }
+.m-actions:empty { display: none; }
 .doc-frame { width: 100%; height: 460px; border: 2.5px solid var(--ink); background: var(--paper); }
 
 /* 조작 안내 — 먹 덩어리 그림 + 한 줄 */

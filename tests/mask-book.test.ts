@@ -1,4 +1,4 @@
-// 가면 여러 장 + 이름 — 옛 저장 이전 · 이름 정리 · 8장 상한 · 지우면 장착 해제 · 저장 왕복
+// 가면 여러 장 + 이름 — 옛 저장 이전 · 이름 정리 · 개당 값 · 상한 · 지우면 장착 해제 · 저장 왕복
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_LOADOUT, DEFAULT_OWNED_IDS } from '../src/meta/loadout';
 import {
@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 const SAVE = (over: Partial<MaskSave> = {}): MaskSave => ({
-  masks: [], maskId: '', maskArt: emptyMask(), owned: [...DEFAULT_OWNED_IDS, 'mask'], loadout: { ...DEFAULT_LOADOUT }, ...over,
+  masks: [], maskId: '', maskArt: emptyMask(), blanks: 999, owned: [...DEFAULT_OWNED_IDS, 'mask'], loadout: { ...DEFAULT_LOADOUT }, ...over,
 });
 
 describe('옛 저장 이전', () => {
@@ -97,24 +97,52 @@ describe('이름 정리', () => {
   });
 });
 
-describe('8장 상한 · 공방', () => {
-  it('8장까지만 만든다', () => {
+describe('개당 값 · 상한', () => {
+  it('상한까지만 만든다', () => {
     const s = SAVE();
     for (let i = 0; i < MASK_MAX; i++) expect(createMask(s, '', emptyMask()), String(i)).not.toBeNull();
     expect(createMask(s, '', emptyMask())).toBeNull();
     expect(s.masks).toHaveLength(MASK_MAX);
-    expect(s.masks.map((m) => m.id)).toEqual(['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8']);
+    expect(s.masks[7].id).toBe('m8');
+    expect(s.blanks).toBe(999 - MASK_MAX);
   });
 
-  it('불러올 때도 8장에서 자른다', () => {
-    const many = Array.from({ length: 12 }, (_, i) => ({ id: `m${i + 1}`, name: `n${i}`, art: emptyMask() }));
+  it('불러올 때도 상한에서 자른다', () => {
+    const many = Array.from({ length: MASK_MAX + 4 }, (_, i) => ({ id: `m${i + 1}`, name: `n${i}`, art: emptyMask() }));
     expect(loadMaskBook(many, 'm1', emptyMask(), true).masks).toHaveLength(MASK_MAX);
   });
 
-  it('공방을 안 열었으면 못 만든다', () => {
-    const s = SAVE({ owned: [...DEFAULT_OWNED_IDS] });
-    expect(createMask(s, 'x', SAMPLE_MASK)).toBeNull();
-    expect(wearMask(s, 'none')).toBe(true);
+  it('값을 낸 만큼만 만든다 — 다 쓰면 못 만들고, 첫 장이 소유를 연다', () => {
+    const s = SAVE({ blanks: 1, owned: [...DEFAULT_OWNED_IDS] });
+    expect(createMask(s, 'x', SAMPLE_MASK)).not.toBeNull();
+    expect(s.blanks).toBe(0);
+    expect(s.owned).toContain('mask');
+    expect(s.loadout.mask).toBe('mask');
+    expect(createMask(s, 'y', SAMPLE_MASK)).toBeNull();
+    expect(s.masks).toHaveLength(1);
+  });
+
+  it('지우면 그 장은 없어지고 돌아오지 않는다', () => {
+    const s = SAVE({ blanks: 1 });
+    const m = createMask(s, 'x', SAMPLE_MASK)!;
+    expect(deleteMask(s, m.id)).toBe(true);
+    expect(s.blanks).toBe(0);
+  });
+
+  it('다시 그리기는 장을 쓰지 않는다', () => {
+    const s = SAVE({ blanks: 1 });
+    const m = createMask(s, 'x', SAMPLE_MASK)!;
+    expect(updateMask(s, m.id, 'y', emptyMask())).toBe(true);
+    expect(s.blanks).toBe(0);
+  });
+
+  it('옛 공방 주인은 여덟 장 몫이 남고, 새 값이 있으면 그대로 읽는다', () => {
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, owned: ['mask'], maskArt: SAMPLE_MASK }));
+    expect(loadSave().blanks).toBe(7);
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, owned: ['mask'], masks: [{ id: 'm1', name: 'a', art: SAMPLE_MASK }], blanks: 0 }));
+    expect(loadSave().blanks).toBe(0);
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, owned: ['hammer'] }));
+    expect(loadSave().blanks).toBe(0);
   });
 
   it('빈 판 새 가면은 쓰는 가면을 안 바꾸고, 그림 있는 새 가면은 바로 쓴다', () => {

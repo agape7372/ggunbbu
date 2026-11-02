@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TICK, UI_FLOW } from '../src/config';
-import { LOOK_DUST_COST, nextDustGoal, WEAPON_DUST_COST } from '../src/meta/economy';
+import { nextDustGoal, WEAPON_DUST_COST } from '../src/meta/economy';
 import { ACHIEVES, claimableCount, DAILY_POOL, dailyDone } from '../src/meta/missions';
 import type { DailyState, MissionProgress } from '../src/meta/types';
 
@@ -29,9 +29,8 @@ describe('nextDustGoal — 결과 카드의 다음 목표', () => {
     expect(second.cost).toBeGreaterThanOrEqual(first.cost);
   });
 
-  it('무기를 다 가지면 마스크, 그것까지 가졌으면 null', () => {
-    expect(nextDustGoal(Object.keys(WEAPON_DUST_COST), 0)!.id).toBe('mask');
-    expect(nextDustGoal([...Object.keys(WEAPON_DUST_COST), ...Object.keys(LOOK_DUST_COST)], 0)).toBeNull();
+  it('무기를 다 가지면 null', () => {
+    expect(nextDustGoal(Object.keys(WEAPON_DUST_COST), 0)).toBeNull();
   });
 });
 

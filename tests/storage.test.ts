@@ -186,7 +186,7 @@ describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무�
     const d = loadSave();
     expect(d.v).toBe(1);
     expect(d.guardTaught).toBe(false);
-    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.stats).toMatchObject({ buildings: 0, runs: 0 });
     expect(d.license).toBe(0);
     expect(d.opsGrade).toEqual({});
   });
@@ -194,27 +194,27 @@ describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무�
   it('플레이 흔적이 있는 옛 세이브는 이미 해 본 사람 — 가드 가르치기·평생 첫 판 줄을 건너뛴다', () => {
     store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
     expect(loadSave().guardTaught).toBe(true);
-    expect(loadSave().stats).toEqual({ buildings: 0, runs: 1 });
+    expect(loadSave().stats).toMatchObject({ buildings: 0, runs: 1 });
     store.set(SAVE_KEY, JSON.stringify({ v: 1, dust: 40 }));
     expect(loadSave().guardTaught).toBe(true);
     // 안내만 닫고 한 판도 안 한 사람은 신입 그대로
     store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true }));
     expect(loadSave().guardTaught).toBe(false);
-    expect(loadSave().stats).toEqual({ buildings: 0, runs: 0 });
+    expect(loadSave().stats).toMatchObject({ buildings: 0, runs: 0 });
     // 키가 있는 새 저장은 그대로 — 가르치기 전에 저장된 신입은 다음 실행에도 배운다
     store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: true, guardTaught: false, stats: { buildings: 3, runs: 0 } }));
     expect(loadSave().guardTaught).toBe(false);
-    expect(loadSave().stats).toEqual({ buildings: 3, runs: 0 });
+    expect(loadSave().stats).toMatchObject({ buildings: 3, runs: 0 });
   });
 
   it('왕복: 새 키가 그대로 돌아온다', () => {
     saveSave({
       ...structuredClone(DEFAULT_SAVE),
-      guardTaught: true, stats: { buildings: 321, runs: 7 }, license: 2, opsGrade: { glass: 'A', night: 'S' },
+      guardTaught: true, stats: { ...DEFAULT_SAVE.stats, buildings: 321, runs: 7 }, license: 2, opsGrade: { glass: 'A', night: 'S' },
     });
     const d = loadSave();
     expect(d.guardTaught).toBe(true);
-    expect(d.stats).toEqual({ buildings: 321, runs: 7 });
+    expect(d.stats).toMatchObject({ buildings: 321, runs: 7 });
     expect(d.license).toBe(2);
     expect(d.opsGrade).toEqual({ glass: 'A', night: 'S' });
   });
@@ -228,7 +228,7 @@ describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무�
     }));
     const d = loadSave();
     expect(d.guardTaught).toBe(false);
-    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.stats).toMatchObject({ buildings: 0, runs: 0 });
     expect(d.license).toBe(3);
     expect(d.opsGrade).toEqual({ glass: 'S', orbit: 'B' });
   });
@@ -236,7 +236,7 @@ describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무�
   it('stats가 객체가 아니어도 죽지 않는다', () => {
     store.set(SAVE_KEY, JSON.stringify({ v: 1, stats: 7, opsGrade: [1, 2] }));
     const d = loadSave();
-    expect(d.stats).toEqual({ buildings: 0, runs: 0 });
+    expect(d.stats).toMatchObject({ buildings: 0, runs: 0 });
     expect(d.opsGrade).toEqual({});
   });
 });

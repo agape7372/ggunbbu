@@ -22,7 +22,7 @@ describe('미션', () => {
     const a = ensureDaily(null, Date.UTC(2026, 7, 29, 1));
     const b = ensureDaily(a, Date.UTC(2026, 7, 29, 10));
     expect(b).toBe(a);
-    expect(a.items.length).toBe(3);
+    expect(a.items.length).toBe(4);
   });
 
   it('완파 이벤트가 파괴 미션을 올린다', () => {
@@ -57,13 +57,13 @@ describe('일일 미션 풀 — 닿은 구역 (C6)', () => {
     for (const k of keys) expect(pickDailyIds(k, false, 2)).toEqual(pickDailyIds(k, false));
   });
 
-  it('같은 날짜 · 같은 구역이면 같은 셋, 항상 셋이다', () => {
+  it('같은 날짜 · 같은 구역이면 같은 넷, 항상 넷이다', () => {
     for (const k of keys) {
       for (const reached of [0, 1, 2, 3]) {
         const a = pickDailyIds(k, true, reached);
         expect(a).toEqual(pickDailyIds(k, true, reached));
-        expect(a).toHaveLength(3);
-        expect(new Set(a).size).toBe(3);
+        expect(a).toHaveLength(4);
+        expect(new Set(a).size).toBe(4);
       }
     }
   });

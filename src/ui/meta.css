@@ -1,9 +1,62 @@
-/* 미션(ms-) · 구역 작전(op-) — 「먹 한 획」. 색은 토큰만, 섞기 0, 깊이는 단단한 먹 그림자.
-   주홍 = 지금 누를 것 하나 · 먹 채움 도장 = 판정·상태 · 옅은 먹 = 아직 못 하는 것.
-   논리 무대 높이는 늘 780 — vh·뷰포트 조건 없이 고정 px. SVG 필터는 컷 틀·도장에만. */
+/* 미션(ms-) · 출근 창(at-) · 시작 장비 시트(kt-) · 구역 작전(op-) — 「먹 한 획」 칸 문법.
+   그림자 · 둥근 모서리 없음. 칸은 탭바 도장(.inkseal)과 같은 만드는 법: 바탕 + 안쪽을 파낸 면에 clip-path(--sealclip · --sealclip2)로 거친 가장자리.
+   줄 = 한 톤 낮은 한지(--paper-2) 거친 칸 · 보상 = 밝은 판(--card) 먹 테두리 정사각 칸 · 주홍 = 지금 누를 것 하나 · 남색 = 출근 · 고동 = 시작 장비.
+   칸 사이 12px · 구획 사이 28px. 논리 무대 높이는 늘 780 — vh·뷰포트 조건 없이 고정 px. */
 
-/* ── 갈래 머리(오늘 · 업적 · 구역 · 특별작전) ─────────────── */
-.ms-h,
+/* ── 글자 · 크기 공용 값 — 메타 화면(미션 · 매점 · 도감 · 창 · 보상)은 이 값만 쓴다 ─────
+   제목 붓 40 · 구획 붓 27 · 이름 16 · 본문 15 · 작은 글 13.5(이 밑 금지) · 숫자 = Black Han Sans.
+   행간: 붓 1~1.1 · 이름 1.3 · 본문 1.5. 작은 단추 글자는 붓이 아니라 Black Han Sans 17. 붓은 25 밑으로 안 쓴다.
+   누름 칸 48 이상 · 단추 사이 8 이상 · 큰 단추 54.
+   11-02 크기 손질: 46 · 30 · 17 · 60에서 줄였다. 칸이 커서 한 화면에 두세 개만 보였다. */
+:root {
+  --t-title: 400 40px/1 var(--brush);
+  --t-sec: 400 27px/1.1 var(--brush);
+  --t-name: 700 16px/1.3 var(--sans);
+  --t-body: 500 15px/1.5 var(--sans);
+  --t-small: 500 13.5px/1.4 var(--sans);
+  --t-num: 400 18px/1 var(--black);
+}
+
+.ov-meta,
+.m-card,
+.rf { word-break: keep-all; overflow-wrap: anywhere; text-wrap: pretty; letter-spacing: -0.01em; }
+
+.qty { letter-spacing: 0.02em; }
+
+.btn.sm { min-height: 48px; padding: 0 18px 3px 12px; font: 400 17px/1 var(--black); }
+.btn.lg { min-height: 54px; font: 400 20px/1 var(--black); }
+
+/* 수량 쪽지 — 칸 오른쪽 아래 먹 바탕 + 한지 글자. 외곽선 글씨는 작은 칸에서 뭉개져 쓰지 않는다 */
+.qty {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  min-width: 22px;
+  padding: 3px 5px 3px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 400 14px/1 var(--black);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+  clip-path: var(--sealclip2);
+}
+
+/* 구입 안내 단추 — 구석의 작은 동그라미(보이는 크기 24 · 누름 칸 48). 눌러야 펼쳐진다 */
+.info { align-self: flex-end; min-width: 0; font: var(--t-small); color: var(--ink2); }
+.info[open] { align-self: stretch; }
+.info summary { display: grid; place-items: center; width: 48px; height: 48px; margin-left: auto; list-style: none; cursor: pointer; }
+.info summary::-webkit-details-marker { display: none; }
+.info svg { width: 24px; height: 24px; }
+.info circle { fill: none; stroke: currentColor; stroke-width: 2.4; }
+.info circle.d { fill: currentColor; stroke: none; }
+.info path { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+.info-b { display: grid; gap: 6px; }
+.info-b p { margin: 0; }
+.m-body .info { margin: -8px -10px -14px 0; }
+
+/* ── 구역 작전 머리 ────────────────────────────────────── */
 .op-h {
   display: flex;
   align-items: baseline;
@@ -14,78 +67,325 @@
   transform-origin: 0 100%;
 }
 
-.ms-h small,
-.op-h small { font: 700 13px/1 var(--body); color: var(--ink2); }
+.op-h small { font: 700 13.5px/1 var(--body); color: var(--ink2); }
 
-/* ── 미션 줄 ───────────────────────────────────────────── */
-.ms-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'name act' 'desc act' 'prog act' 'rew act';
-  align-items: center;
-  column-gap: 12px;
-  row-gap: 5px;
-  padding: 12px 2px 14px;
-}
+/* ── 미션 화면 — 세 탭(오늘 · 현장 · 실적). 먹 틀 안에 초록 붓 띠 머리(위에 붙음) + 탭 도장 줄 ── */
+.ov-meta[data-screen='missions'] { --ms-band: 74px; --ms-tabs: 58px; padding: 20px 0 18px; }
+.ov-meta[data-screen='missions'] > .ov-body { max-width: none; }
+.ov-meta[data-screen='missions'] > .ov-nav { padding-inline: 22px; }
 
-/* 줄 사이 = 굵게 들어가 가늘게 빠지는 먹 한 획(필터 없이 clip-path) */
-.ms-row::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 92%;
-  height: 4px;
-  background: var(--ink);
-  clip-path: polygon(0 10%, 70% 30%, 100% 55%, 70% 80%, 0 100%);
-  rotate: -0.6deg;
-}
-
-.ms-row:nth-child(even)::after { width: 84%; rotate: 0.5deg; }
-.ms-name { grid-area: name; font: 700 16px/1.25 var(--body); }
-.ms-desc { grid-area: desc; font: 700 13px/1.35 var(--body); color: var(--ink2); }
-.ms-prog { grid-area: prog; display: flex; align-items: center; gap: 10px; }
-
-/* 붓 막대 — 먹 테두리 안에 먹이 차오른다. 끝은 갈필처럼 빠진다 */
-.ms-bar {
-  position: relative;
-  flex: 1;
-  height: 13px;
-  border: 2.5px solid var(--ink);
-  border-radius: 2px 7px 3px 6px;
-  overflow: hidden;
-}
-
-.ms-bar i {
-  position: absolute;
-  left: 0;
+.ms-band {
+  position: sticky;
   top: 0;
-  bottom: 0;
-  width: var(--p);
-  background: var(--ink);
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 45%, calc(100% - 3px) 100%, 0 100%);
-  transform-origin: 0 50%;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  width: min(430px, calc(100% - 40px));
+  margin-inline: auto;
+  height: var(--ms-band);
+  padding: 8px 16px 17px;
+  background: var(--green);
+  color: var(--paper);
+  clip-path: var(--bandclip);
 }
 
-.ms-count { font: 700 14px/1 var(--body); white-space: nowrap; }
-.ms-rew { grid-area: rew; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 700 15px/1 var(--body); }
-.ms-act { grid-area: act; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ms-band .meta-title { font: var(--t-title); rotate: 0deg; }
 
-/* 처음 받을 것 = 주홍 「받기」 인장 하나 */
-.ms-take { width: 78px; height: 78px; rotate: -4deg; }
-.ms-take b { font-size: 36px; line-height: 0.95; }
-/* 나머지 받을 것 = 먹 획 */
-.ms-take2 { width: 96px; height: 56px; padding: 0 16px 3px 18px; rotate: 1.5deg; }
-.ms-take2 b { font-size: 30px; }
-/* 받은 것 = 작은 먹 「받음」 도장(못 누름) */
-.ms-got { width: 56px; height: 56px; rotate: 7deg; }
-.ms-got b { font-size: 27px; }
-.ms-got.fresh { animation: stamp 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
-.ms-boost { font: 700 13px/1.1 var(--body); color: var(--ink); white-space: nowrap; rotate: -2deg; }
-.ms-done { margin-top: 12px; font: 700 13px/1.5 var(--body); color: var(--ink2); }
+/* 지갑 — 초록 띠 위에 한지 쪽지 둘. 그림 선이 먹이라 한지 바탕이 있어야 읽힌다 */
+.ms-wallet { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.ms-wallet .cur { gap: 5px; padding: 2px 9px 3px 7px; background: var(--paper); color: var(--ink); clip-path: var(--sealclip2); }
+.ms-wallet .coin { width: 18px; height: 18px; }
+.ms-wallet b { font: 400 16px/1 var(--black); font-variant-numeric: tabular-nums; }
 
-/* ── 작전 컷 2×2 ──────────────────────────────────────── */
+/* 탭 도장 줄 — 띠 바로 밑에 붙는다(스크롤해도 한 번에 바뀐다). 고른 탭은 먹 채움, 받을 것이 있으면 주홍 점.
+   띠의 거친 밑단 8px 밑까지 깔아 띠 뒤로 지나가는 글이 비치지 않게 한다 */
+.ms-tabs {
+  position: sticky;
+  top: calc(var(--ms-band) - 8px);
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  height: var(--ms-tabs);
+  margin-top: -8px;
+  padding: 6px max(20px, calc((100% - 430px) / 2)) 4px;
+  background: var(--paper);
+}
+
+.ms-tab {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  min-height: 48px;
+  padding: 0 0 5px;
+  color: var(--ink);
+  font: var(--t-sec);
+}
+
+.ms-tab::before,
+.ms-tab::after { content: ''; position: absolute; }
+.ms-tab::before { inset: 0; background: var(--ink); clip-path: var(--sealclip2); z-index: -2; }
+.ms-tab::after { inset: 3px; background: var(--card); clip-path: var(--sealclip); z-index: -1; }
+.ms-tab.on { color: var(--paper); }
+.ms-tab.on::after { display: none; }
+.ms-tab:active { scale: 0.96; }
+.ms-dot { position: absolute; right: 10px; top: 7px; width: 12px; height: 12px; background: var(--seal); clip-path: var(--sealclip2); }
+
+.ms-page { max-width: 470px; margin-inline: auto; padding: 8px 20px 28px; }
+.ms-in { animation: ms-in 0.22s var(--ease-out) backwards; }
+.ms-sec { display: grid; align-content: start; gap: 8px; }
+.ms-sec + .ms-sec,
+.ms-sec + .ms-dm,
+.ms-dm + .ms-sec { margin-top: 8px; }
+.ms-page > :first-child { margin-top: 0; }
+
+.ms-name { font: var(--t-name); }
+.ms-sub { font: var(--t-small); color: var(--ink2); }
+.ms-num { font: 400 14px/1 var(--black); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ms-sub .ms-num { color: var(--ink); }
+.ms-all { width: 100%; margin-top: 12px; }
+
+/* 오늘 탭 맨 위 — 작업이 바뀌기까지 남은 시간 */
+.ms-clock { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; padding: 0 2px; font: var(--t-name); }
+.ms-clock .fuse { gap: 8px; min-height: 30px; }
+.ms-clock .fuse svg { width: 120px; height: 22px; }
+
+/* 줄 = 한 톤 낮은 한지 거친 칸 */
+.ms-line,
+.ms-row,
+.ms-dm,
+.ms-score { position: relative; isolation: isolate; background: var(--paper-2); clip-path: var(--cutclip); }
+
+/* 출근 · 신입 · 월급 한 줄 — 그림 · 이름 + 작은 글 · 보상 · 받기 */
+.ms-line {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto 64px;
+  grid-template-areas: 'ico nm rw act' 'ico sb rw act';
+  align-items: center;
+  gap: 2px 8px;
+  min-height: 60px;
+  padding: 4px 10px 4px 12px;
+}
+
+.ms-line > .gd { grid-area: ico; width: 36px; height: 36px; }
+.ms-line > .ms-name { grid-area: nm; align-self: end; }
+.ms-line > .ms-sub { grid-area: sb; align-self: start; }
+.ms-line > .ms-rew { grid-area: rw; max-width: 84px; justify-content: flex-end; }
+.ms-line > .ms-act { grid-area: act; }
+
+/* 오늘 출근 칸 = 남색 테두리 */
+.ms-attend { clip-path: none; background: none; }
+.ms-attend::before,
+.ms-attend::after { content: ''; position: absolute; }
+.ms-attend::before { inset: 0; background: var(--navy); clip-path: var(--cutclip); z-index: -2; }
+.ms-attend::after { inset: 4px; background: var(--paper-2); clip-path: var(--cutclip); z-index: -1; }
+
+/* 막대 — 옅은 먹 바탕 위 굵은 먹 획. 0%여도 막대로 읽힌다 */
+.ms-bar { position: relative; display: block; height: 12px; background: var(--ink3); clip-path: var(--sealclip2); }
+.ms-bar.lg { height: 16px; }
+.ms-bar i { position: absolute; inset: 0 auto 0 0; width: var(--p); background: var(--ink); transform-origin: 0 50%; }
+
+/* 보상 = 정사각 칸(46px) + 오른쪽 아래 수량(판 위 콤보 숫자처럼 먹 테두리 + 한지 채움) */
+.ms-rew { display: flex; flex-wrap: wrap; gap: 8px; }
+.ms-rew .rw { position: relative; isolation: isolate; display: grid; place-items: center; width: 46px; height: 46px; }
+.ms-rew .rw::before,
+.ms-rew .rw::after { content: ''; position: absolute; }
+.ms-rew .rw::before { inset: 0; background: var(--edge, var(--ink)); clip-path: var(--sealclip2); z-index: -2; }
+.ms-rew .rw::after { inset: 2.5px; background: var(--card); clip-path: var(--sealclip); z-index: -1; }
+.ms-rew .rw .gd { width: 32px; height: 32px; translate: -1px -2px; }
+
+/* 소유로 들어오는 것(꾸미기)은 금 테두리 칸 + 이름 */
+.ms-rew .rw-own { --edge: var(--gold); }
+.ms-rew .rw-own img { width: 92%; height: 92%; object-fit: contain; }
+.ms-rew .rw-txt { --edge: var(--gold); width: auto; min-width: 46px; padding: 0 12px; font: 700 14px/1.2 var(--sans); }
+
+/* 줄 안 작은 보상 칸(40) */
+.ms-rew.sm { gap: 4px; }
+.ms-rew.sm .rw { width: 40px; height: 40px; }
+.ms-rew.sm .rw .gd { width: 28px; height: 28px; }
+.ms-rew.sm .rw-txt { min-width: 40px; padding: 0 6px; }
+.ms-rew.sm .qty { padding: 2px 4px; }
+
+/* 받기 자리 — 줄 오른쪽 세로 가운데. 2배는 받기 아래로 8px 띄운다 */
+.ms-act { flex: none; width: 64px; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 8px; }
+.ms-act:empty { visibility: hidden; }
+.ms-take { width: 100%; min-width: 0; padding: 0 14px 3px 8px; }
+.ms-boost { min-height: 48px; padding: 0 12px 3px 6px; font: 700 14px/1.15 var(--sans); white-space: normal; }
+
+/* 받은 것 = 옅은 먹 이름표(못 누름) */
+.ms-got { display: grid; place-items: center; min-height: 40px; background: var(--ink3); color: var(--ink); clip-path: var(--sealclip2); font: 700 15px/1 var(--sans); }
+.ms-got.fresh { animation: ms-pop 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) backwards; }
+
+/* ── 오늘의 철거 대상 — 왼쪽 건물(네 층) · 오른쪽 이름 + 일당 상자 둘 ── */
+.ms-dm { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: end; gap: 10px; padding: 6px 10px; }
+
+.ms-bld { position: relative; width: 72px; height: 92px; }
+.ms-fls { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.ms-fl { flex: 1; background: var(--src) 0 calc(var(--k) * 100% / 3) / 100% 400% no-repeat; border: 2px solid var(--ink); }
+.ms-fl + .ms-fl { margin-top: -2px; }
+.ms-fl.gone:not(.fresh) { visibility: hidden; }
+.ms-fl.fresh { position: relative; z-index: 2; animation: ms-fall 0.8s cubic-bezier(0.4, 0, 0.8, 0.5) 0.05s forwards; }
+
+/* 잔해 — 먹 더미. 없어진 층 수만큼 높아진다 */
+.ms-rub {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  bottom: -2px;
+  height: calc(var(--g) * 7px + 5px);
+  background: var(--ink);
+  clip-path: polygon(0 100%, 0 78%, 7% 58%, 14% 70%, 24% 30%, 33% 56%, 44% 12%, 55% 52%, 64% 34%, 76% 62%, 86% 40%, 94% 66%, 100% 76%, 100% 100%);
+}
+
+.ms-rub.fresh { animation: ms-rub 0.3s ease-out 0.5s backwards; }
+
+.ms-stamp {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  z-index: 3;
+  translate: -50% 0;
+  rotate: -8deg;
+  padding: 2px 10px 7px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 400 30px/1 var(--brush);
+  white-space: nowrap;
+  clip-path: var(--sealclip);
+}
+
+.ms-stamp.fresh { animation: stamp 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.7s both; }
+
+.ms-dm-r { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ms-dm-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; }
+.ms-dm-t { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.ms-dm-t small { font: var(--t-small); color: var(--ink2); }
+.ms-dm-t b { font: var(--t-sec); }
+.ms-dm-h .ms-act:empty { display: none; }
+
+/* 일당 상자 둘 — 가로로. 몇 개 받으면 · 보상 칸. 받기는 머리 줄 오른쪽 하나(받을 단계가 있을 때만) */
+.ms-wgs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ms-wg { position: relative; display: flex; flex-direction: column; gap: 3px; }
+.ms-wg-n { font: 400 15px/1 var(--black); font-variant-numeric: tabular-nums; }
+.ms-wg .ms-ok { left: 40px; top: 60%; }
+
+/* ── 작업 줄 — 위 = 이름 · 막대 · 수치, 아래 = 보상 칸 · 오른쪽 끝 단추. 설명 없음 ── */
+.ms-works { gap: 8px; }
+.ms-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 8px; padding: 6px 10px 8px 12px; }
+.ms-rt { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(40px, 1fr) auto; align-items: center; gap: 8px; min-height: 24px; }
+.ms-row .ms-act { flex-direction: row; align-items: center; justify-content: flex-end; width: auto; min-height: 48px; }
+.ms-row .ms-take,
+.ms-row .ms-boost,
+.ms-row .ms-got { width: 76px; }
+/* 받은 줄 — 글자는 연먹(한지 위 5:1)으로 낮추고 막대 · 그림만 옅게 */
+.ms-row.done .ms-name { color: var(--ink2); }
+.ms-row.done .ms-bar { opacity: 0.55; }
+
+/* ── 현장 — 표지 · 점수 · 특근 수당 · 세로 30칸 ── */
+.ms-cover { position: relative; isolation: isolate; height: 180px; }
+.ms-cover::before { content: ''; position: absolute; inset: 0; background: var(--ink); clip-path: var(--cutclip); z-index: -2; }
+.ms-scene { position: absolute; inset: 4px; overflow: hidden; background: var(--paper); clip-path: var(--cutclip); }
+
+.ms-cv-name {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  padding: 4px 14px 9px;
+  background: var(--ink);
+  color: var(--paper);
+  font: var(--t-sec);
+  clip-path: var(--sealclip2);
+}
+
+.ms-cv-days {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 7px 12px 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--t-name);
+  clip-path: var(--sealclip2);
+}
+
+.ms-cv-days b { font: 400 20px/1 var(--black); font-variant-numeric: tabular-nums; }
+.ms-cover .pk-stamp { top: auto; right: 12px; bottom: 10px; }
+
+.ms-score { display: grid; gap: 8px; margin-top: 8px; padding: 12px 14px 14px; }
+.ms-sc-t { display: flex; align-items: baseline; gap: 4px; font: var(--t-name); }
+.ms-sc-t b { font: 400 30px/1 var(--black); font-variant-numeric: tabular-nums; }
+.ms-x2,
+.ms-pass { padding: 3px 9px 4px; font: 700 14px/1.2 var(--sans); clip-path: var(--sealclip2); }
+.ms-x2 { margin-left: auto; background: var(--ink); color: var(--paper); }
+.ms-pass { margin-left: auto; background: var(--gold); color: var(--ink); }
+.ms-x2 + .ms-pass { margin-left: 4px; }
+
+/* 특근 수당 — 그 달 전용 꾸미기 둘(그림 칸 + 이름표) 옆에 금 결제 단추 */
+.ms-buy { position: relative; isolation: isolate; display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 10px; background: var(--paper-2); clip-path: var(--cutclip); }
+.ms-own { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ms-own .ms-rew .rw { width: 50px; height: 50px; }
+.ms-own-n { font: 700 14px/1.2 var(--sans); }
+.ms-pay { flex: 1 1 0; flex-direction: column; gap: 0; min-width: 0; padding: 0 22px 4px 8px; font-size: 20px; line-height: 1.1; white-space: normal; }
+
+/* 위에 붙는 모두 받기 — 띠 · 탭 밑 */
+.ms-stick { position: sticky; top: calc(var(--ms-band) - 8px + var(--ms-tabs)); z-index: 2; margin-top: 10px; padding: 4px 0 6px; background: var(--paper); }
+.ms-stick .btn { width: 100%; }
+
+/* 세로 트랙 — 가운데 번호 도장 · 왼쪽 일반 · 오른쪽 특근(금) */
+.ms-track { position: relative; display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.ms-track::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; translate: -50% 0; background: var(--ink3); clip-path: var(--sealclip2); }
+.ms-rung { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 60px; }
+.ms-no { position: relative; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding-bottom: 2px; background: var(--ink3); color: var(--ink); font: 400 18px/1 var(--black); font-variant-numeric: tabular-nums; clip-path: var(--sealclip); }
+.ms-rung.open .ms-no { background: var(--ink); color: var(--paper); }
+
+.ms-rg { position: relative; display: flex; align-items: center; justify-content: flex-end; min-height: 56px; padding: 6px 8px; background: var(--paper-2); clip-path: var(--sealclip2); }
+.ms-rg.paid { justify-content: flex-start; }
+.ms-rg .ms-rew.sm { gap: 4px; }
+.ms-rg .ms-rew.sm .rw { width: 44px; height: 44px; }
+.ms-rg .ms-rew.sm .rw .gd { width: 32px; height: 32px; }
+.ms-rg .ms-rew.sm .rw-txt { min-width: 44px; }
+.ms-rg.paid .rw { --edge: var(--gold); }
+.ms-rung:not(.open) .ms-rg:not(.paid) .rw { --edge: var(--ink3); }
+/* 잠긴 특근 칸은 그림 · 금 테두리 · 수량 그대로 — 자물쇠만 얹는다(사기 전에 갖고 싶어야 한다). 사려는 칸이면 칸 전체가 구매 단추 */
+button.ms-rg { width: 100%; color: var(--ink); text-align: left; }
+button.ms-rg:active { scale: 0.97; }
+/* 흐림은 그림에만 — 수량 쪽지(.qty)는 늘 또렷하다 */
+.ms-rung:not(.open) .ms-rg:not(.paid) .rw > :not(.qty),
+.ms-rg.got .rw > :not(.qty),
+.ms-wg.got .rw > :not(.qty),
+.ms-row.done .rw > :not(.qty) { opacity: 0.5; }
+
+.ms-ok { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; translate: -50% -50%; }
+.ms-ok path { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.ms-lock { position: absolute; right: 6px; top: 6px; width: 18px; height: 18px; }
+.ms-lock path { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ms-lock .f { fill: var(--ink); stroke: none; }
+
+/* ── 실적 — 낙관판 3열. 인장 하나 = 부문 하나 ── */
+.ms-rec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 2px 4px; font: var(--t-name); }
+.ms-rec-h b.ms-num { font-size: 18px; color: var(--ink); margin-left: 2px; }
+
+.ms-seals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; margin-top: 12px; }
+.ms-seal { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 48px; color: var(--ink); }
+.ms-seal:active .ms-sl { scale: 0.94; }
+.ms-seal.s-none { --bd: var(--ink3); --fl: var(--card); --tx: var(--ink2); }
+.ms-seal.s-run { --bd: var(--ink); --fl: var(--ink); --tx: var(--paper); }
+.ms-seal.s-full { --bd: var(--gold); --fl: var(--ink); --tx: var(--paper); }
+.ms-seal.s-ready { --bd: var(--seal); --fl: var(--seal); --tx: var(--paper); }
+
+.ms-sl { position: relative; isolation: isolate; display: grid; place-items: center; width: 84px; height: 84px; }
+.ms-sl::before,
+.ms-sl::after { content: ''; position: absolute; }
+.ms-sl::before { inset: 0; background: var(--bd); clip-path: var(--sealclip2); z-index: -2; }
+.ms-sl::after { inset: 4px; background: var(--fl); clip-path: var(--sealclip); z-index: -1; }
+.ms-sl b { color: var(--tx); font: 400 54px/1 var(--brush); translate: 0 -3px; }
+.ms-sl-t { font: 500 14px/1.3 var(--sans); text-align: center; }
+.ms-sl-t .ms-num { margin-left: 2px; color: var(--ink); }
+
+/* ── 구역 작전 컷 2×2 ─────────────────────────────────── */
 .op-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; }
 
 .op-cut {
@@ -107,7 +407,7 @@
 .op-cut .frame { left: 6px; top: 6px; width: calc(100% - 12px); height: calc(100% - 12px); }
 .op-cut:disabled .frame path { stroke: var(--ink3); }
 
-/* 구역 층 그림 — 먹 윤곽 + 단단한 먹 그림자, 컷 위 변을 뚫고 나온다(홈 건물과 같은 문법) */
+/* 구역 층 그림 — 먹 윤곽, 컷 위 변을 뚫고 나온다(홈 건물과 같은 문법) */
 .op-pic {
   position: absolute;
   right: 12px;
@@ -115,7 +415,6 @@
   height: 104px;
   aspect-ratio: 540 / 680;
   rotate: 4deg;
-  box-shadow: 5px 6px 0 var(--ink);
   border: 4px solid var(--ink);
   background: var(--paper);
   z-index: 6;
@@ -124,7 +423,7 @@
 .op-grid > :nth-child(even) .op-pic { rotate: -3deg; right: 16px; }
 .op-pic img { width: 100%; height: 100%; object-fit: cover; }
 /* 잠긴 구역 = 그림 대신 옅은 먹 판 */
-.op-cut:disabled .op-pic { background: var(--ink3); border-color: var(--ink3); box-shadow: 5px 6px 0 var(--ink3); }
+.op-cut:disabled .op-pic { background: var(--ink3); border-color: var(--ink3); }
 
 .op-name {
   position: relative;
@@ -159,15 +458,121 @@
 [data-screen='missions'].anim .meta-title,
 [data-screen='ops'].anim .meta-title { animation: wipe 0.28s ease-out both; }
 
+[data-screen='missions'].anim .ms-line,
 [data-screen='missions'].anim .ms-row,
-[data-screen='missions'].anim .ms-h,
+[data-screen='missions'].anim .ms-dm { animation: rise 0.3s var(--ease-out) calc(var(--i, 0) * 45ms) backwards; }
+
 [data-screen='ops'].anim .op-h { animation: rise 0.3s var(--ease-out) calc(var(--i, 0) * 45ms) both; }
 
-[data-screen='missions'].anim .ms-bar i { animation: ms-fill 0.25s ease-out calc(0.1s + var(--i, 0) * 45ms) both; }
-[data-screen='missions'].anim .ms-take { animation: stamp 0.28s cubic-bezier(0.2, 1.3, 0.4, 1) 0.4s both; }
+[data-screen='missions'].anim .ms-bar i { animation: ms-fill 0.25s ease-out calc(0.1s + var(--i, 0) * 45ms) backwards; }
+[data-screen='missions'].anim .ms-take { animation: ms-pop 0.28s cubic-bezier(0.2, 1.3, 0.4, 1) 0.4s backwards; }
 
 [data-screen='ops'].anim .op-cut { animation: rise 0.3s var(--ease-out) calc(var(--i, 0) * 45ms) both; }
 [data-screen='ops'].anim .op-pic { animation: drop 0.36s cubic-bezier(0.2, 1.2, 0.4, 1) calc(0.05s + var(--i, 0) * 45ms) both; }
 [data-screen='ops'].anim .op-grade { animation: stamp 0.26s cubic-bezier(0.2, 1.3, 0.4, 1) 0.42s both; }
 
 @keyframes ms-fill { from { scale: 0 1; } to { scale: 1 1; } }
+@keyframes ms-pop { 0% { scale: 0.85; } 60% { scale: 1.05; } 100% { scale: 1; } }
+@keyframes ms-in { from { opacity: 0; translate: 0 8px; } }
+/* 받은 층 — 흔들린 뒤 떨어져 사라진다. 끝 모습 = 안 보임 */
+@keyframes ms-fall { 0% { translate: 0 0; rotate: 0deg; opacity: 1; } 12% { translate: -3px 0; } 24% { translate: 3px 0; } 36% { translate: -2px 0; opacity: 1; } 100% { translate: 8px 80px; rotate: 8deg; opacity: 0; } }
+@keyframes ms-rub { from { height: calc((var(--g) - 1) * 7px + 5px); } }
+@media (prefers-reduced-motion: reduce) { .ms-fl.fresh { visibility: hidden; } }
+
+/* ── 출근 창 본문 — 일곱 칸 판. 4열, 일곱째는 두 칸. 창 안 폭 310px 안에서 안 잘린다 ── */
+.at-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.at-c {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 102px;
+  padding: 12px 3px 10px;
+}
+
+.at-c::before,
+.at-c::after { content: ''; position: absolute; }
+.at-c::before { inset: 0; background: var(--ink); clip-path: var(--sealclip2); z-index: -2; }
+.at-c::after { inset: 3px; background: var(--card); clip-path: var(--sealclip); z-index: -1; }
+.at-c.big { grid-column: span 2; }
+
+.at-day { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; font: 700 14px/1.2 var(--sans); color: var(--ink2); white-space: nowrap; }
+.at-rw { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 6px 10px; }
+.at-c .rw { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; font: 400 16px/1 var(--black); white-space: nowrap; }
+.at-c .rw .gd { width: 28px; height: 28px; }
+.at-c .rw-txt { font: 700 14px/1.2 var(--sans); white-space: normal; }
+
+/* 지난 칸 = 옅은 먹 테두리 + 가라앉은 바탕 + 초록 확인 표시 */
+.at-c.past::before { background: var(--ink3); }
+.at-c.past::after { background: var(--paper-2); }
+.at-c.past .rw { color: var(--ink2); }
+.at-ok { flex: none; width: 18px; height: 18px; }
+.at-ok path { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 오늘 칸 = 남색 굵은 테두리 + 밝은 바탕 + 남색 날짜표 */
+.at-c.today::before { background: var(--navy); }
+.at-c.today::after { inset: 6px; }
+.at-c.today .at-day { color: var(--paper); background: var(--navy); clip-path: var(--sealclip2); padding: 3px 8px; }
+
+/* ── 시작 장비 시트 — 줄 하나: 체크 · 그림 · 이름 + 보유 · 수량(또는 사기). 칸은 먹 도장 문법 ── */
+.kt { display: grid; gap: 10px; container-type: inline-size; }
+.kt-row,
+.kt-check,
+.kt-step { position: relative; isolation: isolate; }
+
+.kt-row::before, .kt-row::after,
+.kt-check::before, .kt-check::after,
+.kt-step::before, .kt-step::after { content: ''; position: absolute; }
+
+.kt-row::before, .kt-check::before, .kt-step::before { background: var(--ink); clip-path: var(--sealclip2); z-index: -2; }
+.kt-row::after, .kt-check::after, .kt-step::after { background: var(--card); clip-path: var(--sealclip); z-index: -1; }
+
+.kt-row { display: flex; align-items: center; gap: 6px; min-height: 76px; padding: 8px 8px 8px 4px; }
+.kt-row::before { inset: 0; background: var(--ink3); clip-path: var(--cutclip); }
+.kt-row::after { inset: 3px; clip-path: var(--cutclip); }
+.kt-row.on::before { background: var(--brown); }
+.kt-row.on::after { inset: 5px; }
+.kt-row > .gd { flex: none; width: 44px; height: 44px; }
+
+/* 보이는 칸은 36, 누르는 칸은 48 */
+.kt-check { flex: none; display: grid; place-items: center; width: 48px; height: 48px; }
+.kt-check::before { inset: 6px; }
+.kt-check::after { inset: 9px; }
+.kt-check svg { width: 24px; height: 24px; }
+.kt-check path { fill: none; stroke: var(--paper); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.kt-row.on .kt-check::before { background: var(--brown); }
+.kt-row.on .kt-check::after { display: none; }
+.kt-check:disabled::before { background: var(--ink3); }
+
+.kt-txt { flex: 1; min-width: 0; }
+.kt-name { font: 400 17px/1.25 var(--black); word-break: keep-all; }
+.kt-have { margin-top: 4px; font: 500 14px/1.2 var(--sans); color: var(--ink2); white-space: nowrap; }
+
+.kt-qty { flex: none; display: flex; align-items: center; gap: 2px; }
+.kt-qty b { min-width: 22px; font: 400 20px/1 var(--black); text-align: center; }
+.kt-step { display: grid; place-items: center; width: 48px; height: 48px; font: 700 26px/1 var(--sans); color: var(--ink); }
+.kt-step::before { inset: 0; }
+.kt-step::after { inset: 3px; }
+.kt-step:disabled { color: var(--ink3); }
+.kt-step:disabled::before { background: var(--ink3); }
+.kt-step:active:not(:disabled) { scale: 0.94; }
+
+.kt-buy { flex: none; min-height: 52px; min-width: 92px; padding: 0 24px 4px 12px; }
+.kt-buy .gd { width: 26px; height: 26px; }
+.kt-buy b { font: 400 24px/1 var(--brush); }
+
+/* 창이 좁으면(폭 330 밑) 그림 · 이름만 한 단 줄여 이름 자리를 번다. 누르는 칸은 그대로 */
+@container (max-width: 330px) {
+  .kt-row { gap: 4px; padding-right: 6px; }
+  .kt-row > .gd { width: 36px; height: 36px; }
+  .kt-check { width: 44px; }
+  .kt-name { font-size: 16px; }
+  .kt-qty { gap: 0; }
+  .kt-qty b { min-width: 14px; }
+}
+
+.kt-foot { margin-top: 12px; font: 500 14px/1.45 var(--sans); color: var(--ink2); }
+.kt-wallet { display: flex; align-items: center; gap: 6px; margin-top: 6px; font: 700 15px/1.2 var(--sans); }
+.kt-wallet .gd { width: 22px; height: 22px; }

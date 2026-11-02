@@ -40,7 +40,14 @@
    계속 읽는다. 옛 저장과 `SAMPLE_MASK`가 이 번호로 색을 가리키니 `MASK_PALETTE`는 순서도 값도 바꾸지 마라.
    도트판 기본 색 `MASK_SWATCHES`는 저장과 무관해서 마음대로 바꿔도 된다. 가드: `tests/mask.test.ts`.
 10. **화면(`src/ui`)은 「먹 한 획」 문법이다**(2026-10-31, 정본 = `src/style.css` 머리말). 한지 · 먹 · 옅은 먹에
-    주홍 인장은 **화면마다 누를 것 하나**, 노랑은 베는 순간만. 그라데이션 · 흐림 · 반투명 없음(깊이는 단단한 먹 그림자).
+    주홍 인장은 **화면마다 누를 것 하나**, 노랑은 베는 순간만. 그라데이션 · 흐림 없음. 그림자 칸 금지(2026-11-01 사용자
+    「그림자지는칸 컨셉좀 버려」) — 칸은 탭바 칸처럼 거친 먹 사각(`.inkseal` 만드는 법)이나 `--paper-2` 거친 칸으로 만든다.
+    둥근 카드 · 알약 칩 · 평면 색 띠 · 스티커 그림은 게임 밖 문법이다(2026-11-01 사용자 「너무 게임 컨셉이랑 안맞는데」).
+    반투명은 창 뒤 먹 막 하나뿐이다. 단추는 붓 획(먹 · 주홍 · 금 · 옅은 먹), 금(`--gold`)은 결제 단추 · 구매 확인 창 머리 · 소유물 칸 테두리만 쓴다.
+    제목 · 상품 이름은 붓, 읽는 글은 `--sans`, 수량 · 가격은 `--black`(판 콤보 숫자와 같은 글꼴)이다.
+    창 머리 색 = 창 종류(출근 남 · 보상 초록 · 특가 주홍 · 시작 장비 고동 · 구매 확인 금 · 나머지 먹), 거친 붓 띠로 칠한다.
+    상품 그림(`goodsArt`)은 고른 굵기 먹 테 + 재질 색 한 판이다. 빛 · 그늘 판 · 반짝임 · 광택 점은 없다(2026-11-02 사용자
+    「명암이 부담스러워 아이콘처럼 단순한 2D느낌」). 졸라맨은 판 그림을 찍는다(`shopArt`). 재화 표는 `ink.glyph` 한 곳에서 상품 그림으로 나간다. 같은 것은 어디서나 같은 색이다(궤도조각 = 파랑 `BLUE` · 먼지 = 판에서 건물이 무너질 때 이는 먼지 구름 면 `PUFF` = `render/effects`의 `PUFF_FILL`). 먼지 표는 구름 + 뒤로 튀는 벽돌 · 돌 조각이다(2026-11-02 「먼지 리디자인」, 구름만이면 날씨로 읽힌다).
     붓글씨(동해독도)는 25px 이상만. 등급 글자(S · A · B)는 본문 굵게(붓글씨 S는 5로 읽힌다).
     오버레이의 `data-el` 이름은 전체에서 하나만 쓴다. `$()`는 첫 일치를 잡는다(10-31 작전 목록이 홈 단추 속에 그려졌다).
 11. **콤보 수는 판 위 타격 자리에 렌더러가 찍는다**(콤보 도장, `COMBO_MARK` · 2026-10-31 사용자 요청). HUD 옆 띠에 콤보 칸을
@@ -59,16 +66,23 @@
     기록 코드 · 공유 · 다시 보기는 없다(2026-11-01 뺌, 되살릴 땐 커밋 `8d30fdf`).
     렌더 · 소리는 GameState를 읽기만 한다. 종은 땅에 닿으면 깨진다(빗나감, 깔지 않는다). 깬 뒤 쓰러짐 연출 중엔 안 다친다.
     가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts`.
+15. **메타 화면은 `meta.css` 머리의 글자 값(`--t-*`)과 `.btn.sm` · `.btn.lg` · `.qty` · `.ms-bar`만 쓴다**(2026-11-01, 정본 = `docs/META2_2026-11-01.md`).
+    작은 글 13.5px 밑 금지, 외곽선 수량 글씨 금지, 누름 칸 48 이상. 보상은 `rewardFx` 세 단계(S · M · L)로 보이고 토스트로 되돌리지 않는다.
+    크기는 11-02 손질 값이다(사용자 「크기좀 적절하게 조절」: 제목 붓 40 · 구획 27 · 이름 16 · 큰 단추 54 · 작은 단추 48 · 탭바 도장 54).
+    재화 판은 띠 + 여섯 칸이 한 화면(무대 780)에 다 보인다. 칸 · 띠를 늘리면 셋째 줄 가격이 잘린다.
+    특가 타이머는 끝나면 진짜 끝이다. 가짜 타이머 · 반복 팝업 · 닫기 숨기기 금지, 취소선 정가는 실제로 파는 값만. 효율은 정말 따로 파는 것만 더한 값 ÷ 가격이고 150% 밑이면 인장을 안 찍는다(`effPct`). 산식을 바꾸면 안내 단추 문구도 같이 고친다. 패널 · 특가 창에 설명 줄을 쓰지 않고 구입 고지는 안내 단추(`infoHtml`) 안에 둔다. 오늘 사서 값이 가격에 못 미치는 특근은 팔지 않는다(`soldOut`의 `dateKey`). 재화 묶음의 덤은 상품마다 첫 구매 한 번뿐이다(`firstDouble`). 매일 덤을 넣으면 실제 단가가 내려가 효율 인장이 줄줄이 사라진다.
+    특근 줄은 재화 · 소모품 · 외형뿐이다(판 능력치 금지). 꾸미기 id는 무기와 `owned`를 같이 쓰니 겹치면 안 된다(`frost` · `gold` · `flame`).
+    가드: `tests/meta-upgrade.test.ts` · `tests/meta-monetize.test.ts`.
 
 ## 검증
 
-- `npm test` — 744 테스트(7 건너뜀, 2026-11-01 진행 막대 기준, `release/1.0`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 853 테스트(7 건너뜀, 2026-11-02 재화 상점 기준, `feat/meta-monetize`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
   (원본 TTF 8개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 500/700 · 동해독도 · 고운바탕 400/700.
   `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).
 - 디버그 APK: `npm --prefix shell run web:build` → `npm --prefix shell run sync` → `npm --prefix shell run apk`.
-  릴리스 빌드는 `shell/android/key.properties`가 없거나 광고 ID가 테스트 값이면 gradle이 멈춘다(`docs/RELEASE.md`).
+  릴리스 빌드는 `shell/android/key.properties`가 없거나 광고 ID가 테스트 값이거나 웹 번들에 `release-build.txt` 표식이 없으면 gradle이 멈춘다(`docs/RELEASE.md`).
 - 브라우저 확인: `.claude/launch.json` → 프리뷰(포트 5173), 모바일 뷰포트 375×812.
   화면 검수는 화면비 여럿으로 — 375×812만 보면 무대가 높이에 먼저 닿는 넓은 기기(사용자 실기기 416×657)에서
   메뉴가 화면 폭 61%에 갇힌 걸 못 본다(10-28). 메뉴 폭 ÷ 화면 폭을 숫자로 잰다.
@@ -94,7 +108,7 @@ core/통합/테스트는 메인이 직접.
 - 원작 에셋(스프라이트·MIDI·명칭·내레이션 텍스트) 사용 금지.
 - 네이티브(Capacitor/AdMob/OTA)는 `src/platform/`에서만 만난다. 접근은 `window.Capacitor.Plugins`
   **런타임 조회만** — 정적/동적 bare import 금지(웹 번들 오염·WebView 무음 null). 플러그인 패키지는
-  `shell/`에만 있고 루트 런타임 의존성은 0을 유지한다. IAP는 v1 제외(ROADMAP).
+  `shell/`에만 있고 루트 런타임 의존성은 0을 유지한다. 결제는 `src/platform/iap.ts`만 만난다(구매 → 지급 · 저장 → 소비 · 승인 순서).
 - 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `npm run ota:release -- <version>`이 갱신한다.
 - 에셋 예산 게이트: `npm run build`가 `scripts/check-budget.mjs`로 dist·이미지 상한과 중복을 검사한다.
 - 앱 아이콘 원본 = `assets/brand/src/gunbbu-icon.svg` 하나. 굽기 = `node scripts/gen-native-icons.mjs --playwright-module <playwright 폴더>`

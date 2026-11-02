@@ -11,7 +11,7 @@
     "images:capture": "node scripts/capture-store.mjs",
     "images:check": "node scripts/check-image-runtime.mjs",
     "typecheck": "tsc --noEmit",
-    "build": "node scripts/clean-dist.mjs && node scripts/check-release.mjs && tsc --noEmit && vite build && node scripts/check-budget.mjs",
+    "build": "node scripts/clean-dist.mjs && node scripts/check-release.mjs && tsc --noEmit && vite build && node scripts/check-release.mjs --mark && node scripts/check-budget.mjs",
     "check:release": "node scripts/check-release.mjs",
     "preview": "vite preview --host",
     "test": "vitest run",

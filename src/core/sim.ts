@@ -35,6 +35,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     score: 0,
     guardGauge: GUARD_GAUGE.MAX,
     wazaGauge: 0,
+    wazaBank: 0,
     guardRegenCd: 0,
     lives: PLAYER.LIVES,
     hitstop: 0,
@@ -63,6 +64,11 @@ export function advance(s: GameState, input: InputFrame): void {
   if (s.hitstop > 0) {
     s.hitstop -= 1;
     return;
+  }
+  // 시작 장비 「필살 충전」 — 게이지가 비면(쓴 뒤 · 2막 진입 리셋 뒤) 하나 써서 다시 채운다
+  if (s.wazaBank > 0 && s.wazaGauge < WAZA_GAUGE.COST) {
+    s.wazaBank -= 1;
+    s.wazaGauge = WAZA_GAUGE.MAX;
   }
   // 이번 틱에 발행되는 이벤트만 히트스톱 주입 대상 (advance 말미 참조)
   const evStart = s.events.length;
@@ -490,6 +496,14 @@ function onPlayerCrushed(s: GameState): void {
   s.player.bufJump = 0;
   s.player.bufGuard = 0;
   s.events.push({ kind: 'hurt' });
+}
+
+/** 시작 장비 — 목숨 +lives, 필살 wazas번 분(첫 번은 게이지, 나머지는 wazaBank). makeState 바로 뒤에 건다 */
+export function applyStartKit(s: GameState, lives: number, wazas: number): void {
+  s.lives += lives;
+  if (wazas <= 0) return;
+  s.wazaGauge = WAZA_GAUGE.MAX;
+  s.wazaBank = wazas - 1;
 }
 
 /** 광고 부활 등 — 콤보·점수 유지, 라이프 1, 짧은 무적. 씬이 over===gameover 일 때 호출. */
