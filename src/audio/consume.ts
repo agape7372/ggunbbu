@@ -1,7 +1,7 @@
 // GameState.events → SFX. core는 이벤트만 발행, 이 모듈이 프레임마다 소비(클리어는 씬).
 // boltCue/land 등은 kind 재사용 — 페이즈·보스 상태로 전용 프리셋을 고른다.
 import type { GameState, JuiceEvent, JuiceKind, Material, WeaponId } from '../core/types';
-import { AUDIO, BOSS, HAT_FX, JUICE, STACK, TPS } from '../config';
+import { AUDIO, BOSS, HAT_FX, JUICE, STACK, TPS, WAZA_RUN } from '../config';
 import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
 import { landmarkSounds, snapOf, type LmSnap } from './landmarkSfx';
@@ -57,16 +57,18 @@ export function consumeAudio(s: GameState): void {
       const semis = e.kind === 'hit' ? comboSemitones(e.combo ?? 0) : 0;
       for (const name of mapped) {
         // 필살 폭발은 히트스톱이 풀리는 틱에 화면에서 터진다 — 폭발음도 그 박자로 늦춘다
-        if (name === 'special') {
+        if (name === 'special' && e.kind === 'special') {
           playSfx('specialCharge'); // 휘익은 지금, 폭발은 히트스톱이 풀릴 때
           playSfx(name, { delay: JUICE.special.hitstop / TPS });
-        } else if (name === 'hatGet') playSfx(name, { delay: HAT_FX.LAND / TPS }); // 고비 소리는 지금, 「팅」은 머리에 씌워질 때
+        } else if (name === 'inkSnap' && e.kind === 'special') playSfx(name, { delay: JUICE.special.hitstop / TPS }); // 무음일섬 — 한 줄을 뽑는 프레임(wazaShow)
+        else if (name === 'sheathe') playSfx(name, { delay: (JUICE.special.hitstop + WAZA_RUN.mukjul.burst - 8) / TPS }); // 터지기 여덟 틱 전
+        else if (name === 'hatGet') playSfx(name, { delay: HAT_FX.LAND / TPS }); // 고비 소리는 지금, 「팅」은 머리에 씌워질 때
         else playSfx(name, semis !== 0 ? { pitchSemitones: semis } : undefined);
       }
     }
   }
   // 덕킹은 틱당 한 번 — 필살·격파(깊게)가 완파(가볍게)와 겹치면 깊은 쪽만
-  if (kinds.has('special') || kinds.has('bossDefeat')) pulseDuckBgm();
+  if (kinds.has('special') || kinds.has('wazaBurst') || kinds.has('bossDefeat')) pulseDuckBgm();
   else if (kinds.has('stackDestroy')) pulseDuckBgm(AUDIO.DUCK_DESTROY, AUDIO.DUCK_DESTROY_S);
 
   if (comboMilestone(prevCombo, s.combo) !== null) playSfx('milestone');
@@ -135,7 +137,19 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
     case 'butterCollapse':
       return ['butterPop'];
     case 'special':
+      // 시간차 필살은 휘익만 — 폭발은 터지는 틱(wazaBurst)에. 무음일섬은 뽑는 소리 · 칼 거둠을 미리 걸어 둔다
+      if (s.waza === 'mukjul') return ['whiff', 'specialCharge', 'inkSnap', 'sheathe'];
+      if (s.waza in WAZA_RUN) return ['whiff', 'specialCharge'];
       return ['whiff', 'special']; // 입력 틱 = 휘두름, 폭발음은 consumeAudio가 늦춘다
+    case 'wazaSwing': // 용오름 = 바람 · 월하난무 = 칼마다 끊어 치는 소리 · 십이연참 = 휘익
+      if (s.waza === 'baram') return ['gust'];
+      return [s.waza === 'dalmuri' ? 'inkSnap' : 'whiff'];
+    case 'wazaHit': {
+      const own = WEAPON_HIT[s.weapon];
+      return [own ?? HIT_VARIANTS[hitRR++ % HIT_VARIANTS.length]];
+    }
+    case 'wazaBurst':
+      return s.waza === 'nakgwan' ? ['stamp', 'special'] : ['special'];
     case 'hurt':
       return ['pinned'];
     case 'guardBounce':

@@ -132,7 +132,7 @@ export const ORBIT_NAME = '궤도조각';
 export const REVIVE_MAX = MAX_REVIVES_PER_RUN;
 export const MISSION_AD_MULT = 2;
 
-/** 올려베기·철벽 해금 */
+/** 올려베기 · 용오름 해금 */
 export const WAZA_ORBIT_COST = 80;
 
 /** 코스메틱 1종 */
@@ -144,7 +144,10 @@ export const COSMETIC_ORBIT_COST = 40;
  */
 export const ORBIT_COSTS: Readonly<Record<string, number>> = {
   ageba: WAZA_ORBIT_COST,
-  tetsu: WAZA_ORBIT_COST,
+  baram: WAZA_ORBIT_COST,
+  mukjul: 120,
+  nakgwan: 120,
+  dalmuri: 160,
   tenchi: 0,
   ink: 0,
   amber: COSMETIC_ORBIT_COST,

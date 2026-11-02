@@ -2,7 +2,7 @@
 // 수치/페이즈 id는 config·core가 정본. 여기는 표시용 문자열만.
 // 멸망해가는 지구. 하늘이 건물을 뽑아 던지고, 자격 없는 졸라맨이 벤다.
 
-import type { Act2Phase, ItemId, Theme, WeaponId } from '../core/types';
+import type { Act2Phase, ItemId, Theme, WazaId, WeaponId } from '../core/types';
 import type { FxSlot, Tier } from '../meta/tier';
 
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
@@ -189,7 +189,7 @@ export const OPERATIONS: readonly OperationCopy[] = [
 ];
 
 /** 장착 필살 1종. 효과 수치는 config·core 정본 — 문구만. */
-export type WazaCopyId = 'tenchi' | 'ageba' | 'tetsu';
+export type WazaCopyId = WazaId;
 
 export interface WazaCopy {
   id: WazaCopyId;
@@ -211,11 +211,29 @@ export const WAZA_COPY: Record<WazaCopyId, WazaCopy> = {
     desc: '발밑에서 위로만 벤다.',
     blurb: '발밑에서 위로만 벤다.',
   },
-  tetsu: {
-    id: 'tetsu',
-    name: '철벽',
-    desc: '부수지 않는다. 튕기고 버틴다.',
-    blurb: '부수지 않는다. 튕기고 버틴다.',
+  mukjul: {
+    id: 'mukjul',
+    name: '무음일섬',
+    desc: '화면을 가르는 한 줄. 칼을 거두면 터진다. 층 점수 두 배.',
+    blurb: '소리 없이 긋고, 칼을 거두면 터진다.',
+  },
+  dalmuri: {
+    id: 'dalmuri',
+    name: '월하난무',
+    desc: '달 아래 다섯 칼, 마지막에 달째 가른다. 보스에 가장 세다.',
+    blurb: '달을 띄우고, 다섯 번 베고, 반으로 가른다.',
+  },
+  nakgwan: {
+    id: 'nakgwan',
+    name: '십이연참',
+    desc: '열두 번 베고 도장을 찍는다. 콤보가 오른다.',
+    blurb: '열두 번 베고, 마지막에 도장.',
+  },
+  baram: {
+    id: 'baram',
+    name: '용오름',
+    desc: '회오리 셋으로 치고 띄운다. 번개와 포탄을 쓸어 낸다.',
+    blurb: '부수지 않고, 하늘을 쓸어 낸다.',
   },
 };
 

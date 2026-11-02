@@ -120,27 +120,27 @@ describe('가드 봇 실측 계약 (5시드)', () => {
 
 describe('작전 문구 · 다음 도장', () => {
   it('다음 도장까지 모자란 값', () => {
-    expect(opShort('glass', 0)).toEqual({ next: 'B', short: 14 });
-    expect(opShort('glass', 14)).toEqual({ next: 'A', short: 4 });
-    expect(opShort('glass', 18)).toEqual({ next: 'S', short: 5 });
+    expect(opShort('glass', 0)).toEqual({ next: 'B', short: 10 });
+    expect(opShort('glass', 10)).toEqual({ next: 'A', short: 3 });
+    expect(opShort('glass', 13)).toEqual({ next: 'S', short: 4 });
     expect(opShort('glass', 40)).toBeNull();
   });
 
   it('목표 한 줄은 B 기준, 도장 문턱은 한 줄', () => {
-    expect(SCREENS.ops.goal('glass')).toBe('90초 안에 건물 14채');
+    expect(SCREENS.ops.goal('glass')).toBe('90초 안에 건물 10채');
     expect(SCREENS.ops.goal('orbit')).toBe('20초 버티기');
-    expect(SCREENS.ops.ladder('glass')).toBe('B 14 · A 18 · S 23');
+    expect(SCREENS.ops.ladder('glass')).toBe('B 10 · A 13 · S 17');
     expect(SCREENS.ops.ladder('orbit')).toBe('B 20 · A 35 · S 60');
   });
 
   it('판 도중 한 줄: 건물 작전은 남은 시간 · 다음 도장, 버티기 작전은 버틴 초', () => {
-    expect(SCREENS.ops.hud('glass', 63, 7)).toBe('63초 · 7/14채 B');
+    expect(SCREENS.ops.hud('glass', 63, 7)).toBe('63초 · 7/10채 B');
     expect(SCREENS.ops.hud('glass', 10, 25)).toBe('10초 · 25채 S');
     expect(SCREENS.ops.hud('orbit', 30, 22)).toBe('22/35초 A');
   });
 
   it('결과 카드의 진행 줄', () => {
-    expect(SCREENS.ops.progress('night', 9)).toBe('B 도장까지 4채');
+    expect(SCREENS.ops.progress('night', 9)).toBe('B 도장까지 2채');
     expect(SCREENS.ops.progress('night', 99)).toBe('');
   });
 });

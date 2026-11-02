@@ -274,7 +274,7 @@ export interface LandmarkState {
 export type GimmickId = 'none' | 'glass' | 'ice' | 'night' | 'orbit';
 
 /** 장착 필살. 체크포인트 타격 수에 영향을 주면 안 된다. */
-export type WazaId = 'tenchi' | 'ageba' | 'tetsu';
+export type WazaId = 'tenchi' | 'ageba' | 'mukjul' | 'dalmuri' | 'nakgwan' | 'baram';
 
 /**
  * 장착 무기. 대미지는 전부 1이다 — 2막 체크포인트가 층 HP 합(=타격 수)이라 대미지를 바꾸면
@@ -295,7 +295,8 @@ export type JuiceKind =
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
-  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape';
+  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape'
+  | 'wazaSwing' | 'wazaHit' | 'wazaBurst';
 
 export interface JuiceEvent {
   kind: JuiceKind;
@@ -392,6 +393,16 @@ export interface GameState {
   stage: StageRun | null;
   /** 명물 보스 (작업 지시서 보스전일 때만) */
   lm: LandmarkState | null;
+  /** 시간차 필살이 도는 중(config WAZA_RUN) — t = 발동 히트스톱 뒤 지난 틱, stack = 벤 건물(같은 건물일 때만 멈추고 터뜨린다) */
+  wazaRun: WazaRun | null;
+  /** 필살 대미지가 들어간 마지막 틱 — 보스를 필살로 끝냈나(작업 지시서 특기 사항)를 이 틱으로 가린다 */
+  wazaHitTick: number;
+}
+
+export interface WazaRun {
+  id: WazaId;
+  t: number;
+  stack: FallingStack | null;
 }
 
 /** 프레임 입력 — input 레이어가 생성해 sim에 주입 */

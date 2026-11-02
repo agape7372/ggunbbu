@@ -244,7 +244,7 @@ export const ACT1 = {
   // 17,048,529 로 이 문턱을 넘는다 — "9,999,999에서 2막으로 넘어간다"와 어긋나 보인다.
   // 단 그 기록의 의미(누적/평생 최고 vs 해금 직전값)가 불명이라 모순 확정이 아니라 가설이다.
   UNLOCK_SCORE: 9_999_999,
-  FLOORS_MIN: 3, FLOORS_ADD: 7,   // 층수 = 3 + floor(7p)
+  FLOORS_MIN: 5, FLOORS_ADD: 5,   // 층수 = 5 + floor(5p) — 11-01 (5) 「여러 층이어야 깨는 맛」: 처음부터 5층, 끝은 그대로 10층
   // 재질 분포 [p, weak, mid, hard] — 구간 선형 보간
   MAT_DIST: [
     [0.0, 0.70, 0.30, 0.00],
@@ -293,8 +293,34 @@ export const SPECIAL = {
   AGEBA_ITER_MAX: 24,     // 올려베기 연속 타격 안전 상한 (HP3×6층 + 여유)
   POSE_TICKS: 48,         // 연출만. 시뮬 파괴는 발동 틱에 끝난다
   AGEBA_FLOORS: 6,        // 올려베기: 발끝에서 위로 최대 층수
-  TETSU_V: 1190,          // 철벽: 지면 가드와 같은 띄움. 파괴 없음
 } as const;
+
+/**
+ * 시간차 필살 넷(2026-11-01, docs/INK_FX_2026-11-01.md §5) — 베어 두고 나중에 터진다. 틱은 발동 히트스톱이 끝난 뒤부터 센다.
+ * freeze = 벤 건물이 터질 때까지 그 자리에 멈춘다(졸라맨은 필살 자세라 손을 못 쓴다) · burst = 남은 층을 통째로 부수는 틱(0 = 안 부순다)
+ * · floorMul = 터질 때 층 점수 배율 · bossDmg = 보스 · 명물에 주는 대미지(터질 때, 검풍은 한 번마다)
+ * · hits = 연참 · 검풍 한 타 틱(맨 아래층에 1대미지, 콤보 +1, 게이지는 안 찬다) · lift = 한 타마다 건물을 띄운다.
+ * 천지개벽 · 올려베기는 발동 틱에 끝난다(스테이지 봇이 천지개벽을 쓴다 — 바꾸면 3-B를 다시 잰다).
+ */
+export const WAZA_RUN = {
+  /** 무음일섬 — 화면을 가르는 한 줄을 남겨 두고 칼을 거두면 터진다(벤 동안 건물은 멈춘다). 참철도 영상 일곱 편이 화면이 검어진 뒤
+   *  1.55 ~ 1.75초에 터진다 — 그 정적이 맛이라 96틱(1.6초). 필살 무적(SPECIAL.IFRAMES 120)이 터짐까지 덮는다 */
+  mukjul: { freeze: true, burst: 96, floorMul: 2, bossDmg: 10, hits: [] as readonly number[], lift: false },
+  /** 월하난무 — 달 아래 고요 → 첫 칼(30) → 엇갈린 칼 넷이 네 틱마다(투두두두) → 숨 한 번 → 달을 세로로 가른다. 보스 · 명물에 가장 세다 */
+  dalmuri: { freeze: true, burst: 56, floorMul: 1, bossDmg: 25, hits: [30, 36, 40, 44, 48] as readonly number[], lift: false },
+  /** 십이연참 — 열두 번 휘갈기고 곧바로 도장을 찍는다(마지막 타 뒤 네 틱) */
+  nakgwan: { freeze: true, burst: 30, floorMul: 1, bossDmg: 10, hits: [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26] as readonly number[], lift: false },
+  /** 용오름 — 회오리 셋이 건물을 치고 띄운다. 부수지 않고, 하늘의 번개 · 포탄까지 쓸어 낸다 */
+  baram: { freeze: false, burst: 0, floorMul: 0, bossDmg: 4, hits: [6, 18, 30] as readonly number[], lift: true },
+} as const;
+export type WazaRunId = keyof typeof WAZA_RUN;
+
+/**
+ * 무기 이펙트 크기(렌더 전용, 11-01 (5) 「너무 심심해 · 더 크고 화려하게」) — 친 자리 그림을 그 자리를 축으로 키운다
+ * (자리 · 크기 · 굵기 · 속도 · 무게를 같이, 칼 잔상은 칼 길이 그대로). LIFE = 키운 그림이 더 오래 사는 배율.
+ * WAZA = 필살 박자마다 터지는 그 무기 그림(wazaShow → bladeFx.weaponBurst)
+ */
+export const WEAPON_FX = { SIZE: 1.6, WAZA: 2.1, LIFE: 1.2 } as const;
 
 // ── 구역 작전 기믹 (아케이드 gimmick='none' 이면 미적용) ────────
 export const GIMMICK = {
@@ -507,7 +533,6 @@ export const LANDMARK = {
     G: 3000, VTERM: 520,
     NEXT_GAP: 40,
     BAND_LO: 336, BAND_HI: 404, // 띠 둘(읽는 띠 · 외주 바뀜이 고른다)
-    TETSU_SIT: 90,           // 철벽 즉시 걸기 = 미끄러진 걸림(창 90틱)
     READ_SPLIT: 33, READ_MAX: 2, // 읽는 띠: 받은 높이 < 33 = 늦게(+1) · 이상 = 일찍(−1), ±2로 자른다
     HALF_Y: 300, HALF_TICKS: 60, // 3막 첫 걸림: 팔이 반만 꺾여 추가 300까지(점프 베기만 닿는다)
     CABLE_HITS: 3,           // 내리는 중 짐을 이만큼 베면 줄이 끊겨 바로 떨어진다
@@ -531,6 +556,10 @@ export const JUICE: Record<string, JuiceSpec> = {
   stackDestroy:   { hitstop: 6, shake: 8, flash: 0, particles: 24 },
   butterCollapse: { hitstop: 2, shake: 3, flash: 2, particles: 8 },
   special:        { hitstop: 10, shake: 16, flash: 4, particles: 32 },
+  // 시간차 필살 — 연참 · 검풍 한 타는 평타보다 가볍게(열두 번 이어진다), 터짐은 완파 위
+  wazaSwing:      { hitstop: 0, shake: 0, flash: 0, particles: 0 }, // 한 타의 박자(맞든 안 맞든) — 그림 · 소리용
+  wazaHit:        { hitstop: 1, shake: 2, flash: 0, particles: 4 },
+  wazaBurst:      { hitstop: 8, shake: 16, flash: 0, particles: 32 },
   hurt:           { hitstop: 4, shake: 8, flash: 3, particles: 4 },
   // 밑면 충돌 — 막혔다는 걸 손에 알리되 타격보다 약하게(적을 친 게 아니다)
   headBonk:       { hitstop: 1, shake: 2, flash: 0, particles: 4 },
@@ -561,7 +590,7 @@ export const JUICE_SYS = {
   PITCH_STEP_PER_10_COMBO: 1, // 반음
   // 완파 규모 k = clamp(BASE + 층수 × PER_FLOOR, BASE, MAX) — 흔들림·파편·엔소·팝업을 k배
   STACK_K_BASE: 0.8, STACK_K_PER_FLOOR: 0.1, STACK_K_MAX: 1.8,
-  STACK_RING_FLOORS: 3,   // 이 층수 이상이면 노랑 엔소 한 획 추가
+  STACK_RING_FLOORS: 3,   // 이 층수 이상이면 큰 먹 엔소 한 획 추가(속은 무기 포인트 색)
   // 번쩍 강도(설정 flashLevel 0 끔 · 1 약 · 2 기본) — 알파에 곱한다
   FLASH_LEVEL_MUL: [0, 0.5, 1] as const,
   // 몸 반응(발 기준 눌림) — 착지는 세로, 점프는 가로
@@ -599,6 +628,8 @@ export const JUICE_SYS = {
   STAR_PX: { hit: 13, floorCollapse: 24, stackDestroy: 38, butterCollapse: 16 } as Record<string, number>,
   // 집중선 · 색 반전(완파 IMPACT_FLOORS층 이상 · 필살 · 보스 격파). 반전은 COOLDOWN 틱에 한 번만
   IMPACT_TICKS: 8, INVERT_TICKS: 2, IMPACT_FLOORS: 3, INVERT_COOLDOWN: 45,
+  // 필살 반전(screenfx.inkFrame) 사이 최소 틱 — 전화면 번쩍은 초당 3번을 넘기지 않는다(광과민 기준)
+  INK_GAP: 20,
   // 콤보 열기 — 이 콤보부터 필드 양옆에 속도선이 선다(단계마다 진해진다)
   HEAT_COMBO: [30, 60, 120, 250] as const,
   // 의성어 글자 기본 크기(px) · 등장 튐 배율 · 등장 틱
@@ -617,11 +648,13 @@ export const JUICE_SYS = {
 export const COMBO_MARK = {
   DX: 96,           // 레인 가운데에서 오른쪽으로 — 졸라맨을 비킨다
   DY: 34,           // 맞은 자리(건물 밑면)보다 아래 — 건물 · 의성어를 안 가린다
-  PX: 30,           // 숫자 기본 크기. 콤보 500까지 (1 + GROW)배로 큰다
-  GROW: 0.75,
-  LABEL_PX: 13,     // 「COMBO」 먹 이름표
-  PUNCH: 0.22,      // 평타 튐(배) — 연타(7f 주기)엔 작게, 큰 건 고비에 몬다
-  PUNCH_TICKS: 6,
+  PX: 52,           // 숫자 기본 크기(11-01 (5) 30 → 52 「콤보가 너무 작고」). 콤보 500까지 (1 + GROW)배로 큰다
+  GROW: 0.6,
+  LABEL_PX: 15,     // 「COMBO」 먹 이름표
+  TOP: 160,         // 도장 · 고비 말 윗선(화면) — HUD 진행 막대 줄(60 ~ 118)과 그 밑 딱지(스테이지 정보 줄 124 ~ 152) 밑. 버터바 배너도 이 위다
+  PUNCH: 0.36,      // 평타 튐(배) — 칠 때마다 1.36배로 튀었다 8틱에 선다 + 좌우로 번갈아 기운다
+  PUNCH_TICKS: 8,
+  TILT: 0.09,       // 평타 기울기(라디안) — 튐과 같이 줄어든다
   HOLD: 75,         // 마지막 타격 뒤 버티는 틱. 지나면 EXIT 틱에 접힌다
   EXIT: 8,
   BREAK: 26,        // 콤보가 끊기면 숫자가 두 동강 나 떨어지는 틱
@@ -678,6 +711,22 @@ export const PALETTE = {
   WHITE: '#F4F1E8',
   RUBBLE: '#9A958C',     // 잔해 채움 [튜닝] — 구 #3A3A42 는 INK와 명도가 붙어 캐릭터를 삼켰다
 } as const;
+
+/**
+ * 무기 포인트 색 — 판 이펙트는 먹 + 이 색 하나(2026-11-01 「먹 한 획」 2판, docs/INK_FX_2026-11-01.md §4).
+ * 벤 순간(획의 속 · 맞은 자리)에만 쓰고 먹으로 마른다. 한지(BG) 위에서 형광이 아니게 밝기 L* 45~72로 골랐다.
+ */
+export const WEAPON_INK = {
+  sword: '#E3A21A', hammer: '#8C877D', crowbar: '#2F5C9A', grinder: '#E8701E',
+  iron: '#5D7183', saw: '#9A4F2C', hazard: '#E9B21A', beam: '#C0532E',
+  flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
+} as const;
+/** 옛 칼빛 설정값(저장값은 그대로) → 먹에 맞는 포인트 색. 철거칼 획 속(effects · weaponFx · sprites 참격 호) */
+export const SLASH_INK: Readonly<Record<string, string>> = {
+  '#FFD200': WEAPON_INK.sword, '#E5302E': WEAPON_INK.flame, '#4FD8E8': WEAPON_INK.frost,
+};
+/** 도장 색 — 낙관 · 인장. 무기와 상관없이 하나(UI 주홍 인장과 같은 뜻) */
+export const SEAL_INK = '#C4301E'; // style.css --seal 과 같은 색
 
 // ── 저장 ────────────────────────────────────────────────────────
 export const SAVE_KEY = 'gunbbu.v1';
@@ -737,10 +786,11 @@ export const UI_FLOW = {
 // ── 작전 · 자격 · 첫 판 안내 (B3) ──────────────────────────────
 // 특별작전 등급 — 시작 p는 GIMMICK.START_P. 가드 봇 5시드 실측(tests/ops.test.ts)으로 맞췄다:
 // B는 5시드 중 4 이상, S는 1 이하. 건물 작전은 한도 안에 부순 채 수, 버티기 작전은 버틴 초가 값이다.
+// 11-01 (5) 1막 층수 5 + floor(5p)에 맞춰 다시 맞췄다 — 봇 채 수 유리 19 → 14 · 빙결 20 → 18 · 야간 18 → 15(중앙값), 문턱도 같은 비율로 내림(봇은 여전히 대부분 A · S 없음).
 export const OPERATION = {
-  glass: { limitSec: 90, metric: 'buildings', grade: { B: 14, A: 18, S: 23 } },
-  ice: { limitSec: 120, metric: 'buildings', grade: { B: 15, A: 20, S: 26 } },
-  night: { limitSec: 150, metric: 'buildings', grade: { B: 13, A: 17, S: 22 } },
+  glass: { limitSec: 90, metric: 'buildings', grade: { B: 10, A: 13, S: 17 } },
+  ice: { limitSec: 120, metric: 'buildings', grade: { B: 14, A: 18, S: 23 } },
+  night: { limitSec: 150, metric: 'buildings', grade: { B: 11, A: 14, S: 18 } },
   orbit: { limitSec: 60, metric: 'seconds', grade: { B: 20, A: 35, S: 60 } },
 } as const;
 

@@ -15,6 +15,14 @@ function hs(seed: number, k: number): number {
   return v - Math.floor(v);
 }
 
+/** 주기 없는 잡음 −0.5..0.5 — 정수 칸마다 hs 값을 부드럽게 잇는다 */
+function vnoise(seed: number, t: number): number {
+  const i = Math.floor(t);
+  const f = t - i;
+  const u = f * f * (3 - 2 * f);
+  return hs(seed, i) + (hs(seed, i + 1) - hs(seed, i)) * u - 0.5;
+}
+
 /** 먹 방울 — 둥근 머리가 ang 쪽으로 날고 꼬리가 반대쪽으로 뾰족하다. tail = 꼬리 길이(빠를수록 길다) */
 export function inkDrop(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, ang: number, tail: number): void {
   if (r < 0.3) return;
@@ -85,6 +93,222 @@ export function inkBlot(ctx: CanvasRenderingContext2D, x: number, y: number, R: 
 /** 붓 누름 — 들어갈 때 눌러 굵어지고(앞 7%) 끝으로 갈수록 가늘게 빠진다. s = 획 위 자리 0 → 1 */
 const press = (s: number): number => (0.5 + 0.5 * Math.min(1, s / 0.07)) * (1 - 0.78 * Math.pow(s, 1.4));
 
+/** 누름 곡선 셋 — s = 획 위 자리 0(댄 곳) → 1(뗀 곳), 값 = 굵기 배율 */
+export const PRESS = {
+  /** 엔소 — 대며 눌렀다가 끝으로 빠진다 */
+  enso: press,
+  /** 베기 — 가늘게 들어가 앞 3분의 1에서 가장 굵고 칼끝처럼 뾰족하게 빠진다 */
+  cut: (s: number): number => Math.sin(Math.PI * Math.pow(Math.min(1, Math.max(0, s)), 0.7)),
+  /** 튕김 — 대는 데가 가장 굵고 한 번에 빠진다(갈고리 끝 · 쳐낸 획) */
+  flick: (s: number): number => Math.pow(1 - Math.min(1, s), 1.15),
+  /** 먹줄 — 처음부터 끝까지 고르다(양 끝만 살짝) */
+  line: (s: number): number => Math.min(1, s / 0.04, (1 - s) / 0.04 + 0.35),
+  /** 한 일(一) — 붓머리를 눌러 대고, 몸은 조금 가늘게, 끝에서 다시 눌렀다 뗀다(돈필) */
+  yi: (s: number): number => Math.min(1, s / 0.02, (1 - s) / 0.03)
+    * (0.8 + 0.32 * Math.exp(-(((s - 0.07) / 0.06) ** 2)) + 0.3 * Math.exp(-(((s - 0.92) / 0.05) ** 2))),
+  /** 내리꽂기 — 하늘에서 가늘게 들어와 땅에 닿을수록 굵다(낙뢰) */
+  fall: (s: number): number => Math.min(1, s / 0.1) * (0.6 + 0.4 * s) * Math.min(1, (1 - s) / 0.02 + 0.5),
+} as const;
+
+/**
+ * 붓 획 한 줄기 — at(s, out)이 획 위 자리 s의 점을 out에 쓴다. len = 대략 길이(점 개수만 정한다).
+ * s0 ~ s1만 그린다(모양으로 지우기 — 꼬리부터 깎으려면 s0을 올린다). dry = 비백.
+ * 비백(11-01 레퍼런스: 실제 마른 붓 · 잉크 슬래시 VFX) — 붓털은 머리에선 먹을 머금어 한 덩이고, 꼬리로 가며
+ * 가닥(6~16)으로 풀린다. 가닥마다 굵기 · 끝나는 자리가 달라 틈이 저절로 생기고, 바깥 가닥이 먼저 끊긴다.
+ */
+function strokeAlong(
+  ctx: CanvasRenderingContext2D, at: (s: number, out: number[]) => void, len: number,
+  w: number, s0: number, s1: number, dry: number, seed: number, pr: (s: number) => number,
+): void {
+  if (s1 - s0 < 0.01 || w < 0.3) return;
+  const P = [0, 0];
+  const A = [0, 0];
+  const B = [0, 0];
+  const eaten = s0 > 0.001; // 꼬리를 깎은 획 — 깎인 끝도 뾰족하게
+  const span = s1 - s0;
+  /** 한 줄기를 채운다 — lane = 가로 자리(-1..1, 0 = 가운데) · hw(s) = 반폭 배율 · e = 끝나는 자리 */
+  const band = (lane: number, hw: (s: number) => number, e: number, k: number): void => {
+    if (e - s0 < 0.01) return;
+    const n = Math.max(6, Math.ceil(((e - s0) * len) / 5));
+    ctx.beginPath();
+    for (let side = 1; side >= -1; side -= 2) {
+      for (let j = 0; j <= n; j++) {
+        const i = side === 1 ? j : n - j;
+        const s = s0 + (e - s0) * (i / n);
+        at(s, P);
+        at(Math.max(0, s - 0.004), A);
+        at(Math.min(1, s + 0.004), B);
+        const tx = B[0] - A[0];
+        const ty = B[1] - A[1];
+        const tl = Math.hypot(tx, ty) || 1;
+        const split = s < 0.2 ? 0 : Math.min(1, (s - 0.2) / 0.6);
+        const tip = eaten ? Math.min(1, (s - s0) / 0.12) : 1;
+        // 끝으로 갈수록 가늘게 — 가닥이 끊기는 자리에서 뾰족하게 빠진다
+        const end = Math.min(1, (e - s) / Math.max(0.04, (e - s0) * 0.18));
+        const body = 0.5 * w * pr(s) * tip;
+        const off = lane * body * (1 + 0.35 * dry * split);
+        // 가장자리 떨림 — 주기 없는 잡음(물결 리본이 되지 않게). 머리는 작게, 꼬리는 두 배, 한쪽(side 1)이 더 거칠다
+        const rough = (0.5 + 0.5 * split) * (side === 1 ? 1 : 0.55) * Math.min(1, w * 0.07) * vnoise(seed + k * 7 + (side === 1 ? 0 : 50), s * len * 0.16);
+        const rad = off + side * body * hw(s) * end + w * 0.05 * Math.sin(seed + s * 11) + rough;
+        const px = P[0] - (ty / tl) * rad;
+        const py = P[1] + (tx / tl) * rad;
+        if (j === 0 && side === 1) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  if (dry <= 0.04) {
+    band(0, () => 1, s1, 0);
+    return;
+  }
+  // 몸통 — 머리에서 먹을 머금은 한 덩이. 마를수록 일찍 끝나고 끝에서 가늘게 가닥 속으로 사라진다
+  band(0, () => 1, s0 + span * (1 - 0.62 * Math.min(1, dry)), 0);
+  // 가닥 — 너비 전체를 나눠 덮고(겹쳐서 머리 쪽엔 틈이 없다) 꼬리에서 가늘어지며 제각각 끊긴다
+  const K = 5 + Math.round(7 * Math.min(1, dry));
+  for (let k = 0; k < K; k++) {
+    const lane = -1 + (2 * (k + 0.5)) / K + (hs(seed, k + 70) - 0.5) * (1.2 / K);
+    const outer = Math.abs(lane);
+    const cut = dry * (0.02 + 0.42 * hs(seed, k + 90) * (0.4 + 0.6 * outer));
+    // 굵은 다발과 실 같은 털이 섞인다 — 제곱으로 몇 가닥만 굵게
+    const thick = (0.7 + 2.1 * hs(seed, k + 110) ** 2) / K;
+    band(lane, (s) => thick * (1 - 0.45 * dry * Math.max(0, (s - 0.3) / 0.7)), s1 - span * cut, k + 1);
+  }
+}
+
+/** 곧은(bend로 살짝 휜) 붓 획 — (x0,y0) = 댄 곳 · (x1,y1) = 뗀 곳. bend = 가운데가 진행 방향 왼쪽으로 부푸는 px */
+export function brushLine(
+  ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number,
+  w: number, s0: number, s1: number, dry: number, seed: number, bend = 0, pr: (s: number) => number = PRESS.cut,
+): void {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const L = Math.hypot(dx, dy) || 1;
+  const nx = -dy / L;
+  const ny = dx / L;
+  strokeAlong(ctx, (s, o) => {
+    const k = bend * Math.sin(Math.PI * s);
+    o[0] = x0 + dx * s + nx * k;
+    o[1] = y0 + dy * s + ny * k;
+  }, L, w, s0, s1, dry, seed, pr);
+}
+
+/** 꺾인 붓 획 — pts = [x0,y0, x1,y1, …] 꺾은선을 길이 비례로 따라간다(낙뢰 · 지그재그 · 철골 꺾임) */
+export function brushPath(
+  ctx: CanvasRenderingContext2D, pts: readonly number[], w: number, s0: number, s1: number,
+  dry: number, seed: number, pr: (s: number) => number = PRESS.cut,
+): void {
+  const n = pts.length / 2 - 1;
+  if (n < 1) return;
+  const cum = [0];
+  for (let i = 0; i < n; i++) cum.push(cum[i] + Math.hypot(pts[i * 2 + 2] - pts[i * 2], pts[i * 2 + 3] - pts[i * 2 + 1]));
+  const L = cum[n] || 1;
+  strokeAlong(ctx, (s, o) => {
+    const d = s * L;
+    let i = 0;
+    while (i < n - 1 && cum[i + 1] < d) i++;
+    const f = (d - cum[i]) / (cum[i + 1] - cum[i] || 1);
+    o[0] = pts[i * 2] + (pts[i * 2 + 2] - pts[i * 2]) * f;
+    o[1] = pts[i * 2 + 1] + (pts[i * 2 + 3] - pts[i * 2 + 1]) * f;
+  }, L, w, s0, s1, dry, seed, pr);
+}
+
+/** 호 붓 획 — 중심 (cx,cy) 반지름 r, a0에서 sweep(라디안, 음수면 반대로)만큼. flat = 세로 배율 */
+export function brushArc(
+  ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, a0: number, sweep: number,
+  w: number, s0: number, s1: number, dry: number, seed: number, flat = 1, pr: (s: number) => number = PRESS.cut,
+): void {
+  strokeAlong(ctx, (s, o) => {
+    const th = a0 + sweep * s;
+    o[0] = cx + Math.cos(th) * r;
+    o[1] = cy + Math.sin(th) * r * flat;
+  }, Math.abs(sweep) * r, w, s0, s1, dry, seed, pr);
+}
+
+/**
+ * 방향 있는 먹 튐 — 친 쪽(ang)으로 길쭉한 덩이 + 앞쪽 혹 셋 + 같은 쪽 부채로 튄 방울 n(가까운 것은 가는 줄로 이어진다).
+ * 크기는 부르는 쪽이 R로(popScale 등), 지우기도 R을 줄여서.
+ */
+export function spatter(ctx: CanvasRenderingContext2D, x: number, y: number, R: number, ang: number, seed: number, n = 7): void {
+  if (R < 0.6) return;
+  ctx.beginPath();
+  // 덩이 — 둘레를 흔든 열여섯 점을 가운데점 곡선으로 잇는다. 친 쪽으로 늘어나고 그쪽에 뾰족한 혀가 한두 개 나온다.
+  const N = 16;
+  const px: number[] = [];
+  const py: number[] = [];
+  for (let k = 0; k < N; k++) {
+    const th = (k / N) * TAU;
+    const rel = Math.cos(th - ang);
+    let r = R * (0.8 + 0.22 * hs(seed, k)) * (1 + 0.4 * Math.max(0, rel));
+    // 친 쪽으로 뻗은 혀 — 하나만, 짧게(여럿이면 벌레 다리로 읽힌다)
+    if (k === Math.round(((ang / TAU) % 1 + 1) % 1 * N + (hs(seed, 40) - 0.5) * 2) % N) r *= 1.3 + 0.2 * hs(seed, 50);
+    px.push(x + Math.cos(th) * r);
+    py.push(y + Math.sin(th) * r);
+  }
+  ctx.moveTo((px[N - 1] + px[0]) / 2, (py[N - 1] + py[0]) / 2);
+  for (let k = 0; k < N; k++) {
+    const q = (k + 1) % N;
+    ctx.quadraticCurveTo(px[k], py[k], (px[k] + px[q]) / 2, (py[k] + py[q]) / 2);
+  }
+  ctx.closePath();
+  // 튄 방울 — 친 쪽 부채. 멀수록 작고, 머리는 바깥 · 꼬리는 덩이 쪽(날아간 방향이 보인다)
+  for (let i = 0; i < n; i++) {
+    const a = ang + (hs(seed, i + 10) - 0.5) * 1.5;
+    const f = hs(seed, i + 20);
+    const d = R * (1.6 + 2.3 * f);
+    const rr = R * (0.27 - 0.15 * f);
+    if (rr < 0.35) continue;
+    const bx = x + Math.cos(a) * d;
+    const by = y + Math.sin(a) * d;
+    ctx.moveTo(bx + Math.cos(a - Math.PI / 2) * rr, by + Math.sin(a - Math.PI / 2) * rr);
+    ctx.arc(bx, by, rr, a - Math.PI / 2, a + Math.PI / 2);
+    ctx.lineTo(bx - Math.cos(a) * rr * (1.6 + 1.6 * (1 - f)), by - Math.sin(a) * rr * (1.6 + 1.6 * (1 - f)));
+    ctx.closePath();
+  }
+  // 잔 점 — 위성 방울보다 멀리, 크기 편차가 크다(레퍼런스 §2-7 셋째 단)
+  for (let i = 0; i < n + 3; i++) {
+    const a = ang + (hs(seed, i + 120) - 0.5) * 2.2;
+    const d = R * (2.4 + 2.6 * hs(seed, i + 140));
+    const rr = Math.max(0.5, R * 0.07 * (0.4 + hs(seed, i + 160) * 1.4));
+    if (rr > R * 0.3) continue;
+    const bx = x + Math.cos(a) * d;
+    const by = y + Math.sin(a) * d;
+    ctx.moveTo(bx + rr, by);
+    ctx.arc(bx, by, rr, 0, TAU);
+  }
+  // 속 빈 고리 방울 하나 — 먹이 마르며 가장자리만 남았다(안쪽 원을 거꾸로 감아 구멍)
+  if (n >= 4 && R >= 6) {
+    const a = ang + (hs(seed, 180) - 0.5) * 1.1;
+    const d = R * (1.9 + 0.8 * hs(seed, 181));
+    const rr = R * 0.2;
+    const bx = x + Math.cos(a) * d;
+    const by = y + Math.sin(a) * d;
+    ctx.moveTo(bx + rr, by);
+    ctx.arc(bx, by, rr, 0, TAU, false);
+    ctx.moveTo(bx + rr * 0.55, by);
+    ctx.arc(bx, by, rr * 0.55, 0, TAU, true);
+  }
+  ctx.fill();
+}
+
+/** 마른 먹 가루 — 붓을 털 때 튄 잔 점 무리(먼지 · 쇳가루). k = 1 → 0 점이 작아진다 */
+export function inkDust(ctx: CanvasRenderingContext2D, x: number, y: number, R: number, k: number, seed: number, n = 9): void {
+  if (k <= 0.05) return;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = hs(seed, i) * TAU;
+    const d = R * Math.sqrt(hs(seed, i + 30));
+    const rr = (0.7 + 1.5 * hs(seed, i + 60)) * k;
+    if (rr < 0.3) continue;
+    const bx = x + Math.cos(a) * d;
+    const by = y + Math.sin(a) * d * 0.7;
+    ctx.moveTo(bx + rr, by);
+    ctx.arc(bx, by, rr, 0, TAU);
+  }
+  ctx.fill();
+}
+
 /**
  * 엔소 — 붓으로 한 번에 그은 원. 획 위 자리 s0(꼬리) ~ s1(머리)만 그린다(0 = 붓을 댄 곳 · 1 = 뗀 곳, 한 바퀴의 93%).
  * w = 가장 굵은 데 굵기 · a0 = 붓을 댄 각 · dry = 마른 정도(0 = 한 줄, 커질수록 세 갈래로 갈라져 벌어지고 갈래마다 다른 데서 끊긴다)
@@ -95,30 +319,11 @@ export function enso(
   a0: number, s0: number, s1: number, dry: number, flat: number, seed: number,
 ): void {
   if (s1 - s0 < 0.01 || w < 0.3 || r < 1) return;
-  const bands = dry > 0.04 ? 3 : 1;
-  for (let b = 0; b < bands; b++) {
-    const lane = bands === 1 ? 0 : b - 1;
-    const bw = bands === 1 ? 1 : 0.46 - 0.12 * dry;
-    const off = lane * w * (0.3 + 0.2 * dry);
-    // 비백 — 가운데 갈래가 가장 길고 바깥 둘은 먼저 끊긴다
-    const cut = bands === 1 ? 0 : dry * (lane === 0 ? 0.06 : 0.16 + 0.22 * hs(seed, b));
-    const e = s1 - (s1 - s0) * cut;
-    if (e - s0 < 0.01) continue;
-    const n = Math.max(6, Math.ceil((e - s0) * 44));
-    ctx.beginPath();
-    for (let side = 1; side >= -1; side -= 2) {
-      for (let j = 0; j <= n; j++) {
-        const i = side === 1 ? j : n - j; // 바깥 가장자리는 꼬리 → 머리, 안쪽은 되돌아온다
-        const s = s0 + (e - s0) * (i / n);
-        const th = a0 + s * SPAN;
-        const rad = r * (1 + 0.035 * Math.sin(seed + s * 9)) + off + side * 0.5 * w * bw * press(s);
-        const px = x + Math.cos(th) * rad;
-        const py = y + Math.sin(th) * rad * flat;
-        if (j === 0 && side === 1) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
+  // 둘레 흔들림은 반지름에, 비백은 strokeAlong이(꼬리로 갈수록 갈래가 벌어진다)
+  strokeAlong(ctx, (s, o) => {
+    const th = a0 + s * SPAN;
+    const rad = r * (1 + 0.035 * Math.sin(seed + s * 9));
+    o[0] = x + Math.cos(th) * rad;
+    o[1] = y + Math.sin(th) * rad * flat;
+  }, SPAN * r, w, s0, s1, dry, seed, press);
 }

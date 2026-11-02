@@ -17,10 +17,10 @@ describe('도감', () => {
   it('모은 수 = 가진 칸 / 전체 칸, 산 것이 늘린다', () => {
     const base = bookCount(bookGroups(new Set()));
     expect(base.have).toBe(9);
-    expect(base.total).toBe(46);
+    expect(base.total).toBe(49); // 11-01 시간차 필살 넷 · (5) 철벽 뺌 · 11-02 메타 2차 칸
     const more = bookCount(bookGroups(new Set(['iron', 'ageba', 'mask'])));
     expect(more.have).toBe(12);
-    expect(more.total).toBe(46);
+    expect(more.total).toBe(49);
   });
 
   it('모든 무기 id가 한 번씩, 상점 순서대로', () => {

@@ -37,7 +37,6 @@ const BLADE_ITEMS: readonly { id: BladeId; name: string }[] = [
 const WAZA_ITEMS: readonly { id: WazaId; name: string }[] = [
   { id: 'tenchi', name: '천지개벽' },
   { id: 'ageba', name: '올려베기' },
-  { id: 'tetsu', name: '철벽' },
 ];
 
 const LETTER_ITEMS: readonly { id: LettersId; name: string }[] = [

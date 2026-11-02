@@ -1,11 +1,16 @@
-// 화면 단위 연출 — 번쩍(다단) · 공사 테이프 · 필살 예비동작(엔소·유령) · 사망 틀 · 지면선 번쩍
-// · 집중선·색 반전(큰 한 방) · 예능 자막 · 콤보 속도선.
+// 화면 단위 연출 — 번쩍(다단: 다침 · 사망 · 궤도 낙하만 건다) · 공사 테이프 · 필살 예비동작(엔소·유령) · 사망 틀 · 지면선 번쩍
+// · 집중선 · 색 반전(큰 한 방) · 완파 자막 판 「N층 철거!」 · 콤보 속도선. 11-01 (3)에 걷었던 집중선 · 반전 · 자막 판은
+// 11-01 (5)에 옛 판(0c8ae64)으로 되돌렸다(「건물파괴 스타일은 옛날이 낫고」). 필살은 inkFrame으로 반전 프레임을 따로 건다.
 // 파티클(effects.ts)과 달리 "화면 전체나 한 줄"을 그리는 것들이다. core는 모른다. 상태는 이 모듈에만 있다.
 // DOM 없음 — ctx만 받는다. 시간은 drawGame이 틱마다 부르는 stepScreenFx()가 한 칸씩 흘린다.
 
 import { JUICE_SYS, PALETTE, VIEW } from '../config';
 import { flashMul } from './feel';
 import { enso, inkDrop } from './ink';
+
+/** 먹 붓글씨(동해독도) — 25px 이상에만. 캔버스는 DOM이 아직 안 쓴 글꼴을 대체 글꼴로 그리니 불러올 때 한 번 당겨 둔다 */
+export const brushFont = (px: number): string => `${Math.round(px)}px "East Sea Dokdo", "Black Han Sans", serif`;
+if (typeof document !== 'undefined') void document.fonts?.load(brushFont(40)).catch(() => {});
 
 // ── 번쩍 ────────────────────────────────────────────────────────
 export interface FlashStage { color: string; a: number; ticks: number }
@@ -171,7 +176,9 @@ let impactY = 0;
 let impactSeed = 1;
 let invertT = 0;
 let invertCd = 0;
+let inkGap = 0; // 필살 반전 사이 남은 틱(inkFrame)
 
+/** 필드만 그린다 — 조작 존을 침범하지 않게 */
 function clipField(ctx: CanvasRenderingContext2D): void {
   ctx.beginPath();
   ctx.rect(0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
@@ -237,6 +244,22 @@ function drawInvert(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = '#808080';
   ctx.fillRect(0, 0, VIEW.W, VIEW.H);
   ctx.restore();
+}
+
+/**
+ * 필살 반전 프레임 — 완파 쿨다운은 무시하고 바로 ticks 프레임 뒤집는다(필살 첫 칼 · 터짐). 번쩍임 설정이 기본(2)일 때만.
+ * 단 필살 반전끼리는 INK_GAP 틱을 띄운다(전화면 번쩍 초당 3번 이하 — 연달아 오면 뒤의 것을 건너뛴다).
+ * 다침 붉은 번쩍은 정보라 남기고, 같은 틱 아이보리 · 잉크 번쩍은 반전이 대신한다
+ */
+export function inkFrame(ticks: number): void {
+  if (flashLevel < 2 || inkGap > 0) return;
+  inkGap = JUICE_SYS.INK_GAP;
+  invertT = Math.max(invertT, ticks);
+  invertCd = JUICE_SYS.INVERT_COOLDOWN;
+  if (stages[0]?.color !== PALETTE.RED) {
+    stages = [];
+    stageT = 0;
+  }
 }
 
 // ── 콤보 열기 — 콤보가 오를수록 필드 양옆에 아래로 흐르는 속도선 ──
@@ -332,6 +355,7 @@ export function stepScreenFx(): void {
   if (impactT > 0) impactT -= 1;
   if (invertT > 0) invertT -= 1;
   if (invertCd > 0) invertCd -= 1;
+  if (inkGap > 0) inkGap -= 1;
   heatT += 1;
   if (caption && ++caption.t >= JUICE_SYS.CAPTION_TICKS) caption = null;
 }
@@ -356,5 +380,6 @@ export function resetScreenFx(): void {
   impactT = 0;
   invertT = 0;
   invertCd = 0;
+  inkGap = 0;
   caption = null;
 }

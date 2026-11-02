@@ -7,9 +7,10 @@
 
 import type { DebrisPiece, FallingStack, GameState, JuiceEvent } from '../core/types';
 import {
-  AUDIO, BOSS, CAMERA, COMBO_MARK, COSMETIC_COLORS, DEBRIS, HAT_FX, JUICE, JUICE_SYS, PALETTE, PLAYER, SCORE, STACK, VIEW, WEAPON,
+  AUDIO, BOSS, CAMERA, COMBO_MARK, COSMETIC_COLORS, DEBRIS, HAT_FX, JUICE, JUICE_SYS, PALETTE, PLAYER, SCORE, SEAL_INK, STACK, VIEW, WEAPON,
 } from '../config';
-import { onomatoFor, CAPTIONS, ITEM_COPY, destroyedCaption } from '../content';
+import { brushLine, enso, inkDrop, PRESS } from './ink';
+import { onomatoFor, ITEM_COPY, destroyedCaption } from '../content';
 import {
   initSprites, drawPlayer, drawHat, drawMask, drawStack, drawBoss, drawEntity, hardHat, hatSpot,
   drawGroundRocks, drawStackShadow, floorTile, setPlayerCosmetics, setPlayerMask, setPlayerWeapon,
@@ -20,14 +21,17 @@ import { drawChapterBackdrop } from './background';
 import { cameraFollowY } from './camera';
 import { vibrate } from '../platform/native';
 import {
-  drawBackEffects, drawEffects, resetEffects, setSlashColor, spawnBellClang, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,
+  drawBackEffects, drawEffects, pointInk, resetEffects, setSlashColor, spawnBellClang, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,
 } from './effects';
 import {
   drawBell, drawLandmarkBack, drawLandmarkFront, hastyShakeX, isBellStack, noteBellBreak, resetLandmarkFx, shatterBody,
 } from './landmarkFx';
 import { bladeAura, drawBladeFx } from './bladeFx';
+import {
+  drawWazaBack, drawWazaMid, drawWazaTitle, drawWazaWorld, resetWazaShow, startWazaShow, stepWazaShow, takeWazaJolt, wazaShowEvent, wazaShowState,
+} from './wazaShow';
 import { bossBodyHit, introFloorTop, resetBossFx, stepBossFx } from './executor';
-import { addTrauma, defeatSlow, kickPx, pickHaptic, shakePx, shakeSample, stackScale, type HapticCounters } from './feel';
+import { addTrauma, defeatSlow, kickPx, pickHaptic, shakePx, shakeSample, type HapticCounters } from './feel';
 import * as fx from './screenfx';
 
 /** 흔들림 진폭(px). 이벤트가 addTrauma로 쌓고 반감기 SHAKE_HALF_LIFE_F로 줄어든다. */
@@ -76,7 +80,7 @@ let prelude: Prelude | null = null;
 let releasing: Prelude | null = null;
 
 // 팝업은 월드 좌표로 저장하고 그릴 때 카메라를 한 번 적용한다(BL-09)
-/** 의성어 — px = 글자 크기, life = 처음 틱(등장 튐·버티기·떠오름을 나이로 잰다), rot = 기울기 */
+/** 글자 팝업(먹 붓글씨) — px = 글자 크기, life = 처음 틱(등장 · 버티기 · 오그라듦을 나이로 잰다), rot = 기울기 */
 interface Popup { text: string; x: number; y: number; ticks: number; life: number; px: number; rot: number }
 const popups: Popup[] = [];
 
@@ -87,7 +91,8 @@ let popupSeed = 0;
  * 고비(COMBO_MARK.STEPS)마다 효과가 하나씩 는다. 자리는 월드 좌표로 쥐고 그릴 때 카메라를 더한다.
  * age = 마지막 타격 뒤 틱(HOLD + EXIT를 넘기면 접혀서 다음 타격을 기다린다) · burst = 고비 연출 나이(−1 = 없음)
  */
-interface ComboMark { n: number; x: number; y: number; tx: number; ty: number; age: number; burst: number; step: number }
+/** ink = 친 무기의 포인트 색(100부터 붓판 속) */
+interface ComboMark { n: number; x: number; y: number; tx: number; ty: number; age: number; burst: number; step: number; ink: string }
 let mark: ComboMark | null = null;
 const MARK_GONE = COMBO_MARK.HOLD + COMBO_MARK.EXIT;
 /** 끊긴 콤보 — 두 동강 나 떨어지는 숫자. 새 콤보 도장과 따로 논다(끊기자마자 다시 쳐도 끝까지 떨어진다) */
@@ -106,13 +111,6 @@ function scatter(): number {
 // 08-30(P1-3): letters 코스메틱 — 저콤보(<50) 팝업 기본색. 에스컬레이션 색은 공통.
 let lettersColor: string = PALETTE.INK;
 
-function comboColor(n: number): string {
-  if (n >= 500) return PALETTE.RED;
-  if (n >= 100) return PALETTE.YELLOW_DEEP;
-  if (n >= 50) return PALETTE.BLUE;
-  return lettersColor;
-}
-
 export function setFeedbackOptions(o: { shakeLevel?: 0 | 1 | 2; vibration?: boolean; flashLevel?: 0 | 1 | 2 }): void {
   if (o.shakeLevel !== undefined) shakeLevel = o.shakeLevel;
   if (o.vibration !== undefined) vibrationOn = o.vibration;
@@ -125,6 +123,7 @@ function resetRunState(): void {
   fx.resetScreenFx();
   resetBossFx();
   resetLandmarkFx();
+  resetWazaShow();
   trauma = 0;
   kickY = 0;
   kickV = 0;
@@ -178,30 +177,19 @@ function reactFlash(e: JuiceEvent): void {
     case 'lifeLost':
       if ((e.n ?? 1) <= 0) onDeath();
       return;
-    case 'special': // 2단 — 종이가 하얗게 날아갔다가 잉크로 눌린다
-      fx.flash({ color: PALETTE.BG, a: 0.6, ticks: 3 }, { color: PALETTE.INK, a: 0.35, ticks: spec.flash });
+    case 'special': // 필살 번쩍 · 반전 프레임은 wazaShow 박자(wazaCue)가 건다
+    case 'wazaHit':
+    case 'wazaBurst':
       return;
-    case 'bossDefeat': // 아이보리 12틱 감쇠
+    case 'bossDefeat': // 아이보리 12틱 감쇠(옛 판) — 반전이 같이 서면 반전이 대신한다
       fx.flash({ color: PALETTE.BG, a: 0.85, ticks: 12 });
       return;
-    case 'boltStrike': // 가볍게 — 같은 틱의 피격(붉은 0.3)을 덮지 않는다(약한 새 번쩍은 무시된다)
-      fx.flash({ color: PALETTE.BG, a: 0.25, ticks: spec.flash });
-      return;
-    case 'phaseClear': // 티어 포효 — 아이보리 → 잉크 + 공사 테이프 두 줄
-      if ((e.n ?? 0) >= 100) {
-        fx.flash({ color: PALETTE.BG, a: 0.5, ticks: 3 }, { color: PALETTE.INK, a: 0.3, ticks: 4 });
-        fx.startTape();
-      }
-      return;
-    case 'hit': // 연타 장면이 번쩍이면 눈이 아프다 — 맞은 층만 하얗게(drawHitFlash)
-    case 'floorCollapse': // 화면 전체가 회색으로 눌려 탁해졌다 — 층 조각·킥·별이 대신한다
-      return;
-    case 'guardBounce': // 막아 냈다 — 잉크 번쩍은 화면이 어두워져 맞은 것처럼 읽혔다. 종이 번쩍(「깡」)으로
-    case 'guardAirBounce':
-      fx.flash({ color: PALETTE.BG, a: 0.32, ticks: spec.flash });
+    case 'phaseClear': // 티어 포효 — 공사 테이프 두 줄(번쩍 없이)
+      if ((e.n ?? 0) >= 100) fx.startTape();
       return;
     default:
-      if (spec && spec.flash > 0) fx.flash({ color: PALETTE.INK, a: Math.min(0.4, 0.1 * spec.flash), ticks: spec.flash });
+      // 11-01 먹 개편 — 화면 전체를 칠하는 번쩍은 다침 · 사망(정보)뿐이다. 격파 · 가드 · 번개 · 그 밖의 무게는
+      // 히트스톱 · 흔들림 · 획의 크기가 진다(타격은 맞은 층만 하얗게 — drawHitFlash)
   }
 }
 
@@ -255,7 +243,7 @@ function shatterFloor(s: GameState, e: JuiceEvent): void {
   }
 }
 
-/** 큰 한 방의 화면 반응 — 집중선(완파·필살·격파) · 반전(큰 완파·필살·격파) · 완파 자막. */
+/** 큰 한 방의 화면 반응(옛 판, 11-01 (5)에 되돌림) — 집중선(완파 · 격파) · 반전(큰 완파 · 격파) · 완파 자막 판. 필살은 wazaShow가 따로 건다 */
 function reactImpact(s: GameState, e: JuiceEvent): void {
   const headY = VIEW.GROUND_Y - s.player.y - PLAYER.H + smoothCam; // 화면 좌표
   switch (e.kind) {
@@ -268,7 +256,6 @@ function reactImpact(s: GameState, e: JuiceEvent): void {
       if (gone?.variant !== 'butterbar') fx.startCaption(destroyedCaption(n), `+${SCORE.DESTROY_BONUS.toLocaleString('en-US')}`);
       return;
     }
-    case 'special': fx.startImpact(VIEW.LANE_X[s.player.lane], headY, true); return;
     case 'bossDefeat': fx.startImpact(VIEW.W / 2, VIEW.FIELD_TOP + (VIEW.FIELD_H - VIEW.FIELD_TOP) * 0.45, true); return;
     default:
   }
@@ -278,14 +265,15 @@ function reactImpact(s: GameState, e: JuiceEvent): void {
  * 콤보 도장에 타격 하나 — y = 맞은 자리(건물 밑면) 고도. 고비를 넘는 타격이면 그 칸 연출을 켠다.
  * 콤보 100 · 500 밈 자막은 HUD(runCaps)가 판당 한 번 맡는다 — 여기선 판 위 도장만.
  */
-function markHit(n: number, y: number): void {
+function markHit(n: number, y: number, ink: string): void {
   const C = COMBO_MARK;
   n = Math.min(n, SCORE.COMBO_CAP);
   const tx = VIEW.LANE_X[0] + C.DX;
   const ty = VIEW.GROUND_Y - y + C.DY;
   // 보스 입장은 끊김 이벤트 없이 콤보를 0으로 돌린다 — 작아진 수는 새 도장
-  if (!mark || n < mark.n) mark = { n: 0, x: tx, y: ty, tx, ty, age: MARK_GONE, burst: -1, step: -1 };
+  if (!mark || n < mark.n) mark = { n: 0, x: tx, y: ty, tx, ty, age: MARK_GONE, burst: -1, step: -1, ink };
   const m = mark;
+  m.ink = ink;
   if (m.age >= MARK_GONE) { m.x = tx; m.y = ty; } // 접혀 있던 도장은 맞은 자리에서 다시 편다
   m.tx = tx;
   m.ty = ty;
@@ -299,7 +287,7 @@ function markHit(n: number, y: number): void {
     if (prev >= C.STEPS[i].at || n < C.STEPS[i].at) continue;
     m.burst = 0;
     m.step = i;
-    if (i >= 3 && !reduceMotion) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - 4); // 100부터 내리꽂기 — 화면도 툭
+    if (!reduceMotion) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - (2 + 1.5 * i)); // 고비마다 화면도 툭(위로 갈수록 세게)
     return;
   }
 }
@@ -312,19 +300,6 @@ function markBreak(n: number): void {
   shards = { n: m.n, x: m.x, y: m.y, t: 0 };
 }
 
-/** 의성어 글자 크기 — 타격은 작게, 무너질수록 크게. 콤보가 오르면 조금씩 더 커진다. */
-function onomatoPx(e: JuiceEvent, combo: number): number {
-  const base = JUICE_SYS.ONOMATO_PX;
-  switch (e.kind) {
-    case 'hit': return base * 0.8 * (1 + Math.min(combo / 500, 0.6));
-    case 'floorCollapse': return base * 1.1 * (1 + Math.min(combo / 500, 0.6));
-    case 'stackDestroy': return base * 1.5 * Math.min(1.5, stackScale(e.n));
-    case 'special':
-    case 'bossDefeat': return base * 2;
-    default: return base;
-  }
-}
-
 /** 이벤트 하나가 화면에 일으키는 모든 것. 필살 예비동작이 끝난 뒤에는 쥐고 있던 묶음이 이 길로 들어온다. */
 function react(s: GameState, e: JuiceEvent): void {
   const ws = WEAPON[s.weapon].shake;
@@ -335,8 +310,11 @@ function react(s: GameState, e: JuiceEvent): void {
   reactFlash(e);
   reactBody(e);
   reactImpact(s, e);
+  wazaShowEvent(s, e, lastStack);
   // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
-  spawnFromEvent(s, e);
+  // 필살 한 타 · 터짐은 wazaShow가 그린다(파티클 없음). 필살이 부순 완파도 wazaShow가 갈라 터뜨리니 발밑 공통 완파(조각 · 엔소 · 방울)를 겹치지 않는다
+  const byWaza = e.kind === 'stackDestroy' && (releasing !== null || s.events.some((v) => v.kind === 'wazaHit' || v.kind === 'wazaBurst'));
+  if (e.kind !== 'wazaHit' && e.kind !== 'wazaBurst' && !byWaza) spawnFromEvent(s, e);
   // 작업 지시서 명물: 종은 안 깎여 금이 없다(깡) · 땅에 떨어지면 금 가며 깨진다 · 몸 층은 그 층 그림으로 조각난다
   if (e.kind === 'hit' && e.mat === 'bell') spawnBellClang(VIEW.LANE_X[0], VIEW.GROUND_Y - (e.y ?? s.player.y + PLAYER.H));
   if (e.kind === 'floorCollapse') {
@@ -344,19 +322,18 @@ function react(s: GameState, e: JuiceEvent): void {
     else if (!shatterBody(s, e)) shatterFloor(s, e);
   }
   // 콤보 도장 — 콤보를 올린 타격만(층 붕괴는 타격일 때만 combo가 실린다 · 보스 타격은 combo 없이 온다)
-  const hitCombo = e.kind === 'hit' || e.kind === 'bossHit' ? e.combo ?? s.combo
+  const hitCombo = e.kind === 'hit' || e.kind === 'bossHit' || e.kind === 'wazaHit' ? e.combo ?? s.combo
     : e.kind === 'floorCollapse' || e.kind === 'butterCollapse' ? e.combo : undefined;
-  if (hitCombo !== undefined && hitCombo > 0) markHit(hitCombo, e.y ?? s.player.y + PLAYER.H);
+  if (hitCombo !== undefined && hitCombo > 0) markHit(hitCombo, e.y ?? s.player.y + PLAYER.H, pointInk(s.weapon));
   if (e.kind === 'comboBreak') markBreak(e.combo ?? 0);
   if (e.kind === 'hatGet') hatFx = { t: 0, n: e.combo ?? s.combo };
-  // 의성어 (동시 3개 상한)
+  // 글자 팝업 (동시 3개 상한) — 먹 붓글씨, 테 · 노랑 · 그림자 없이(불변 13 · 글자 딱지 없음)
   const combo = e.combo ?? s.combo;
-  let word = onomatoFor(e.kind, combo);
-  if (e.kind === 'special') {
-    word = onomatoFor(s.waza === 'ageba' ? 'specialAgeba' : s.waza === 'tetsu' ? 'specialTetsu' : 'special', combo);
-  }
-  if (word && combo >= 999) word = CAPTIONS.combo999;
-  // 상자는 뭘 받았는지가 정보다 — 콤보 자막보다 앞선다
+  // 필살은 의성어 대신 wazaShow가 이름을 세로 붓글씨로 쓴다
+  let word = e.kind === 'special' ? '' : onomatoFor(e.kind, combo);
+  // 타격 · 층 · 완파 · 가드 의성어는 걷었다 — 보스 격파 「작전성공」만 남는다(완파는 screenfx 붓글씨 「N층」)
+  if (e.kind !== 'bossDefeat') word = null;
+  // 상자는 뭘 받았는지가 정보다
   const supply = e.kind === 'supply';
   if (supply && e.item) word = ITEM_COPY[e.item].pop;
   if (word) {
@@ -364,15 +341,14 @@ function react(s: GameState, e: JuiceEvent): void {
     const same = popups.findIndex((p) => p.text === word);
     if (same >= 0) popups.splice(same, 1);
     else if (popups.length >= JUICE_SYS.ONOMATOPOEIA_MAX) popups.shift();
-    const life = e.kind === 'special' || supply ? 40 : e.kind === 'stackDestroy' ? 32 : 24;
     popups.push({
       text: word,
       x: VIEW.LANE_X[0] + ((combo * 13) % 30) - 15,
-      // 완파는 이벤트 y가 없다 — 머리 위(마지막 층이 있던 자리)에 박는다
+      // 격파 · 상자는 이벤트 y가 없다 — 머리 위에 쓴다
       y: VIEW.GROUND_Y - (e.y ?? s.player.y + PLAYER.H + 20) - 30,
-      ticks: life,
-      life,
-      px: onomatoPx(e, combo),
+      ticks: 40,
+      life: 40,
+      px: JUICE_SYS.ONOMATO_PX * (supply ? 1.6 : 2.6), // 붓글씨는 25px 이상
       rot: -0.08 + scatter() * 0.12,
     });
   }
@@ -405,6 +381,7 @@ function beginPrelude(s: GameState, evs: readonly JuiceEvent[]): void {
     before: lastStack,
     cut: 0,
   };
+  startWazaShow(s, lastStack);
 }
 
 function releasePrelude(s: GameState): void {
@@ -440,6 +417,7 @@ export function consumeEvents(s: GameState): void {
   if (s.tick < lastTick) resetRunState();
   lastTick = s.tick;
   watchBoss(s);
+  stepWazaShow(s);
   if (prelude) {
     prelude.left -= 1;
     if (prelude.left <= 0) releasePrelude(s);
@@ -449,6 +427,10 @@ export function consumeEvents(s: GameState): void {
     if (!prelude && evs.some((e) => e.kind === 'special')) beginPrelude(s, evs);
     else playEvents(s, evs);
   }
+  // 필살 박자의 흔들림 · 킥(wazaShow가 쌓아 둔 것)
+  const jolt = takeWazaJolt();
+  if (jolt.shake > 0) trauma = addTrauma(trauma, jolt.shake);
+  if (jolt.kick > 0 && !reduceMotion) kickY = Math.max(-JUICE_SYS.SHAKE_MAX_AMP, kickY - jolt.kick);
   // 보스 입장은 끊김 이벤트 없이 콤보를 0으로 돌린다 — 떠 있던 수를 조용히 거둔다
   if (s.combo === 0) mark = null;
 }
@@ -532,6 +514,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   drawChapterBackdrop(ctx, s);
   ctx.restore();
   ctx.translate(0, cam);
+  drawWazaBack(ctx, cam); // 필살 암전 — 하늘만(땅은 아래에서 다시 칠한다)
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
   fx.drawGroundLine(ctx);
@@ -557,11 +540,8 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   }
   drawLandmarkFront(ctx, s, g); // 구층탑 처마 · 풍경, 땅에서 깨지는 종
   if (prelude?.ghost) {
-    // 사라진 건물의 유령 — 정지된 동안 점점 옅어진다
-    ctx.save();
-    ctx.globalAlpha = JUICE_SYS.PRELUDE_GHOST_ALPHA * (0.55 + 0.45 * (prelude.left / prelude.total));
+    // 사라진 건물 — 예비동작이 풀려 낙뢰가 꽂힐 때까지 그대로 서 있다(옅어지지 않는다 · 11-01)
     drawStack(ctx, prelude.ghost, g, s.gimmick);
-    ctx.restore();
   }
   drawDebris(ctx, s, g);
   drawBackEffects(ctx); // 층 조각·먼지 구름은 건물과 같은 층 — 졸라맨을 덮지 않게 플레이어보다 먼저
@@ -578,8 +558,10 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // ★08-30 계약 개정: 관통 시각화(반투명·스침 획·착지 위험 표시)는 전부 제거했다.
   // 밑면이 막고 누르는 세계에서는 "통과 중"이라는 상태 자체가 없다 — 없는 것을 그리면 거짓말이다.
   // 접촉 피드백은 core가 발행하는 headBonk 이벤트(먼지·소리·진동)가 진다.
-  // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2)
-  const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES;
+  // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2).
+  // 필살 무적이 그 구간으로 내려와도 필살 연출이 도는 동안은 통짜(긴 필살의 터짐 순간에 졸라맨이 꺼지지 않게)
+  drawWazaMid(ctx); // 필살 달 — 건물 위, 졸라맨 아래(졸라맨이 달을 등지고 선다)
+  const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES && !wazaShowState();
   setPlayerWeapon(s.weapon);
   bladeAura(s); // 대검 칼 기운 — 지금 포즈의 칼날에서
   if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
@@ -601,7 +583,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     if (s.hat && !hatFlying()) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY); // 받는 중엔 날아오는 쪽이 그린다
     if (squash) ctx.restore();
   }
-  if (prelude) fx.drawPrelude(ctx, 1 - prelude.left / prelude.total, prelude.x, prelude.y);
+  drawWazaWorld(ctx, s, cam);
   ctx.restore();
 
   // 필드 클립 재적용 — 파티클·팝업·마커가 조작 존(하단 170px)을 침범하지 않게 (08-30, P1-5)
@@ -623,6 +605,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.restore();
   drawComboMark(ctx, cam);
   drawHatFx(ctx, s, cam);
+  drawWazaTitle(ctx);
   ctx.restore();
   ctx.restore();
 
@@ -790,41 +773,35 @@ function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.restore();
 }
 
-const markFont = (px: number): string => `${Math.round(px)}px "Black Han Sans", sans-serif`;
 /** 숫자 크기 — 콤보 500까지 (1 + GROW)배로 큰다 */
+/** 콤보 이름표 활자 — 붓 숫자 밑 작은 고정폭(콤보 도장 · 안전모 띠) */
+const LABEL_FONT = `700 ${COMBO_MARK.LABEL_PX - 2}px "Gunbbu Mono", "Gunbbu Sans", monospace`;
 const markPx = (n: number): number => COMBO_MARK.PX * (1 + (COMBO_MARK.GROW * Math.min(n, 500)) / 500);
 /** 지나온 고비 수 — 10부터 기울고 30부터 먹 그림자 */
 const markTier = (n: number): number => COMBO_MARK.STEPS.filter((st) => n >= st.at).length;
-/** 도장 높이(화면) — 필드 위아래 끝에 걸리면 안으로 민다(밑엔 이름표 자리까지) */
+/** 도장 높이(화면) — 위는 HUD 막대 줄 밑, 아래는 이름표 자리까지 안으로 민다 */
 const markScreenY = (y: number, cam: number, px: number): number =>
-  Math.max(VIEW.FIELD_TOP + px * 0.5 + 6, Math.min(VIEW.FIELD_H - px * 0.5 - COMBO_MARK.LABEL_PX - 10, y + cam));
+  Math.max(COMBO_MARK.TOP + px * 0.5, Math.min(VIEW.FIELD_H - px * 0.5 - COMBO_MARK.LABEL_PX - 10, y + cam));
 const hatFlying = (): boolean => !reduceMotion && hatFx !== null && hatFx.t < HAT_FX.LAND;
 
 /**
- * 판 위 글씨 붓 — 잉크 링 + 흰 링 + 채움. ★08-30 7차: 아이보리 헤일로 하나만 두면 배경색과 같은 색이라
- * 밝은 건물 면 위에서 통째로 사라진다(사용자 영상 판정). 잉크 링을 바깥에 둘러 밝은 곳 · 어두운 곳 어디서든 한 겹은 산다.
- * shadow = 먹 그림자 한 겹(글자가 찍힌 것처럼)
+ * 판 위 먹 글씨 — 한지색 테 한 겹 + 먹(글자 색) 채움. 테가 있어 어두운 건물 면 위에서도 산다(08-30 7차 — 그때는 노랑 채움이라
+ * 잉크 링이 더 필요했다). 11-01 먹 개편: 잉크 링 · 먹 그림자 · 노랑 채움(스티커)을 걷었다. halo = false면 테 없이(낙관 속 숫자)
  */
-function inkText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fill: string, shadow = false): void {
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = PALETTE.INK;
-  if (shadow) {
-    ctx.fillStyle = PALETTE.INK;
-    ctx.strokeText(text, x + 3, y + 3.5);
-    ctx.fillText(text, x + 3, y + 3.5);
+function inkText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fill: string, halo = true): void {
+  if (halo) {
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = PALETTE.WHITE;
+    ctx.strokeText(text, x, y);
   }
-  ctx.strokeText(text, x, y);
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = PALETTE.WHITE;
-  ctx.strokeText(text, x, y);
   ctx.fillStyle = fill;
   ctx.fillText(text, x, y);
 }
 
 /**
- * 콤보 도장(화면 좌표, 틱마다 한 번). 고비 칸 k에 따라 효과가 쌓인다:
- * 0 말 · 1 먹 고리 · 2 노랑 베기 · 3 내리꽂기 + 집중선 · 4 X 베기 · 5 먹 방울 · 6 주홍 낙관 · 7 MAX
+ * 콤보 도장(화면 좌표, 틱마다 한 번). 숫자 · 고비 말은 먹 붓글씨(동해독도). 고비 칸 k에 따라 효과가 쌓인다:
+ * 0 말 · 1 붓 고리(엔소) · 2 먹 베기 획 · 3 내리꽂기 · 4 X 베기 · 5 먹 방울 · 6 주홍 낙관(SEAL_INK) · 7 MAX
  */
 function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
   drawShards(ctx, cam);
@@ -839,7 +816,7 @@ function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
   const t = m.burst;
   const k = t >= 0 ? m.step : -1;
   ctx.save();
-  ctx.font = markFont(px);
+  ctx.font = fx.brushFont(px);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const w = ctx.measureText(txt).width;
@@ -861,110 +838,90 @@ function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
   }
   if (k >= 0) drawBurstBack(ctx, k, t, x, y, px);
   ctx.translate(x + jx, y + dy);
+  if (!reduceMotion) ctx.rotate((m.n % 2 ? 1 : -1) * C.TILT * pu); // 칠 때마다 번갈아 기울었다 선다
   ctx.scale(sc, sc);
   const seal = m.n >= 500;
+  // 붓판 — 10부터 숫자 밑 붓 한 획, 50부터 숫자 뒤 굵은 먹 획(숫자는 한지색), 100부터 그 속에 무기 포인트 색. 칠 때마다 3틱에 다시 긋는다
+  const board = !seal && tier >= 3;
+  if (!seal && tier >= 1) {
+    const bw = w + 34;
+    const s1 = Math.min(1, (m.age + 1) / 3);
+    ctx.fillStyle = PALETTE.INK;
+    if (board) brushLine(ctx, -bw / 2, 3, bw / 2, -3, px * 0.92, 0, s1, 0.45, m.n % 7, 3, PRESS.yi);
+    else brushLine(ctx, -bw / 2, px * 0.44, bw / 2, px * 0.38, px * 0.17, 0, s1, 0.5, m.n % 7, 2, PRESS.yi);
+    if (board && tier >= 4) {
+      ctx.fillStyle = m.ink;
+      brushLine(ctx, -bw / 2 + 6, px * 0.24, bw / 2 - 4, px * 0.2, px * 0.22, 0, s1, 0.3, m.n % 5, 2, PRESS.yi);
+    }
+  }
   if (seal) {
-    // 500부터 주홍 낙관 — 숫자를 한지색으로 뺀다(500 고비엔 숫자와 같이 내리꽂힌다)
+    // 500부터 주홍 낙관 — 숫자를 한지색으로 뺀다(500 고비엔 숫자와 같이 내리꽂힌다). 테 없이 인주 면만
     const sw = w + 16;
     const sh = px * 0.95;
     ctx.save();
     ctx.rotate(-0.06);
-    ctx.fillStyle = PALETTE.RED;
+    ctx.fillStyle = SEAL_INK;
     ctx.fillRect(-sw / 2, -sh / 2, sw, sh);
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = PALETTE.INK;
-    ctx.strokeRect(-sw / 2, -sh / 2, sw, sh);
     ctx.restore();
   }
-  // 이름표 — 먹 글씨 + 흰 테
+  // 이름표 — 붓 숫자 밑 작은 활자(낙관 옆 관지처럼). 굵은 고딕 딱지는 붓글씨와 따로 놀았다(11-01)
   const label = m.n >= SCORE.COMBO_CAP ? 'MAX COMBO' : 'COMBO';
-  const ly = px * 0.5 + C.LABEL_PX * 0.5 + 4;
-  ctx.font = markFont(C.LABEL_PX);
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = PALETTE.WHITE;
-  ctx.strokeText(label, 0, ly);
-  ctx.fillStyle = PALETTE.INK;
-  ctx.fillText(label, 0, ly);
-  ctx.font = markFont(px);
+  const ly = px * 0.5 + C.LABEL_PX * 0.5 + 2;
+  ctx.font = LABEL_FONT;
+  ctx.letterSpacing = '3px';
+  inkText(ctx, label, 0, ly, PALETTE.INK);
+  ctx.letterSpacing = '0px';
+  ctx.font = fx.brushFont(px);
   if (tier >= 1) ctx.transform(1, 0, -0.2, 1, 0, 0); // 앞으로 기운다
-  inkText(ctx, txt, 0, 0, seal ? PALETTE.WHITE : comboColor(m.n), tier >= 2);
+  inkText(ctx, txt, 0, 0, seal || board ? PALETTE.WHITE : lettersColor, !seal && !board);
   ctx.restore();
   if (k >= 0) drawBurstFront(ctx, k, t, x, y, px);
   m.age += 1;
   if (t >= 0) m.burst = t + 1 > C.BURST ? -1 : t + 1;
 }
 
-/** 고비 연출 — 숫자 뒤: 집중선(100~) · 노랑 베기(50~, 200부터 X) · 먹 고리(30~) */
+/** 고비 연출 — 숫자 뒤: 먹 베기 획(50~, 200부터 X) · 붓 고리 엔소(30~) */
 function drawBurstBack(ctx: CanvasRenderingContext2D, k: number, t: number, x: number, y: number, px: number): void {
   ctx.save();
-  if (k >= 3 && !reduceMotion && t < 10) {
-    const r0 = px * 0.9 + 6;
-    const r1 = r0 + 12 + 26 * (1 - t / 10);
-    ctx.fillStyle = PALETTE.INK;
-    ctx.beginPath();
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2 + 0.2;
-      const c = Math.cos(a);
-      const sn = Math.sin(a);
-      ctx.moveTo(x + c * r0 - sn * 2.2, y + sn * r0 + c * 2.2);
-      ctx.lineTo(x + c * r0 + sn * 2.2, y + sn * r0 - c * 2.2);
-      ctx.lineTo(x + c * r1, y + sn * r1);
-      ctx.closePath();
-    }
-    ctx.fill();
-  }
-  if (k >= 2) slashBand(ctx, x, y, -0.32, t);
-  if (k >= 4) slashBand(ctx, x, y, 0.42, t - 3);
-  if (k >= 1 && !reduceMotion && t < 14) {
-    ctx.strokeStyle = PALETTE.INK;
-    ctx.lineWidth = 7 * (1 - t / 14);
-    ctx.beginPath();
-    ctx.arc(x, y, px * 0.6 + t * 5, 0, Math.PI * 2);
-    ctx.stroke();
+  ctx.fillStyle = PALETTE.INK;
+  if (k >= 2) slashStroke(ctx, x, y, -0.32, t, 3);
+  if (k >= 4) slashStroke(ctx, x, y, 0.42, t - 3, 5);
+  if (k >= 1 && !reduceMotion && t < 16) {
+    // 붓 고리 — 숫자 둘레를 4틱에 한 바퀴 긋고 퍼지며 대던 데부터 마른다
+    const u = t / 16;
+    enso(ctx, x, y, px * 0.62 + t * 3, 6.5 * (1 - 0.45 * u), -1.2, u < 0.3 ? 0 : (u - 0.3) / 0.7, Math.min(1, (t + 1) / 4), 0.2 + 0.6 * u, 1, 11);
   }
   ctx.restore();
 }
 
-/** 노랑 베기 한 줄 — 3틱에 그어지고 남은 틱에 가늘어진다. 먹 테를 둘러 한지 위에서도 산다 */
-function slashBand(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, t: number): void {
+/** 먹 베기 한 획 — 3틱에 그어지고 6틱부터 꼬리가 깎여 14틱에 다 먹힌다. 숫자 뒤를 비스듬히 가른다 */
+function slashStroke(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, t: number, seed: number): void {
   if (t < 0 || t >= 14) return;
-  const len = 170 * Math.min(1, (t + 1) / 3);
-  const h = 12 * (t < 3 ? 1 : 1 - (t - 3) / 11);
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(ang);
-  ctx.beginPath();
-  ctx.moveTo(-85, 0);
-  ctx.lineTo(-85 + len - 10, -h / 2);
-  ctx.lineTo(-85 + len, 0);
-  ctx.lineTo(-85 + len - 10, h / 2);
-  ctx.closePath();
-  ctx.fillStyle = PALETTE.YELLOW;
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = PALETTE.INK;
-  ctx.stroke();
-  ctx.restore();
+  const c = Math.cos(ang) * 85;
+  const sn = Math.sin(ang) * 85;
+  brushLine(ctx, x - c, y - sn, x + c, y + sn, 14, t < 6 ? 0 : (t - 6) / 8, Math.min(1, (t + 1) / 3), 0.35, seed, 7);
 }
 
-/** 고비 연출 — 숫자 앞: 먹 방울(300~) · 고비 말(숫자 위에 노랑으로 박혔다가 끝 8틱에 접힌다) */
+/** 고비 연출 — 숫자 앞: 튄 먹 방울(300~) · 고비 말(숫자 위 먹 붓글씨, 크게 박혔다가 끝 8틱에 접힌다) */
 function drawBurstFront(ctx: CanvasRenderingContext2D, k: number, t: number, x: number, y: number, px: number): void {
   const C = COMBO_MARK;
   ctx.save();
-  if (k >= 5 && !reduceMotion && t < 24) {
+  if (k >= 2 && !reduceMotion && t < 24) {
+    // 50부터 숫자 둘레로 먹 방울이 튄다(고비가 클수록 많이)
     ctx.fillStyle = PALETTE.INK;
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + 0.4;
-      const d = px * 0.55 + (3 + (i % 3)) * t; // 숫자 가장자리에서 튄다 — 숫자에 묻지 않게
-      ctx.beginPath();
-      ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d + 0.12 * t * t, (3.4 - (i % 2) * 1.2) * (1 - t / 24), 0, Math.PI * 2);
-      ctx.fill();
+    const nd = 6 + 2 * k;
+    for (let i = 0; i < nd; i++) {
+      const a = (i / nd) * Math.PI * 2 + 0.4;
+      const sp = 3 + (i % 3);
+      const d = px * 0.55 + sp * t; // 숫자 가장자리에서 튄다 — 숫자에 묻지 않게
+      const f = 1 - t / 24;
+      // 머리는 나는 쪽(떨어질수록 아래로 돈다), 꼬리는 지나온 쪽
+      inkDrop(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d + 0.12 * t * t, (3.4 - (i % 2) * 1.2) * f, Math.atan2(Math.sin(a) * sp + 0.24 * t, Math.cos(a) * sp), 5 * f);
     }
   }
   const word = C.STEPS[k].word;
-  const wpx = 17 + 2 * k;
-  ctx.font = markFont(wpx);
+  const wpx = 40 + 4 * k; // 붓글씨는 25px 이상 — 11-01 (5) 크게(40 ~ 68)
+  ctx.font = fx.brushFont(wpx);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const ww = ctx.measureText(word).width;
@@ -972,12 +929,12 @@ function drawBurstFront(ctx: CanvasRenderingContext2D, k: number, t: number, x: 
   const out = Math.max(0, (t - (C.BURST - 8)) / 8);
   ctx.translate(
     Math.max(ww / 2 + 6, Math.min(VIEW.W - ww / 2 - 6, x - 4)),
-    Math.max(VIEW.FIELD_TOP + wpx, y - px * 0.5 - wpx * 0.5 - 10),
+    Math.max(C.TOP + wpx * 0.5, y - px * 0.5 - wpx * 0.5 - 10),
   );
   ctx.rotate(-0.1);
   const wsc = (1 + 0.5 * inU * inU) * (1 - out * out);
   ctx.scale(wsc, wsc);
-  inkText(ctx, word, 0, 0, PALETTE.YELLOW, true);
+  inkText(ctx, word, 0, 0, PALETTE.INK);
   ctx.restore();
 }
 
@@ -990,7 +947,7 @@ function drawShards(ctx: CanvasRenderingContext2D, cam: number): void {
   const px = markPx(sh.n);
   const txt = String(sh.n);
   ctx.save();
-  ctx.font = markFont(px);
+  ctx.font = fx.brushFont(px);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const half = ctx.measureText(txt).width / 2 + 8;
@@ -1019,7 +976,7 @@ function drawShards(ctx: CanvasRenderingContext2D, cam: number): void {
 }
 
 /**
- * 안전모 받기(화면 좌표, 틱마다 한 번) — 먹 띠가 IN에 왼쪽에서 들어와 OUT부터 오른쪽으로 빠진다.
+ * 안전모 받기(화면 좌표, 틱마다 한 번) — 넓은 붓이 IN까지 왼쪽에서 오른쪽으로 먹 띠를 긋고, OUT부터 왼쪽 끝이 깎여 GONE에 다 먹힌다.
  * 띠에 찍힌 안전모는 OUT부터 돌며 머리로 날아가 LAND에 씌워지고, END까지 머리에 먹 고리 하나.
  */
 function drawHatFx(ctx: CanvasRenderingContext2D, s: GameState, cam: number): void {
@@ -1029,15 +986,13 @@ function drawHatFx(ctx: CanvasRenderingContext2D, s: GameState, cam: number): vo
   const t = f.t;
   const slotX = 112;
   const slotY = H.BAND_Y - 2;
-  const run = VIEW.W + 60;
-  let off = 0;
-  if (!reduceMotion && t < H.IN) off = -run * (1 - t / H.IN) ** 3;
-  else if (!reduceMotion && t >= H.OUT) off = run * Math.min(1, (t - H.OUT) / (H.GONE - H.OUT)) ** 2;
-  if (t < H.GONE) drawHatBand(ctx, off, f.n);
+  const s1 = reduceMotion ? 1 : 1 - (1 - Math.min(1, t / H.IN)) ** 3;
+  const s0 = reduceMotion || t < H.OUT ? 0 : Math.min(1, (t - H.OUT) / (H.GONE - H.OUT)) ** 2;
+  if (t < H.GONE) drawHatBand(ctx, s0, s1, f.n);
   if (t >= H.IN - 2 && t < H.OUT) {
     // 띠에 도장처럼 찍힌다 — 크게 박혔다 앉는다
     const pu = reduceMotion ? 0 : Math.max(0, 1 - (t - (H.IN - 2)) / 6);
-    bigHat(ctx, slotX + off, slotY, 5, 3.2 * (1 + 0.7 * pu * pu), 0);
+    bigHat(ctx, slotX, slotY, 5, 3.2 * (1 + 0.7 * pu * pu), 0);
   }
   // 깔려서 벌써 깨졌으면(같은 틱에 깔림) 날아갈 안전모가 없다
   const at = s.hat ? hatSpot(s.player.pose, s.player.poseTick, VIEW.LANE_X[s.player.lane], VIEW.GROUND_Y - s.player.y) : null;
@@ -1076,30 +1031,26 @@ function bigHat(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
 }
 
 /** 띠 — 양 끝을 비스듬히 자른 먹 띠 + 위아래 노랑 테 한 줄씩. 「안전모!」 한지색 + 「COMBO n」 노랑 */
-function drawHatBand(ctx: CanvasRenderingContext2D, off: number, n: number): void {
+/** 안전모 먹 띠 — [s0, s1] 구간만 그어져 있다. 글자는 먹이 지나간 자리 안에서만 보인다(그어지며 드러나고 깎이며 사라진다) */
+function drawHatBand(ctx: CanvasRenderingContext2D, s0: number, s1: number, n: number): void {
   const y = HAT_FX.BAND_Y;
-  const h = HAT_FX.BAND_H / 2;
+  const x0 = -30;
+  const x1 = VIEW.W + 30;
   ctx.save();
-  ctx.translate(off, 0);
-  ctx.beginPath();
-  ctx.moveTo(-10, y - h);
-  ctx.lineTo(VIEW.W + 30, y - h);
-  ctx.lineTo(VIEW.W + 10, y + h);
-  ctx.lineTo(-30, y + h);
-  ctx.closePath();
   ctx.fillStyle = PALETTE.INK;
-  ctx.fill();
-  ctx.fillStyle = PALETTE.YELLOW;
-  ctx.fillRect(-30, y - h - 6, VIEW.W + 60, 3);
-  ctx.fillRect(-30, y + h + 3, VIEW.W + 60, 3);
+  brushLine(ctx, x0, y + 4, x1, y - 6, HAT_FX.BAND_H, s0, s1, 0.55, 23, -5);
+  ctx.beginPath();
+  ctx.rect(x0 + (x1 - x0) * s0, y - HAT_FX.BAND_H, (x1 - x0) * (s1 - s0) * 0.9, HAT_FX.BAND_H * 2);
+  ctx.clip();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.font = markFont(30);
   ctx.fillStyle = PALETTE.WHITE;
-  ctx.fillText(ITEM_COPY.hat.pop, 148, y - 6);
-  ctx.font = markFont(14);
-  ctx.fillStyle = PALETTE.YELLOW;
-  ctx.fillText(`COMBO ${n}`, 150, y + 18);
+  ctx.font = fx.brushFont(36);
+  ctx.fillText(ITEM_COPY.hat.pop, 148, y - 7);
+  ctx.font = LABEL_FONT;
+  ctx.letterSpacing = '3px';
+  ctx.fillText(`COMBO ${n}`, 151, y + 17);
+  ctx.letterSpacing = '0px';
   ctx.restore();
 }
 
@@ -1115,8 +1066,8 @@ export function comboMarkView(): { n: number; shown: boolean; step: number; brok
 }
 
 /**
- * 의성어 — 크게 박혔다가(ONOMATO_POP배 → 1, ONOMATO_POP_TICKS) 제자리에서 버티고, 끝 8틱에 떠오르며 사라진다.
- * 잉크 그림자를 한 겹 깔아 글자가 화면에 '찍힌' 것처럼 읽힌다.
+ * 글자 팝업 — 먹 붓글씨(동해독도). 테 · 판 · 그림자 · 알파 없이 크기로 들고 난다:
+ * 앞 6틱에 부풀어(넘침 1.12) 앉고, 끝 8틱에 오그라든다.
  */
 function drawPopups(ctx: CanvasRenderingContext2D): void {
   for (let i = popups.length - 1; i >= 0; i--) {
@@ -1124,27 +1075,15 @@ function drawPopups(ctx: CanvasRenderingContext2D): void {
     p.ticks -= 1;
     if (p.ticks <= 0) { popups.splice(i, 1); continue; }
     const age = p.life - p.ticks;
-    const popU = Math.max(0, 1 - age / JUICE_SYS.ONOMATO_POP_TICKS);
-    const pop = 1 + (JUICE_SYS.ONOMATO_POP - 1) * popU * popU;
-    const rise = p.ticks < 8 ? (8 - p.ticks) * 1.6 : 0;
+    const grow = age < 6 ? 0.5 + 0.62 * Math.sin((age / 6) * (Math.PI / 2)) : 1 + 0.12 * Math.max(0, 1 - (age - 6) / 4);
+    const sc = grow * Math.min(1, p.ticks / 8) ** 0.8;
     ctx.save();
-    ctx.globalAlpha = Math.min(1, p.ticks / 8);
-    ctx.translate(p.x, p.y - rise);
+    ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
-    ctx.scale(pop, pop);
-    ctx.font = `${Math.round(p.px)}px "Black Han Sans", sans-serif`;
+    ctx.scale(sc, sc);
+    ctx.font = fx.brushFont(p.px);
     ctx.textAlign = 'center';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = PALETTE.INK;
     ctx.fillStyle = PALETTE.INK;
-    ctx.strokeText(p.text, 2.5, 3);     // 그림자
-    ctx.fillText(p.text, 2.5, 3);
-    ctx.strokeText(p.text, 0, 0);       // 노랑 채움은 아이보리 배경에서 제일 약하다 — 잉크 링 필수
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.strokeText(p.text, 0, 0);
-    ctx.fillStyle = PALETTE.YELLOW_DEEP;
     ctx.fillText(p.text, 0, 0);
     ctx.restore();
   }

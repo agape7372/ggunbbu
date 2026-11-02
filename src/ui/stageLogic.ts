@@ -3,11 +3,11 @@
 
 import { BOSS_NAME } from '../content';
 import { REJECT, STAGE_MODE, STAGE_TEXT, fmtGap, fmtStageTime, stageOutro } from '../content/stages';
-import { BOSS, LANDMARK } from '../config';
+import { ACT1, BOSS, LANDMARK } from '../config';
 import { lmAct } from '../core/landmark';
 import { stageDef, stageScript, type StageResult } from '../core/stage';
 import { STAGES } from '../core/stages';
-import type { GameState, StageDiff } from '../core/types';
+import type { Act2Phase, GameState, StageDiff } from '../core/types';
 import { STAMP_KEYS, chaeBehind, hasStamp, stampBits, type RecordNews, type StageRecord } from '../meta/stageRecord';
 
 /** 반려 사유 한 줄 — 못 찍은 첫 자리(접수 · 이상 없음 · 기한 내 · 전임자 확인 차례). 특기 사항은 사유 대신 수수께끼가 늘 보인다 */
@@ -59,17 +59,18 @@ export function executorBar(hp: number): HudBar {
 }
 
 /**
- * 판 위 진행 막대 — 대본 중엔 나온 걸음이 칸으로 차고, 끝 이름표가 다음에 올 것을 알린다(보스 이름 · 끝).
+ * 판 위 진행 막대 — 대본 중엔 치운 걸음이 칸으로 차고(서 있는 건물은 남은 셈), 끝 이름표가 다음에 올 것을 알린다(보스 이름 · 끝).
  * 보스 중엔 남은 몸이 준다: 명물은 층 칸 위 남은 내구, 집행기는 체력.
  */
 export function stageBar(s: GameState): HudBar | null {
   const st = s.stage;
   if (!st) return null;
   if (st.phase === 'script') {
-    const w = workProgress(st.id, st.step);
-    if (w.total === 0) return null;
+    const total = workProgress(st.id, 0).total;
+    if (total === 0) return null;
+    const done = st.tally.splits.length; // 치운 걸음 — 걸음이 판에서 사라지는 틱에 하나씩 는다
     const end = stageDef(st.id).boss ? bossName(st.id) : STAGE_MODE.barEnd;
-    return { label: `${w.done}/${w.total}`, fill: w.done / w.total, n: w.total, end };
+    return { label: `${STAGE_MODE.barLeft} ${total - done}`, fill: done / total, n: total, end };
   }
   if (st.phase !== 'boss') return null;
   if (s.boss) return executorBar(s.boss.hp);
@@ -79,6 +80,24 @@ export function stageBar(s: GameState): HudBar | null {
   const { FLOORS, HP } = BODY[lm.id];
   const left = body.floors.reduce((a, f) => a + Math.max(0, f.segs[0]?.hp ?? 0), 0);
   return { label: bossName(st.id), fill: Math.min(1, left / (FLOORS * HP)), n: FLOORS, end: '' };
+}
+
+const ACT2_ORDER: readonly Act2Phase[] = ['cathedral', 'tower', 'bolt', 'rock'];
+
+/**
+ * 아케이드 위 막대 — 1막은 진행도(p)가 장 네 칸을 채우고 끝 인장 「2막」, 2막은 남은 단계 넷 끝에 집행기.
+ * 달(집행기)이면 체력 막대. 특별작전 · 버터바 · 토코톤은 막대 없음(배너 자리)
+ */
+export function arcadeBar(s: GameState): HudBar | null {
+  if (s.mode === 'act1') {
+    if (s.gimmick !== 'none') return null; // 특별작전은 2막으로 안 넘어간다
+    const left = Math.ceil((1 - s.p) * 100);
+    return { label: `${STAGE_MODE.barLeft} ${left}%`, fill: s.p, n: ACT1.CHAPTER_BOUNDS.length + 1, end: STAGE_MODE.barAct2 };
+  }
+  if (s.mode !== 'act2' || !s.act2Phase) return null;
+  if (s.act2Phase === 'moon') return s.boss ? executorBar(s.boss.hp) : null;
+  const i = ACT2_ORDER.indexOf(s.act2Phase);
+  return { label: `${STAGE_MODE.barLeft} ${ACT2_ORDER.length - i}`, fill: i / ACT2_ORDER.length, n: ACT2_ORDER.length, end: BOSS_NAME };
 }
 
 /** 못 깬 판의 진척 — 대본 중이면 걸음, 명물 앞이면 명물 이름 */
