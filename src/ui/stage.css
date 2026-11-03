@@ -20,7 +20,6 @@
   padding: 10px 14px;
   border: 3px solid var(--ink);
   background: var(--paper);
-  box-shadow: 4px 5px 0 var(--ink);
   rotate: -1deg;
   font: 700 15px/1.4 var(--body);
 }
@@ -45,13 +44,12 @@
   background: var(--paper);
   border: 3px solid var(--ink);
   border-radius: 3px 8px 4px 9px;
-  box-shadow: 4px 5px 0 var(--ink);
 }
 
 .st-cards > :nth-child(odd) { rotate: -0.5deg; }
 .st-cards > :nth-child(even) { rotate: 0.6deg; }
 .st-card:active:not(:disabled) { scale: 0.96; }
-.st-card:disabled { color: var(--ink2); border-color: var(--ink3); box-shadow: 4px 5px 0 var(--ink3); }
+.st-card:disabled { color: var(--ink2); border-color: var(--ink3); }
 .st-id { grid-area: id; font: 700 14px/1 var(--body); color: var(--ink2); }
 /* 보스가 있는 판 = 번호 옆 먹 인장(램프 이름표는 테두리라 겹쳐 읽히지 않는다) */
 .st-boss { margin-left: 4px; padding: 2px 4px 1px; background: var(--ink); color: var(--paper); font: 700 11px/1 var(--body); font-style: normal; vertical-align: 1px; }
@@ -79,7 +77,6 @@
   padding: 16px 16px 14px 18px;
   background: var(--paper-2);
   border: 3px solid var(--ink);
-  box-shadow: 6px 8px 0 var(--ink);
   rotate: -0.6deg;
 }
 
@@ -147,7 +144,6 @@
   padding: 14px 16px 16px 18px;
   background: var(--paper-2);
   border: 3px solid var(--ink);
-  box-shadow: 6px 8px 0 var(--ink);
   rotate: -0.4deg;
 }
 

@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { checkRelease } from '../scripts/check-release.mjs';
 
 const REAL = 'ca-app-pub-1234567890123456/1234567890';
+const SELLER = '건뿌 · 대표 · 010-0000-0000';
 const TEST = 'ca-app-pub-3940256099942544/5224354917';
 const script = fileURLToPath(new URL('../scripts/check-release.mjs', import.meta.url));
 
@@ -20,7 +21,8 @@ it('릴리스 모드: 빈 값·테스트 단위·잘못된 형식은 실패, 실
   expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: '  ' })).toHaveLength(1);
   expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: TEST })[0]).toMatch(/테스트/);
   expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: 'abc' })[0]).toMatch(/형식/);
-  expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: REAL })).toEqual([]);
+  expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: REAL })[0]).toMatch(/VITE_SELLER_INFO/);
+  expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: REAL, VITE_SELLER_INFO: SELLER })).toEqual([]);
   expect(checkRelease({ ...on, VITE_ADMOB_REWARDED_ID: REAL, VITE_TESTER: '1' })[0]).toMatch(/VITE_TESTER/);
   expect(checkRelease({ VITE_TESTER: '1' })).toEqual([]); // 시험판(릴리스 아님)은 통과
 });
@@ -28,7 +30,7 @@ it('릴리스 모드: 빈 값·테스트 단위·잘못된 형식은 실패, 실
 it('명령줄: 릴리스 모드 + 테스트 단위는 종료 코드 1, 평소엔 0', () => {
   const run = (env) => spawnSync(process.execPath, [script], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8' });
   expect(run({ GUNBBU_RELEASE: '1', VITE_ADMOB_REWARDED_ID: TEST }).status).toBe(1);
-  expect(run({ GUNBBU_RELEASE: '1', VITE_ADMOB_REWARDED_ID: REAL }).status).toBe(0);
+  expect(run({ GUNBBU_RELEASE: '1', VITE_ADMOB_REWARDED_ID: REAL, VITE_SELLER_INFO: SELLER }).status).toBe(0);
   expect(run({}).status).toBe(0);
 });
 

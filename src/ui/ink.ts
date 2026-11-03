@@ -3,10 +3,12 @@
 // 섞기 0 — 그라데이션·blur·반투명 없음. 거친 가장자리는 index.html의 SVG 필터 #rough · #rough2.
 
 import { SWORDS } from '../render/swordShapes';
+import { goods } from './goodsArt';
 const PAPER = '#F4F1E8';
 const INK = '#1A1A20';
 const INK3 = '#A9A7AE';
 const SEAL = '#C4301E';
+const GOLD = '#E3A82B';
 
 export const reduceMotion = (): boolean =>
   typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -41,7 +43,7 @@ const PADS: Record<string, [number, number, string, string[]]> = {
 };
 
 let varsSet = false;
-/** 붓 획·먹 덩어리 그림을 :root 변수로 한 번 깐다(--sA·--sA3(옅은 먹)·--pA·--pA2(누름)·--pGs(주홍 탈출)) */
+/** 붓 획·먹 덩어리 그림을 :root 변수로 한 번 깐다(--sA·--sA3(옅은 먹)·--sAs(주홍)·--sAg(금, 돈 내는 단추)·--pA·--pA2(누름)·--pGs(주홍 탈출)) */
 export function installInkVars(): void {
   if (varsSet || typeof document === 'undefined') return;
   varsSet = true;
@@ -49,6 +51,8 @@ export function installInkVars(): void {
   for (const [k, [w, body, dry]] of Object.entries(STROKES)) {
     st.setProperty(`--${k}`, dataURI(strokeSVG(w, body, dry, INK)));
     st.setProperty(`--${k}3`, dataURI(strokeSVG(w, body, dry, INK3)));
+    st.setProperty(`--${k}s`, dataURI(strokeSVG(w, body, dry, SEAL)));
+    st.setProperty(`--${k}g`, dataURI(strokeSVG(w, body, dry, GOLD)));
   }
   for (const [k, [w, h, body, dry]] of Object.entries(PADS)) {
     st.setProperty(`--${k}`, dataURI(blob(w, h, body, dry, INK, false)));
@@ -122,9 +126,8 @@ export function replay(el: Element | null, cls: string): void {
   el.classList.add(cls);
 }
 
-/** 손으로 그린 작은 글리프(index.html의 symbol) */
-export const glyph = (id: 'dust' | 'orb' | 'life'): string =>
-  `<svg class="gl" aria-hidden="true"><use href="#g-${id}"/></svg>`;
+/** 재화 표 — 상품 그림을 작게. 먹 띠에서도 어디서나 같은 색 */
+export const glyph = (id: 'dust' | 'orb'): string => goods(id).replace('"gd"', '"gd coin"');
 
 /* ── 등급 연출(상점) — 전설 큰 칼의 칼 기운(칼 둘레 짧은 먹 획 다섯)과 베는 섬광. 칼 그림과 같은 120×300 칸 ── */
 const AURA = [

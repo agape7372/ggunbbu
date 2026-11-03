@@ -3,7 +3,12 @@ import { sanitizeLayout, type ButtonLayout } from './input/layout';
 import {
   DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, enforceOwnedLoadout, sanitizeOwned, validateLoadout, type Loadout,
 } from './meta/loadout';
-import { initAchieveProgress, type DailyState, type MissionProgress } from './meta/missions';
+import { initAchieveProgress, mergeAchieves, type DailyState, type MissionProgress } from './meta/missions';
+import { emptyItems, validateItems, type Items } from './meta/kit';
+import { SKU_IDS, validateRegular, type Regular } from './meta/catalog';
+import { emptyOffers, validateOffers, type Offers } from './meta/offers';
+import { emptySeason, validateSeason, type Season } from './meta/season';
+import { ROOKIE, validateAttend, validateSalary, validateWage, type Attend, type Salary, type Wage } from './meta/progress';
 import { LICENSE_EXAMS } from './meta/economy';
 import { emptyMask, isMaskArt, loadMaskBook } from './meta/mask';
 import type { MaskEntry } from './meta/types';
@@ -41,13 +46,39 @@ export interface SaveData {
   achieves: MissionProgress[];
   howtoSeen: boolean; // 첫 실행 조작 안내를 봤는지 (무버전 추가 키)
   guardTaught: boolean; // 평생 첫 목숨 손실 때 가드를 가르쳤는지 (무버전 추가 키)
-  stats: { buildings: number; runs: number }; // 평생 누적 — 철거 자격 조건 · 첫 판 판별 (무버전 추가 키)
+  stats: SaveStats; // 평생 누적 — 철거 자격 조건 · 첫 판 판별 · 실적 (무버전 추가 키)
   license: number; // 철거 자격 등급 0(견습)~3(1급) (무버전 추가 키)
   opsGrade: Partial<Record<OpId, OpGrade>>; // 특별작전 최고 도장 (무버전 추가 키)
   maskArt: string; // 고른 가면의 그림(파생) — 형식은 meta/mask.ts 머리 주석 (무버전 추가 키)
-  masks: MaskEntry[]; // 내 가면 목록(최대 8장). 옛 저장은 loadMaskBook이 maskArt에서 옮긴다 (무버전 추가 키)
+  masks: MaskEntry[]; // 내 가면 목록. 옛 저장은 loadMaskBook이 maskArt에서 옮긴다 (무버전 추가 키)
+  blanks: number; // 새로 그릴 수 있는 마스크 수 — 한 장 만들 때 하나 쓴다 (무버전 추가 키)
   maskId: string; // 고른 가면 id — 쓰는지는 loadout.mask (무버전 추가 키)
   stages: Record<string, StageRecord>; // 작업 지시서 판마다 기록 — meta/stageRecord.ts (무버전 추가 키)
+  bestBare: number; // 시작 장비(목숨 · 필살) 없이 낸 아케이드 최고 (무버전 추가 키)
+  items: Items; // 시작 장비 보유량 — meta/kit.ts (무버전 추가 키)
+  bought: string[]; // 산 적 있는 상품 id — 1회 상품 · 첫 구매 두 배 (무버전 추가 키)
+  noAds: boolean; // 광고 없는 현장 (무버전 추가 키)
+  salary: Salary; // 월급 봉투 남은 칸 (무버전 추가 키)
+  attend: Attend; // 출근부 (무버전 추가 키)
+  wage: Wage; // 일당 받은 단계 (무버전 추가 키)
+  rookie: number; // 신입 과제 받은 단계 수 (무버전 추가 키)
+  offers: Offers; // 시간제한 특가 — meta/offers.ts (무버전 추가 키)
+  adDay: { key: string; n: number }; // 상점 광고 궤도조각 하루 횟수 (무버전 추가 키)
+  iapTokens: string[]; // 처리 끝낸 결제 토큰(최근 것만) — 중복 지급 방지 (무버전 추가 키)
+  season: Season; // 이달의 현장 — meta/season.ts (무버전 추가 키)
+  regular: Regular; // 단골 도장 (무버전 추가 키)
+  firstGift: boolean; // 첫 결제 선물을 받았나 (무버전 추가 키)
+  coffee: string; // 공짜 커피를 받은 날 (무버전 추가 키)
+}
+
+export interface SaveStats {
+  buildings: number;
+  runs: number;
+  specials: number;
+  guards: number;
+  bosses: number;
+  /** 시작 장비를 들고 들어간 판 수 */
+  kitRuns: number;
 }
 
 export const DEFAULT_SAVE: SaveData = {
@@ -77,13 +108,29 @@ export const DEFAULT_SAVE: SaveData = {
   achieves: initAchieveProgress(),
   howtoSeen: false,
   guardTaught: false,
-  stats: { buildings: 0, runs: 0 },
+  stats: { buildings: 0, runs: 0, specials: 0, guards: 0, bosses: 0, kitRuns: 0 },
   license: 0,
   opsGrade: {},
   maskArt: emptyMask(),
   masks: [],
+  blanks: 0,
   maskId: '',
   stages: {},
+  bestBare: 0,
+  items: emptyItems(),
+  bought: [],
+  noAds: false,
+  salary: { left: 0, key: '' },
+  attend: { step: 0, key: '' },
+  wage: { key: '', got: 0 },
+  rookie: 0,
+  offers: emptyOffers(),
+  adDay: { key: '', n: 0 },
+  iapTokens: [],
+  season: emptySeason(),
+  regular: { stamps: 0, got: 0 },
+  firstGift: false,
+  coffee: '',
 };
 
 const BAK_KEY = `${SAVE_KEY}.bak`;
@@ -152,20 +199,47 @@ function normalize(raw: Record<string, unknown>): SaveData {
     owned,
     loadout,
     daily: isDailyState(data.daily) ? data.daily : null,
-    achieves: Array.isArray(data.achieves) ? data.achieves.filter(isProgress) : initAchieveProgress(),
+    achieves: Array.isArray(data.achieves) ? mergeAchieves(data.achieves.filter(isProgress)) : initAchieveProgress(),
     howtoSeen: typeof data.howtoSeen === 'boolean' ? data.howtoSeen : DEFAULT_SAVE.howtoSeen,
     guardTaught: data.guardTaught === true,
     stats: validateStats(data.stats),
     license: num(data.license, 0, LICENSE_EXAMS.length),
     opsGrade: validateOpsGrade(data.opsGrade),
     ...book,
+    // 옛 공방 주인은 여덟 장까지 공짜였다 — 남은 몫을 그대로 쥐여 준다
+    blanks: num(data.blanks, owned.includes('mask') ? Math.max(0, 8 - book.masks.length) : 0, 9999),
     stages: validateStageRecords(data.stages),
+    bestBare: num(data.bestBare, 0, 99_999_999),
+    items: validateItems(data.items),
+    bought: strList(data.bought).filter((id) => (SKU_IDS as readonly string[]).includes(id)),
+    noAds: data.noAds === true,
+    salary: validateSalary(data.salary),
+    attend: validateAttend(data.attend),
+    wage: validateWage(data.wage),
+    rookie: num(data.rookie, 0, ROOKIE.length),
+    offers: validateOffers(data.offers),
+    adDay: validateAdDay(data.adDay),
+    iapTokens: strList(data.iapTokens),
+    season: validateSeason(data.season),
+    regular: validateRegular(data.regular),
+    firstGift: data.firstGift === true,
+    coffee: typeof data.coffee === 'string' ? data.coffee : '',
   };
+}
+
+function strList(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+}
+
+function validateAdDay(v: unknown): SaveData['adDay'] {
+  const o = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+  return { key: typeof o.key === 'string' ? o.key : '', n: num(o.n, 0, 99) };
 }
 
 function validateStats(v: unknown): SaveData['stats'] {
   const o = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
-  return { buildings: num(o.buildings, 0, 99_999_999), runs: num(o.runs, 0, 99_999_999) };
+  const n = (x: unknown): number => num(x, 0, 99_999_999);
+  return { buildings: n(o.buildings), runs: n(o.runs), specials: n(o.specials), guards: n(o.guards), bosses: n(o.bosses), kitRuns: n(o.kitRuns) };
 }
 
 /** 알려진 작전 id × 알려진 도장만 살린다 — 나머지는 버린다 */

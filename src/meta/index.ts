@@ -17,7 +17,6 @@ export {
   LICENSE_EXAMS,
   LICENSE_TITLES,
   licenseTitle,
-  LOOK_DUST_COST,
   MASK_DUST_COST,
   nextExam,
   takeExam,
@@ -36,6 +35,7 @@ export {
   WEAPON_DUST_COST,
 } from './economy';
 export type { ExamStatus, LicenseExam, Wallet } from './economy';
+export { AD_ORBIT_DAILY, adOrbitLeft, noteAdOrbit } from './economy';
 export {
   betterGrade,
   isOpGrade,

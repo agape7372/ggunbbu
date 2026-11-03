@@ -1,11 +1,17 @@
-/* 상점 — 「먹 한 획」(ui/shopView.ts). 접두사 sh-.
-   겉 틀(.ov-screen.ov-meta · 컷 틀 · 가는 길 도장 줄)은 overlay가 그린다. 여기는 스크롤 칸(.ov-body) 안만.
+/* 상점 — 「먹 한 획」(ui/shopView.ts). 접두사 sh- (장비 탭) · pk- (꾸러미 탭, ui/packView.ts).
+   겉 틀(.ov-screen.ov-meta · 컷 틀 · 가는 길 도장 줄)은 overlay가 그린다. 여기는 스크롤 칸(.ov-body) 안만: 먹 붓 띠 머리(제목 + 지갑, 위에 붙음) 아래.
    큰 칼(고른 무기) → 칼꽂이(연장 넷 · 대검 여덟) → 그림 칸(필살 · 마스크 · 꾸미기) → 철거 자격 → 결제.
    필터는 칼 그림 · 고른 고리 · 주홍 도장에만. 작은 먹 도장 · 쪽지 · 획 단추엔 없다(긴 목록 · 저사양 WebView). */
 
-.sh { display: flex; flex-direction: column; padding-bottom: 12px; }
+/* 먹 틀(.frame) 안에 머리 띠 — 틀에서 띄워 시작하고, 안쪽 칸은 띠와 같은 20px 들여쓰기 */
+.ov-meta[data-screen='shop'] { padding: 20px 0 18px; }
+.ov-meta[data-screen='shop'] > .ov-body { max-width: none; }
+.ov-meta[data-screen='shop'] > .ov-nav { padding-inline: 22px; }
 
-/* ── 머리: 제목 + 지갑. 스크롤해도 위에 붙어 있다 ── */
+.sh { display: flex; flex-direction: column; padding-bottom: 20px; }
+.sh > :not(.sh-top) { width: 100%; max-width: 470px; margin-inline: auto; padding-inline: 20px; }
+
+/* ── 머리: 먹 붓 띠 + 붓 제목 + 지갑(띠 안). 스크롤해도 위에 붙어 있다 ── */
 .sh-top {
   position: sticky;
   top: 0;
@@ -14,27 +20,34 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 0 8px;
-  background: var(--paper);
+  width: min(430px, calc(100% - 40px));
+  margin-inline: auto;
+  padding: 8px 16px 17px;
+  background: var(--ink);
+  color: var(--paper);
+  clip-path: var(--bandclip);
 }
+
+.sh-title { font: var(--t-title); rotate: 0deg; }
 
 .sh-wallet {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
-  font: 700 14px/1.2 var(--body);
+  gap: 2px;
+  font: 700 14px/1.2 var(--sans);
 }
 
-.sh-wallet b { font-size: 18px; }
+.sh-wallet b { font: 400 18px/1 var(--black); }
+.sh-wallet .coin { width: 21px; height: 21px; }
 
 /* 지금 장착 — 먹 쪽지 줄 */
-.sh-worn { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 6px; margin: 2px 0 6px; }
-.sh-worn-h { font: 700 13px/1 var(--body); color: var(--ink2); margin-right: 2px; }
-.sh-worn .tag { font-size: 12.5px; padding: 4px 6px 3px; border-width: 2px; }
+.sh-worn { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 16px 0 8px; }
+.sh-worn-h { font: 700 14px/1 var(--body); color: var(--ink2); margin-right: 2px; }
+.sh-worn .tag { font-size: 14px; padding: 5px 7px 4px; border-width: 2px; }
 
 /* ── 큰 칼 — 고른 무기를 크게, 28°. 글은 왼쪽(한지 띠로 칼 위에서도 읽힌다) ── */
-.sh-hero { position: relative; isolation: isolate; min-height: 276px; margin-top: 2px; }
+.sh-hero { position: relative; isolation: isolate; min-height: 290px; margin-top: 10px; }
 
 .sh-big, .sh-ghost, .sh-aura, .sh-flash {
   position: absolute;
@@ -57,14 +70,14 @@
 .sh-flash, .sh-cflash { clip-path: inset(0 100% 0 0); }
 .sh-flash { animation: shflash 2.6s linear infinite; }
 
-.sh-info { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 62%; padding-top: 4px; }
+.sh-info { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 64%; padding-top: 4px; }
 .sh-kind { display: flex; align-items: center; gap: 6px; font: 700 14px/1 var(--body); color: var(--ink2); }
 .sh-kind:empty { display: none; }
 
 /* 등급 꼬리표 — 일반 ink2 맨글씨 · 고급 ink 굵게 · 희귀 먹 테두리 상자 · 전설 뒤집힌 먹 상자 */
-.sh-tier { font: 700 13px/1 var(--body); white-space: nowrap; }
+.sh-tier { font: 700 14px/1 var(--body); white-space: nowrap; }
 .sh-tier.t-common { color: var(--ink2); }
-.sh-tier.t-fine { color: var(--ink); }
+.sh-tier.t-fine { color: var(--ink); background: var(--paper); }
 .sh-tier.t-rare { color: var(--ink); background: var(--paper); border: 1.5px solid var(--ink); padding: 3px 5px 2px; }
 .sh-tier.t-legend { color: var(--paper); background: var(--ink); padding: 4px 6px 3px; }
 
@@ -74,25 +87,25 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font: 400 13px/1.35 var(--body);
+  font: 400 14px/1.4 var(--body);
   color: var(--ink2);
   text-shadow: var(--halo);
 }
 
 .sh-hname {
-  font: 400 56px/0.95 var(--brush);
+  font: 400 48px/0.95 var(--brush);
   rotate: -3deg;
   transform-origin: 0 100%;
   white-space: nowrap;
   text-shadow: var(--halo);
 }
 
-.sh-hprice { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 700 15px/1 var(--body); text-shadow: var(--halo); }
+.sh-hprice { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 700 16px/1 var(--body); text-shadow: var(--halo); }
 .sh-hprice b { font-size: 24px; }
 
 /* 다음 목표 = 먹 꼬리표 */
 .sh-goal {
-  font: 700 12.5px/1 var(--body);
+  font: 700 14px/1 var(--body);
   color: var(--paper);
   background: var(--ink);
   padding: 5px 8px 4px;
@@ -103,7 +116,7 @@
 }
 
 /* 능력치 셋 — 막대(무기 전부 중 최댓값 대비) + 실제 값 + 장착 칼 대비 차이 */
-.sh-stat { display: grid; grid-template-columns: 44px minmax(0, 1fr) 34px 32px; align-items: center; gap: 5px; width: 100%; font: 700 12.5px/1 var(--body); text-shadow: var(--halo); }
+.sh-stat { display: grid; grid-template-columns: 50px minmax(0, 1fr) 38px 36px; align-items: center; gap: 5px; width: 100%; font: 700 14px/1 var(--body); text-shadow: var(--halo); }
 .sh-bar { position: relative; height: 10px; border: 2px solid var(--ink); background: var(--paper); }
 .sh-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
 .sh-v, .sh-d { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
@@ -111,12 +124,12 @@
 .sh-d.dn { color: var(--ink2); }
 
 /* 이펙트 칸 다섯 — 찬 칸 = 먹 상자 · 빈 칸 = 점선 */
-.sh-fx { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
-.sh-fx span { font: 700 12.5px/1 var(--body); padding: 4px 5px 3px; white-space: nowrap; }
+.sh-fx { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; }
+.sh-fx span { font: 700 14px/1 var(--body); padding: 4px 5px 3px; white-space: nowrap; }
 .sh-fx .on { color: var(--paper); background: var(--ink); border: 1px solid var(--ink); }
 .sh-fx .off { color: var(--ink2); background: var(--paper); border: 1px dashed var(--ink3); }
 
-.sh-hact { margin-top: 8px; }
+.sh-hact { margin-top: 10px; }
 .sh-hact .sh-act { height: 56px; padding: 0 22px 3px 20px; align-items: flex-start; }
 .sh-hact .sh-act b { font-size: 30px; }
 
@@ -124,47 +137,47 @@
 /* 주홍 = 지금 누를 것 하나(사기 · 응시) */
 .sh-main { width: 66px; height: 66px; rotate: -4deg; flex: none; }
 .sh-main b { font-size: 30px; line-height: 0.9; }
-.sh-main small { font-size: 12.5px; margin-top: 2px; }
+.sh-main small { font-size: 14px; margin-top: 2px; }
 .sh-main.big { width: 96px; height: 96px; rotate: -5deg; }
 .sh-main.big b { font-size: 44px; }
 .sh-main.big small { font-size: 14px; }
 
 /* 먹 획 단추 — 사기 · 장착 · 그리기. 모자라면 옅은 먹(.stroke:disabled) + 남은 양 */
-.sh-act { height: 48px; padding: 0 14px 2px 16px; align-items: center; text-align: center; }
+.sh-act { height: 52px; padding: 0 14px 2px 16px; align-items: center; text-align: center; }
 .sh-act b { font-size: 28px; }
-.sh-act span { font-size: 12.5px; }
+.sh-act span { font-size: 14px; }
 
 /* 장착 중 = 먹 도장(못 누름) */
-.sh-on { flex: none; height: 46px; padding: 0 12px; rotate: -3deg; filter: none; }
+.sh-on { flex: none; height: 48px; padding: 0 12px; rotate: -3deg; filter: none; }
 .sh-on b { font-size: 26px; white-space: nowrap; }
 
 /* 보유 · 장착 작은 도장. 먹 튐은 도장 밖에 둔다(도장은 clip-path라 안에 두면 잘린다) */
 .sh-stampw { position: relative; display: inline-block; flex: none; }
 .sh-stampw .seal { width: 36px; height: 36px; rotate: 8deg; filter: none; }
-.sh-stampw .seal small { font-size: 12.5px; }
+.sh-stampw .seal small { font-size: 13px; }
 .sh-own .seal { width: 40px; height: 40px; rotate: -6deg; }
 .sh-fresh .seal { animation: stamp 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
 .sh-fresh .spl { animation: splat 0.32s cubic-bezier(0.1, 0.8, 0.3, 1) 0.12s both; }
 
 /* 「N 더」 = 한지 쪽지 */
-.sh-more { position: absolute; z-index: 2; right: -4px; top: 8px; rotate: -8deg; font-size: 12.5px; padding: 3px 5px; }
+.sh-more { position: absolute; z-index: 2; right: -4px; top: 8px; rotate: -8deg; font-size: 14px; padding: 3px 5px; }
 
 /* ── 묶음 이름 ── */
 .sh-grp {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 16px 0 4px 2px;
+  margin: 32px 0 8px 2px;
   font: 400 28px/1 var(--brush);
   rotate: -2deg;
   transform-origin: 0 100%;
 }
 
-.sh-grp small { font: 700 13px/1 var(--body); color: var(--ink2); }
-.sh-sub { margin: 10px 0 2px; font: 700 13.5px/1 var(--body); color: var(--ink2); }
+.sh-grp small { font: 700 14px/1 var(--body); color: var(--ink2); }
+.sh-sub { margin: 16px 0 4px; font: 700 14.5px/1 var(--body); color: var(--ink2); }
 
 /* ── 칼꽂이 — 고르는 단추. 칼마다 실루엣이 다르다 ── */
-.sh-rack { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 4px; }
+.sh-rack { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 8px; }
 
 .sh-cell {
   position: relative;
@@ -172,10 +185,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
-  height: 150px;
-  padding-bottom: 2px;
+  height: 158px;
+  padding-bottom: 4px;
 }
 
 /* 칼 그림 상자 — 희귀는 잔상 사본, 전설은 섬광이 같은 상자 안에서 칼을 가로지른다 */
@@ -188,18 +201,19 @@
 .sh-pic path, .sh-pic circle, .sh-pic rect { stroke: var(--line, var(--ink)); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; }
 .sh-pic .pr { stroke: var(--paper); stroke-width: 5; }
 .sh-pic .p, .sh-pic .y { stroke: none; }
-.tools .sh-cell { height: 128px; }
+.tools .sh-cell { height: 136px; }
 .tools .sh-pw { width: 36px; height: 90px; }
 
-.sh-cname { font: 700 14px/1 var(--body); white-space: nowrap; }
-.sh-cprice { font: 700 13px/1 var(--body); white-space: nowrap; }
+.sh-cname { font: 700 15px/1 var(--body); white-space: nowrap; }
+.sh-cprice { font: 700 14px/1 var(--body); white-space: nowrap; }
 .sh-cell.is-short { --line: var(--ink3); }
 .sh-cell.is-short .sh-cname,
 .sh-cell.is-short .sh-cprice,
 .sh-cell.is-owned .sh-cprice { color: var(--ink2); }
 .sh-cell .sh-badge { position: absolute; z-index: 2; right: 0; top: 6px; }
-/* 왼쪽 위 = 등급 꼬리표(오른쪽 위는 도장 · 쪽지) */
-.sh-cell .sh-tier { position: absolute; z-index: 2; left: 2px; top: 6px; font-size: 12.5px; }
+/* 왼쪽 아래 = 등급 꼬리표 — 칼은 위가 무거워 손잡이 옆이 빈다(오른쪽 위는 도장 · 쪽지) */
+.sh-cell .sh-tier { position: absolute; z-index: 2; left: 0; bottom: 44px; font-size: 14px; }
+.sh-cell .sh-tier.t-fine { padding: 2px 2px 1px; }
 .sh-cell .sh-tier.t-rare { padding: 2px 4px 1px; }
 .sh-cell .sh-tier.t-legend { padding: 3px 5px 2px; }
 
@@ -230,29 +244,26 @@
 .sh-ring path { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
 
 /* ── 그림 칸(필살 · 마스크 · 꾸미기) — 판 속 졸라맨 그림 + 이름 + 값 + 할 일 ── */
-.sh-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
-.sh-it { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; text-align: center; }
+.sh-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 12px; }
+.sh-it { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; text-align: center; }
 .sh-it.wide { grid-column: span 2; }
 .sh-art { position: relative; width: 80px; }
 .sh-art img { width: 80px; height: auto; }
 .sh-art .sh-badge { position: absolute; z-index: 2; right: -12px; top: -2px; }
-.sh-name { font: 700 14px/1.2 var(--body); }
-.sh-price { display: inline-flex; align-items: center; gap: 3px; font: 700 13px/1 var(--body); color: var(--ink2); }
-.sh-price .gl { width: 15px; height: 15px; }
+.sh-name { font: 700 15px/1.2 var(--body); }
+.sh-price { display: inline-flex; align-items: center; gap: 3px; font: 700 14px/1 var(--body); color: var(--ink2); }
+.sh-price .coin { width: 20px; height: 20px; }
 .sh-acts { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 66px; }
 .sh-it.is-short .sh-name { color: var(--ink2); }
 
 /* 버는 길 — 광고 · 먼지 바꾸기 */
-.sh-earn { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 10px; }
-.sh-earn .stroke,
-.sh-skus .stroke { height: 58px; }
-.sh-earn .stroke b,
-.sh-skus .stroke b { font-size: 28px; }
-.sh-earn .stroke span { font-size: 12.5px; white-space: normal; }
-.sh-skus { display: grid; gap: 8px; }
+.sh-earn { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+.sh-earn .stroke { height: 78px; } /* 이름 + 설명 두 줄 — 붓글씨가 획 위로 넘으면 한지색에 묻힌다 */
+.sh-earn .stroke b { font-size: 28px; }
+.sh-earn .stroke span { font-size: 14px; line-height: 1.25; }
 
-/* ── 철거 자격 — 등급 도장 + 조건 + 응시 ── */
-.sh-exam { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 6px; }
+/* ── 철거 자격 — 등급 도장 + 조건 + 응시. 뜻은 테두리로 남긴다 ── */
+.sh-exam { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; margin-top: 8px; }
 
 .sh-grade {
   display: grid;
@@ -260,14 +271,12 @@
   width: 64px;
   height: 64px;
   border: 4px solid var(--ink);
-  background: var(--paper);
-  box-shadow: 5px 6px 0 var(--ink);
+  background: var(--card);
   font: 400 34px/1 var(--brush);
-  rotate: -4deg;
 }
 
-.sh-ebody { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.sh-ename { font: 700 15px/1.2 var(--body); }
+.sh-ebody { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sh-ename { font: 700 17px/1.25 var(--body); }
 .sh-exam .sh-price { flex-wrap: wrap; }
 
 /* ── 등장 안무(0.7초 안) — 위에서부터: 제목 → 지갑 → 큰 칼 획 순서 → 글 → 칼꽂이 팝 → 주홍 도장 ── */
@@ -307,12 +316,208 @@
 }
 
 /* 가면 칸 — 장착 · 그리기를 세로로 쌓는다 */
-.sh-acts.sh-col { flex-direction: column; gap: 4px; min-height: 0; }
-.sh-col .sh-act { height: 40px; }
+.sh-acts.sh-col { flex-direction: column; gap: 6px; min-height: 0; }
+.sh-col .sh-act { height: 48px; }
 .sh-col .sh-act b { font-size: 24px; }
-.sh-col .sh-on { height: 40px; }
+.sh-col .sh-on { height: 48px; }
 .sh-col .sh-on b { font-size: 22px; }
 
 /* 「새 가면」 — 빈 점선 상자 + 더하기 */
 .sh-new { display: grid; place-items: center; height: 80px; border: 2px dashed var(--ink3); color: var(--ink2); }
 .sh-new .ic { width: 34px; height: 34px; }
+
+/* ── 탭 — 장비 · 꾸러미. 선택한 탭은 먹 면으로 채운다 ── */
+.sh-tabs { display: flex; gap: 12px; margin-top: 8px; }
+.sh-tabs .sh-tab {
+  flex: 1 1 0;
+  display: grid;
+  place-items: center;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  font: var(--t-sec);
+  line-height: 1;
+  color: var(--ink);
+}
+.sh-tabs .sh-tab.on { background: var(--ink); color: var(--paper); }
+
+/* ── 꾸러미 — 맨 위 고정 묶음 · 그림 탭 줄 · 먹판 패널 · 정사각 칸 격자 · 세로 줄. 둥근 모서리 · 그림자 · 알약 없음 ── */
+.pk { display: flex; flex-direction: column; gap: 12px; padding: 6px 0 8px; font-family: var(--sans); color: var(--ink); }
+
+/* 맨 위 고정 묶음 — 첫 결제 선물(먹 바탕) · 공짜 커피 · 단골 도장판(한 톤 낮은 한지) */
+.pk-fix { display: flex; flex-direction: column; gap: 10px; }
+.pk-free, .pk-reg { background: var(--paper-2); clip-path: var(--cutclip); }
+
+.pk-gift { display: flex; align-items: center; gap: 10px; padding: 6px 12px 8px 6px; background: var(--ink); color: var(--paper); clip-path: var(--cutclip); }
+.pk-gift .pk-sq { flex: none; width: 48px; }
+.pk-gift .pk-sq::after { background: var(--paper); }
+.pk-gimg { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pk-gt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pk-gt b { font: var(--t-name); }
+.pk-gt span { font: var(--t-small); color: var(--paper-2); }
+
+.pk-free { display: flex; align-items: center; gap: 10px; padding: 7px 12px 9px 8px; }
+.pk-free .pk-sq { flex: none; width: 48px; }
+.pk-free .pk-sq::before { background: var(--card); }
+.pk-fm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pk-fm b { font: var(--t-name); }
+.pk-fm .cur { font: var(--t-small); font-weight: 700; color: var(--ink2); }
+.pk-free .btn, .pk-later { flex: none; width: 92px; }
+.pk-later { display: grid; place-items: center; min-height: 48px; background: var(--ink3); color: var(--ink); clip-path: var(--sealclip2); font: var(--t-small); font-weight: 700; }
+
+.pk-reg { display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 12px; }
+.pk-reg.done { align-items: center; padding: 6px; }
+.pk-reg.done .seal { width: 60px; height: 60px; rotate: -5deg; font-size: 28px; }
+.pk-rh { font: var(--t-name); }
+.pk-sts { display: grid; grid-template-columns: var(--cols); gap: 4px; }
+.pk-st { display: grid; place-items: center; height: 36px; border: 2px solid var(--ink3); color: var(--ink2); font: var(--t-num); font-size: 13.5px; font-variant-numeric: tabular-nums; clip-path: var(--sealclip2); }
+.pk-st.on { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.pk-st.gift { border: 3px solid var(--ink); background: var(--card); }
+.pk-st.gift.own { border-color: var(--gold); }
+.pk-st.gift.got { opacity: 0.4; }
+.pk-st .gd { width: 26px; height: 26px; }
+.pk-rn { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pk-rn span { min-width: 0; font: var(--t-small); font-weight: 700; }
+.pk-rn .btn { flex: none; width: 92px; }
+
+/* 그림 탭 줄 — 다섯이 한 줄에 같은 폭. 고른 탭은 굵은 먹 밑획, 특가가 있으면 추천에 주홍 점 */
+.pk-tabs { position: relative; display: flex; gap: 4px; }
+.pk-tab { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; min-height: 56px; padding: 1px 2px 8px; color: var(--ink2); font: var(--t-small); font-weight: 700; white-space: nowrap; }
+.pk-tab .gd { width: 30px; height: 30px; }
+.pk-tab.on { color: var(--ink); font-weight: 900; }
+.pk-tab.on::after { content: ''; position: absolute; left: 4px; right: 4px; bottom: 0; height: 6px; background: var(--ink); clip-path: var(--sealclip2); }
+.pk-dot { position: absolute; left: calc(50% + 9px); top: 1px; width: 11px; height: 11px; background: var(--seal); clip-path: var(--sealclip2); }
+
+.pk-view { display: flex; flex-direction: column; gap: 10px; }
+.pk-panel + .pk-panel { margin-top: 4px; }
+
+/* 붓 제목 */
+.pk-head { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.pk-title { margin: 0; font: var(--t-sec); }
+
+/* 먹 컷 — 먹 바탕을 거친 사각으로 깎고 안쪽을 한지로 판다(탭바 칸과 같은 만드는 법) */
+.pk-panel, .pk-row { position: relative; isolation: isolate; }
+.pk-panel::before, .pk-row::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ink); clip-path: var(--cutclip); }
+.pk-panel::after, .pk-row::after { content: ''; position: absolute; inset: 4px; z-index: -1; background: var(--paper); clip-path: var(--cutclip); }
+
+.pk-panel { display: flex; flex-direction: column; gap: 8px; padding: 4px 4px 10px; }
+.pk-panel > :not(.pk-top) { margin: 0 10px; }
+
+/* 먹판 장면이 패널 맨 위부터 — 제목은 먹 바탕에 한지색 글자(왼쪽 위), 도화선은 왼쪽 아래, 효율 인장은 오른쪽 위 */
+.pk-top { position: relative; height: 104px; overflow: hidden; background: var(--ink); }
+.pk-top.sm { height: 94px; }
+.pk-top.sm img { object-fit: contain !important; } /* 작은 장면은 전체가 보이게 — 바탕이 같은 먹색이라 경계가 안 보인다 */
+.pk-scene { position: absolute; inset: 0; overflow: hidden; }
+.pk-top > .pk-title { position: absolute; left: 12px; top: 10px; z-index: 1; max-width: 58%; color: var(--paper); text-wrap: balance; }
+
+/* 오른쪽 위 주홍 인장 — 효율 하나. 숫자는 붓이 아니라 숫자 글꼴(붓은 25px 밑으로 안 쓴다) */
+.pk-stamp { position: absolute; z-index: 1; right: 8px; top: 6px; width: 66px; height: 66px; gap: 2px; rotate: 7deg; }
+.pk-stamp b { font-size: 26px; }
+.pk-stamp::after { inset: 5px; }
+.pk-stamp b.n { font: var(--t-num); font-size: 18px; font-variant-numeric: tabular-nums; }
+.pk-top.sm .pk-stamp { width: 72px; height: 72px; }
+.pk-top.sm .pk-stamp b.n { font-size: 20px; }
+
+/* 아래 줄 — 왼쪽 구성 칸 · 오른쪽 가격. 패널 두세 장이 한 화면에 보이게 낮게 */
+.pk-deal { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.pk-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 48px)); gap: 4px; }
+.pk-strip .pk-sq .gd { padding: 3px; }
+.pk-panel > .pk-tier > .pk-strip { grid-template-columns: repeat(auto-fill, 48px); }
+
+/* 정사각 칸 격자 — 한 줄 4칸, 많으면 줄 바꿈. 칸 안 그림 + 오른쪽 아래 수량(.qty), 칸 아래 이름(구매 확인 창에서도 쓴다) */
+.pk-parts { display: block; font-family: var(--sans); }
+.pk-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 8px; }
+.pk-grid.one { grid-template-columns: 112px; justify-content: center; } /* 재화 · 마스크 단품 — 구매 창에서 크게 */
+.pk-cell { display: flex; flex-direction: column; gap: 8px; min-width: 0; text-align: center; }
+.pk-sq { position: relative; isolation: isolate; display: block; aspect-ratio: 1; }
+.pk-sq::before, .pk-sq.own::after { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--paper-2); clip-path: var(--sealclip2); }
+.pk-sq.own::before { background: var(--gold); }
+.pk-sq.own::after { inset: 3px; }
+.pk-sq .gd { display: block; width: 100%; height: 100%; padding: 5px; }
+.pk-sq .qty { right: -5px; bottom: -6px; } /* 칸 밖으로 비어져 그림을 덮지 않는다 */
+.pk-n { font: var(--t-small); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+
+/* 월급 두 단 — 구매 즉시 · 매일 */
+.pk-tiers { display: flex; flex-direction: column; gap: 10px; }
+.pk-tier { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pk-tl { font: var(--t-name); }
+
+/* 도화선 — 옅은 먹 = 탄 자리, 먹 = 남은 심지, 끝에 주홍 불꽃(깜빡임 없음). 옆에 시:분:초 */
+.fuse { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 34px; }
+.fuse svg { flex: none; width: 170px; height: 30px; overflow: visible; }
+.fuse path { fill: none; stroke-width: 4; stroke-linecap: round; }
+.fuse-burnt { stroke: var(--ink3); }
+.fuse-live { stroke: var(--ink); stroke-dasharray: 100 100; }
+.fuse path.fuse-fl { fill: var(--seal); stroke: none; opacity: 0; }
+.fuse path.fuse-fl.on { opacity: 1; }
+.fuse-t { min-width: 5.2em; font: var(--t-num); font-size: 20px; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* 표지 도화선 — 장면 밑 먹 줄 한 칸. 장면은 그 위로 올라가 주인공을 안 가린다 */
+.pk-top.fused .pk-scene { bottom: 28px; }
+.pk-top.fused img { object-position: 50% 100% !important; }
+.pk-top .fuse { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; gap: 8px; min-height: 0; height: 28px; background: var(--ink); }
+.pk-top .fuse svg { width: 136px; height: 24px; }
+.pk-top .fuse-burnt { stroke: var(--ink2); }
+.pk-top .fuse-live { stroke: var(--paper); }
+.pk-top .fuse-t { min-width: 0; font-size: 17px; color: var(--paper); }
+
+/* 가격 묶음 — 정가(취소선) 아래 큰 금 획 단추, 구석에 도장 쪽지 */
+.pk-pay { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.pk-b { position: relative; display: block; }
+.pk-was + .pk-b { margin-top: 10px; }
+.pk-buy { width: 108px; }
+.pk-tip { position: absolute; right: -4px; top: -11px; z-index: 1; padding: 2px 7px 3px; background: var(--ink); color: var(--paper); font: var(--t-small); font-style: normal; font-weight: 700; white-space: nowrap; clip-path: var(--sealclip2); rotate: 3deg; pointer-events: none; }
+
+/* 세로 줄 — 왼쪽 그림(값이 클수록 큼) · 가운데 큰 수 · 오른쪽 가격 */
+.pk-rows { display: flex; flex-direction: column; gap: 8px; }
+.pk-row { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; min-height: 72px; padding: 5px 14px 5px 10px; border: 0; background: none; color: var(--ink); font-family: var(--sans); text-align: left; }
+.pk-rart { display: flex; align-items: center; justify-content: center; width: 68px; height: 60px; }
+.pk-rart .gd { width: 40px; height: 40px; }
+.pk-row.t2 .pk-rart .gd { width: 48px; height: 48px; }
+.pk-row.t3 .pk-rart .gd { width: 56px; height: 56px; }
+.pk-rbig { display: flex; flex-direction: column; gap: 2px; min-width: 0; font: var(--t-small); font-weight: 700; color: var(--ink2); }
+.pk-bigq { font: var(--t-num); font-size: 26px; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
+.pk-kn { font: 400 18px/1.15 var(--black); color: var(--ink); }
+.pk-row .btn { min-width: 96px; }
+.pk-row .btn.pay { min-height: 48px; padding: 0 12px; font-size: 18px; white-space: nowrap; }
+
+/* 재화 판 — 두 열 세 줄. 위 = 먹판 + 달 + 그림(값이 클수록 큼), 가운데 = 수량 · 도장 쪽지, 아래 = 금 가격. 왼쪽 위 쪽지 = 첫 구매 덤 */
+/* 띠 + 여섯 칸이 한 화면(무대 780)에 다 보이는 높이 — 칸 약 128 · 띠 68. 늘리면 셋째 줄 가격이 잘린다 */
+.pk-top.band { height: 68px; clip-path: var(--cutclip); }
+.pk-coins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+.pk-coin { position: relative; isolation: isolate; display: grid; grid-template: 'cart cart' 'cq tip' 'pay pay' / minmax(0, 1fr) auto; align-items: center; gap: 4px; width: 100%; padding: 4px 4px 7px; border: 0; background: none; color: var(--ink); font-family: var(--sans); }
+.pk-coin::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ink); clip-path: var(--cutclip); }
+.pk-coin::after { content: ''; position: absolute; inset: 4px; z-index: -1; background: var(--paper); clip-path: var(--cutclip); }
+.pk-cart { grid-area: cart; position: relative; display: block; height: 50px; overflow: hidden; background: var(--ink); }
+.pk-cart .gd { position: absolute; left: 64%; top: 50%; width: 42px; height: 42px; translate: -50% -50%; } /* 왼쪽 위는 말풍선 자리 */
+.pk-cart .gd:first-child { width: 66px; height: 66px; }
+.pk-coin.t2 .pk-cart .gd:last-child { width: 48px; height: 48px; }
+.pk-coin.t3 .pk-cart .gd:last-child { width: 50px; height: 50px; }
+.pk-cq { grid-area: cq; display: flex; align-items: center; gap: 4px; padding-left: 8px; font: var(--t-num); font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pk-cq .gd { flex: none; width: 20px; height: 20px; }
+/* 도장 쪽지는 단추 모서리가 아니라 수량 줄 오른쪽 — 칸이 낮아 단추 위에 얹으면 가격 · 수량 글자에 닿는다 */
+.pk-coin .pk-b { display: contents; }
+.pk-coin .pk-tip { grid-area: tip; position: static; margin-right: 6px; rotate: -3deg; }
+.pk-coin .btn.pay { grid-area: pay; min-height: 34px; margin: 0 8px; padding: 0 8px; font-size: 17px; white-space: nowrap; } /* 칸 전체가 누름 칸이라 단추는 그림만 */
+.pk-plus { position: absolute; left: 0; top: -6px; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 8px 12px; background: var(--seal); color: var(--paper); clip-path: polygon(2% 3%, 98% 0, 100% 80%, 38% 83%, 24% 100%, 20% 84%, 0 82%); rotate: -3deg; pointer-events: none; }
+.pk-plus small { font: var(--t-small); font-weight: 700; line-height: 1.1; }
+.pk-plus b { display: flex; align-items: center; gap: 2px; font: var(--t-num); font-size: 15px; font-variant-numeric: tabular-nums; }
+.pk-plus .gd { flex: none; width: 16px; height: 16px; }
+
+/* 특가 창 본문 — 창 폭(약 276) 안에서 작은 칸 */
+.pk-offer { display: flex; flex-direction: column; gap: 10px; }
+.pk-offer .pk-grid { gap: 8px 6px; }
+.pk-offer .pk-sq { align-self: center; width: 54px; }
+.pk-offer .fuse { gap: 8px; }
+.pk-offer .fuse svg { width: 150px; }
+.pk-oprice { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 0; }
+.pk-was { font: var(--t-small); color: var(--ink2); }
+.pk-was s { text-decoration-thickness: 2px; }
+.pk-oprice i { font: var(--t-name); font-style: normal; color: var(--ink2); }
+.pk-oprice b { font: var(--t-num); font-size: 32px; font-variant-numeric: tabular-nums; }
+
+/* 맨 아래 줄 — 구매 복원은 왼쪽, 안내 단추는 오른쪽 구석. 펴도 단추는 그 자리고 글은 그 밑으로 */
+.pk-legal { position: relative; }
+.pk-legal .btn { position: absolute; left: 0; top: 0; min-height: 48px; padding: 0 20px 3px 14px; font: 400 16px/1 var(--black); }

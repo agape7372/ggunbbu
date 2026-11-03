@@ -4,7 +4,7 @@ import {
   DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, enforceOwnedLoadout, equip, isOwned, sanitizeOwned, slotOf, validateLoadout,
 } from '../src/meta/loadout';
 import {
-  LICENSE_EXAMS, LOOK_DUST_COST, MASK_DUST_COST, WEAPON_DUST_COST, dustCost, nextDustGoal,
+  LICENSE_EXAMS, MASK_DUST_COST, WEAPON_DUST_COST, dustCost, nextDustGoal,
 } from '../src/meta/economy';
 import { SAMPLE_MASK, emptyMask, wornMask } from '../src/meta/mask';
 import { DEFAULT_SAVE, loadSave, saveSave } from '../src/storage';
@@ -71,19 +71,16 @@ describe('마스크 값', () => {
     expect(MASK_DUST_COST).toBeLessThan(LICENSE_EXAMS[LICENSE_EXAMS.length - 1].fee);
   });
 
-  it('먼지 값 찾기는 무기와 마스크를 둘 다 돌려준다', () => {
-    expect(dustCost('mask')).toBe(MASK_DUST_COST);
+  it('먼지 값 찾기는 무기만 돌려준다 — 마스크는 개당 값이 따로 있다', () => {
+    expect(dustCost('mask')).toBeUndefined();
     expect(dustCost('hammer')).toBe(WEAPON_DUST_COST.hammer);
     expect(dustCost('none')).toBeUndefined();
     expect(dustCost('ghost')).toBeUndefined();
   });
 
-  it('결과 카드 목표 — 무기가 먼저, 다 사면 마스크, 그것까지 사면 없다', () => {
-    expect(nextDustGoal([], 99_999)!.id).not.toBe('mask'); // 먼지가 넘쳐도 무기부터
+  it('결과 카드 목표 — 안 산 무기만, 다 사면 없다', () => {
     expect(nextDustGoal(WEAPONS.slice(1), 0)!.id).toBe(WEAPONS[0]);
-    expect(nextDustGoal(WEAPONS, 1200)).toEqual({ id: 'mask', cost: MASK_DUST_COST, short: MASK_DUST_COST - 1200 });
-    expect(nextDustGoal(WEAPONS, 5000)!.short).toBe(0);
-    expect(nextDustGoal([...WEAPONS, ...Object.keys(LOOK_DUST_COST)], 0)).toBeNull();
+    expect(nextDustGoal(WEAPONS, 0)).toBeNull();
   });
 });
 

@@ -3,7 +3,7 @@
 // 매 프레임 부르지만 값이 바뀐 칸만 쓴다. 거친 붓 필터는 안 바뀌는 칸(밑줄·일시정지 인장)에만 걸려 있다(style.css).
 
 import type { GameState } from '../core/types';
-import { ACT2, CAPTION_MS } from '../config';
+import { ACT2, CAPTION_MS, PLAYER } from '../config';
 import { ACT2_PHASES, BOSS_NAME, CAPTIONS, hudModeLabel, SCREENS } from '../content';
 import { ICON } from './icons';
 import { fmt } from './ink';
@@ -18,7 +18,6 @@ export interface HudApi {
   teach(on: boolean): void;
 }
 
-const LIVES = 3;
 const pinHint = `${CAPTIONS.pinned}<small>탈출: 빠져나오기 · 공격: 아래층 베기</small>`;
 
 /** 졸라맨 목숨 하나 — 잃으면 옅은 먹 위에 사선 한 획 */
@@ -38,6 +37,7 @@ export function mountHud(
           <span class="hud-zone" data-el="mode"></span>
           <span class="hud-lives" data-el="lives" role="img"></span>
           <span class="hud-hat" data-el="hat" role="img" aria-label="안전모" hidden>${ICON.hat}</span>
+          <span class="hud-bank" data-el="bank" hidden></span>
         </div>
         <div class="hud-floor" data-el="floor"></div>
       </div>
@@ -63,6 +63,7 @@ export function mountHud(
   const scoreEl = el('score');
   const livesEl = el('lives');
   const hatEl = el('hat');
+  const bankEl = el('bank');
   const modeEl = el('mode');
   const floorEl = el('floor');
   const bossWrap = el('boss');
@@ -94,6 +95,7 @@ export function mountHud(
   let lastScore = -1;
   let lastLives = -1;
   let lastHat: boolean | null = null;
+  let lastBank = 0;
   let lastCap = false;
   let lastMode = '';
   let lastFloor = '';
@@ -144,10 +146,17 @@ export function mountHud(
       }
       if (s.lives !== lastLives) {
         lastLives = s.lives;
+        // 시작 장비로 늘어난 목숨은 그만큼 칸이 는다. 잃으면 칸째 사라지고 기본 셋만 빈 칸으로 남는다
+        const cap = Math.max(PLAYER.LIVES, s.lives);
         let h = '';
-        for (let i = 0; i < LIVES; i++) h += life(i < s.lives);
+        for (let i = 0; i < cap; i++) h += life(i < s.lives);
         livesEl.innerHTML = h;
-        livesEl.setAttribute('aria-label', `목숨 ${Math.max(0, s.lives)}/${LIVES}`);
+        livesEl.setAttribute('aria-label', `목숨 ${Math.max(0, s.lives)}`);
+      }
+      if (s.wazaBank !== lastBank) {
+        lastBank = s.wazaBank;
+        bankEl.hidden = s.wazaBank <= 0;
+        bankEl.textContent = `필살 +${s.wazaBank}`;
       }
       if (s.hat !== lastHat) {
         lastHat = s.hat;

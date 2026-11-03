@@ -450,11 +450,11 @@ export function openMaskEditor(host: HTMLElement, init: MaskEditorInit, h: MaskE
     c.setAttribute('aria-modal', 'true');
     c.setAttribute('aria-labelledby', 'mk-del-title');
     c.innerHTML = `<div class="m-card" tabindex="-1">
-      <h2 class="m-title" id="mk-del-title">지울까요?</h2>
-      <div class="m-body"><p class="uname mk-del-name">${escapeHtml(init.name || init.fallback)}</p><p>마스크와 그림이 사라져요.</p></div>
+      <div class="m-band"><div class="m-hd"><h2 class="m-title" id="mk-del-title">지울까요?</h2></div></div>
+      <div class="m-body"><p class="uname mk-del-name">${escapeHtml(init.name || init.fallback)}</p><p>마스크 1개가 없어져요.<br>되돌릴 수 없어요.</p></div>
       <div class="m-actions">
-        <button type="button" class="stroke s3" data-mk="del-no"><b>취소</b></button>
-        <button type="button" class="stroke s3" data-mk="del-yes"><b>지우기</b></button>
+        <button type="button" class="btn" data-mk="del-no">취소</button>
+        <button type="button" class="btn cta" data-mk="del-yes">지우기</button>
       </div></div>`;
     host.appendChild(c);
     confirmEl = c;

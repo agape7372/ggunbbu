@@ -360,6 +360,8 @@ export interface GameState {
   guardGauge: number;
   /** 기술 게이지 0~100 (원작 황색 wazabar) — 타격으로만 충전, 필살기 전용 */
   wazaGauge: number;
+  /** 시작 장비 「필살 충전」 남은 수 — 게이지가 비면 하나 써서 가득 채운다. 평소엔 0 */
+  wazaBank: number;
   /** 방어 게이지 회복 대기 틱 (가드 사용 직후 잠시 회복 정지) */
   guardRegenCd: number;
   lives: number;

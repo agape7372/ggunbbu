@@ -31,36 +31,27 @@ export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
   gold: 2400,
 };
 
-/** 마스크(도트판에 직접 찍는 얼굴) — 비싸게: 대검 최고 2400 위, 1급 응시료 4000 아래. 한 번 사면 다시 그리기는 무료 */
+/** 마스크 한 개(도트판에 직접 찍는 얼굴) — 비싸게: 대검 최고 2400 위, 1급 응시료 4000 아래. 있던 장은 다시 그려도 무료 */
 export const MASK_DUST_COST = 3000;
-
-/** 먼지로 사는 꾸미기 — 무기 표와 따로 둔다. 결과 카드 목표는 무기를 다 가진 다음에 여기서 고른다 */
-export const LOOK_DUST_COST: Readonly<Record<string, number>> = {
-  mask: MASK_DUST_COST,
-};
 
 const has = (table: Readonly<Record<string, number>>, id: string): boolean =>
   Object.prototype.hasOwnProperty.call(table, id);
 
 export function dustCost(id: string): number | undefined {
-  if (has(WEAPON_DUST_COST, id)) return WEAPON_DUST_COST[id];
-  return has(LOOK_DUST_COST, id) ? LOOK_DUST_COST[id] : undefined;
+  return has(WEAPON_DUST_COST, id) ? WEAPON_DUST_COST[id] : undefined;
 }
 
-/** 결과 카드의 다음 목표 — 아직 안 가진 먼지 구매품 중 가장 싼 것(무기 먼저, 다 가졌으면 꾸미기). 모자란 먼지(0이면 지금 살 수 있다). 다 가졌으면 null */
+/** 결과 카드의 다음 목표 — 아직 안 가진 무기 중 가장 싼 것. 모자란 먼지(0이면 지금 살 수 있다). 다 가졌으면 null */
 export function nextDustGoal(
   owned: readonly string[],
   dust: number,
 ): { id: string; cost: number; short: number } | null {
-  for (const table of [WEAPON_DUST_COST, LOOK_DUST_COST]) {
-    let best: { id: string; cost: number } | null = null;
-    for (const [id, cost] of Object.entries(table)) {
-      if (owned.includes(id)) continue;
-      if (!best || cost < best.cost) best = { id, cost };
-    }
-    if (best) return { ...best, short: Math.max(0, best.cost - dust) };
+  let best: { id: string; cost: number } | null = null;
+  for (const [id, cost] of Object.entries(WEAPON_DUST_COST)) {
+    if (owned.includes(id)) continue;
+    if (!best || cost < best.cost) best = { id, cost };
   }
-  return null;
+  return best && { ...best, short: Math.max(0, best.cost - dust) };
 }
 
 // ── 철거 자격 (C4) ─────────────────────────────────────────────
@@ -114,6 +105,20 @@ export function takeExam(inv: { license: number; dust: number; stats: { building
 
 /** 광고 1편당 궤도 */
 export const ORBIT_PER_AD = 8;
+
+/** 상점 광고 궤도조각 하루 횟수 — 광고 공장을 막는다 */
+export const AD_ORBIT_DAILY = 5;
+
+/** 오늘 남은 상점 광고 횟수 */
+export function adOrbitLeft(day: { key: string; n: number }, dateKey: string): number {
+  return Math.max(0, AD_ORBIT_DAILY - (day.key === dateKey ? day.n : 0));
+}
+
+/** 상점 광고 한 번을 센다 */
+export function noteAdOrbit(day: { key: string; n: number }, dateKey: string): void {
+  day.n = day.key === dateKey ? day.n + 1 : 1;
+  day.key = dateKey;
+}
 
 /** 일일/업적 미션 궤도 기본치 */
 export const ORBIT_MISSION_BASE = 12;

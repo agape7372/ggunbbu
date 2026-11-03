@@ -1,0 +1,81 @@
+/* 보상 연출(rf-) — 먹 막 위에 그린다. 그라데이션 · 흐림 없음. 지우기는 모양으로, 반전 번쩍임 없음.
+   M = 칸이 도장처럼 찍힘 / L = 엔소 획 + 먹 튐 + 인장 + 약한 흔들림. 머리 색은 창 종류와 같은 뜻. */
+.rf {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(26, 26, 32, 0.93);
+  color: var(--paper);
+  pointer-events: auto;
+  outline: none;
+  animation: rf-in 0.14s linear backwards;
+}
+
+.rf[data-tone='green'] { --rf: var(--green); }
+.rf[data-tone='navy'] { --rf: var(--navy); }
+.rf[data-tone='gold'] { --rf: var(--gold); }
+
+.rf-box { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(350px, 100%); text-align: center; }
+.rf.l .rf-box { animation: rf-shake 0.26s linear 0.42s backwards; }
+
+/* 무대 — M은 작은 띠 자리, L은 엔소 자리 */
+.rf-stage { position: relative; display: grid; place-items: center; }
+.rf.m .rf-stage { height: 0; }
+.rf.l .rf-stage { width: 220px; height: 220px; margin-bottom: -14px; }
+
+.rf-enso { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rf-enso path { fill: none; stroke: var(--paper); stroke-width: 15; stroke-linecap: round; stroke-dasharray: 1; animation: rf-draw 0.4s var(--ease-out) backwards; }
+
+.rf-drop { position: absolute; left: 50%; top: 50%; width: var(--s); height: var(--s); margin: calc(var(--s) / -2); background: var(--paper); clip-path: var(--sealclip); opacity: 0; animation: rf-drop 0.5s var(--ease-out) 0.36s backwards; }
+@keyframes rf-drop {
+  0% { opacity: 1; transform: rotate(var(--a)) translateX(60px) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(0.2); }
+}
+
+.rf-seal { position: relative; width: 128px; height: 128px; rotate: -8deg; animation: rf-stamp 0.22s cubic-bezier(0.3, 1.4, 0.5, 1) 0.36s backwards; }
+.rf-seal b { font: 400 54px/1 var(--brush); }
+.rf[data-tone='gold'] .rf-seal { background: var(--gold); color: var(--ink); }
+
+.rf-title { font: 400 38px/1.15 var(--brush); color: var(--paper); text-wrap: balance; word-break: keep-all; animation: rise 0.24s var(--ease-out) backwards; }
+.rf.l .rf-title { animation-delay: 0.5s; }
+.rf-sub { font: var(--t-body); color: var(--paper); word-break: keep-all; animation: rise 0.24s var(--ease-out) 0.08s backwards; }
+.rf.l .rf-sub { animation-delay: 0.56s; }
+
+/* 칸 — 미션 칸보다 크다. 줄이 넘치면 아래로, 가운데 정렬 */
+.rf-cells { justify-content: center; gap: 10px; max-height: 280px; overflow: hidden auto; padding: 6px; }
+.rf-cells:empty { display: none; }
+.rf-cells .rw { width: 76px; height: 76px; animation: rf-cell 0.2s cubic-bezier(0.3, 1.4, 0.5, 1) var(--at, 0ms) backwards; }
+.rf-cells .rw::before { background: var(--rf, var(--paper)); }
+.rf-cells .rw .gd { width: 54px; height: 54px; }
+.rf-cells .qty { font-size: 16px; }
+.rf-cells .rw-txt { width: auto; min-height: 76px; padding: 0 16px; font: var(--t-name); color: var(--ink); }
+
+.rf-ok { width: 200px; margin-top: 6px; animation: rf-in 0.2s linear 0.3s backwards; }
+
+/* 건너뛴 뒤 = 끝 모습 */
+.rf.end *, .rf.end *::before { animation: none !important; }
+.rf.end .rf-drop { display: none; }
+
+@keyframes rf-in { from { opacity: 0; } }
+@keyframes rf-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes rf-stamp { from { scale: 2.4; opacity: 0; } 60% { opacity: 1; } to { scale: 1; } }
+@keyframes rf-cell { from { scale: 1.8; opacity: 0; } to { scale: 1; opacity: 1; } }
+@keyframes rf-shake { 0% { translate: 0 0; } 25% { translate: -4px 3px; } 50% { translate: 3px -3px; } 75% { translate: -2px 1px; } 100% { translate: 0 0; } }
+
+/* S — 지갑으로 나는 칸 */
+.rf-fly { position: absolute; z-index: 39; width: 40px; height: 40px; margin: -20px; pointer-events: none; animation: rf-fly 0.46s cubic-bezier(0.5, 0, 0.8, 0.5) backwards; }
+.rf-fly .gd { width: 100%; height: 100%; }
+@keyframes rf-fly {
+  0% { translate: 0 0; scale: 1.1; }
+  30% { translate: calc(var(--dx) * 0.1) -26px; scale: 1.25; }
+  100% { translate: var(--dx) var(--dy); scale: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf *, .rf *::before, .rf { animation: none !important; }
+  .rf-drop { display: none; }
+}
