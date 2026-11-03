@@ -280,7 +280,9 @@ function demoHtml(
 ): string {
   const gone = Math.min(claimedN, FLOORS);
   const freshIdx = fresh && works.some((w) => w.def.id === fresh && w.p.claimed) ? gone - 1 : -1;
-  const floors = Array.from({ length: FLOORS }, (_, k) => `<i class="ms-fl${k < gone ? ' gone' : ''}${k === freshIdx ? ' fresh' : ''}" style="--k:${k}"></i>`).join('');
+  // 그림 경로는 칸마다 인라인으로 둔다. CSS 변수로 넘기면 상대 경로가 assets/ 기준으로 풀려 404가 난다
+  const bg = `background-image:url('./img/floors/${v.site.theme}.png')`;
+  const floors = Array.from({ length: FLOORS }, (_, k) => `<i class="ms-fl${k < gone ? ' gone' : ''}${k === freshIdx ? ' fresh' : ''}" style="--k:${k};${bg}"></i>`).join('');
   const stamp = gone >= FLOORS ? `<span class="ms-stamp${freshIdx === FLOORS - 1 ? ' fresh' : ''}"><b>완파</b></span>` : '';
   const steps = WAGE_STEPS.map((need, s) => {
     const got = s < v.wageGot;
@@ -291,7 +293,7 @@ function demoHtml(
   }).join('');
   const take = v.wageStep >= 0 ? takeBtn('data-take="wage"', main) : '';
   return `<section class="ms-dm" style="--i:${i}" aria-label="오늘의 철거 대상 ${escapeHtml(v.site.name)}, 작업 ${gone}/${FLOORS}">
-    <div class="ms-bld" style="--src:url('./img/floors/${v.site.theme}.png');--g:${gone}">
+    <div class="ms-bld" style="--g:${gone}">
       <div class="ms-fls">${floors}</div>
       <i class="ms-rub${freshIdx >= 0 ? ' fresh' : ''}"></i>${stamp}
     </div>

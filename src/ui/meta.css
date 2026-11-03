@@ -224,7 +224,7 @@
 
 .ms-bld { position: relative; width: 72px; height: 92px; }
 .ms-fls { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.ms-fl { flex: 1; background: var(--src) 0 calc(var(--k) * 100% / 3) / 100% 400% no-repeat; border: 2px solid var(--ink); }
+.ms-fl { flex: 1; background-position: 0 calc(var(--k) * 100% / 3); background-size: 100% 400%; background-repeat: no-repeat; border: 2px solid var(--ink); }
 .ms-fl + .ms-fl { margin-top: -2px; }
 .ms-fl.gone:not(.fresh) { visibility: hidden; }
 .ms-fl.fresh { position: relative; z-index: 2; animation: ms-fall 0.8s cubic-bezier(0.4, 0, 0.8, 0.5) 0.05s forwards; }
