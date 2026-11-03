@@ -11,7 +11,7 @@ import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
   N, keepBits, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
 } from './bladeFx';
-import { PRESS, brushArc, brushLine, inkDrop, inkSplat, popScale, spatter } from './ink';
+import { PRESS, brushArc, brushLine, hotCore, inkDrop, inkSplat, popScale, spatter } from './ink';
 
 const GROUND = VIEW.GROUND_Y;
 const TAU = Math.PI * 2;
@@ -369,6 +369,7 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
         if (core && b0 < 0.6) {
           ctx.fillStyle = p.c2;
           brushLine(ctx, x0, y0, xm, ym, p.v * 0.42, Math.max(b0, 0.12), b1 * 0.9, 0, p.seed, 0, BODY);
+          hotCore(ctx, u / 0.35, (k) => brushLine(ctx, x0, y0, xm, ym, p.v * 0.42 * k, Math.max(b0, 0.12), b1 * 0.9, 0, p.seed, 0, BODY));
         }
         return;
       }
@@ -382,6 +383,7 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       if (core) {
         ctx.fillStyle = p.c2;
         brushLine(ctx, x0, y0, x1, y1, p.v * 0.42, Math.max(s0, 0.1), s1 * 0.8, 0, p.seed, bend, pr);
+        hotCore(ctx, u / 0.35, (k) => brushLine(ctx, x0, y0, x1, y1, p.v * 0.42 * k, Math.max(s0, 0.1), s1 * 0.8, 0, p.seed, bend, pr));
       }
       return;
     }
@@ -419,6 +421,7 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       if (u < 0.15 && p.c2 !== p.c1) {
         ctx.fillStyle = p.c2;
         spatter(ctx, 0, 0, R * 0.5, p.rot, p.seed, 0);
+        hotCore(ctx, u / 0.15, (k) => spatter(ctx, 0, 0, R * 0.5 * k, p.rot, p.seed, 0));
       }
       ctx.restore();
       return;

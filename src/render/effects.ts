@@ -13,21 +13,21 @@ import { DEBRIS, JUICE, JUICE_SYS, PALETTE, SLASH_INK, TICK, VIEW, WEAPON_INK } 
 import { drawAsset } from './assets';
 import { bladeReact, resetBladeFx, tierK, updateBladeFx } from './bladeFx';
 import { stackScale } from './feel';
-import { PRESS, brushLine, enso, inkBlot, inkDrop, inkDust, inkSplat, popScale, spatter } from './ink';
+import { PRESS, brushLine, enso, hotCore, inkBlot, inkDrop, inkDust, inkSplat, popScale, spatter } from './ink';
 import { inkFlick, setSwordInk } from './weaponFx';
 
 /**
- * chip = 잉크 외곽선 두른 파편(안전모 · 유리 조각) · frag = 층 그림을 그대로 든 조각 · star = 흰 별 「깡」(막아 낸 순간만)
+ * chip = 잉크 외곽선 두른 파편(안전모 · 유리 조각) · frag = 층 그림을 그대로 든 조각
  * — 먹 한 획(ink.ts): spark = 튕긴 가는 획 · ink = 먹 방울 · splat = 땅에 번진 먹 · spat = 친 쪽으로 튄 먹
  * · dry = 마른 먹 가루 무리 · dust = 마른 가루 한 점 · enso = 붓으로 그은 원. 알파로 지우지 않는다 — 줄고 꼬리부터 깎인다
  */
-type Style = 'spark' | 'shard' | 'chip' | 'dust' | 'cream' | 'frag' | 'star' | 'puff'
+type Style = 'spark' | 'shard' | 'chip' | 'dust' | 'cream' | 'frag' | 'puff'
   | 'ink' | 'splat' | 'spat' | 'blot' | 'dry' | 'enso';
 
-/** 그리는 순서 — 조각·파편·엔소가 뒤, 가루가 가운데, 튕긴 획·별·먹 방울이 맨 앞 */
+/** 그리는 순서 — 조각·파편·엔소가 뒤, 가루가 가운데, 튕긴 획·먹 방울이 맨 앞 */
 const LAYER: Record<Style, number> = {
   frag: 0, shard: 0, chip: 0, cream: 0, enso: 0, splat: 0, spat: 0, blot: 0, dust: 1, dry: 1, puff: 1,
-  spark: 2, star: 2, ink: 2,
+  spark: 2, ink: 2,
 };
 /**
  * 층 조각 · 먹 튐 — 건물과 같은 층이라 졸라맨을 가리지 않게 플레이어보다 먼저 그린다(drawBackEffects).
@@ -54,7 +54,7 @@ interface Particle {
   bounce: number;
   /** 초당 속도 감쇠(0 = 없음) — 먼지 구름이 퍼지다 선다 */
   drag: number;
-  /** puff·star 모양을 정하는 수 */
+  /** puff 모양을 정하는 수 */
   seed: number;
   /** frag: 구운 조각 캔버스(FRAG_SS배) · 그 안의 기준점(무게중심) · 논리 크기 — enso: w = 획 굵기 · h = 세로 배율 · spat · dry: w = 방울 · 점 수 */
   img: HTMLCanvasElement | null;
@@ -69,7 +69,6 @@ interface Particle {
 const POOL = JUICE_SYS.PARTICLE_POOL;
 const DUST = ['#B9B3A6', '#948E82', '#6E695F'] as const;
 const HAT_WHITE = '#FFFFFF'; // 안전모 — sprites.ts hardHat과 같은 흰색
-const FLASH_WHITE = '#FFFFFF'; // 흰 별 「깡」 — 아이보리(PALETTE.WHITE) 위에서도 튀는 순백
 const BUTTER = ['#E39E00', '#C98A12'] as const; // 버터 방울 — 형광 노랑 대신 짙은 버터색 둘
 const PUFF_FILL = '#D9D2C3';  // 만화 먼지 구름 면 — 하늘(아이보리)보다 어둡고 잉크보다 한참 밝다
 
@@ -325,8 +324,8 @@ function spat(x: number, y: number, R: number, ang: number, life: number, core =
 }
 
 /**
- * 건물 파괴는 11-01 (5)에 옛 판(0c8ae64)으로 되돌렸다(사용자 「건물파괴 스타일은 옛날이 낫고」): 먼지 구름 · 먹 터짐 · 눕는 엔소 · 재질 조각 · 타격 별.
- * 옛 판의 노랑(#FFD200)만 그 무기 포인트 색으로 바꿨다.
+ * 건물 파괴는 11-01 (5)에 옛 판(0c8ae64)으로 되돌렸다(사용자 「건물파괴 스타일은 옛날이 낫고」): 먼지 구름 · 먹 터짐 · 눕는 엔소 · 재질 조각.
+ * 옛 판의 노랑(#FFD200)만 그 무기 포인트 색으로 바꿨다. 옛 판의 타격 별(흰 속 든 열 갈래 별)은 11-03에 뺐다(사용자: 꽃 같은 모양은 넣지 말라).
  */
 /** 만화 먼지 구름 — 잉크 외곽선을 두른 납작한 구름. 가운데서 바깥으로 밀려나며 부풀었다가 마지막에 확 줄어 사라진다. */
 function puffs(x: number, y: number, n: number, spreadX: number, size: number, out: number, life = 0.6): void {
@@ -340,19 +339,9 @@ function puffs(x: number, y: number, n: number, spreadX: number, size: number, o
   }
 }
 
-/** 타격 별 — 포인트 색 별 + 흰 속 + 잉크 외곽. 몇 프레임만 튀었다 사라진다 */
-function star(x: number, y: number, r: number, life: number, color: string): void {
-  fill('star', x, y, 0, 0, 0, life, r, color, { rot: n01() * Math.PI, seed: n01() * 1000 });
-}
-
 /** 친 자리에 터진 먹 — 맞은 밑면에 묻는다(BACK, 졸라맨 뒤) */
 function blot(x: number, y: number, R: number, life: number): void {
   fill('blot', x, y, 0, 0, 0, life, R, PALETTE.INK, { seed: n01() * 1000 });
-}
-
-/** 흰 별 「깡」 — 먹 테 두른 흰 별(맨 앞). 막아 낸 순간 · 안전모가 깨진 순간뿐, 한 장면에 하나 작게 */
-function clang(x: number, y: number, r: number, life: number): void {
-  fill('star', x, y, 0, 0, 0, life, r, FLASH_WHITE, { rot: n01() * Math.PI, seed: n01() * 1000 });
 }
 
 /** 엔소 충격파 — r0에서 grow만큼 퍼지며 붓이 한 바퀴를 긋고 시작점부터 마른다. w = 굵기 · flat = 세로 배율 · core = 베는 순간 색 */
@@ -368,20 +357,18 @@ function inkHit(x: number, y: number, k: number, core: string, own: boolean): vo
   drops(x, y, Math.round(1.5 + k), -Math.PI / 2 - 1.1, -Math.PI / 2 + 1.1, 180, 360 + 60 * k, 2.2, 0.3);
 }
 
-/** 층 붕괴(옛 판) — 큰 먹 터짐 · 땅에 떨어져 번지는 방울 · 층 밑면을 따라 눕는 엔소 · 옆으로 밀려 나오는 먼지 구름 · 재질 조각 · 타격 별 */
-function inkCollapse(x: number, y: number, k: number, core: string, mat?: string): void {
+/** 층 붕괴(옛 판) — 큰 먹 터짐 · 땅에 떨어져 번지는 방울 · 층 밑면을 따라 눕는 엔소 · 옆으로 밀려 나오는 먼지 구름 · 재질 조각 */
+function inkCollapse(x: number, y: number, k: number, mat?: string): void {
   blot(x + signed() * 8, y + 2, 12 + 2 * k, 0.2);
   drops(x, y, Math.round(5 + 3 * k), -Math.PI / 2 - 1.35, -Math.PI / 2 + 1.35, 240, 520, 3, 0.65, true);
   ensoAt(x, y + 2, 20, 110 + 20 * k, 0.32, 6, 0.3);
   shards(x, y, JUICE.floorCollapse.particles, mat, 1);
-  star(x + signed() * 10, y - 3, JUICE_SYS.STAR_PX.floorCollapse, 0.18, core);
   puffs(x, y + 2, JUICE_SYS.PUFF_COLLAPSE, VIEW.LANE_W * 0.36, 12, 120); // 벤 자리(층 밑면)에서 옆으로 밀려 나온다
 }
 
-/** 가드 — 막힌 자리에 작은 흰 별 · 밑면을 따라 좌우로 쳐내는 굵은 먹 획 · 옆으로 튀는 방울 */
+/** 가드 — 막힌 자리 밑면을 따라 좌우로 쳐내는 굵은 먹 획 · 옆으로 튀는 방울 */
 function parry(x: number, y: number, air: boolean): void {
   const k = air ? 1.2 : 1;
-  clang(x, y, 9 * k, 0.1);
   for (const d of [-1, 1]) {
     inkFlick(x + d * 8, y + 1, d > 0 ? -0.12 : Math.PI + 0.12, 58 * k, 8 * k, 0.26);
     drops(x + d * 8, y, 2, d > 0 ? -0.9 : Math.PI + 0.15, d > 0 ? -0.15 : Math.PI + 0.9, 200, 380, 2.4, 0.4);
@@ -743,9 +730,8 @@ export function updateEffects(dt: number): void {
 
 const BRONZE = ['#8A6F3E', '#6B5530', '#A88A52'] as const; // sprites.ts 종 재질 색
 
-/** 종 「깡」 — 안 깎이니 금은 없다. 흰 별 · 놋쇠 불꽃 · 퍼지는 엔소 한 고리 (x, y = 월드 캔버스 좌표) */
+/** 종 「깡」 — 안 깎이니 금은 없다. 놋쇠 불꽃 · 퍼지는 엔소 한 고리 (x, y = 월드 캔버스 좌표) */
 export function spawnBellClang(x: number, y: number): void {
-  clang(x, y, 12, 0.12);
   ensoAt(x, y, 14, 70, 0.26, 5, 0.5);
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + n01() * 0.4;
@@ -798,7 +784,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     if (s.gimmick === 'glass') glassBurst(x, y, e.kind === 'floorCollapse' ? JUICE_SYS.GLASS_CHIPS : JUICE_SYS.GLASS_CHIPS_HIT);
     const k = tierK(e.combo ?? s.combo);
     // 오함마는 맞은 자리를 제 발묵으로 누르고, 그라인더는 젖은 먹 대신 불티 · 쇳가루로 갈린다(weaponFx) — 먹 튐을 겹치지 않는다
-    if (e.kind === 'floorCollapse') inkCollapse(x, y, k, pointInk(s.weapon), e.mat);
+    if (e.kind === 'floorCollapse') inkCollapse(x, y, k, e.mat);
     else inkHit(x, y, k, pointInk(s.weapon), s.weapon === 'hammer' || s.weapon === 'grinder');
     return;
   }
@@ -816,8 +802,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   if (e.kind === 'hatBreak') {
     // 흰 파편(잉크 외곽선) 5개 + 남은 수만큼 먼지
     const n = JUICE.hatBreak?.particles ?? 10;
-    clang(x, y, 11, 0.12); // 막아 준 순간 — 작은 흰 별과 작은 엔소
-    ensoAt(x, y, 10, 50, 0.28, 5);
+    ensoAt(x, y, 10, 50, 0.28, 5); // 막아 준 순간 — 작은 엔소
     shards(x, y, 5, undefined, 1.1, HAT_WHITE, 'chip');
     dust(x, y, Math.max(0, n - 5));
     return;
@@ -849,7 +834,7 @@ function iceSparks(x: number, y: number, n: number): void {
   }
 }
 
-/** 완파(옛 판) — 층수(n)가 클수록 파편 · 엔소가 커진다. 층수 3 이상이면 포인트 색으로 긋는 바깥 엔소가 하나 더. 먹 왕관 · 먼지 구름 · 타격 별 */
+/** 완파(옛 판) — 층수(n)가 클수록 파편 · 엔소가 커진다. 층수 3 이상이면 포인트 색으로 긋는 바깥 엔소가 하나 더. 먹 왕관 · 먼지 구름 */
 function stackBurst(x: number, y: number, n: number | undefined, core: string): void {
   const k = stackScale(n);
   shards(x, y, Math.min(48, Math.round(JUICE.stackDestroy.particles * k)), undefined, 1.45 + 0.2 * k);
@@ -858,7 +843,6 @@ function stackBurst(x: number, y: number, n: number | undefined, core: string): 
   if ((n ?? 0) >= JUICE_SYS.STACK_RING_FLOORS) ensoAt(x, y, 30, 120 * k, 0.5, 11 * k, 1, core);
   drops(x, y, Math.round(8 * k), -Math.PI / 2 - 1.5, -Math.PI / 2 + 1.5, 260, 640, 3.4, 0.7, true);
   puffs(x, y, JUICE_SYS.PUFF_DESTROY, VIEW.LANE_W * 0.42, 15 + 3 * k, 150, 0.8);
-  star(x, y, JUICE_SYS.STAR_PX.stackDestroy * Math.min(1.3, k), 0.24, core);
 }
 
 /** 번개 착탄 — 땅에서 솟는 먹 줄기(튕긴 획) + 마른 가루 + 땅에 눕는 엔소 하나 */
@@ -1019,9 +1003,6 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle, py: number): v
     case 'dry':
       inkDust(ctx, p.x, py, p.size * (1.3 - 0.3 * t), Math.pow(t, 0.6), p.seed, p.w);
       return;
-    case 'star':
-      drawStar(ctx, p, py, 1 - t);
-      return;
     case 'puff':
       drawPuff(ctx, p, py, 1 - t);
       return;
@@ -1047,6 +1028,7 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle, py: number): v
       if (p.c2 && u < 0.15) {
         ctx.fillStyle = p.c2;
         spatter(ctx, p.x, py, R * 0.5, p.rot, p.seed, 0);
+        hotCore(ctx, u / 0.15, (k) => spatter(ctx, p.x, py, R * 0.5 * k, p.rot, p.seed, 0));
       }
       return;
     }
@@ -1059,12 +1041,14 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle, py: number): v
       const dry = Math.min(1, Math.max(0, (u - 0.18) / 0.45));
       const w = p.w * (1 - 0.45 * u);
       const a0 = p.rot + p.spin * (p.maxLife - p.life);
-      if (p.c2 && u < 0.12) {
+      const hot = !!p.c2 && u < 0.12;
+      if (hot) {
         ctx.fillStyle = PALETTE.INK; // 포인트 색 획엔 먹 테 — 아이보리 위에서도 읽히게
         enso(ctx, p.x, py, r, w * 1.5 + 2, a0, tail, head, 0, p.h, p.seed);
         ctx.fillStyle = p.c2;
       }
       enso(ctx, p.x, py, r, w, a0, tail, head, dry, p.h, p.seed);
+      if (hot) hotCore(ctx, u / 0.12, (k) => enso(ctx, p.x, py, r, w * k, a0, tail, head, 0, p.h, p.seed));
       return;
     }
     default: {
@@ -1073,33 +1057,6 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle, py: number): v
       ctx.fill();
     }
   }
-}
-
-/** 흰 별 「깡」 — 들쭉날쭉한 흰 별 + 잉크 외곽. 첫 프레임이 가장 크고 줄어든다(옅어지지 않는다). */
-function drawStar(ctx: CanvasRenderingContext2D, p: Particle, py: number, u: number): void {
-  const R = p.size * (1.15 - 0.75 * u);
-  const spikes = 10;
-  ctx.beginPath();
-  for (let i = 0; i < spikes * 2; i++) {
-    const a = p.rot + (i / (spikes * 2)) * Math.PI * 2;
-    const rr = i % 2 === 0 ? R * (0.75 + 0.25 * Math.abs(Math.sin(p.seed + i * 2.7))) : R * 0.42;
-    const sx = p.x + Math.cos(a) * rr;
-    const sy = py + Math.sin(a) * rr;
-    if (i === 0) ctx.moveTo(sx, sy);
-    else ctx.lineTo(sx, sy);
-  }
-  ctx.closePath();
-  ctx.fillStyle = p.color;
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = PALETTE.INK;
-  ctx.stroke();
-  if (p.color === FLASH_WHITE) return;
-  ctx.beginPath(); // 포인트 색 별(벤 순간)만 흰 속
-  ctx.moveTo(p.x + R * 0.28, py);
-  ctx.arc(p.x, py, R * 0.28, 0, Math.PI * 2);
-  ctx.fillStyle = FLASH_WHITE;
-  ctx.fill();
 }
 
 /** 구름 덩이 [x, y, 반지름] — 반지름 1 기준. 가운데 큰 덩이에서 좌우로 작아지고 아래는 평평하다(옆으로 긴 먼지). */

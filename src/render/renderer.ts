@@ -13,7 +13,7 @@ import { brushLine, enso, inkDrop, PRESS } from './ink';
 import { onomatoFor, ITEM_COPY, destroyedCaption } from '../content';
 import {
   initSprites, drawPlayer, drawHat, drawMask, drawStack, drawBoss, drawEntity, hardHat, hatSpot,
-  drawGroundRocks, drawStackShadow, floorTile, setPlayerCosmetics, setPlayerMask, setPlayerWeapon,
+  drawGroundRocks, drawStackShadow, floorTile, setLiveBody, setPlayerCosmetics, setPlayerMask, setPlayerWeapon,
 } from './sprites';
 import { maskColors, wornMask } from '../meta/mask';
 import { setFxMask } from './weaponFx';
@@ -28,8 +28,9 @@ import {
 } from './landmarkFx';
 import { bladeAura, drawBladeFx } from './bladeFx';
 import {
-  drawWazaBack, drawWazaMid, drawWazaTitle, drawWazaWorld, resetWazaShow, startWazaShow, stepWazaShow, takeWazaJolt, wazaShowEvent, wazaShowState,
+  drawWazaMid, drawWazaTitle, drawWazaWorld, resetWazaShow, startWazaShow, stepWazaShow, takeWazaJolt, wazaShowEvent, wazaShowState,
 } from './wazaShow';
+import { wazaBody } from './wazaBody';
 import { bossBodyHit, introFloorTop, resetBossFx, stepBossFx } from './executor';
 import { addTrauma, defeatSlow, kickPx, pickHaptic, shakePx, shakeSample, type HapticCounters } from './feel';
 import * as fx from './screenfx';
@@ -313,7 +314,9 @@ function react(s: GameState, e: JuiceEvent): void {
   wazaShowEvent(s, e, lastStack);
   // 히트스톱은 core(sim advance 말미)가 주입한다 — 렌더러는 상태를 쓰지 않는다 (08-30, P0-5)
   // 필살 한 타 · 터짐은 wazaShow가 그린다(파티클 없음). 필살이 부순 완파도 wazaShow가 갈라 터뜨리니 발밑 공통 완파(조각 · 엔소 · 방울)를 겹치지 않는다
-  const byWaza = e.kind === 'stackDestroy' && (releasing !== null || s.events.some((v) => v.kind === 'wazaHit' || v.kind === 'wazaBurst'));
+  // 연참 · 칼 · 검풍이 층을 무너뜨린 타(같은 틱에 wazaSwing)도 그렇다 — 공통 타격 먹 · 베기 자국이 월하난무 보름달 위에 끼었다(11-02)
+  const byWaza = (e.kind === 'stackDestroy' && (releasing !== null || s.events.some((v) => v.kind === 'wazaHit' || v.kind === 'wazaBurst')))
+    || (e.kind === 'floorCollapse' && s.events.some((v) => v.kind === 'wazaSwing'));
   if (e.kind !== 'wazaHit' && e.kind !== 'wazaBurst' && !byWaza) spawnFromEvent(s, e);
   // 작업 지시서 명물: 종은 안 깎여 금이 없다(깡) · 땅에 떨어지면 금 가며 깨진다 · 몸 층은 그 층 그림으로 조각난다
   if (e.kind === 'hit' && e.mat === 'bell') spawnBellClang(VIEW.LANE_X[0], VIEW.GROUND_Y - (e.y ?? s.player.y + PLAYER.H));
@@ -514,7 +517,6 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   drawChapterBackdrop(ctx, s);
   ctx.restore();
   ctx.translate(0, cam);
-  drawWazaBack(ctx, cam); // 필살 암전 — 하늘만(땅은 아래에서 다시 칠한다)
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
   fx.drawGroundLine(ctx);
@@ -560,9 +562,10 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 접촉 피드백은 core가 발행하는 headBonk 이벤트(먼지·소리·진동)가 진다.
   // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2).
   // 필살 무적이 그 구간으로 내려와도 필살 연출이 도는 동안은 통짜(긴 필살의 터짐 순간에 졸라맨이 꺼지지 않게)
-  drawWazaMid(ctx); // 필살 달 — 건물 위, 졸라맨 아래(졸라맨이 달을 등지고 선다)
+  drawWazaMid(ctx, cam); // 갈라진 건물 · 월하난무의 밤과 달 — 건물 위, 졸라맨 아래(졸라맨이 달을 등지고 선다)
   const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES && !wazaShowState();
   setPlayerWeapon(s.weapon);
+  setLiveBody(wazaBody(s, wazaShowState())); // 필살 몸 연기 — 그리는 동안만(칼 기운 · 졸라맨 · 마스크 · 안전모가 같은 몸을 본다)
   bladeAura(s); // 대검 칼 기운 — 지금 포즈의 칼날에서
   if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
     const px = VIEW.LANE_X[s.player.lane];
@@ -583,6 +586,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
     if (s.hat && !hatFlying()) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY); // 받는 중엔 날아오는 쪽이 그린다
     if (squash) ctx.restore();
   }
+  setLiveBody(null);
   drawWazaWorld(ctx, s, cam);
   ctx.restore();
 

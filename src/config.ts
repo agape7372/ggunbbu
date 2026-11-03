@@ -598,6 +598,8 @@ export const JUICE_SYS = {
   LAND_DUST: 4,
   // 종이 오려내기 후광 — 오프스크린 캐시는 기본 HALO_SS배(졸라맨 프레임 후광은 프레임 배율을 따른다)
   HALO_PX: 1.75, HALO_SS: 2,
+  // 달군 속(ink.hotCore) — 벤 순간 포인트 색 속 한가운데 종이빛 줄의 굵기(속 굵기에 곱함) · 식는 데 드는 몫(포인트 색이 보이는 동안 중)
+  HOT_W: 0.7, HOT_U: 0.7,
   // 필살 예비동작 — 유령 알파·엔소 수축 시작 반지름 (길이는 JUICE.special.hitstop)
   PRELUDE_GHOST_ALPHA: 0.5, PRELUDE_RING_R: 150,
   // 사망 — 붉은 번쩍 틱·파티클 배속·틀 지속
@@ -624,8 +626,6 @@ export const JUICE_SYS = {
   FRAG_COLS: 3, FRAG_ROWS: 2, FRAG_LIFE: 1.05, FRAG_G: 1650,
   // 만화 먼지 구름 수 — 층 붕괴 / 완파
   PUFF_COLLAPSE: 3, PUFF_DESTROY: 8,
-  // 타격 별 반지름(px)
-  STAR_PX: { hit: 13, floorCollapse: 24, stackDestroy: 38, butterCollapse: 16 } as Record<string, number>,
   // 집중선 · 색 반전(완파 IMPACT_FLOORS층 이상 · 필살 · 보스 격파). 반전은 COOLDOWN 틱에 한 번만
   IMPACT_TICKS: 8, INVERT_TICKS: 2, IMPACT_FLOORS: 3, INVERT_COOLDOWN: 45,
   // 필살 반전(screenfx.inkFrame) 사이 최소 틱 — 전화면 번쩍은 초당 3번을 넘기지 않는다(광과민 기준)

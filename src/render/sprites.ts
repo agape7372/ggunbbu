@@ -7,7 +7,7 @@ import type {
   PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
   FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId, GreatswordId,
 } from '../core/types';
-import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS, MASK_DRAW, SLASH_INK, WEAPON_INK } from '../config';
+import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS, MASK_DRAW, SLASH_INK, WEAPON_INK, JUICE_SYS } from '../config';
 import { PRESS, brushPath } from './ink';
 import { drawAsset, drawAssetHalo, hasAsset } from './assets';
 import { drawHalo, haloFor } from './halo';
@@ -436,6 +436,7 @@ function playerPngKey(): string | null {
 }
 
 function playerBob(pose: PlayerPose, animTick: number): number {
+  if (live) return 0; // 몸 연기는 숨 쉬지 않는다
   return pose === 'idle' && Math.floor(animTick / 20) % 2 === 1 ? -1 : 0; // 2f 숨쉬기
 }
 
@@ -460,6 +461,7 @@ export function setPlayerMask(art: string | null): void {
 /** 머리 중심(발 기준, 숨쉬기 전) — 안전모·마스크가 drawPlayer와 같은 프레임에서 읽는다. 시트에 머리 자리가 없으면 null */
 export function playerHead(pose: PlayerPose, animTick: number): readonly [number, number] | null {
   initSprites();
+  if (live) return liveHead(live);
   if (playerPngKey()) {
     const i = playerSheetFrame(pose, animTick);
     return SHEET_HEAD[i] ?? SHEET_FLAT_HEAD[i] ?? null;
@@ -601,7 +603,7 @@ function inkParts(id: string): InkPart[] {
 
 /** 칼 몸 — 상점 칼 그림(120×300 칸)을 손(hx,hy) → 칼끝(tx,ty)에 맞춰 돌리고 줄여 그린다.
  *  색은 상점과 같다: 먹 몸통 · 한지색 무늬 · 참격 노랑(= 칼빛 ARC). 칼은 따로 선 물건이라 몸 색(LINE)이 아니라 잉크 */
-function swordBody(c: CanvasRenderingContext2D, id: string, hx: number, hy: number, tx: number, ty: number): void {
+function swordBody(c: CanvasRenderingContext2D, id: string, hx: number, hy: number, tx: number, ty: number, halo = 0): void {
   const hold = SWORD_HOLD[id] ?? SWORD_HOLD.sword;
   const s = (Math.hypot(tx - hx, ty - hy) * hold.k) / (hold.handY - hold.tipY);
   c.save();
@@ -610,6 +612,18 @@ function swordBody(c: CanvasRenderingContext2D, id: string, hx: number, hy: numb
   c.scale(s, s);
   c.translate(-60, -hold.handY);
   c.lineWidth = 3; // 한지색 고리(pr)의 테 굵기 — 상점 CSS와 같다
+  if (halo > 0) {
+    // 후광 — 칼 실루엣을 halo(논리 px)만큼 부풀린 한지색(몸 연기는 굽지 않아서 선으로 낸다)
+    c.fillStyle = c.strokeStyle = PALETTE.BG;
+    c.lineJoin = 'round';
+    for (const { path, cls } of inkParts(id)) {
+      c.lineWidth = (cls === 'pr' ? 3 : 0) + (2 * halo) / s;
+      c.stroke(path);
+      if (cls !== 'pr') c.fill(path);
+    }
+    c.restore();
+    return;
+  }
   for (const { path, cls } of inkParts(id)) {
     if (cls === 'pr') {
       c.strokeStyle = PALETTE.BG;
@@ -1026,6 +1040,130 @@ function frameSS(ctx: CanvasRenderingContext2D): number {
 }
 
 // ══════════════════════════════════════════════════════════════
+// 필살 몸 연기 — 구운 프레임 대신 관절 자리를 받아 그 자리에서 긋는다(11-02 「졸라맨 후속모션이 없으니 허전함」).
+// 필살은 틱마다 자세가 이어져 움직여서 굽지 않는다. 후광은 같은 선을 한지색으로 굵게 먼저 긋는다
+// (구운 후광 = 실루엣을 HALO_PX 부풀린 것과 같은 모양). 자세 시간표는 wazaBody.ts.
+// ══════════════════════════════════════════════════════════════
+
+type Pt = readonly [number, number];
+/** 한 장면의 몸 — 발 기준(x 앞 +, y 위 −). 무릎은 골반 · 발로 풀어 앞으로 굽히고, 팔은 곧게 긋는다(e = 팔 굽힘 px) */
+export interface Body {
+  head: Pt;
+  hip: Pt;
+  fF: Pt;
+  fB: Pt;
+  /** 칼 쥔 손 */
+  hF: Pt;
+  hB: Pt;
+  /** 칼 각 — 0 = 앞, π/2 = 아래 */
+  sa: number;
+  /** 칼 길이 배율 — 짧으면 화면 안쪽으로 누운 칼 */
+  sl: number;
+  eF: number;
+  eB: number;
+  /** 몸 가로 배율 1 → −1 = 제자리에서 돈다 */
+  turn: number;
+}
+
+export const SWORD_L = 24; // 보통 칼 길이(서기 25 · 내려치기 18 · 필살 21의 가운데)
+export const GREAT_L = 33;
+
+const THIGH = 11.6; // 위 마디 = 아래 마디, 합이 서기 다리 길이(골반 → 발 23.1)
+const SHOULDER_K = (SHOULDER_Y - HEAD_Y - HEAD_R) / (HIP_Y - HEAD_Y - HEAD_R); // 목~골반 위 어깨 자리
+
+/** 어깨 — 목과 골반 사이(구운 졸라맨과 같은 비율). 자세 시간표가 손을 팔 길이 안에 놓을 때도 쓴다 */
+export function shoulderOf(head: Pt, hip: Pt): [number, number] {
+  const ny = head[1] + HEAD_R;
+  return [head[0] + (hip[0] - head[0]) * SHOULDER_K, ny + (hip[1] - ny) * SHOULDER_K];
+}
+
+let live: Body | null = null;
+
+/** 렌더러가 판 졸라맨을 그리는 동안만 건다 — drawPlayer · playerHead · playerBlade · 숨쉬기가 구운 프레임 대신 이 몸을 본다 */
+export function setLiveBody(b: Body | null): void {
+  live = b;
+}
+
+/** 0을 지나는 돌기에도 변환이 뒤집히지 않게 — 옆으로 선 한 줄 대신 아주 얇은 몸 */
+const turnK = (t: number): number => (t < 0 ? -1 : 1) * Math.max(0.08, Math.abs(t));
+
+/** 무릎 — 골반 → 발을 두 마디로 풀고 앞(+x)으로 굽힌다. 닿지 않으면 곧게 편다 */
+function kneeOf(hip: Pt, foot: Pt): [number, number] {
+  const dx = foot[0] - hip[0];
+  const dy = foot[1] - hip[1];
+  const d = Math.min(2 * THIGH - 1e-3, Math.max(1e-3, Math.hypot(dx, dy)));
+  const a = Math.atan2(dy, dx) - Math.acos(d / (2 * THIGH));
+  return [hip[0] + THIGH * Math.cos(a), hip[1] + THIGH * Math.sin(a)];
+}
+
+/** 팔 — 어깨 → 손, e만큼 팔을 굽힌다(앞으로 뻗은 팔이면 + = 아래) */
+function armOf(sh: Pt, hand: Pt, e: number): [number, number][] {
+  if (Math.abs(e) < 0.3) return [[sh[0], sh[1]], [hand[0], hand[1]]];
+  const dx = hand[0] - sh[0];
+  const dy = hand[1] - sh[1];
+  const L = Math.hypot(dx, dy) || 1;
+  return [[sh[0], sh[1]], [(sh[0] + hand[0]) / 2 - (dy / L) * e, (sh[1] + hand[1]) / 2 + (dx / L) * e], [hand[0], hand[1]]];
+}
+
+function swordTip(b: Body, great: boolean): [number, number] {
+  const L = (great ? GREAT_L : SWORD_L) * b.sl;
+  return [b.hF[0] + Math.cos(b.sa) * L, b.hF[1] + Math.sin(b.sa) * L];
+}
+
+function liveHead(b: Body): [number, number] {
+  return [b.head[0] * turnK(b.turn), b.head[1]];
+}
+
+/** 칼 [손 x, y, 칼끝 x, y](발 기준, 돈 몸은 가로를 뒤집은 채) — 대검 칼 기운 · 연출의 칼끝 별빛 */
+export function liveBlade(b: Body, great = !!greatLook(playerWeapon)): Seg {
+  const k = turnK(b.turn);
+  const [tx, ty] = swordTip(b, great);
+  return [b.hF[0] * k, b.hF[1], tx * k, ty];
+}
+
+function polyline(c: CanvasRenderingContext2D, pts: readonly (readonly [number, number])[]): void {
+  c.beginPath();
+  c.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+  c.stroke();
+}
+
+function drawLiveBody(ctx: CanvasRenderingContext2D, b: Body, x: number, footY: number): void {
+  // 돈 몸은 점만 가로로 줄인다 — 캔버스를 줄이면 선 굵기까지 얇아져 옆으로 선 순간 졸라맨이 사라진다(머리는 늘 동그랗게)
+  const k = turnK(b.turn);
+  const X = (p: Pt): [number, number] => [p[0] * k, p[1]];
+  const neck: Pt = [b.head[0], b.head[1] + HEAD_R];
+  const sh = shoulderOf(b.head, b.hip);
+  const lines = [
+    armOf(sh, b.hB, b.eB),
+    [b.hip, kneeOf(b.hip, b.fB), b.fB],
+    [neck, b.hip],
+    [b.hip, kneeOf(b.hip, b.fF), b.fF],
+    armOf(sh, b.hF, b.eF),
+  ].map((l) => l.map(X));
+  const [hx, hy] = X(b.head);
+  const [gx, gy] = X(b.hF);
+  const [tx, ty] = X(swordTip(b, !!greatLook(playerWeapon)));
+  ctx.save();
+  ctx.translate(x, footY);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // 후광 — 선 · 머리 고리 · 칼을 한지색으로 굵게 먼저
+  const H = JUICE_SYS.HALO_PX;
+  ctx.strokeStyle = PALETTE.BG;
+  ctx.lineWidth = LINE_W + 2 * H;
+  for (const l of lines) polyline(ctx, l);
+  ctx.beginPath();
+  ctx.arc(hx, hy, HEAD_R, 0, Math.PI * 2);
+  ctx.stroke();
+  swordBody(ctx, playerWeapon, gx, gy, tx, ty, H);
+  for (const l of lines) stroke(ctx, l);
+  circle(ctx, hx, hy, HEAD_R);
+  swordBody(ctx, playerWeapon, gx, gy, tx, ty);
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════════
 // 엔티티 (bolt/rock/shot/rabbit/cannon)
 // ══════════════════════════════════════════════════════════════
 function buildBoltIcon(): HTMLCanvasElement {
@@ -1343,6 +1481,10 @@ export function drawPlayer(
   facing: 1 | -1 = 1
 ): void {
   initSprites();
+  if (live) {
+    drawLiveBody(ctx, live, x, footCanvasY);
+    return;
+  }
   const footY = footCanvasY + playerBob(pose, animTick);
   // ★코스메틱 방침(08-30 검증 P1): PNG 시트는 기본 룩 전용 — 비기본 body/blade 장착 시
   // 프로시저럴이 이긴다. 안 그러면 Wave 3 PNG 투입 순간 팔리는 코스메틱이 무음 사망.
@@ -1386,6 +1528,7 @@ export function greatArcPoint(t: number, off = 0, turn = 0, grow = 1): [number, 
 /** 지금 프레임의 대검 칼날 — 발 기준 [손x, 손y, 칼끝x, 칼끝y](숨쉬기 포함). 대검이 아니거나 칼이 없는 포즈면 null */
 export function playerBlade(pose: PlayerPose, animTick: number): Seg | null {
   if (!greatLook(playerWeapon)) return null;
+  if (live) return liveBlade(live);
   const b = pickPlayerFrame(pose, animTick).blade;
   const bob = playerBob(pose, animTick);
   return b && [b[0], b[1] + bob, b[2], b[3] + bob];

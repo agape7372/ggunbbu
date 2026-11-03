@@ -3,9 +3,22 @@
 // 엔소(붓으로 그은 원)는 시작점부터 말라 세 갈래(비백)로 갈라지며 끊긴다.
 // 색은 부르는 쪽이 fillStyle로 정한다 — 여기선 모양만.
 
-import { PALETTE } from '../config';
+import { JUICE_SYS, PALETTE } from '../config';
 
 const TAU = Math.PI * 2;
+/**
+ * 달군 속 — 막 벤 포인트 색 속 한가운데에 종이빛 줄을 한 번 더 칠한다. 벤 순간 하얗게 달았다가 포인트 색으로 식는다.
+ * 빛을 번지게 깔지 않고 모양으로만 낸다. f = 포인트 색이 보이는 동안 중 지난 몫(0 → 1). 줄은 HOT_U 몫 안에 사라진다.
+ * 굵게 버티다 끝에 빨리 준다(제곱근) — 가는 줄이 오래 남으면 광택처럼 읽힌다. draw(k)는 속 굵기에 k를 곱해 칠한다.
+ */
+export function hotCore(ctx: CanvasRenderingContext2D, f: number, draw: (k: number) => void): void {
+  const heat = 1 - f / JUICE_SYS.HOT_U;
+  if (heat <= 0) return;
+  const was = ctx.fillStyle;
+  ctx.fillStyle = PALETTE.BG;
+  draw(JUICE_SYS.HOT_W * Math.sqrt(Math.min(1, heat)));
+  ctx.fillStyle = was;
+}
 /** 엔소 한 바퀴 — 다 닫지 않는다(붓을 뗀 틈) */
 const SPAN = TAU * 0.93;
 

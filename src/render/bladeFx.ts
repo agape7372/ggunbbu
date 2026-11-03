@@ -13,7 +13,7 @@
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, SEAL_INK, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import { comboMilestone } from '../audio/consume';
-import { brushArc, brushLine, brushPath, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter } from './ink';
+import { brushArc, brushLine, brushPath, hotCore, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter } from './ink';
 import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites';
 import { drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
 
@@ -760,13 +760,17 @@ function drawBrush(ctx: CanvasRenderingContext2D, p: Bit, py: number, u: number)
   };
   ctx.fillStyle = p.c1;
   paint(p.v, s0, s1, dry);
-  if (!p.c2 || p.c2 === p.c1 || u >= (p.hold || (p.st ? 0.55 : 0.4))) return;
+  const hold = p.hold || (p.st ? 0.55 : 0.4);
+  if (!p.c2 || p.c2 === p.c1 || u >= hold) return;
   const c0 = Math.max(s0, 0.06);
   const c1 = Math.max(c0, s1 * 0.8);
   if (c1 - c0 < 0.02 || p.v * 0.45 < 0.6) return;
   ctx.fillStyle = p.c2;
   paint(p.v * (p.st ? 0.62 : 0.42), c0, c1, 0);
-  if (!p.st) return;
+  if (!p.st) {
+    hotCore(ctx, u / hold, (k) => paint(p.v * 0.42 * k, c0, c1, 0));
+    return;
+  }
   // 공사중 — 노랑 속을 먹 빗금이 가른다(방금 칠한 속을 오려 그 안에만)
   ctx.save();
   ctx.clip();
@@ -835,6 +839,7 @@ function drawBit(ctx: CanvasRenderingContext2D, p: Bit, py: number): void {
       if (p.c2 && p.c2 !== p.c1 && u < 0.2) {
         ctx.fillStyle = p.c2;
         spatter(ctx, p.x, py, R * 0.5, p.rot, p.seed, 0);
+        hotCore(ctx, u / 0.2, (k) => spatter(ctx, p.x, py, R * 0.5 * k, p.rot, p.seed, 0));
       }
       return;
     }
