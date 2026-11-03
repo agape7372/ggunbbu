@@ -1,5 +1,5 @@
 // 명물 보스 넷(종탑 · 바람탑 · 구층탑 · 타워크레인)의 그림 — 몸 · 장식 · 창 인장 · 종. 정본 = docs/STAGES_2026-10-31.md §6.
-// ★GameState는 읽기만 한다(기록 재생이 같은 판을 다시 돌려 비교한다). 여기 모듈 변수는 전부 그리기 보간용이고,
+// ★GameState는 읽기만 한다(작업 지시서는 같은 입력이면 같은 판 — 불변 14). 여기 모듈 변수는 전부 그리기 보간용이고,
 // 틱이 되감기거나 명물이 없어지면 비운다. 난수 없음 — 모양은 해시로 정해 매번 같다.
 // 몸은 층이 본체라 기존 drawStack(재질 · 금 · 깨짐 단계)을 그대로 쓰고, 그 위에 장식만 얹는다.
 // 몸 밑면 쪽(바닥)에 표식을 둔다: 평소엔 몸이 높이 떠서 윗부분이 화면 밖이라, 똑딱 · 깃발 · 띠는 보이는 밑동에 있어야 읽힌다.
@@ -10,7 +10,7 @@ import { lmAct, windBreathLeft } from '../core/landmark';
 import { CLOCK_STEP, PAGODA_LOW_Y, blockProgress, craneBand } from '../audio/landmarkSfx';
 import { drawStack, floorTile } from './sprites';
 import { spawnBellShatter, spawnFloorShatter } from './effects';
-import { inkBlot, popScale } from './ink';
+import { hs, inkBlot, popScale } from './ink';
 
 const TAU = Math.PI * 2;
 const CX = VIEW.LANE_X[0];
@@ -107,12 +107,6 @@ export function cableFray(got: number): 0 | 1 | 2 {
 /** 크레인 반창 — 3막 첫 걸림에 팔이 반만 꺾여 추가 HALF_Y까지 내려오는 동안 */
 export function craneHalf(lm: LandmarkState): boolean {
   return lm.id === 'crane' && lm.st === 'sit' && lm.cue === 2;
-}
-
-/** 모양을 해시로 정한다(난수 아님) 0..1 */
-function hs(seed: number, k: number): number {
-  const v = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453;
-  return v - Math.floor(v);
 }
 
 /** 인장 주홍 면의 너비(px) —먹이 오른쪽 끝에서부터 말라, 남은 시간만큼 왼쪽에 주홍이 남는다(막대). 알파는 쓰지 않는다 */

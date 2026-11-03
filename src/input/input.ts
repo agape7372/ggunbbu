@@ -19,8 +19,6 @@ export const SPECIAL_DEBOUNCE_MS = 180;
 
 export interface InputSource {
   sample(): InputFrame;
-  /** 이번 샘플에 아무 입력이든 있었는가 (타이틀 "탭하여 시작"용) */
-  anyPressed(): boolean;
   onFirstGesture(cb: () => void): void;
 }
 
@@ -52,7 +50,6 @@ export function debounceSpecial(
 export function createInput(touch: TouchInput | null): InputSource {
   const edges = new Set<'jump' | 'attack' | 'special'>();
   const heldGuardKeys = new Set<string>();
-  let any = false;
   let firstCb: (() => void) | null = null;
   let firstFired = false;
   let lastSpecialAt = Number.NEGATIVE_INFINITY;
@@ -78,8 +75,8 @@ export function createInput(touch: TouchInput | null): InputSource {
     e.preventDefault();
     fireFirst();
     if (e.repeat) return;
-    if (act) { edges.add(act); any = true; }
-    if (isGuard) { heldGuardKeys.add(e.code); any = true; }
+    if (act) edges.add(act);
+    if (isGuard) heldGuardKeys.add(e.code);
   });
   window.addEventListener('keyup', (e) => {
     heldGuardKeys.delete(e.code);
@@ -117,17 +114,9 @@ export function createInput(touch: TouchInput | null): InputSource {
       lastSpecialAt = spec.nextLast;
       merged.special = spec.fire;
 
-      if (t) {
-        any = any || t.pressed.jump || t.pressed.attack || t.pressed.special || t.held.guard;
-        t.clearPressed();
-      }
+      t?.clearPressed();
       edges.clear();
       return merged;
-    },
-    anyPressed(): boolean {
-      const a = any;
-      any = false;
-      return a;
     },
     onFirstGesture(cb: () => void): void { firstCb = cb; },
   };

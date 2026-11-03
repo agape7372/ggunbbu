@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { makeState } from '../src/core/sim';
 import type { JuiceEvent, WeaponId } from '../src/core/types';
 import { GREATSWORD_IDS, WEAPON_IDS } from '../src/meta/loadout';
-import { bladeReact, drawBladeFx, drawBladeShot, resetBladeFx, updateBladeFx } from '../src/render/bladeFx';
+import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx } from '../src/render/bladeFx';
 
 /** 그릴 때 고른 색과 부른 그리기를 모으는 ctx */
 function drawn(draw = (c: CanvasRenderingContext2D) => drawBladeFx(c, 0)): string {
@@ -48,13 +48,6 @@ describe('대검 이펙트', () => {
       burst(w);
       expect(drawn(), w).not.toBe('');
       for (let i = 0; i < 125; i++) updateBladeFx(1 / 60);
-      expect(drawn(), w).toBe('');
-    }
-  });
-
-  it('상점 진열 사진은 칼마다 그리고, 빌린 판 풀은 비워 둔다', () => {
-    for (const w of GREATSWORD_IDS) {
-      expect(drawn((c) => drawBladeShot(c, w, 0, 0)), w).not.toBe('');
       expect(drawn(), w).toBe('');
     }
   });

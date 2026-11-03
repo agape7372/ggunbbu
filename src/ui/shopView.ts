@@ -7,17 +7,17 @@
 import './shop.css';
 import { WEAPON } from '../config';
 import {
-  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, DUST_EXCHANGE, GREATSWORD_IDS, MASK_DUST_COST, ORBIT_COSTS, ORBIT_PER_AD, WAZA_IDS, WAZA_ORBIT_COST,
-  WEAPON_DUST_COST, WEAPON_IDS, examStatus, licenseTitle, nextDustGoal, nextExam,
-} from '../meta';
-import type { Loadout, WeaponId } from '../meta';
+  COSMETIC_ORBIT_COST, DUST_EXCHANGE, MASK_DUST_COST, ORBIT_COSTS, ORBIT_PER_AD, WAZA_ORBIT_COST, WEAPON_DUST_COST,
+  examStatus, licenseTitle, nextDustGoal, nextExam,
+} from '../meta/economy';
+import type { Loadout, WeaponId } from '../meta/types';
 import { MASK_MAX, SAMPLE_MASK, wornMask, wornMaskId } from '../meta/mask';
 import type { MaskEntry } from '../meta/types';
 import { FX_SLOTS, WEAPON_TIER, filledSlots } from '../meta/tier';
 import { FX_SLOT_COPY, TIER_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
 import { SCREENS } from '../content/screens';
 import { skuById } from '../meta/catalog';
-import { LOOK_EARNED, slotOf } from '../meta/loadout';
+import { DEFAULT_OWNED_IDS, GREATSWORD_IDS, LOOK_EARNED, WAZA_IDS, WEAPON_IDS, slotOf } from '../meta/loadout';
 import { armFuses, lazyScenes, packHtml, stopScenes, resetPackTab, setPackTab, type PackView } from './packView';
 import { escapeHtml } from './html';
 import { ICON } from './icons';
@@ -134,8 +134,6 @@ export interface ShopHandlers {
   onExchange(): void;
   /** 산 것·기본 품목 장착 */
   onEquip(slot: string, id: string): void;
-  /** 산 마스크의 「그리기」 — 도트판을 연다 */
-  onMaskEdit(): void;
   /** 시작 장비를 궤도조각으로 산다 */
   onKitBuy(id: string): void;
   /** 끝나지 않았거나 재설치로 잃은 구매를 되찾는다 */

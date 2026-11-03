@@ -11,7 +11,7 @@ import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
   N, keepBits, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
 } from './bladeFx';
-import { PRESS, brushArc, brushLine, hotCore, inkDrop, inkSplat, popScale, spatter } from './ink';
+import { PRESS, brushArc, brushLine, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
 
 const GROUND = VIEW.GROUND_Y;
 const TAU = Math.PI * 2;
@@ -251,8 +251,8 @@ function pixels(x: number, y: number, n: number, spd: number): void {
 // ── 들머리 ───────────────────────────────────────────────────
 
 /**
- * bladeReact가 이벤트마다 맨 먼저 부른다 — 연장 넷의 타격·층 깨기·완파·헛스윙, 필살 셋(예비동작 뒤 풀린 시점의 졸라맨 자리),
- * 게이지 참·콤보 끊김·깔림 탈출, 마스크 도트. 돌려주는 박자는 대검 베기 자국·잔상도 쓴다(타격이 아니면 1타)
+ * bladeReact가 이벤트마다 맨 먼저 부른다 — 연장 넷의 타격·층 깨기·완파·헛스윙,
+ * 게이지 참·콤보 끊김·깔림 탈출, 필살 때 마스크 도트(필살 그림은 wazaShow). 돌려주는 박자는 대검 베기 자국·잔상도 쓴다(타격이 아니면 1타)
  */
 export function weaponReact(s: GameState, e: JuiceEvent): Beat {
   const strike = e.kind === 'hit' || e.kind === 'bossHit' || e.kind === 'butterCollapse' || e.kind === 'floorCollapse';
@@ -343,7 +343,7 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       return;
     }
     case 'hook': {
-      // 붓 획 — 앞 12%에 그어지고(머리가 나아간다) 35%부터 꼬리가 깎여 끝에 다 먹힌다. 벤 순간(앞 15%)엔 획 속이 포인트 색
+      // 붓 획 — 앞 12%에 그어지고(머리가 나아간다) 35%부터 꼬리가 깎여 끝에 다 먹힌다. 벤 순간(앞 35%)엔 획 속이 포인트 색
       const s1 = Math.min(1, u / 0.12);
       const s0 = u < 0.35 ? 0 : Math.min(0.99, (u - 0.35) / 0.65);
       const mode = p.a;
@@ -377,7 +377,7 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       const y1 = py + (dy * L) / 2;
       const pr = mode === GOUGE ? PRESS.line : mode === FLICK ? PRESS.flick : PRESS.cut;
       const dry = mode === GOUGE ? 0.85 : mode === FLICK ? 0.6 : 0.42; // 곧은 획도 꼬리는 붓털로 갈라진다
-      const bend = mode === GOUGE ? 0 : (hash(p.seed, 1) - 0.5) * L * 0.16;
+      const bend = mode === GOUGE ? 0 : (hs(p.seed, 1) - 0.5) * L * 0.16;
       ctx.fillStyle = p.c1;
       brushLine(ctx, x0, y0, x1, y1, p.v, s0, s1, dry, p.seed, bend, pr);
       if (core) {
@@ -391,12 +391,12 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       // 불티 분수 — 줄기 i는 (i/n)·a초에 나와 0.12~0.24초 날며 꼬리를 끈다(머리가 굵은 튕김 획). 처음 절반은 불티 색, 식으면 먹
       const age0 = p.max - p.life;
       for (let i = 0; i < p.v; i++) {
-        const h1 = hash(p.seed, i);
-        const h2 = hash(p.seed, i + 40);
+        const h1 = hs(p.seed, i);
+        const h2 = hs(p.seed, i + 40);
         const age = age0 - (p.a * i) / p.v - h1 * 0.02;
         const span = 0.12 + 0.12 * h2;
         if (age <= 0 || age >= span) continue;
-        const ang = p.rot + (hash(p.seed, i + 80) - 0.5) * 0.7;
+        const ang = p.rot + (hs(p.seed, i + 80) - 0.5) * 0.7;
         const sp = p.size * (0.6 + 0.6 * h2);
         const vx = Math.cos(ang) * sp;
         const vy = Math.sin(ang) * sp + SPARK_G * age;
@@ -457,10 +457,4 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
     }
     default:
   }
-}
-
-/** 0~1 고정 난수 — 같은 조각은 매 프레임 같은 모양 */
-function hash(seed: number, k: number): number {
-  const h = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453;
-  return h - Math.floor(h);
 }

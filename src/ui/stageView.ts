@@ -29,7 +29,6 @@ export interface StageUi {
 
 /** 마지막에 고른 난이도 — 세션 안 변수(저장 키 없음). 기본 정규 */
 let diffPick: StageDiff = 1;
-export const sessionDiff = (): StageDiff => diffPick;
 
 type View = { k: 'list' } | { k: 'detail'; id: string } | { k: 'log' };
 

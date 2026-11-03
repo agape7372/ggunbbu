@@ -109,7 +109,7 @@ export const PLAYER = {
   // 원작 대조가 살아 있는 것은 **정점(8.2층)** 하나뿐. 되돌리려면 이 문단부터 뒤집을 것.
   GRAVITY: 1735,          // px/s² [튜닝] 정점 보존·시간축 압축 (원작 파생 204의 8.5배)
   JUMP_V0: 1388,          // px/s  [튜닝] 정점 555px = 8.17층은 [원작 이식] 그대로
-  W: 46, H: 55,          // 원작 82×98 × 0.5625
+  H: 55,                 // 원작 98 × 0.5625
   // 원작은 한 번의 참격이 "한 층"에 닿는다(참격 스프라이트 67px vs 층 120px).
   // 기존 128px는 40px 층 기준 3.2개 층을 동시에 때려 위치 선정을 무의미하게 만들었다.
   ATTACK_REACH: 68,       // = FLOOR_H (층 1개)
@@ -117,7 +117,6 @@ export const PLAYER = {
   ATTACK_PRE: 1, ATTACK_ACTIVE: 3, ATTACK_POST: 2,
   INPUT_BUFFER: 3,        // f
   GUARD_STARTUP_GROUND: 4, // f — "착지 직후 점프가드 불가"의 근원
-  GUARD_STARTUP_AIR: 0,
   GUARD_BREAK_STUN: 20,
   HIT_IFRAMES: 90,
   PIN_ESCAPE_IFRAMES_LIFT: 60,
@@ -159,7 +158,7 @@ export const STACK = {
   SPAWN_CUE_TICKS: 30,
   // 페이즈별 낙하 물리 [g_b px/s², V_TERM px/s]
   ACT1_G: [1530, 3400] as const,       // p=0 → p=1 선형
-  ACT1_VTERM: [238, 714] as const,    // 140 + 280·p^0.7
+  ACT1_VTERM: [238, 714] as const,    // 238 + 476·p^0.7
   BUTTER_G: 1020, BUTTER_VTERM: 153,
   CATHEDRAL_G: 4080, CATHEDRAL_VTERM: 952,
   TOWER_G: 1190, TOWER_VTERM: 170,
@@ -230,7 +229,7 @@ export const DEBRIS = {
 export const MAT_HP: Record<string, number> = {
   weak: 1, mid: 2, hard: 3,
   butter: 1,
-  cathedral: 5,
+  cathedral: 5,            // 아래 넷은 2막 체크포인트 산술(30/40/148/168)의 층 HP — checkpoints.test 가드
   lobby: 10, office: 1, penthouse: 20,
   bell: 999,               // 안 깎인다(building.damageStack) — 깔림 Z 탈출도 실패한다
 };
@@ -359,10 +358,8 @@ export const SCORE = {
 // ⚠ 그 테스트는 표의 산술 자기정합성(30/40/148/168/180/228/230)만 지킨다. 원작 대조가 아니다.
 export const ACT2 = {
   INTERLUDE_TICKS: 180,
-  CATHEDRAL_FLOORS: 6, CATHEDRAL_HP: 5,   // 6×5 = 30
-  TOWER_LOBBY_HP: 10,                      // +10 = 40
-  TOWER_OFFICE_FLOORS: 108, TOWER_OFFICE_HP: 1,  // +108 = 148
-  TOWER_PENT_HP: 20,                       // +20 = 168
+  CATHEDRAL_FLOORS: 6,                     // × MAT_HP.cathedral 5 = 30
+  TOWER_OFFICE_FLOORS: 108,                // 로비 +10 = 40 → 사무층 108×1 = 148 → 펜트하우스 +20 = 168 (HP는 MAT_HP)
   BOLT_COUNT: 12,                          // +12 = 180
   BOLT_EARLY: 4, BOLT_EARLY_GAP: 90,       // 전반 4발 90f 간격
   BOLT_RHYTHM_GAP: 30,                     // 후반 8발 120BPM = 30f/발
@@ -389,7 +386,6 @@ export const BOSS = {
   ENTER_Y_OFFSET: 80,     // 등장 시작 높이 = 화면 위 + 이만큼
   RECOVER_TICKS: 60,      // 패턴 종료 회복 틈 (≈6타)
   ROAR_TICKS: 45,         // 티어 전이 무적 포효
-  W: VIEW.LANE_W, H: 88,
   // 외형과 판정을 분리한다. 기존 타격 여유 64는 그림 높이와 무관하다.
   HIT_REACH: 64,
   BODY_W: 250, BODY_H: 44, BODY_BOTTOM: 32,
@@ -402,7 +398,7 @@ export const BOSS = {
   RISE: { BOLT_GAP_5: 45, WAVE_GAP_9: 60, DOWN_WINDOW: 90 },
   RABBIT: { COUNT: 5, ENTER_GAP: 30, FIRE_DELAY: 20, LEAVE: 30, HP: 1, SHOT_V: 480 },
   CANNON: {
-    COUNT: 3, AIM_GAP: 40, AIM_TELE: 30, SHOT_V: 700, SPARK_V: 300, SPARK_H: 24, HP: 2,
+    COUNT: 3, AIM_GAP: 40, AIM_TELE: 30, SHOT_V: 700, HP: 2,
     MUZZLE_Y: 260,               // 포구 높이(px) — 전기탄이 생기는 곳이자 대포의 타격 높이. 렌더도 이 높이에 그린다
     X: [80, 180, 280] as const,  // 좌/중/우 설치 x — 가운데만 직격, 양옆은 스파크 위협
   },
@@ -587,7 +583,6 @@ export const JUICE_SYS = {
   PARTICLE_POOL: 384,
   ONOMATOPOEIA_MAX: 3,    // 동시 의성어 팝업 상한
   PITCH_JITTER: 0.06,     // SFX 피치 ±6%
-  PITCH_STEP_PER_10_COMBO: 1, // 반음
   // 완파 규모 k = clamp(BASE + 층수 × PER_FLOOR, BASE, MAX) — 흔들림·파편·엔소·팝업을 k배
   STACK_K_BASE: 0.8, STACK_K_PER_FLOOR: 0.1, STACK_K_MAX: 1.8,
   STACK_RING_FLOORS: 3,   // 이 층수 이상이면 큰 먹 엔소 한 획 추가(속은 무기 포인트 색)
@@ -600,8 +595,6 @@ export const JUICE_SYS = {
   HALO_PX: 1.75, HALO_SS: 2,
   // 달군 속(ink.hotCore) — 벤 순간 포인트 색 속 한가운데 종이빛 줄의 굵기(속 굵기에 곱함) · 식는 데 드는 몫(포인트 색이 보이는 동안 중)
   HOT_W: 0.7, HOT_U: 0.7,
-  // 필살 예비동작 — 유령 알파·엔소 수축 시작 반지름 (길이는 JUICE.special.hitstop)
-  PRELUDE_GHOST_ALPHA: 0.5, PRELUDE_RING_R: 150,
   // 사망 — 붉은 번쩍 틱·파티클 배속·틀 지속
   DEATH_FLASH_TICKS: 8, DEATH_SLOW: 0.3, DEATH_SLOW_TICKS: 24, DEATH_FRAME_TICKS: 18,
   // 공사 테이프 2줄(보스 포효) 지속 틱
@@ -632,8 +625,8 @@ export const JUICE_SYS = {
   INK_GAP: 20,
   // 콤보 열기 — 이 콤보부터 필드 양옆에 속도선이 선다(단계마다 진해진다)
   HEAT_COMBO: [30, 60, 120, 250] as const,
-  // 의성어 글자 기본 크기(px) · 등장 튐 배율 · 등장 틱
-  ONOMATO_PX: 20, ONOMATO_POP: 1.8, ONOMATO_POP_TICKS: 5,
+  // 의성어 글자 기본 크기(px)
+  ONOMATO_PX: 20,
   // 새 건물이 막 나타난 뒤 양옆에 남는 낙하 선(틱)
   DROP_STREAK_TICKS: 22,
   // 예능 자막(완파 층수 · 콤보 고비) 지속 틱 — 박혀 들어오기 6 · 빠지기 7 포함

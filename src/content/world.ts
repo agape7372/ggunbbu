@@ -2,7 +2,7 @@
 // 수치/페이즈 id는 config·core가 정본. 여기는 표시용 문자열만.
 // 멸망해가는 지구. 하늘이 건물을 뽑아 던지고, 자격 없는 졸라맨이 벤다.
 
-import type { Act2Phase, ItemId, Theme, WazaId, WeaponId } from '../core/types';
+import type { Act2Phase, GimmickId, ItemId, Theme, WazaId, WeaponId } from '../core/types';
 import type { FxSlot, Tier } from '../meta/tier';
 
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
@@ -11,8 +11,6 @@ export const HERO = '뿌뿌';
 /** 2막 보스. 하늘에서 건물을 집어 던지는 무인 철거 집게보. */
 export const BOSS_NAME = '집행기';
 
-export const TITLE = '건뿌!!';
-export const TITLE_EN = 'GUNBBU';
 export const TAGLINE = '하늘이 던진다. 베면 된다';
 
 export interface RegionCopy {
@@ -23,10 +21,6 @@ export interface RegionCopy {
   name: string;
   /** 「제n구역: 이름」 */
   headline: string;
-  /** 도감 한 줄 */
-  blurb: string;
-  /** 잠금 시 */
-  locked: string;
 }
 
 /** 1막 챕터 4구역. 인덱스는 ACT1.CHAPTER_THEMES 와 동일. */
@@ -36,32 +30,24 @@ export const REGIONS: readonly RegionCopy[] = [
     theme: 'europe',
     name: '서쪽 회랑',
     headline: '제1구역: 서쪽 회랑',
-    blurb: '죽은 땅 위로 아치가 날아온다.',
-    locked: '제1구역: ???',
   },
   {
     index: 1,
     theme: 'asia',
     name: '강턱 시장',
     headline: '제2구역: 강턱 시장',
-    blurb: '가게는 비었고 지붕만 떨어진다.',
-    locked: '제2구역: ???',
   },
   {
     index: 2,
     theme: 'eastasia',
     name: '기와능선',
     headline: '제3구역: 기와능선',
-    blurb: '아무도 없는 능선에 기와가 쏟아진다.',
-    locked: '제3구역: ???',
   },
   {
     index: 3,
     theme: 'modern',
     name: '철근 해안',
     headline: '제4구역: 철근 해안',
-    blurb: '바다는 말랐다. 철근이 꽂힌다.',
-    locked: '제4구역: ???',
   },
 ] as const;
 
@@ -70,60 +56,10 @@ export function regionOf(chapter: number): RegionCopy {
   return REGIONS[i];
 }
 
-/** 아케이드 4구역 위에 얹는 기믹 작전. id는 GimmickId 와 1:1 (none 제외). */
-export type GimmickZoneId = 'glass' | 'ice' | 'night' | 'orbit';
-
-export interface GimmickZoneCopy {
-  gimmick: GimmickZoneId;
-  name: string;
-  headline: string;
-  blurb: string;
-  locked: string;
-}
-
-export const GIMMICK_ZONES: readonly GimmickZoneCopy[] = [
-  {
-    gimmick: 'glass',
-    name: '유리 골목',
-    headline: '특별작전: 유리 골목',
-    blurb: '유리 층이 먼저 깨지고 조각이 남는다.',
-    locked: '특별작전: ???',
-  },
-  {
-    gimmick: 'ice',
-    name: '빙결 부두',
-    headline: '특별작전: 빙결 부두',
-    blurb: '언 부두에서는 가드가 덜 튕긴다.',
-    locked: '특별작전: ???',
-  },
-  {
-    gimmick: 'night',
-    name: '야간 투척',
-    headline: '특별작전: 야간 투척',
-    blurb: '밤에는 다음 건물이 빨리 온다.',
-    locked: '특별작전: ???',
-  },
-  {
-    gimmick: 'orbit',
-    name: '궤도 직하',
-    headline: '특별작전: 궤도 직하',
-    blurb: '궤도에서 꽂힌다. 빛만 먼저 온다.',
-    locked: '특별작전: ???',
-  },
-] as const;
-
-export function gimmickZoneOf(id: GimmickZoneId): GimmickZoneCopy {
-  for (const z of GIMMICK_ZONES) if (z.gimmick === id) return z;
-  return GIMMICK_ZONES[0];
-}
-
-/** 구역 작전 기믹. none = 기본 낙하. */
-export type GimmickId = 'none' | 'glass' | 'ice' | 'night' | 'orbit';
 
 export interface OperationCopy {
   id: string;
   name: string;
-  blurb: string;
   gimmick: GimmickId;
   themeIndex: 0 | 1 | 2 | 3;
 }
@@ -133,56 +69,48 @@ export const OPERATIONS: readonly OperationCopy[] = [
   {
     id: 'west',
     name: '서쪽 회랑',
-    blurb: '죽은 땅 위로 아치가 날아온다.',
     gimmick: 'none',
     themeIndex: 0,
   },
   {
     id: 'market',
     name: '강턱 시장',
-    blurb: '가게는 비었고 지붕만 떨어진다.',
     gimmick: 'none',
     themeIndex: 1,
   },
   {
     id: 'ridge',
     name: '기와능선',
-    blurb: '아무도 없는 능선에 기와가 쏟아진다.',
     gimmick: 'none',
     themeIndex: 2,
   },
   {
     id: 'coast',
     name: '철근 해안',
-    blurb: '바다는 말랐다. 철근이 꽂힌다.',
     gimmick: 'none',
     themeIndex: 3,
   },
   {
     id: 'glass',
     name: '유리 골목',
-    blurb: '유리 층이 먼저 깨지고 조각이 남는다.',
     gimmick: 'glass',
     themeIndex: 0,
   },
   {
     id: 'ice',
     name: '빙결 부두',
-    blurb: '언 부두에서는 가드가 덜 튕긴다.',
     gimmick: 'ice',
     themeIndex: 1,
   },
   {
     id: 'night',
     name: '야간 투척',
-    blurb: '밤에는 다음 건물이 빨리 온다.',
     gimmick: 'night',
     themeIndex: 2,
   },
   {
     id: 'orbit',
     name: '궤도 직하',
-    blurb: '궤도에서 꽂힌다. 빛만 먼저 온다.',
     gimmick: 'orbit',
     themeIndex: 3,
   },
@@ -195,7 +123,6 @@ export interface WazaCopy {
   id: WazaCopyId;
   name: string;
   desc: string;
-  blurb: string;
 }
 
 export const WAZA_COPY: Record<WazaCopyId, WazaCopy> = {
@@ -203,37 +130,31 @@ export const WAZA_COPY: Record<WazaCopyId, WazaCopy> = {
     id: 'tenchi',
     name: '천지개벽',
     desc: '떨어지는 건물을 통째로 부순다.',
-    blurb: '떨어지는 건물을 통째로 부순다.',
   },
   ageba: {
     id: 'ageba',
     name: '올려베기',
     desc: '발밑에서 위로만 벤다.',
-    blurb: '발밑에서 위로만 벤다.',
   },
   mukjul: {
     id: 'mukjul',
     name: '무음일섬',
     desc: '화면을 가르는 한 줄. 칼을 거두면 터진다. 층 점수 두 배.',
-    blurb: '소리 없이 긋고, 칼을 거두면 터진다.',
   },
   dalmuri: {
     id: 'dalmuri',
     name: '월하난무',
     desc: '달 아래 다섯 칼, 마지막에 달째 가른다. 보스에 가장 세다.',
-    blurb: '달을 띄우고, 다섯 번 베고, 반으로 가른다.',
   },
   nakgwan: {
     id: 'nakgwan',
     name: '십이연참',
     desc: '열두 번 베고 도장을 찍는다. 콤보가 오른다.',
-    blurb: '열두 번 베고, 마지막에 도장.',
   },
   baram: {
     id: 'baram',
     name: '용오름',
     desc: '회오리 셋으로 치고 띄운다. 번개와 포탄을 쓸어 낸다.',
-    blurb: '부수지 않고, 하늘을 쓸어 낸다.',
   },
 };
 
@@ -314,18 +235,6 @@ export const ACT2_PHASES: Record<Act2Phase, PhaseCopy> = {
     banner: [`철거 집행: ${BOSS_NAME}`, '건물만 집으라는 지시는 없었다.'],
   },
 };
-
-/** 2막 이어하기 체크포인트 표시. 값 40/148/168 은 config 정본 — 문구만. */
-export const CHECKPOINT_LABEL: Record<40 | 148 | 168, string> = {
-  40: '로비',
-  148: '사무층',
-  168: '펜트하우스',
-};
-
-export function checkpointLabel(n: number): string {
-  if (n === 40 || n === 148 || n === 168) return CHECKPOINT_LABEL[n];
-  return '이어하기';
-}
 
 /** 무기 등급 이름표(src/meta/tier.ts) — 상점 큰 칼 · 칼꽂이 꼬리표 */
 export const TIER_COPY: Record<Tier, string> = {

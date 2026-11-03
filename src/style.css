@@ -59,7 +59,7 @@
   --paper: #F4F1E8;   /* 한지 — 월드와 같은 바닥 */
   --ink: #1A1A20;     /* 먹 — 그림 · 글자 · 판정 도장 (한지 위 15.3:1) */
   --ink2: #5C5C66;    /* 연먹 — 보조 글자 · 아직 못 하는 것의 글자 (5.9:1) */
-  --ink3: #A9A7AE;    /* 옅은 먹 — 못 사는 품목 그림 · 잃은 목숨 · 「부족」 바닥. 글자엔 안 쓴다 */
+  --ink3: #A9A7AE;    /* 옅은 먹 — 못 사는 품목 그림 · 잃은 목숨. 글자엔 안 쓴다 */
   --seal: #C4301E;    /* 주홍 인주 — 지금 누를 것 하나뿐 */
   --slash: #FFD200;   /* 참격 — 베는 순간 · 불길. 글자·누를 것엔 안 쓴다 */
   --paper-2: #E8E3D5; /* 한 톤 낮은 한지 — 도트판 칸 바탕 · 메타 화면 바닥 */
@@ -84,35 +84,7 @@
     2px 2px 0 var(--paper), -2px 2px 0 var(--paper), 2px -2px 0 var(--paper), -2px -2px 0 var(--paper),
     3px 0 0 var(--paper), -3px 0 0 var(--paper), 0 3px 0 var(--paper), 0 -3px 0 var(--paper);
 
-  /* 옛 이름 — 도트판·설치 안내·디버그 판이 아직 쓴다 */
-  --ivory: var(--paper);
-  --dust: var(--ink2);
-  --dust-2: var(--ink3);
-  --yellow: var(--slash);
-  --red: var(--seal);
-  --red-ink: var(--seal);
-  --rule: rgba(26, 26, 32, 0.16);
-  --font-ui: var(--body);
-  --font-display: var(--brush);
-  --font-mono: var(--body);
-  --tap: 58px;
-  --tap-sm: 56px;
-  --col-max: 600px;
-  --sp-1: 3px;
-  --sp-2: 4px;
-  --sp-3: 6px;
-  --sp-4: 8px;
-  --sp-5: 12px;
-  --sp-6: 16px;
-  --sp-7: 24px;
-  --fs-1: 12.5px;
-  --fs-2: 13px;
-  --fs-3: 14px;
-  --fs-4: 14px;
-  --fs-5: 15px;
-  --fs-6: 17px;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-pop: cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 
 * {
@@ -234,7 +206,7 @@ img { display: block; -webkit-user-drag: none; }
   vector-effect: non-scaling-stroke;
 }
 
-/* 인장 — 주홍 = 지금 누를 것(안쪽 한지 테두리) · .ink = 판정·상태 · .no = 옅은 먹 「부족」 */
+/* 인장 — 주홍 = 지금 누를 것(안쪽 한지 테두리) · .ink = 판정·상태 */
 .seal {
   position: relative;
   display: flex;
@@ -261,9 +233,7 @@ img { display: block; -webkit-user-drag: none; }
 .seal b { font-weight: 400; }
 .seal small { font: 700 14px/1.1 var(--body); }
 .seal.ink { background: var(--ink); }
-.seal.no { background: var(--ink3); color: var(--ink); }
-.seal.ink::after,
-.seal.no::after { display: none; }
+.seal.ink::after { display: none; }
 
 /* 가는 길 = 먹 테두리 4px 만 있는 한지 도장 */
 .inkseal {
@@ -575,7 +545,6 @@ img { display: block; -webkit-user-drag: none; }
 .hud-pin { top: 452px; font-size: 44px; rotate: -4deg; }
 .hud-teach small,
 .hud-pin small { display: block; margin-top: 6px; font: 700 15px/1.4 var(--body); }
-/* 필살 준비 — 필살 마름모 오른쪽 위, 공격 키 위 빈자리 */
 
 /* ── 메뉴 화면 공통 ─────────────────────────────────────── */
 .ov-screen {
@@ -1062,8 +1031,6 @@ img { display: block; -webkit-user-drag: none; }
 @keyframes slidein { from { translate: -90% 0; } to { translate: 0 0; } }
 @keyframes wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 -4% 0 0); } }
 @keyframes rise { from { translate: 0 14px; clip-path: inset(0 0 100% 0); } to { translate: 0 0; clip-path: inset(-60% -40% -60% -40%); } }
-@keyframes pop { 0% { scale: 1.6; } 60% { scale: 0.95; } 80% { scale: 1.03; } 100% { scale: 1; } }
-@keyframes pop2 { 0% { scale: 1.6; } 60% { scale: 0.95; } 80% { scale: 1.03; } 100% { scale: 1; } }
 @keyframes breathe2 { 0%, 100% { scale: 1; } 50% { scale: 1.08; } }
 @keyframes popup { 0% { scale: 0; } 60% { scale: 1.12; } 100% { scale: 1; } }
 @keyframes sway { 0%, 100% { rotate: 5deg; } 50% { rotate: 6.4deg; } }
@@ -1071,8 +1038,6 @@ img { display: block; -webkit-user-drag: none; }
 @keyframes splat { 0% { translate: 0 0; scale: 0; } 100% { translate: var(--tx) var(--ty); scale: 1; } }
 @keyframes kwang { 0% { scale: 0.2; rotate: -30deg; } 55% { scale: 1.25; rotate: -3deg; } 75% { scale: 0.95; rotate: -7deg; } 100% { scale: 1; rotate: -6deg; } }
 @keyframes kwang2 { 0% { scale: 0.2; rotate: -30deg; } 55% { scale: 1.25; rotate: -3deg; } 75% { scale: 0.95; rotate: -7deg; } 100% { scale: 1; rotate: -6deg; } }
-@keyframes halfA { to { translate: -18px 14px; rotate: -10deg; } }
-@keyframes halfB { to { translate: 16px 8px; rotate: 6deg; } }
 @keyframes slashk { 0% { clip-path: inset(0 100% 0 0); } 30% { clip-path: inset(0 -2% 0 0); } 62% { clip-path: inset(0 -2% 0 0); } 100% { clip-path: inset(0 -2% 0 102%); } }
 @keyframes fallA { 0% { transform: none; } 35% { transform: translate(calc(-26px * var(--sx)), 16px) rotate(calc(-2deg * var(--sx))); } 100% { transform: translate(calc(-90px * var(--sx)), 960px) rotate(calc(-8deg * var(--sx))); } }
 @keyframes fallB { 0% { transform: none; } 100% { transform: translate(calc(50px * var(--sx)), 900px) rotate(calc(5deg * var(--sx))); } }

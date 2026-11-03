@@ -3,7 +3,7 @@ import './style.css';
 import { VIEW, TICK } from './config';
 import { initTouchLayer } from './input/touch';
 import { createInput } from './input/input';
-import { createApp, mountDebugPanel } from './ui/scenes';
+import { createApp } from './ui/scenes';
 import { preloadAssets } from './render/assets';
 import { refreshFloorSheetAssets } from './render/floorSheetCache';
 import { createAdaptiveDpr } from './render/adaptiveDpr';
@@ -57,7 +57,6 @@ const app = createApp(ctx, input, touch);
 mountInstallPrompt();
 
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('debug')) {
-  mountDebugPanel(() => app.getState());
   (window as unknown as { __app: typeof app }).__app = app; // 브라우저 검증용
 }
 

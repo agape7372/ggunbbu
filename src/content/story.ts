@@ -60,10 +60,6 @@ export const ENDING_LINES: readonly string[] = [
 /** 2막 풀콤보(99,999,999) 엔딩에 덧붙이는 한 줄. */
 export const ENDING_FULL_COMBO = '「기계가 더 못 셉니다.」';
 
-export function chapterLines(chapter: number): readonly string[] {
-  return CHAPTER_LINES[Math.max(0, Math.min(3, chapter | 0))];
-}
-
 /** 평생 첫 판에만 나오는 숨은 줄 */
 export const INTRO_HIDDEN_LINE = '※ 신입 환영. 보험은 없다.';
 

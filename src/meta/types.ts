@@ -1,9 +1,9 @@
 // 메타(미션·재화·로드아웃) 공용 타입. DOM/캔버스 없음.
 
-// 08-30 스윕: WazaId·GimmickId는 core/types가 정본 — 이중 정의 제거, 재수출만
-import type { WazaId, GimmickId, GreatswordId, WeaponId } from '../core/types';
+// 08-30 스윕: WazaId는 core/types가 정본 — 이중 정의 제거, 재수출만
+import type { WazaId, GreatswordId, WeaponId } from '../core/types';
 import type { KitPick } from './kit';
-export type { WazaId, GimmickId, GreatswordId, WeaponId };
+export type { WazaId, GreatswordId, WeaponId };
 export type CosmeticSlot = 'body' | 'blade' | 'letters' | 'mask';
 // 각 목록의 앞 셋만 상점에서 판다 — 나머지는 꾸러미 · 실적 · 특근으로만 들어온다(이름과 얻는 길은 LOOK_EARNED)
 export type BodyId = 'ink' | 'amber' | 'slate' | 'coverall' | 'crown' | 'ash' | 'apron' | 's_night' | 's_powder' | 's_high';

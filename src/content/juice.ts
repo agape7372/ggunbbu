@@ -20,7 +20,6 @@ export const CAPTIONS = {
   combo100: '실화냐',
   combo500: '그만하면 됩니다',
   combo999: '기계가 더 못 셉니다',
-  scoreCap: '기계가 더 못 셉니다',
   record: '기록 돌파',
 } as const;
 

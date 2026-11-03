@@ -229,8 +229,8 @@ export function carryUnderStack(s: GameState, dt: number): void {
 
 // ★08-30: clingToFloors(층 밑면 밀착, 08-29 도입)는 삭제됐다. 낙하 건물 아래서 점프하면
 // 거의 항상 밑면에 접착돼 점프가 13px 홉으로 소멸하고(QA 실측), 같이 끌려 내려가 깔림에
-// 직행하는 구조적 자살 버튼이었다. 점프 = 제자리 회피 + 공중 무적(시각 관통 허용)이라는
-// 08-28 이전 검증 상태로 복원. 재도입하려면 docs/ROADMAP_2026-08-30.md Wave 0 근거를 먼저 뒤집을 것.
+// 직행하는 구조적 자살 버튼이었다. 점프에 무적은 없다(sim.ts 착지 깔림 검사 주석 — 공중이 안전한 건
+// 밑면 접촉이 지면에서만 성립하기 때문). 재도입하려면 docs/ROADMAP_2026-08-30.md Wave 0 근거를 먼저 뒤집을 것.
 
 function tryEnterGuard(s: GameState, airborne: boolean): void {
   const p = s.player;

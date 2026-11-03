@@ -10,11 +10,9 @@ import { HAT, SUPPLY, WEAPON } from '../config';
 import { FX_SLOT_COPY, ITEM_COPY, MASK_COPY, TIER_COPY, WAZA_COPY, WEAPON_COPY } from '../content/world';
 import { LORE } from '../content/lore';
 import type { ItemId } from '../core/types';
-import {
-  COSMETIC_ORBIT_COST, DEFAULT_OWNED_IDS, GREATSWORD_IDS, MASK_DUST_COST, ORBIT_COSTS, WAZA_IDS, WAZA_ORBIT_COST, WEAPON_DUST_COST,
-} from '../meta';
-import type { Loadout, WeaponId } from '../meta';
-import { BLADE_IDS, BODY_IDS, LETTERS_IDS, LOOK_EARNED, isOwned } from '../meta/loadout';
+import { COSMETIC_ORBIT_COST, MASK_DUST_COST, ORBIT_COSTS, WAZA_ORBIT_COST, WEAPON_DUST_COST } from '../meta/economy';
+import type { Loadout, WeaponId } from '../meta/types';
+import { BLADE_IDS, BODY_IDS, DEFAULT_OWNED_IDS, GREATSWORD_IDS, LETTERS_IDS, LOOK_EARNED, WAZA_IDS, isOwned } from '../meta/loadout';
 import { SAMPLE_MASK, wornMask } from '../meta/mask';
 import { ACHIEVES } from '../meta/missions';
 import { FX_SLOTS, WEAPON_TIER, filledSlots, type Tier } from '../meta/tier';

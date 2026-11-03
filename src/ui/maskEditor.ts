@@ -73,10 +73,6 @@ let release: (() => void) | null = null;
 /** 뒤로가기가 도트판보다 먼저 닫을 것(색 만들기 창). 닫았으면 true */
 let backHook: (() => boolean) | null = null;
 
-export function isMaskEditorOpen(): boolean {
-  return panel !== null;
-}
-
 /** 열려 있었으면 저장 없이 닫고 true — 뒤로가기가 먼저 부른다. 색 만들기 창이 떠 있으면 그 창만 닫는다 */
 export function closeMaskEditor(): boolean {
   if (!panel) return false;

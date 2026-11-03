@@ -101,7 +101,6 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   return true;
 }
 
-/** 스택 완파 처리 (마지막 층 붕괴 or 필살기) */
 function spawnFloorDebris(s: GameState, yHit: number): void {
   const cx = VIEW.LANE_X[0];
   const fw = VIEW.LANE_W;
@@ -119,6 +118,7 @@ function spawnFloorDebris(s: GameState, yHit: number): void {
   }
 }
 
+/** 스택 완파 처리 (마지막 층 붕괴 or 필살기) */
 export function destroyStack(s: GameState): void {
   const stack = s.stack;
   if (!stack) return;

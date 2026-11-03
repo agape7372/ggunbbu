@@ -1,6 +1,6 @@
 // 명물 보스 소리 중 이벤트가 없는 것 — 직전 틱과 지금 틱의 lm 차이로 낸다(순수, 소리는 consume.ts가 낸다).
 // 이벤트로 나는 소리(깡 · 퉁 · 몸을 친 댕)는 consume.ts mapEvent 몫이다.
-// 시뮬 상태는 읽기만 한다: 기록 재생이 같은 판을 다시 돌려 비교하니 건드리면 기록이 깨진다.
+// 시뮬 상태는 읽기만 한다(작업 지시서는 같은 입력이면 같은 판 — 불변 14).
 
 import type { GameState, LandmarkId, LandmarkSt } from '../core/types';
 import { LANDMARK, STAGE, TPS } from '../config';

@@ -249,12 +249,6 @@ export const ACHIEVES: readonly MissionDef[] = [
   { id: 'bare_moon', kind: 'achieve', title: '맨손 집행', desc: '시작 장비 없이 집행기를 쓰러뜨린다.', goal: 1, rewardDust: 200, rewardOrbit: 60, line: '맨손' },
 ];
 
-/** index.ts 호환 별칭 */
-export const DAILY_DEFS = DAILY_POOL;
-export const ACHIEVE_DEFS = ACHIEVES;
-export const MISSIONS: readonly MissionDef[] = [...DAILY_POOL, ...ACHIEVES];
-export type MissionId = string;
-
 export const TRACK_BY_ID: Readonly<Record<string, MissionTrack>> = {
   destroy_15: 'destroy',
   destroy_8: 'destroy',
@@ -285,9 +279,9 @@ export const TRACK_BY_ID: Readonly<Record<string, MissionTrack>> = {
   bare_moon: 'bareMoon',
 };
 
-/** 생존 미션이 인정하는 구역 키(영문 id · 한글 지명). */
+/** 생존 미션이 인정하는 구역 키(scenes가 보내는 zoneSurvive.zone). */
 export const SURVIVE_ZONES: Readonly<Record<string, readonly string[]>> = {
-  survive_giwa: ['eastasia', '기와능선', 'tile'],
+  survive_giwa: ['eastasia'],
 };
 
 const DEFS_BY_ID: ReadonlyMap<string, MissionDef> = new Map(
@@ -390,20 +384,11 @@ export function mergeAchieves(saved: readonly MissionProgress[]): MissionProgres
   return ACHIEVES.map((d) => saved.find((p) => p.id === d.id) ?? blankProgress(d.id));
 }
 
-/** 주스/씬 이벤트 배열을 일일·업적에 순서대로 적용. */
-export function applyJuiceToMissions(
-  daily: DailyState,
-  achieves: MissionProgress[],
-  events: readonly MissionEvent[],
-): void {
-  for (const e of events) applyMissionEvent(daily, achieves, e);
-}
-
 /**
  * 이벤트 종류 → 카운트 갱신(제자리 변이).
  * stackDestroy / special / hit·floorCollapse(combo) / adWatched
  * + moonClear / act2Enter / butterPerfect / pinEscape / revive
- * + survive·zoneSurvive / runStart(부활 런 리셋) / supply(보급 상자)  (clingSlash는 08-30 cling 삭제와 함께 제거)
+ * + zoneSurvive / runStart(부활 런 리셋) / supply(보급 상자)  (clingSlash는 08-30 cling 삭제와 함께 제거)
  * + guardBounce·guardAirBounce / stageClear / bareAct2 / bareMoon
  */
 export function applyMissionEvent(
@@ -412,9 +397,9 @@ export function applyMissionEvent(
   event: MissionEvent,
 ): void {
   const kind = event.kind;
-  if (kind === 'runStart' || kind === 'runEnd') {
+  if (kind === 'runStart') {
     resetUnclaimedTrack(achieves, 'revive');
-    if (kind === 'runStart') addOnTrack(daily.items, 'play', 1);
+    addOnTrack(daily.items, 'play', 1);
     return;
   }
   if (kind === 'guardBounce' || kind === 'guardAirBounce') {
@@ -453,7 +438,7 @@ export function applyMissionEvent(
     addOnTrack(daily.items, 'ad', amt(event, 1));
     return;
   }
-  if (kind === 'survive' || kind === 'zoneSurvive') {
+  if (kind === 'zoneSurvive') {
     addSurvive(daily.items, event.zone);
     return;
   }

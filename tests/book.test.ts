@@ -1,6 +1,6 @@
 // 도감 칸 목록 — 묶음 · 가짐 · 번호 · 모은 수 (순수 함수만; 그리기는 화면 검수)
 import { describe, expect, it } from 'vitest';
-import { WEAPON_IDS } from '../src/meta';
+import { WEAPON_IDS } from '../src/meta/loadout';
 import { bookCount, bookGroups } from '../src/ui/bookView';
 
 const flat = (owned: ReadonlySet<string>) => bookGroups(owned).flatMap((g) => g.entries);

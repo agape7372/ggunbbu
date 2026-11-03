@@ -20,6 +20,7 @@
 3. **체크포인트 산술 30/40/148/168/180/228/230**은 `tests/checkpoints.test.ts`가 가드.
    config 수치 변경 시 이 테스트가 깨지면 안 됨. 단 이 가드는 **표의 산술 자기정합성**을
    지킬 뿐 원작 대조가 아니다(깨져도 "원작 이탈"이 아니라 "표 내부 모순"이다).
+   층 HP는 실제로 쓰는 `MAT_HP`(cathedral · lobby · office · penthouse)를 읽는다. 11-03 전엔 아무도 안 읽는 `ACT2.*_HP` 사본을 읽었다.
 4. 콤보 = 유효 타격당 +1. 단절 경로는 `combat.ts` 주석의 전수 목록이 정본.
 5. 이벤트는 타격/판정 지점에서 정확히 1개 발행 — act2run 테스트가 타격 수를 이벤트로 계측한다.
 6. 런타임 의존성 0 유지 (devDeps: vite/typescript/vitest만).
@@ -85,7 +86,7 @@
 
 ## 검증
 
-- `npm test` — 853 테스트(7 건너뜀, 2026-11-02 재화 상점 기준, `feat/meta-monetize`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 858 테스트(7 건너뜀, 2026-11-03 리팩토링 기준, `refactor/cleanup`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
   (원본 TTF 8개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 500/700 · 동해독도 · 고운바탕 400/700.

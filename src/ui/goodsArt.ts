@@ -4,11 +4,13 @@
 // id · defs · 그라데이션 · 필터 · 글자 없음(한 화면에 여러 장이 들어가도 겹치지 않는다).
 import type { SkuId } from '../meta/catalog';
 import { MASK_N, SAMPLE_MASK, cellHex, maskCells } from '../meta/mask';
+import { PUFF_FILL } from '../render/effects';
+import { hs } from '../render/ink';
 
 export type GoodsId =
   | 'gift' | 'toolbox' | 'envelope' | 'orb1' | 'orb3' | 'orbSack' | 'noads' | 'coverall' | 'look' | 'swords' | 'crown'
   | 'mask1' | 'mask3' | 'mask10' | 'life' | 'waza' | 'dust2x' | 'calendar' | 'dust' | 'dustShovel' | 'dustCart' | 'dustTruck'
-  | 'orb' | 'pass' | 'coffee' | 'stamp';
+  | 'orb' | 'pass' | 'coffee';
 
 export type P = readonly [number, number];
 
@@ -28,16 +30,11 @@ const STEEL = '#A9B4C0';
 const MOSS = '#3C7D5C';
 /** 종이 · 천 — 한지 달 위에서 묻히지 않게 한지보다 한 톤 */
 const SHEET = '#DDD7C7';
-/** 먼지 — 판에서 건물이 무너질 때 이는 만화 먼지 구름 면(render/effects PUFF_FILL)과 같은 색 */
-const PUFF = '#D9D2C3';
+/** 먼지 — 판에서 건물이 무너질 때 이는 만화 먼지 구름 면과 같은 색 */
+const PUFF = PUFF_FILL;
 const TAU = Math.PI * 2;
 
 const n1 = (v: number) => +v.toFixed(1);
-/** 결정적 흔들림 0..1 — 그릴 때마다 같은 모양(render/ink.ts와 같은 식) */
-export const hs = (seed: number, k: number): number => {
-  const v = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
 const pt = (p: P) => `${n1(p[0])} ${n1(p[1])}`;
 
 const catmull = (p0: P, p1: P, p2: P, p3: P, t: number): P => {
@@ -501,17 +498,6 @@ const ART: Record<GoodsId, () => string> = {
     + plate(GOLD, [[23.5, 56], [72.5, 56], [69.5, 72], [26.5, 72]], 2.2, 636, 0.3)
     + blob(SHEET, oval(48, 38, 28, 6.5), 3.2, 643)
     + soft(KRAFT, oval(48, 38.4, 22, 3.8)),
-
-  // 도장 찍힌 쿠폰 칸 + 나무 도장
-  stamp: () =>
-    plate(SHEET, [[8, 22], [76, 18], [78, 76], [10, 80]], 4.2, 651)
-    + line([[32, 22], [34, 78]], 2.2, 1.4, 658) + line([[56, 20], [57, 77]], 2.2, 1.4, 659) + line([[9, 50], [77, 47]], 2.2, 1.4, 660)
-    + fill(SEAL, brush(ring(21, 36, 7.4, 14, 0.96, -2, 661), 3.6, 1.4, 661))
-    + fill(SEAL, brush(ring(45, 34, 7.4, 14, 0.96, -1, 662), 3.6, 1.4, 662))
-    + spot(SEAL, 22, 64, 7, 663) + dot(68, 34, 2.2, 664) + dot(46, 63, 2.2, 665)
-    + blob(KRAFT, [[70, 74], [82, 74], [80, 62], [84, 54], [76, 48], [68, 54], [72, 62]], 3, 669)
-    + plate(KRAFT, [[64, 74], [88, 74], [90, 84], [62, 84]], 3, 667, 0.3)
-    + plate(SEAL, [[60, 84], [92, 84], [92, 92], [60, 92]], 3, 666, 0.3),
 };
 
 const SKU_ART: Record<SkuId, GoodsId> = {

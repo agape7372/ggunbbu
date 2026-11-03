@@ -1,13 +1,14 @@
 // 체크포인트 산술 가드레일 — config 테이블 변경 시 즉시 깨진다.
 // [정본] 30 → 40 → 148 → 168 → 180 → 220~230 → 달 230+
 import { describe, it, expect } from 'vitest';
-import { ACT2, BOSS } from '../src/config';
+import { ACT2, BOSS, MAT_HP } from '../src/config';
 
 describe('콤보 체크포인트 산술 (원작 정본)', () => {
-  const cathedral = ACT2.CATHEDRAL_FLOORS * ACT2.CATHEDRAL_HP;
-  const lobby = cathedral + ACT2.TOWER_LOBBY_HP;
-  const office = lobby + ACT2.TOWER_OFFICE_FLOORS * ACT2.TOWER_OFFICE_HP;
-  const pent = office + ACT2.TOWER_PENT_HP;
+  // 층 HP는 실제로 쓰는 MAT_HP에서 읽는다(makeFloor) — 11-03 전엔 아무도 안 읽는 ACT2 사본을 지켰다
+  const cathedral = ACT2.CATHEDRAL_FLOORS * MAT_HP.cathedral;
+  const lobby = cathedral + MAT_HP.lobby;
+  const office = lobby + ACT2.TOWER_OFFICE_FLOORS * MAT_HP.office;
+  const pent = office + MAT_HP.penthouse;
   const bolt = pent + ACT2.BOLT_COUNT;
   const rock = bolt + ACT2.ROCK_COUNT * ACT2.ROCK_HP;
 

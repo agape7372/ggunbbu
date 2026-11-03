@@ -11,9 +11,7 @@ const isSeconds = (id: OpId): boolean => OPERATION[id].metric === 'seconds';
 export const SCREENS = {
   title: {
     buddha: '※ 2막부터 시작 (디버그)',
-    galleryLocked: '???',
     best: '최고 점수',
-    tokotonBest: '야근 최고',
     maxCombo: '최대 콤보',
     today: (done: number, total: number) => `오늘 ${done}/${total}`,
     dust: '먼지',
@@ -31,7 +29,6 @@ export const SCREENS = {
     butterSub: (round: number) => `${round}회차까지`,
     butterLocked: '판에서 만나면 열림',
     ops: '구역 작전',
-    opsSub: '구역 골라 시작',
   },
 
   tabs: {
@@ -95,7 +92,6 @@ export const SCREENS = {
   ops: {
     doneTitle: '작전 완료',
     timeUpTitle: '시간 종료',
-    reportMeta: '철거 보고서',
     built: '벤 건물',
     held: '버틴 시간',
     bestStamp: '최고 도장',
@@ -133,7 +129,6 @@ export const SCREENS = {
     heading: '철거 자격',
     lead: '건물을 부순 만큼 자격이 열린다.',
     exam: '응시',
-    examRow: (from: string, to: string) => `${from} → ${to}`,
     progress: (have: number, need: number) => `건물 ${have.toLocaleString('ko-KR')}/${need.toLocaleString('ko-KR')}채`,
     needBuildings: (n: number) => `건물 ${n.toLocaleString('ko-KR')}채 더`,
     maxTitle: '1급. 필기는 여전히 미응시',
@@ -166,11 +161,6 @@ export const GAMEOVER_QUIPS: readonly string[] = [
   '파괴자 측 변호인이 이겼습니다',
   '남은 지구가 퇴근을 막았습니다',
 ];
-
-export function gameoverQuip(seed: number): string {
-  const i = Math.abs(seed | 0) % GAMEOVER_QUIPS.length;
-  return GAMEOVER_QUIPS[i]!;
-}
 
 // ── 조건 표 (C10) ────────────────────────────────────────────
 // 반응은 코드 분기가 아니라 데이터다. QUIP_RULES 는 구체적인 것부터 — 처음 맞는 규칙이 이긴다.

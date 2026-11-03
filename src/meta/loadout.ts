@@ -6,14 +6,6 @@ import type { BladeId, BodyId, CosmeticSlot, GreatswordId, LettersId, Loadout, M
 export type { BladeId, BodyId, CosmeticSlot, LettersId, Loadout, MaskId, WazaId, WeaponId };
 export type EquipSlot = 'waza' | 'weapon' | CosmeticSlot;
 
-/** index.ts 호환 별칭 — 슬롯 id는 types.ts가 정본. */
-export type BodySkinId = BodyId;
-export type BladeSkinId = BladeId;
-export type LetterSkinId = LettersId;
-export type StickSkinId = BodyId;
-
-export const WAZA_UNLOCK_DEFAULT: readonly WazaId[] = ['tenchi'];
-
 export const WAZA_IDS: readonly WazaId[] = ['tenchi', 'ageba', 'baram', 'mukjul', 'nakgwan', 'dalmuri'];
 /** 대검 — 상점은 이 순서(값 오름차순)로 판다 */
 export const GREATSWORD_IDS: readonly GreatswordId[] = ['iron', 'saw', 'hazard', 'beam', 'flame', 'frost', 'onyx', 'gold'];
@@ -61,28 +53,6 @@ export const DEFAULT_LOADOUT: Loadout = {
   letters: 'flyer',
   mask: 'none',
 };
-
-export const WAZA_CATALOG: Record<WazaId, { name: string; blurb: string; unlockedByDefault: boolean }> = {
-  tenchi: {
-    name: '천지개벽',
-    blurb: '떨어지는 건물을 통째로 부순다.',
-    unlockedByDefault: true,
-  },
-  ageba: {
-    name: '올려베기',
-    blurb: '발밑에서 위로만 벤다.',
-    unlockedByDefault: false,
-  },
-  mukjul: { name: '무음일섬', blurb: '건물을 멈춰 두고 한 줄로 가른다.', unlockedByDefault: false },
-  dalmuri: { name: '월하난무', blurb: '달 아래 다섯 칼, 마지막에 세로로 가른다.', unlockedByDefault: false },
-  nakgwan: { name: '십이연참', blurb: '열두 번 베고 도장을 찍는다.', unlockedByDefault: false },
-  baram: { name: '용오름', blurb: '회오리 셋으로 치고 띄운다.', unlockedByDefault: false },
-};
-
-/** 기본 소유 복사본. 호출측이 mutate해도 모듈 상수는 안 변한다. */
-export function ownedDefaults(): Set<string> {
-  return new Set(DEFAULT_OWNED_IDS);
-}
 
 export function slotOf(id: string): EquipSlot | undefined {
   if (WAZA_SET.has(id)) return 'waza';
@@ -147,13 +117,6 @@ export function equip(
       return loadout;
   }
 }
-
-export function isWazaUnlocked(id: WazaId, unlocked: readonly WazaId[]): boolean {
-  return WAZA_CATALOG[id].unlockedByDefault || unlocked.includes(id);
-}
-
-/** 저장 파싱. 모르는 값은 DEFAULT_LOADOUT 필드로. */
-export const parseLoadout = validateLoadout;
 
 /** 저장 파싱. 모르는 값은 DEFAULT_LOADOUT 필드로. */
 export function validateLoadout(raw: unknown): Loadout {

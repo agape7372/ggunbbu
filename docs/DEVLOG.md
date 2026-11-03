@@ -1666,3 +1666,26 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - **연기 시험**: `tmp/cap/live-smoke.mjs`는 메타 2차의 출근부 팝업이 홈을 가려 막혔다. 팝업을 닫고 404 주소까지 적게 고쳤다(미션 탭 캡처 추가).
 - **push(사용자 「푸시」)**: 원격에 새 가지 `release/1.0`을 올렸다. 배포 워크플로는 `main`에만 걸려 자동 배포는 돌지 않는다. 공개 저장소라 main 대비 비밀 파일 · 키 흔적을 먼저 훑었다(0).
 - **남은 것**: 이 방향이 맞는지 사용자 판단 · 폰 확인.
+
+## 2026-11-03 (2) — 리팩토링: 죽은 코드 · 배럴 정리 (동작 · 저장 · 화면 불변)
+
+- **범위**: 사용자 「건뿌 리팩토링」. 작업 폴더 `D:\gunbbu-refactor`, 가지 `refactor/cleanup`(기준 `release/1.0` `6991a10`). 동작 · 저장 형식 · 화면이 바뀌는 것은 하지 않았다. 49파일 +114 −866.
+- **찾는 법**: export마다 자기 파일 밖 등장 수를 셌다(0이면 후보). 후보의 `export`를 잠시 떼고 tsc `noUnusedLocals`로 진짜 죽은 것만 골랐다(지우면 다음 층이 드러나 세 번 돌림). 모듈은 상대 import를 풀어 아무도 안 부르는 파일을 찾았다. 영역 여섯(core · render 둘 · ui 둘 · meta)은 읽기 전용 조사를 따로 돌렸다.
+- **지운 파일 셋**: `ui/customView.ts`(10-31 UI 교체 뒤 아무도 안 부름) · `ui/gallery.ts` · `meta/index.ts`(배럴. 쓰던 다섯 곳은 하위 모듈을 바로 부른다. 배럴에만 있던 이중 정의 `StickSkinId` · `WAZA_UNLOCK_DEFAULT` · `MissionId`와 이름이 헷갈리던 `applyJuiceToMissions` 별칭도 같이 사라짐).
+- **지운 함수 · 상수**:
+  - render · ui: `screenfx.drawPrelude` · `shopArt.swordArt`와 그것만 쓰던 `bladeFx.drawBladeShot`(그 시험 1건 포함) · `isLayoutEditorOpen` · `isMaskEditorOpen` · `sessionDiff` · `mountDebugPanel`(scenes가 먼저 붙여서 늘 빈 호출) · 아이콘 21개 · 상품 그림 `stamp` · bladeFx 조각 종류 `cut` · `ghost`(뿌리는 곳 0) · `PRESS.fall`.
+  - meta · content · input: 별칭 13개(`WAZA_CATALOG` · `grantDust` · `MISSIONS` 등) · 죽은 글(`GIMMICK_ZONES` · `CHECKPOINT_LABEL` · `TITLE` · `gameoverQuip` · `chapterLines` · 아무도 안 읽는 `blurb` · `locked` 등) · input `anyPressed` · 미션 이벤트 `runEnd` · `survive` 분기(보내는 곳 0).
+  - config 키: `PRELUDE_*` · `GUARD_STARTUP_AIR` · `CANNON.SPARK_V/H` · `PITCH_STEP_PER_10_COMBO` · `ONOMATO_POP*` · `PLAYER.W` · `BOSS.W/H`.
+  - 화면: 만들기만 하고 안 읽던 뷰 필드 9개(`TitleView.bestTokoton` 등) · 부르는 곳 없는 `onMaskEdit` 전달 길.
+  - CSS: 옛 이름 변수 28개 · keyframes 넷(`pop` · `pop2` · `halfA` · `halfB`) · `.seal.no`.
+- **합친 것**: 난수 해시 `hs` 네 벌을 `render/ink.ts` 하나로(식은 글자 그대로). 먼지 색 `PUFF`는 `effects.PUFF_FILL`을 import한다(불변 10 「같은 것은 같은 색」).
+- **가드 고침**: `checkpoints.test`가 아무도 안 읽는 `ACT2.*_HP` 사본을 지키고 있었다. 실제 층 HP는 `MAT_HP`이고 `makeFloor`가 읽는다(`MAT_HP`를 바꿔도 가드가 안 깨졌다). 사본을 지우고 가드가 `MAT_HP`를 읽게 했다. 값은 그대로다.
+- **주석 정정**: 철거된 기능(기록 재생 · 필살 예비동작 링 · 점프 무적 · 토스트 보상 · 하단 연결 예시)을 말하던 주석 20여 곳.
+- **안 한 것**:
+  - 졸라맨 PNG 시트 길 · `drawAsset('crate')`: 지금은 안 쓰지만 「스프라이트는 코덱스로 교체 예정 · 인터페이스 유지」(참고) 자리라 남김.
+  - `ONOMATO` 사전: `juice.ts` 머리가 「다시 쓸 때를 위해 카피만 둔다」고 정해 둠.
+  - 저장 · 결제 경로 중복(검증 도우미 `rec` · `nat` 복붙, 지급 세 곳): 위험이 커서 보류.
+  - 큰 파일 쪼개기(scenes 1873줄 · overlay 1301줄): 시험 없는 화면 코드라 보류.
+  - 프레임마다 생기는 배열 · 클로저(`ink.strokeAlong` 등), 소리 합성 중복, core 매직 넘버 config 옮기기: 화면 · 소리 대조가 따로 필요해 보류.
+- **검증**: tsc 0 · 858 테스트(7 건너뜀, 지운 함수의 시험 1건 빠짐, 글꼴 시험 포함) · 빌드 · 에셋 예산 OK. 화면은 기준판(`6991a10`)과 `tmp/cap/ink.mjs` 두 화면비(390×844 · 416×657) 57장을 화소로 맞댔다. 정적 화면 12장은 화소까지 같다. 나머지는 기준판끼리 두 번 찍은 흔들림(배경 애니메이션 · 창이 뜨는 중간 프레임)과 같은 범위이고, 차이 큰 장은 그림으로 봐서 내용이 같음을 확인했다. 판 안 그림은 렌더 · 이펙트 시험으로만 봤다.
+- **발견(안 고침)**: 조사에서 불변 4 「콤보 전수 목록」(`combat.ts` 머리)에 빠진 경로 후보가 나왔다. 0으로: 버터바 접지(`sim.ts` `breakCombo`) · 종탑 내려찍기 지면 가드(`landmark.ts`). +1: 시간차 필살 · 명물 베기. 확인한 뒤 목록을 고칠 일이다.

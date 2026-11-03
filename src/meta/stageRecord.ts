@@ -1,5 +1,5 @@
 // 작업 지시서 기록 — 순수 산술. 판정은 core/stage.ts(judgeStage), 글은 content/stages.ts, 저장 키는 storage.ts stages.
-// 공유하는 숫자는 정규 하나다(docs/STAGES_2026-10-31.md §4). 견습 · 외주는 램프 한 칸만 남긴다.
+// 기록하는 숫자는 정규 하나다(docs/STAGES_2026-10-31.md §4). 견습 · 외주는 램프 한 칸만 남긴다.
 
 import { STAGES } from '../core/stages';
 import type { StageResult, StageStamps } from '../core/stage';

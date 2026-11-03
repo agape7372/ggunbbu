@@ -70,7 +70,7 @@ const POOL = JUICE_SYS.PARTICLE_POOL;
 const DUST = ['#B9B3A6', '#948E82', '#6E695F'] as const;
 const HAT_WHITE = '#FFFFFF'; // 안전모 — sprites.ts hardHat과 같은 흰색
 const BUTTER = ['#E39E00', '#C98A12'] as const; // 버터 방울 — 형광 노랑 대신 짙은 버터색 둘
-const PUFF_FILL = '#D9D2C3';  // 만화 먼지 구름 면 — 하늘(아이보리)보다 어둡고 잉크보다 한참 밝다
+export const PUFF_FILL = '#D9D2C3';  // 만화 먼지 구름 면 — 하늘(아이보리)보다 어둡고 잉크보다 한참 밝다
 
 function blank(): Particle {
   return {
@@ -752,8 +752,7 @@ export function spawnBellShatter(x: number, y: number): void {
 }
 
 /**
- * consumeEvents 루프용. 캔버스 좌표로 변환한 뒤 spawnHitParticles에 위임.
- * 병렬 renderer가 이 이름을 이미 import하므로 유지한다.
+ * renderer가 이벤트마다 부른다. 캔버스 좌표로 바꿔 그림을 뿌린다.
  */
 export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   bladeReact(s, e); // 대검 덧칠 — 베기 자국·잔상·칼마다 파편(bladeFx)
@@ -789,7 +788,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     return;
   }
   if (e.kind === 'gaugeFull') {
-    // 필살이 찼다 — 몸을 감는 먹 엔소 하나(필살 예비동작이 긋는 원의 예고). 피어오르는 먹 방울은 weaponFx
+    // 필살이 찼다 — 몸을 감는 먹 엔소 하나. 피어오르는 먹 방울은 weaponFx
     ensoAt(x, VIEW.GROUND_Y - s.player.y - 31, 20, 16, 0.5, 4.5);
     return;
   }

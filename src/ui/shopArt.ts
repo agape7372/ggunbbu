@@ -5,12 +5,11 @@
 import { COSMETIC_COLORS, PALETTE, PLAYER } from '../config';
 import type { PlayerPose, WazaId } from '../core/types';
 import type { Loadout, WeaponId } from '../meta/types';
-import { drawBladeShot } from '../render/bladeFx';
-import { inkBlot } from '../render/ink';
+import { hs, inkBlot } from '../render/ink';
 import { drawWazaShot } from '../render/wazaShow';
 import { MASK_DRAW } from '../config';
 import { drawGreatsword, drawMask, drawPlayer, playerHead, setPlayerCosmetics, setPlayerWeapon } from '../render/sprites';
-import { BLUE, GOLD, INK, PAPER, SEAL, brush, hs, orb, paintGoods, paintPaths, patch, ring, type P } from './goodsArt';
+import { BLUE, GOLD, INK, PAPER, SEAL, brush, orb, paintGoods, paintPaths, patch, ring, type P } from './goodsArt';
 
 export interface Look {
   weapon: WeaponId;
@@ -26,12 +25,6 @@ const ART_H = 79;
 const FOOT_Y = 74;
 /** 필살 칸 — 필살 연출이 머리 위로 솟는다(낙뢰 · 쳐올림). 그만큼 위로 길다 */
 const WAZA_H = 96;
-/** 대검 칸 — 칼만 눕혀 그려 가로로 길다 */
-const SWORD_H = 60;
-/** 칼 뒤 층 깨기 장면 — 칼날 가운데쯤, 판보다 조금 작게 */
-const SHOT_X = 32;
-const SHOT_Y = 21;
-const SHOT_K = 0.7;
 /** 마스크 칸 — 윗몸을 2배로. 마스크 가운데가 그림 가로 가운데·위에서 BUST_Y(배율 전) */
 const BUST_K = 2;
 const BUST_Y = 15;
@@ -119,28 +112,6 @@ export function playerArt(look: Look): string {
   return snap(`p|${look.weapon}|${look.body}|${look.blade}|${look.pose}`, ART_H, (ctx) => player(ctx, look, FOOT_Y));
 }
 
-/** 대검 그림 — 칼만 비스듬히, 판 속의 두 배. 졸라맨을 세우면 칼빛 호가 그림을 덮어 여덟 칸이 같아 보인다.
- *  칼 뒤엔 그 칼의 층 깨기 한 장면 — 사기 전에 무엇이 터지는지 보인다 */
-export function swordArt(id: WeaponId): string {
-  return snap(`s|${id}`, SWORD_H, (ctx) => {
-    ctx.save();
-    ctx.translate(SHOT_X, SHOT_Y);
-    ctx.scale(SHOT_K, SHOT_K);
-    drawBladeShot(ctx, id, 0, 0);
-    // 가장자리로 갈수록 옅게 — 그림이 칸보다 좁아 장면 끝이 칸 안에서 직선으로 잘려 보이지 않게(칼은 이 뒤에 그려 그대로)
-    ctx.setTransform(SCALE, 0, 0, SCALE * 0.75, (ART_W / 2) * SCALE, (SWORD_H / 2) * SCALE);
-    const fade = ctx.createRadialGradient(0, 0, 33, 0, 0, 40);
-    fade.addColorStop(0, '#000');
-    fade.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.fillStyle = fade;
-    ctx.fillRect(-40, -40, 80, 80);
-    ctx.restore();
-    ctx.scale(2, 2);
-    drawGreatsword(ctx, id, 9, 24, 37, 4);
-  });
-}
-
 /** 효과글자 그림 — 이 코스메틱이 바꾸는 건 콤보 숫자(50 미만) 색 하나라, 그 숫자가 차오르는 모습 */
 export function lettersArt(id: string): string {
   const color = colorOf('letters', id);
@@ -151,7 +122,7 @@ export function lettersArt(id: string): string {
   }, true);
 }
 
-/** 필살 그림 — 판 화면을 줄인 한 장면: 건물 · 필살 자세 졸라맨(장착한 칼 · 색) · 그 필살의 먹 연출(일곱이 다 다르다). 글자 딱지 없음(11-01) */
+/** 필살 그림 — 판 화면을 줄인 한 장면: 건물 · 필살 자세 졸라맨(장착한 칼 · 색) · 그 필살의 먹 연출(여섯이 다 다르다). 글자 딱지 없음(11-01) */
 export function wazaArt(id: string, look: Omit<Look, 'pose'>): string {
   return snap(`w|${id}|${look.weapon}|${look.body}|${look.blade}`, WAZA_H, (ctx) => {
     setPlayerWeapon(look.weapon);

@@ -32,7 +32,7 @@ export function giveReward(inv: Inv, r: Reward): void {
   inv.blanks += r.masks ?? 0;
 }
 
-/** 보상 한 줄 — 토스트 · 팝업 · 칸 설명 */
+/** 보상 한 줄 — 칸 설명 · 소제목 · aria-label(보상은 rewardFx로 보이고 토스트로 되돌리지 않는다, 불변 15) */
 export function rewardText(r: Reward): string {
   const out: string[] = [];
   if (r.dust) out.push(`먼지 ${r.dust.toLocaleString('ko-KR')}`);

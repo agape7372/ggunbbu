@@ -36,10 +36,6 @@ let panel: HTMLElement | null = null;
 let closeHook: (() => void) | null = null;
 let release: (() => void) | null = null;
 
-export function isLayoutEditorOpen(): boolean {
-  return panel !== null;
-}
-
 /** 열려 있었으면 저장 없이 닫고 true — 뒤로가기가 먼저 부른다 */
 export function closeLayoutEditor(): boolean {
   if (!panel) return false;

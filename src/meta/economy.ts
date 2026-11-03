@@ -126,12 +126,6 @@ export const ORBIT_MISSION_BASE = 12;
 /** 한 판 광고 부활 상한 */
 export const MAX_REVIVES_PER_RUN = 3;
 
-/** 표시명 · index 별칭 */
-export const DUST_NAME = '먼지';
-export const ORBIT_NAME = '궤도조각';
-export const REVIVE_MAX = MAX_REVIVES_PER_RUN;
-export const MISSION_AD_MULT = 2;
-
 /** 올려베기 · 용오름 해금 */
 export const WAZA_ORBIT_COST = 80;
 
@@ -200,10 +194,6 @@ export function exchangeDust(inv: Wallet): boolean {
   inv.dust -= DUST_EXCHANGE.dust;
   inv.orbit += DUST_EXCHANGE.orbit;
   return true;
-}
-
-export function grantDust(inv: Wallet, n: number): void {
-  grant(inv, n, 0);
 }
 
 export function grantOrbit(inv: Wallet, n: number): void {

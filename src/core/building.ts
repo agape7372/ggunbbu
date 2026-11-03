@@ -83,7 +83,7 @@ export function floorSpan(stack: FallingStack, i: number): [number, number] {
 }
 
 /**
- * 히트박스 [lo, hi]와 겹치는 가장 낮은 층에 dmg. 층 붕괴 시 true 반환.
+ * 히트박스 [lo, hi]와 겹치는 가장 낮은 층에 dmg.
  * 반환: 'miss' | 'hit' | 'collapse'
  */
 export function damageStack(

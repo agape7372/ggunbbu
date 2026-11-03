@@ -52,14 +52,15 @@ import {
 } from './overlay';
 import { applySettingsPatch as patchSettings, applySettingsToRuntime, type SettingsSinks } from './settings';
 import {
-  applyMissionEvent, ensureDaily, grant, grantOrbit, initAchieveProgress,
-  MAX_REVIVES_PER_RUN, ORBIT_PER_AD, ACHIEVES, DAILY_POOL, claim, defById,
-  equip, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
+  grant, grantOrbit, MAX_REVIVES_PER_RUN, ORBIT_PER_AD, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
   dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY, MASK_DUST_COST,
-  claimableCount, nextDustGoal, adOrbitLeft, noteAdOrbit,
-  betterGrade, isOpId, licenseTitle, opGrade, opLimitTicks, opValue, takeExam, type OpId,
-} from '../meta';
-import { kstDateKey } from '../meta/missions';
+  nextDustGoal, adOrbitLeft, noteAdOrbit, licenseTitle, takeExam,
+} from '../meta/economy';
+import { equip } from '../meta/loadout';
+import {
+  applyMissionEvent, ensureDaily, initAchieveProgress, ACHIEVES, DAILY_POOL, claim, defById, claimableCount, kstDateKey,
+} from '../meta/missions';
+import { betterGrade, isOpId, opGrade, opLimitTicks, opValue, type OpId } from '../meta/ops';
 import { buyKit, clampPick, isBare, kitDef, kitSheetUseful, pickCount, spendKit, type KitId, type KitPick } from '../meta/kit';
 import {
   FIRST_GIFT, SALARY_DAYS, SKUS, dustOf, effPct, grantSku, orbitOf, skuById, soldOut, takeRegular, type SkuId,
@@ -1352,7 +1353,6 @@ export function createApp(
     onUnlockOrbit: (id) => unlockOrbitItem(id),
     onUnlockDust: (id) => unlockDustItem(id),
     onEquip: (slot, id) => doEquip(slot, id),
-    onMaskEdit: () => openMaskBoard(save.maskId || null), // 옛 길 — 상점은 이제 onEquip('mask-edit' · 'mask-new')로 보낸다
     onExchangeDust: doExchange,
     onHowtoDone: () => { save.howtoSeen = true; saveSave(save); homeNudge(); },
     onResetData: resetData,
@@ -1712,11 +1712,8 @@ export function createApp(
       canRevive: revivesUsed < MAX_REVIVES_PER_RUN,
       adRevive: ads.ready() && !adFree(),
       reviveLeft: MAX_REVIVES_PER_RUN - revivesUsed,
-      reviveMax: MAX_REVIVES_PER_RUN,
       line,
       best,
-      mode: runLabel,
-      rank: licenseTitle(save.license),
     };
   }
 
@@ -1753,7 +1750,6 @@ export function createApp(
         seconds ? [SCREENS.ops.held, `${value}초`, true] : [SCREENS.ops.built, `${value}채`, true],
       ],
       progress: SCREENS.ops.progress(id, value),
-      rank: licenseTitle(save.license),
     };
     scene = 'gameover'; // 카드가 뜰 때까지의 박자는 게임오버와 같다. 카드가 뜨면 opsend
     setChrome('gameover');
@@ -1866,8 +1862,4 @@ export function createApp(
     draw,
     getState: () => state,
   };
-}
-
-export function mountDebugPanel(getState: () => GameState | null): void {
-  mountDebugMenu(getState);
 }

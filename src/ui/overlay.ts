@@ -26,7 +26,8 @@ import { goods } from './goodsArt';
 import type { PackView } from './packView';
 import { kitDef, type KitId, type KitPick } from '../meta/kit';
 import type { OpGrade } from '../meta/ops';
-import { dailyDone, licenseTitle } from '../meta';
+import { licenseTitle } from '../meta/economy';
+import { dailyDone } from '../meta/missions';
 import { APP_VERSION } from '../version';
 import type { Loadout } from '../meta/types';
 import { escapeHtml, infoHtml } from './html';
@@ -57,11 +58,7 @@ export interface TitleView {
   tokotonOpen: boolean;
   butterTier: number;
   bestArcade: number;
-  bestTokoton: number;
-  maxCombo: number;
-  unlockedChapters: number;
   buddhaMode: boolean;
-  soundOn: boolean;
   /** 지갑 */
   dust: number;
   orbit: number;
@@ -99,14 +96,9 @@ export interface GameOverView {
   /** 광고 경로 실재 여부 — false(웹)면 광고 문구 없는 "일어나기" (08-30, P0-2) */
   adRevive: boolean;
   reviveLeft: number;
-  reviveMax: number;
   line: string;
   /** 이번 판이 그 모드 최고 기록을 넘었나 */
   best: boolean;
-  /** 모드 이름 */
-  mode: string;
-  /** 철거 자격 칭호 */
-  rank: string;
   /** 떨어진 건물 조각 그림 = 죽은 구역의 층 */
   theme: string;
 }
@@ -127,7 +119,6 @@ export interface OpsEndView {
   rows: readonly [string, string, boolean?][];
   /** 도장 없을 때 다음 도장까지 한 줄 */
   progress: string;
-  rank: string;
 }
 
 export interface EndingView {
@@ -210,8 +201,6 @@ export interface OverlayHandlers {
   onUnlockDust(id: string): void;
   onExchangeDust(): void;
   onEquip(slot: string, id: string): void;
-  /** 상점 마스크 「그리기」 — 도트판은 씬이 연다 */
-  onMaskEdit(): void;
   onKitBuy(id: string): void;
   onRestore(): void;
   onHowtoDone(): void;
@@ -1211,7 +1200,6 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         onExchange: () => h.onExchangeDust(),
         onExam: () => h.onExam(),
         onEquip: (slot, id) => h.onEquip(slot, id),
-        onMaskEdit: () => h.onMaskEdit(),
         onKitBuy: (id) => h.onKitBuy(id),
         onRestore: () => h.onRestore(),
         onCoffee: () => h.onCoffee(),
@@ -1282,11 +1270,7 @@ export function titleViewFromSave(save: SaveData, selected: number, debugOpen = 
     tokotonOpen: unlocked || save.act2Cleared,
     butterTier: unlocked ? Math.max(3, save.butterTierReached) : save.butterTierReached,
     bestArcade: save.bestArcade,
-    bestTokoton: save.bestTokoton,
-    maxCombo: save.maxCombo,
-    unlockedChapters: chapters,
     buddhaMode: save.buddhaMode && import.meta.env.DEV,
-    soundOn: save.settings.sound,
     dust: save.dust,
     orbit: save.orbit,
     todayDone: today.done,

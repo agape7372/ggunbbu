@@ -8,7 +8,7 @@
 // 알파로 지우지 않는다 — 획은 꼬리부터 깎이고(s0) 마르고, 튐 · 방울은 줄고, 금박은 접혀 사라진다.
 // 대검은 모양 값이라 비쌀수록 화려하다 — 1200부터 칼 기운과 완파 때 모티프 한 번 더(tint).
 // 콤보 50·100·200에서 한 단씩 커지고(100부터 겹 베기), 고비(50·100·200·500·999)를 넘는 타격은 한 번 크게.
-// 연장 넷·필살 셋·게이지 참·콤보 끊김·깔림 탈출·마스크 도트와 연타 줄 박자는 weaponFx.ts — 이 풀과 뿌리개를 빌려 쓴다.
+// 연장 넷·게이지 참·콤보 끊김·깔림 탈출·마스크 도트와 연타 줄 박자는 weaponFx.ts — 이 풀과 뿌리개를 빌려 쓴다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, SEAL_INK, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
@@ -18,16 +18,16 @@ import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites
 import { drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
 
 /** 먹 조각: stroke 곧은 붓 획 · sweep 호 붓 획 · zig 꺾은 획(철골 · 지그재그 · 얼음 금) · dots 리벳 점 줄 · spat 먹 튐 · drop 먹 방울(땅에 닿으면 번짐) ·
- *  dust 마른 가루 · leaf 금박 · cut · ghost 옛 자국 · 잔상(이제 뿌리지 않는다, weapon-fx 시험이 이름을 쓴다)
+ *  dust 마른 가루 · leaf 금박
  *  — 아래 줄은 weaponFx가 그린다: pix 마스크 도트 · hook 붓 획 · nail 불티 분수 · disc 먹 튐 · chunk 나는 먹 · arc 끊긴 붓 고리 */
 export type Kind =
-  | 'cut' | 'stroke' | 'sweep' | 'zig' | 'dots' | 'spat' | 'drop' | 'dust' | 'leaf' | 'ghost'
+  | 'stroke' | 'sweep' | 'zig' | 'dots' | 'spat' | 'drop' | 'dust' | 'leaf'
   | 'pix' | 'hook' | 'nail' | 'disc' | 'chunk' | 'arc';
 
 /** 그리는 순서 — 가루 · 붓 잔상이 뒤, 베기 획 · 튐이 가운데, 날아가는 방울 · 금박이 맨 앞 */
 const LAYER: Record<Kind, number> = {
-  disc: 0, dust: 0, sweep: 0, ghost: 0,
-  cut: 1, hook: 1, arc: 1, stroke: 1, zig: 1, dots: 1, spat: 1,
+  disc: 0, dust: 0, sweep: 0,
+  hook: 1, arc: 1, stroke: 1, zig: 1, dots: 1, spat: 1,
   pix: 2, nail: 2, chunk: 2, drop: 2, leaf: 2,
 };
 
@@ -38,14 +38,14 @@ export interface Bit {
   life: number; max: number;
   size: number; rot: number; spin: number;
   c1: string; c2: string;
-  /** 둘째 치수 — cut · stroke · sweep · zig 두께 · ring 퍼지는 폭 · burst 가시 수 · plate 세로 비 · spark 굵기 · spat · dust · dots 개수 */
+  /** 둘째 치수 — stroke · sweep · zig 두께 · spat · dust · dots 개수(weaponFx 조각은 저마다 다르게 쓴다) */
   v: number;
-  /** 표식 — cut 빗금 · ring 세로 배율(1 = 원) · coin 리벳 · plate 철골 · burst 얼음 · stroke 휨 */
+  /** 표식 — stroke 휨(weaponFx 조각은 저마다 다르게 쓴다) */
   a: number;
   bounce: number;
   seed: number;
   /** 먹 조각 — dry 마름(비백) · pr 누름 곡선(PRESSES 번호) · sw 호 각(sweep) · gr 앞 몇 %에 다 그어지나(spat은 > 0이면 번진다) ·
-   *  st 공사중 빗금(stroke · sweep) · drop은 1이면 땅에 번진 먹 · hold 속 색이 남는 몫(0 = 앞 18%, 빗금은 55%) · pts 꺾은 획의 점들(zig, x·y 기준 상대 좌표) */
+   *  st 공사중 빗금(stroke · sweep) · drop은 1이면 땅에 번진 먹 · hold 속 색이 남는 몫(0 = 앞 40%, 빗금은 55%) · pts 꺾은 획의 점들(zig, x·y 기준 상대 좌표) */
   dry: number; pr: number; sw: number; gr: number; st: number; hold: number; pts: readonly number[];
   /** 필살 그림 — 풀이 넘쳐도 덮지 않는다(keepBits) */
   keep: boolean;
@@ -111,7 +111,7 @@ export function keepBits(draw: () => void): void {
 }
 
 /** v가 굵기인 조각 — 키울 때 같이 굵어진다(나머지는 v가 개수 · 납작 배율) */
-const WIDE: ReadonlySet<Kind> = new Set<Kind>(['cut', 'stroke', 'sweep', 'zig', 'ghost', 'hook', 'arc']);
+const WIDE: ReadonlySet<Kind> = new Set<Kind>(['stroke', 'sweep', 'zig', 'hook', 'arc']);
 let big: { k: number; x: number; y: number } | null = null;
 /**
  * 크게 — 이 안에서 뿌린 조각은 (x, y)를 축으로 k배(자리 · 크기 · 굵기 · 속도 · 무게)이고 WEAPON_FX.LIFE배 오래 산다. 땅 밑으로는 안 간다.
@@ -644,19 +644,6 @@ export function bladeAura(s: GameState): void {
   const x = VIEW.LANE_X[s.player.lane];
   const y = GROUND - s.player.y;
   r.aura([x + b[0], y + b[1], x + b[2], y + b[3]], auraN++, inkOf(s.weapon));
-}
-
-/** 상점 진열 사진 — 이 칼의 층 깨기를 t초 지난 모습으로 한 장. 상점은 로비 탭이라 판 풀을 잠깐 빌린다(앞뒤로 비움) */
-export function drawBladeShot(ctx: CanvasRenderingContext2D, w: WeaponId, x: number, y: number, t = 0.14): void {
-  const g = greatLook(w);
-  if (!g) return;
-  resetBladeFx();
-  const col = inkOf(w);
-  stroke(x, y, 0.3, 60, 6, col, { life: 0.3, stripes: g.shape === 'stripe' ? 1 : 0 });
-  RECIPES[g.shape].floor(x, y, 1, col);
-  for (let k = t; k > 1e-6; k -= TICK) updateBladeFx(Math.min(TICK, k));
-  drawBladeFx(ctx, 0);
-  resetBladeFx();
 }
 
 export function resetBladeFx(): void {

@@ -1,4 +1,4 @@
-// 먹 한 획 — 붓과 먹으로 그린 모양들(그리기만, 상태 없음). effects.ts 파티클과 screenfx 필살 예비동작이 같이 쓴다.
+// 먹 한 획 — 붓과 먹으로 그린 모양들(그리기만, 상태 없음). 판 이펙트 · 필살 연출 · 명물 · 상점 그림이 같이 쓴다.
 // 이 모양들은 옅어지며 사라지지 않는다: 먹 방울은 줄고, 땅에 떨어지면 번졌다 오그라들고,
 // 엔소(붓으로 그은 원)는 시작점부터 말라 세 갈래(비백)로 갈라지며 끊긴다.
 // 색은 부르는 쪽이 fillStyle로 정한다 — 여기선 모양만.
@@ -23,7 +23,7 @@ export function hotCore(ctx: CanvasRenderingContext2D, f: number, draw: (k: numb
 const SPAN = TAU * 0.93;
 
 /** 결정적 흔들림 0..1 — 그릴 때마다 같은 모양이어야 해서 난수를 안 쓴다 */
-function hs(seed: number, k: number): number {
+export function hs(seed: number, k: number): number {
   const v = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453;
   return v - Math.floor(v);
 }
@@ -119,8 +119,6 @@ export const PRESS = {
   /** 한 일(一) — 붓머리를 눌러 대고, 몸은 조금 가늘게, 끝에서 다시 눌렀다 뗀다(돈필) */
   yi: (s: number): number => Math.min(1, s / 0.02, (1 - s) / 0.03)
     * (0.8 + 0.32 * Math.exp(-(((s - 0.07) / 0.06) ** 2)) + 0.3 * Math.exp(-(((s - 0.92) / 0.05) ** 2))),
-  /** 내리꽂기 — 하늘에서 가늘게 들어와 땅에 닿을수록 굵다(낙뢰) */
-  fall: (s: number): number => Math.min(1, s / 0.1) * (0.6 + 0.4 * s) * Math.min(1, (1 - s) / 0.02 + 0.5),
 } as const;
 
 /**

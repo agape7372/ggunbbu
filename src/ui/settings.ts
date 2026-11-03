@@ -1,4 +1,4 @@
-// 설정 적용 레이어. DOM 시트는 overlay.ts 취급설명서가 담당 — 여기선 중복 그리지 않는다.
+// 설정 적용 레이어. DOM 화면은 overlay.ts 「작업 수칙」이 담당 — 여기선 중복 그리지 않는다.
 // leftHanded → touch.setLeftHanded, shake/vibration → renderer.setFeedbackOptions, sound → audio.
 
 import type { ButtonLayout } from '../input/layout';

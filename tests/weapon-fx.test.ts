@@ -45,9 +45,9 @@ function traced(draw: (c: CanvasRenderingContext2D) => void): string {
 const ev = (kind: JuiceKind, combo = 10): JuiceEvent => ({ kind, lane: 0, y: 120, combo, n: 4 });
 
 /** 자국(베기 자국·잔상)을 뺀 조각 수 — 톱날 대검 평타는 기존 그대로 자국 포함 11개라 상한은 조각으로 잰다 */
-const pieces = (): number => liveBits().filter((p) => p.k !== 'cut' && p.k !== 'ghost').length;
+const pieces = (): number => liveBits().length;
 /** 붓 획 · 베기 자국 — 연장은 hook, 대검은 stroke(먹 붓 획) · cut(옛 렌즈 자국) */
-const strokes = (): Bit[] => liveBits().filter((p) => p.k === 'cut' || p.k === 'hook' || p.k === 'stroke');
+const strokes = (): Bit[] => liveBits().filter((p) => p.k === 'hook' || p.k === 'stroke');
 const kinds = (): string => [...new Set(liveBits().map((p) => p.k))].sort().join(' ');
 
 /** 다 흘려 보낸다 — 2초 */

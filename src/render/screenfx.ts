@@ -1,4 +1,4 @@
-// 화면 단위 연출 — 번쩍(다단: 다침 · 사망 · 궤도 낙하만 건다) · 공사 테이프 · 필살 예비동작(엔소·유령) · 사망 틀 · 지면선 번쩍
+// 화면 단위 연출 — 번쩍(다단: 다침 · 사망 · 궤도 낙하만 건다) · 공사 테이프 · 사망 틀 · 지면선 번쩍
 // · 집중선 · 색 반전(큰 한 방) · 완파 자막 판 「N층 철거!」 · 콤보 속도선. 11-01 (3)에 걷었던 집중선 · 반전 · 자막 판은
 // 11-01 (5)에 옛 판(0c8ae64)으로 되돌렸다(「건물파괴 스타일은 옛날이 낫고」). 필살은 inkFrame으로 반전 프레임을 따로 건다.
 // 파티클(effects.ts)과 달리 "화면 전체나 한 줄"을 그리는 것들이다. core는 모른다. 상태는 이 모듈에만 있다.
@@ -6,7 +6,6 @@
 
 import { JUICE_SYS, PALETTE, VIEW } from '../config';
 import { flashMul } from './feel';
-import { enso, inkDrop } from './ink';
 
 /** 먹 붓글씨(동해독도) — 25px 이상에만. 캔버스는 DOM이 아직 안 쓴 글꼴을 대체 글꼴로 그리니 불러올 때 한 번 당겨 둔다 */
 export const brushFont = (px: number): string => `${Math.round(px)}px "East Sea Dokdo", "Black Han Sans", serif`;
@@ -141,31 +140,6 @@ export function drawGroundLine(ctx: CanvasRenderingContext2D): void {
   ctx.save();
   ctx.fillStyle = PALETTE.INK;
   ctx.fillRect(-16, VIEW.GROUND_Y - 1.5, VIEW.W + 32, 3);
-  ctx.restore();
-}
-
-// ── 필살 예비동작 — 붓이 졸라맨 둘레에 엔소를 긋는다 ─────────────
-/**
- * u = 0 → 1 (예비동작 진행). 월드 좌표(카메라 안쪽) (x, y)가 중심.
- * 원은 바깥에서 안으로 좁아지며 붓이 한 바퀴를 그어 가고(먹을 머금어 굵어진다), 먹 방울이 사방에서 빨려 든다.
- * 다 그은 원은 풀리는 틱에 노랑으로 터져 나간다(effects 필살 엔소) — 여기엔 노랑이 없다(노랑 = 베는 순간).
- */
-export function drawPrelude(ctx: CanvasRenderingContext2D, u: number, x: number, y: number): void {
-  const p = Math.max(0, Math.min(1, u));
-  const r = 40 + (JUICE_SYS.PRELUDE_RING_R - 30) * (1 - p) * (1 - p);
-  const drawn = 0.12 + 0.88 * (p < 0.5 ? 2 * p * p : 1 - 2 * (1 - p) * (1 - p)); // 붓질 — 천천히 대서 빨라졌다 감속
-  const w = 3 + 9 * p;
-  ctx.save();
-  ctx.fillStyle = PALETTE.WHITE; // 종이 테 — 건물·밤 위에서도 먹 획이 읽히게
-  enso(ctx, x, y, r, w + 5, -Math.PI / 2, 0, drawn, 0, 1, 7);
-  ctx.fillStyle = PALETTE.INK;
-  enso(ctx, x, y, r, w, -Math.PI / 2, 0, drawn, 0, 1, 7);
-  // 빨려 드는 먹 방울 — 바깥에서 원으로, 다가올수록 작아진다
-  for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2 + 0.3 + (i % 2) * 0.12;
-    const d = r + 10 + (34 + (i % 3) * 14) * (1 - p);
-    inkDrop(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d, 1.4 + 1.6 * (1 - p), a + Math.PI, 3 + 9 * (1 - p));
-  }
   ctx.restore();
 }
 

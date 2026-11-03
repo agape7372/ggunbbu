@@ -68,11 +68,11 @@ let bossMark = '';
 let lastTick = -1;
 
 /**
- * 필살 예비동작 — 히트스톱 동안 링이 수축하고, 끝나는 틱에 쥐고 있던 이벤트를 한꺼번에 푼다.
+ * 필살 예비동작 — 히트스톱 동안 필살 연출(wazaShow)이 돌고, 끝나는 틱에 쥐고 있던 이벤트를 한꺼번에 푼다.
  * before = 시작할 때 서 있던 건물, cut = 풀면서 그 건물에서 부순 층 수(올려베기는 층을 아래부터 차례로 벤다).
  */
 interface Prelude {
-  left: number; total: number; x: number; y: number;
+  left: number;
   ghost: FallingStack | null; held: JuiceEvent[];
   before: FallingStack | null; cut: number;
 }
@@ -332,10 +332,8 @@ function react(s: GameState, e: JuiceEvent): void {
   if (e.kind === 'hatGet') hatFx = { t: 0, n: e.combo ?? s.combo };
   // 글자 팝업 (동시 3개 상한) — 먹 붓글씨, 테 · 노랑 · 그림자 없이(불변 13 · 글자 딱지 없음)
   const combo = e.combo ?? s.combo;
-  // 필살은 의성어 대신 wazaShow가 이름을 세로 붓글씨로 쓴다
-  let word = e.kind === 'special' ? '' : onomatoFor(e.kind, combo);
-  // 타격 · 층 · 완파 · 가드 의성어는 걷었다 — 보스 격파 「작전성공」만 남는다(완파는 screenfx 붓글씨 「N층」)
-  if (e.kind !== 'bossDefeat') word = null;
+  // 의성어는 걷었다 — 보스 격파 「작전성공」만 남는다(완파는 screenfx 붓글씨 「N층」, 필살은 wazaShow 세로 붓글씨)
+  let word = e.kind === 'bossDefeat' ? onomatoFor(e.kind, combo) : null;
   // 상자는 뭘 받았는지가 정보다
   const supply = e.kind === 'supply';
   if (supply && e.item) word = ITEM_COPY[e.item].pop;
@@ -367,18 +365,15 @@ function playEvents(s: GameState, evs: readonly JuiceEvent[]): void {
 
 /**
  * 필살 예비동작 시작 — core는 입력 틱에 건물을 지우고 히트스톱 10틱을 건다(즉응성이 생명이라 그대로).
- * 렌더는 그 정지 동안: ① 사라진 건물을 유령으로 다시 그리고 ② 링을 안으로 수축시키며 ③ 폭발·흔들림·번쩍을 미룬다.
+ * 렌더는 그 정지 동안: ① 사라진 건물을 유령으로 다시 그리고 ② 필살 연출을 시작하며 ③ 폭발·흔들림·번쩍을 미룬다.
  * 끝나는 틱에 쥐고 있던 이벤트를 한꺼번에 푼다.
  */
 function beginPrelude(s: GameState, evs: readonly JuiceEvent[]): void {
-  const total = JUICE.special.hitstop;
   const gone = evs.find((e) => e.kind === 'stackDestroy');
   // 이 묶음에서 건물이 통째로 사라졌고, 방금 그린 건물이 그것일 때만 유령을 쓴다(올려베기로 일부만 깎인 건물은 그대로 서 있다)
   const ghost = gone && !s.stack && lastStack && lastStack.totalFloors === gone.n ? lastStack : null;
   prelude = {
-    left: total, total,
-    x: VIEW.LANE_X[s.player.lane],
-    y: VIEW.GROUND_Y - s.player.y - PLAYER.H / 2,
+    left: JUICE.special.hitstop,
     ghost,
     held: evs.slice(), // 씬이 소비 뒤 events를 비우므로 복사
     before: lastStack,
@@ -777,9 +772,9 @@ function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.restore();
 }
 
-/** 숫자 크기 — 콤보 500까지 (1 + GROW)배로 큰다 */
 /** 콤보 이름표 활자 — 붓 숫자 밑 작은 고정폭(콤보 도장 · 안전모 띠) */
 const LABEL_FONT = `700 ${COMBO_MARK.LABEL_PX - 2}px "Gunbbu Mono", "Gunbbu Sans", monospace`;
+/** 숫자 크기 — 콤보 500까지 (1 + GROW)배로 큰다 */
 const markPx = (n: number): number => COMBO_MARK.PX * (1 + (COMBO_MARK.GROW * Math.min(n, 500)) / 500);
 /** 지나온 고비 수 — 10부터 기울고 30부터 먹 그림자 */
 const markTier = (n: number): number => COMBO_MARK.STEPS.filter((st) => n >= st.at).length;
@@ -1034,7 +1029,6 @@ function bigHat(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
   ctx.restore();
 }
 
-/** 띠 — 양 끝을 비스듬히 자른 먹 띠 + 위아래 노랑 테 한 줄씩. 「안전모!」 한지색 + 「COMBO n」 노랑 */
 /** 안전모 먹 띠 — [s0, s1] 구간만 그어져 있다. 글자는 먹이 지나간 자리 안에서만 보인다(그어지며 드러나고 깎이며 사라진다) */
 function drawHatBand(ctx: CanvasRenderingContext2D, s0: number, s1: number, n: number): void {
   const y = HAT_FX.BAND_Y;
