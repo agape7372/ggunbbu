@@ -72,7 +72,7 @@
     기한 · 전임자는 봇이 잰 값이다. core · config에서 스테이지 판에 닿는 것(공용 PLAYER · GUARD · WEAPON 포함)이나 대본(`core/stages.ts`)을
     바꾸면 다시 잰다(문서 §7-1). 어긋나면 `tests/stage.test.ts`가 깨진다. 스테이지 경로에 `Math.pow` · 삼각함수 금지(기기마다 같은 판).
     **봇이 깬다고 사람이 깨는 게 아니다**(11-01, 봇은 다 깼는데 사용자는 2-1부터 못 깼다). 대본 · 속도를 고치면 사람 대역도 돌린다
-    (`HUMAN=1 DIFFS=0,1 npx vitest run tests/stage-measure.test.ts -t 사람`, 문서 §7-2). 대역은 순수 속도를 못 잰다. 속도는 사람 실측에 맞춘다.
+    (`HUMAN=1 DIFFS=0,1,2 npx vitest run --no-cache tests/stage-measure.test.ts -t 사람` = 지연 6~16 × 연타 8~12 = 판마다 55판, 문서 §7-2). 대역은 순수 속도를 못 잰다. 속도는 사람 실측에 맞춘다.
     기록 코드 · 공유 · 다시 보기는 없다(2026-11-01 뺌, 되살릴 땐 커밋 `8d30fdf`).
     렌더 · 소리는 GameState를 읽기만 한다. 종은 땅에 닿으면 깨진다(빗나감, 깔지 않는다). 깬 뒤 쓰러짐 연출 중엔 안 다친다.
     가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts`.
@@ -86,7 +86,7 @@
 
 ## 검증
 
-- `npm test` — 858 테스트(7 건너뜀, 2026-11-03 리팩토링 기준, `refactor/cleanup`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 860 테스트(7 건너뜀, 2026-11-09 스테이지 재정비 기준, `feat/overhaul-1109`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
   (원본 TTF 8개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 500/700 · 동해독도 · 고운바탕 400/700.

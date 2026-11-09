@@ -483,7 +483,7 @@ describe('종탑 2판', () => {
     expect(s.stack!.y).toBeGreaterThan(VIEW.H - 20);
     expect(s.lm!.x).toBe(2);
     // 받는다
-    for (let i = 0; i < 200 && s.stack!.y > 50; i++) step(s);
+    for (let i = 0; i < 320 && s.stack!.y > 50; i++) step(s); // 종 낙하 VTERM 170: 화면 꼭대기에서 정규 262틱(11-09, 전엔 520이라 200이면 됐다)
     groundGuardPose(s);
     step(s, GUARD);
     expect(s.stage!.tally.bell13).toBe(true);

@@ -4,13 +4,13 @@
 // 기한(par) · 전임자(master)는 이 표에서 정한다(stages.ts 머리 주석).
 import { describe, it } from 'vitest';
 // @ts-ignore — node 타입 없이 돈다(의존성 0). 측정 도구 전용
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 declare const process: { env: Record<string, string | undefined> };
 import type { GameState, InputFrame } from '../src/core/types';
 import { makeState, advance } from '../src/core/sim';
 import { stageSeed, startStage, judgeStage, stageScript } from '../src/core/stage';
 import { STAGES } from '../src/core/stages';
-import { LANDMARK, STAGE } from '../src/config';
+import * as CFG from '../src/config';
 import { lmAct } from '../src/core/landmark';
 import { craneLog, craneWindows, expertBot, fmtTicks, humanBot, runStage, stageBot } from './stageBot';
 
@@ -23,10 +23,22 @@ function cause(s: GameState): string {
   return s.player.pose;
 }
 
-/** TWEAK='{"2-1":{"speed":0.1},"STAGE":{"FAST_SPEED_ADD":0.15}}' — 판 데이터 · STAGE 상수를 이 실행에서만 바꿔 본다(대본은 첫 판을 돌리기 전에만) */
+/** 바꿔 볼 값을 이 실행에서만 얹는다(대본은 첫 판을 돌리기 전에만).
+ *   TWEAK='{"2-1":{"speed":0.1},"STAGE":{"FAST_SPEED_ADD":0.15},"LANDMARK":{"BELL":{"HP":12}},"BOSS":{"HP":200}}'  또는  TWEAK=@경로.json
+ *   키 = 판 id(STAGES 항목) 또는 config.ts 내보낸 객체 이름(STAGE · LANDMARK · BOSS …). 값의 한 단계 깊이까지만 합친다:
+ *   값이 객체(배열 아님)이고 원래도 객체면 Object.assign, 아니면 통째로 바꿔 넣는다(배열은 통째 교체). */
 function tweak(): void {
-  const t = JSON.parse(process.env.TWEAK ?? '{}') as Record<string, object>;
-  for (const [k, v] of Object.entries(t)) Object.assign(k === 'STAGE' ? STAGE : STAGES.find((d) => d.id === k)!, v);
+  const raw = process.env.TWEAK ?? '{}';
+  const t = JSON.parse(raw.startsWith('@') ? readFileSync(raw.slice(1), 'utf8') : raw) as Record<string, Record<string, unknown>>;
+  const plain = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+  for (const [k, v] of Object.entries(t)) {
+    const target = STAGES.find((d) => d.id === k) ?? (CFG as Record<string, unknown>)[k];
+    if (!plain(target)) throw new Error(`TWEAK 키 ${k}: 판 id도 config 객체도 아니다`);
+    for (const [kk, vv] of Object.entries(v)) {
+      if (plain(vv) && plain(target[kk])) Object.assign(target[kk] as object, vv);
+      else target[kk] = vv;
+    }
+  }
 }
 
 describe.skipIf(!process.env.TRACE)('추적', () => {
@@ -63,6 +75,7 @@ describe.skipIf(!process.env.TRACE)('추적', () => {
 //   CRANE=1 DIFFS=0,1 npx vitest run tests/stage-measure.test.ts -t 크레인
 describe.skipIf(!process.env.CRANE)('크레인 창', () => {
   it('짐마다 거는 틈', { timeout: 600_000 }, () => {
+    tweak();
     for (const diff of (process.env.DIFFS ?? '0,1,2').split(',').map(Number) as (0 | 1 | 2)[]) {
       let wave = -1;
       runStage('4-B', diff, {
@@ -79,36 +92,37 @@ describe.skipIf(!process.env.CRANE)('크레인 창', () => {
   });
 });
 
-// 사람 대역 — 반응 지연(틱) × 베기 간격(틱)을 바꿔 가며 몇 번 깨나. 봇 하나의 한 판은 박자 운이 커서 비율로 본다.
-//   HUMAN=1 DIFFS=0,1 npx vitest run tests/stage-measure.test.ts -t 사람   (ONLY · DELAYS=6,8,10,12,14,16 · TAPS=8,10,12 · MARGIN=1 = 막기 여유 ÷ 지연 · FROMBOSS=1 = 보스 연습)
+// 사람 대역 55 — 반응 지연 6~16(열하나) × 베기 간격 8~12(다섯) = 판마다 55번 돌려 몇 번 깨나(%) · 깬 판 평균 시간. 봇 하나의 한 판은 박자 운이 커서 비율로 본다.
+//   HUMAN=1 DIFFS=0,1,2 npx vitest run --no-cache tests/stage-measure.test.ts -t 사람   (ONLY=2-1,3-2 · DELAYS=6,8,10 · TAPS=8,10 로 좁힌다 · OUT=파일 에 한 줄씩 · MARGIN=1 = 막기 여유 ÷ 지연 · FROMBOSS=1 = 보스 연습)
 //   TWEAK=… 로 값을 바꿔 본다(tweak 주석)
-describe.skipIf(!process.env.HUMAN)('사람 대역', () => {
+describe.skipIf(!process.env.HUMAN)('사람 대역 55', () => {
   it('사람 대역이 깨는 비율', { timeout: 3_600_000 }, () => {
     tweak();
     const only = process.env.ONLY?.split(',');
     const diffs = (process.env.DIFFS ?? '1').split(',').map(Number) as (0 | 1 | 2)[];
-    const delays = (process.env.DELAYS ?? '6,8,10,12,14,16').split(',').map(Number);
-    const taps = (process.env.TAPS ?? '8,10,12').split(',').map(Number);
+    const delays = (process.env.DELAYS ?? '6,7,8,9,10,11,12,13,14,15,16').split(',').map(Number);
+    const taps = (process.env.TAPS ?? '8,9,10,11,12').split(',').map(Number);
     for (const d of STAGES) {
       if (only && !only.includes(d.id)) continue;
       for (const diff of diffs) {
         const total = stageScript(d.id).length;
         let ok = 0;
         let lost = 0;
+        let clearTicks = 0;
         const fails = new Map<string, number>();
         for (const delay of delays) {
           for (const tap of taps) {
             const r = runStage(d.id, diff, { policy: humanBot(delay, tap, Math.round(delay * Number(process.env.MARGIN ?? 1))), fromBoss: !!process.env.FROMBOSS });
             const st = r.s.stage!;
-            if (r.result.cleared) { ok += 1; lost += st.tally.lifeLost; continue; }
+            if (r.result.cleared) { ok += 1; lost += st.tally.lifeLost; clearTicks += r.result.ticks; continue; }
             const at = `${st.phase === 'boss' ? '보스' : `${st.step}/${total}`}${r.s.over === 'gameover' ? '' : ' 시간'}`;
             fails.set(at, (fails.get(at) ?? 0) + 1);
           }
         }
         const n = delays.length * taps.length;
         const top = [...fails].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, c]) => `${k}×${c}`).join(' ');
-        const line = `${d.id.padEnd(3)} ${['견습', '정규', '외주'][diff]} ${String(ok).padStart(2)}/${n}`
-          + (ok ? ` 사고 ${(lost / ok).toFixed(1)}` : '') + (top ? ` | 실패 ${top}` : '');
+        const line = `${d.id.padEnd(3)} ${['견습', '정규', '외주'][diff]} ${String(ok).padStart(2)}/${n} ${String(Math.round((ok * 100) / n)).padStart(3)}%`
+          + (ok ? ` 평균 ${fmtTicks(Math.round(clearTicks / ok))} 사고 ${(lost / ok).toFixed(1)}` : '') + (top ? ` | 실패 ${top}` : '');
         console.log(line);
         if (process.env.OUT) appendFileSync(process.env.OUT, line + '\n');
       }
@@ -118,6 +132,7 @@ describe.skipIf(!process.env.HUMAN)('사람 대역', () => {
 
 describe.skipIf(!process.env.MEASURE)('측정', () => {
   it('전 판', { timeout: 1_800_000 }, () => {
+    tweak();
     const only = process.env.ONLY?.split(',');
     const diffs = (process.env.DIFFS ?? '0,1,2').split(',').map(Number) as (0 | 1 | 2)[];
     const rows: string[] = [];
@@ -151,6 +166,7 @@ describe.skipIf(!process.env.MEASURE)('측정', () => {
   // 종탑 정각(BLOCK_PACE) — 종을 떨굴 때(봇이 2막에 못 닿아도 종 주기는 막과 상관없다) 「파 시작부터 센 틱 ÷ 시각」. 기본 봇이 덩이를 안 맞으려면 BLOCK_PACE가 이 최댓값보다 커야 한다.
   // 재려면 config LANDMARK.BELL.BLOCK_PACE 를 크게(9999) 해 둔다. 덩이가 켜지면 측정이 어긋난다
   it('종탑 정각 — 종을 떨굴 때 틱/시', () => {
+    tweak();
     const out: string[] = [];
     for (const [who, policy] of [['기본', stageBot], ['숙련', expertBot]] as const) for (const diff of [1, 2] as const) {
       const s = makeState({ seed: stageSeed('1-B') });
@@ -165,7 +181,7 @@ describe.skipIf(!process.env.MEASURE)('측정', () => {
         s.events.length = 0;
         const lm = s.lm!;
         if (lm.st === 'play' && lm.n > n0) {
-          const hours = LANDMARK.BELL.HOURS[lm.wave];
+          const hours = CFG.LANDMARK.BELL.HOURS[lm.wave];
           const left = hours - n0;
           const ratio = lm.k / hours;
           if (left >= 2) worst = Math.max(worst, ratio);
@@ -179,6 +195,7 @@ describe.skipIf(!process.env.MEASURE)('측정', () => {
 
   // 막별로 봇이 실제로 겪은 창 · 파 수 — 몸이 play에서 sit(앉음) · slam(내려찍기)으로 넘어간 횟수를 막(lmAct)별로 센다. 크레인은 반창(cue 2)을 따로
   it('막별로 겪은 창 · 파', () => {
+    tweak();
     const out: string[] = [];
     for (const id of ['1-B', '2-B', '3-B', '4-B']) for (const diff of [0, 1, 2] as const) {
       for (const [who, policy] of [['기본', stageBot], ['숙련', expertBot]] as const) {
@@ -206,6 +223,7 @@ describe.skipIf(!process.env.MEASURE)('측정', () => {
 
   // 기한 · 전임자 표 — 정규 기본 봇 × 1.3 = 기한, 숙련 봇(점프 마중) = 전임자. 0.5초 단위로 올린다
   it('기한 · 전임자', { timeout: 1_800_000 }, () => {
+    tweak();
     const up = (t: number) => Math.ceil(t / 30) * 30;
     const out: string[] = [];
     for (const d of STAGES) {

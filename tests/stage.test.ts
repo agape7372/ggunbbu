@@ -5,7 +5,8 @@ import { STAGES } from '../src/core/stages';
 import { stageDef, stageScript, stageSeed, startStage } from '../src/core/stage';
 import { makeState, advance } from '../src/core/sim';
 import { EMPTY_INPUT } from '../src/core/types';
-import { HAT, MAT_HP, STAGE } from '../src/config';
+import { BOSS, HAT, MAT_HP, STAGE } from '../src/config';
+import { initBoss, stepBoss } from '../src/core/boss';
 import { addCombo, hurtPlayer } from '../src/core/combat';
 import { runStage, fmtTicks, stageBot, expertBot } from './stageBot';
 
@@ -158,5 +159,33 @@ describe('판정', () => {
     let seen = 0;
     runStage('3-1', 1, { policy: (s) => { seen = Math.max(seen, s.stage!.tally.rockKills.length); return stageBot(s); } });
     expect(seen).toBeGreaterThan(0);
+  });
+});
+
+describe('본사 집행기 전용 값(11-09) — 아케이드 BOSS는 그대로', () => {
+  it('체력 · 둘째 단계 · 탄속은 판에서만 바뀐다', () => {
+    const s = makeState({ seed: stageSeed('HQ') });
+    startStage(s, { id: 'HQ', diff: 1, weapon: 'sword', waza: 'tenchi', fromBoss: true });
+    advance(s, EMPTY_INPUT);
+    expect(s.boss!.hp).toBe(STAGE.EXEC_HP);
+    expect(STAGE.EXEC_HP).not.toBe(BOSS.HP);
+    expect(STAGE.EXEC_TIER2_DMG[0], '견습은 둘째 단계 없음').toBeGreaterThan(BOSS.HP);
+    expect(initBoss().hp).toBe(BOSS.HP);
+  });
+
+  it('둘째 단계 문턱은 난이도를 따라간다', () => {
+    for (const diff of [1, 2] as const) {
+      const s = makeState({ seed: stageSeed('HQ') });
+      startStage(s, { id: 'HQ', diff, weapon: 'sword', waza: 'tenchi', fromBoss: true });
+      advance(s, EMPTY_INPUT);
+      s.boss!.st = 'idle';
+      s.boss!.dmg = STAGE.EXEC_TIER2_DMG[diff] - 1;
+      stepBoss(s);
+      expect(s.boss!.tier, `diff ${diff} 직전`).toBeLessThan(2);
+      s.boss!.st = 'idle'; // 포효가 끝난 뒤
+      s.boss!.dmg = STAGE.EXEC_TIER2_DMG[diff];
+      stepBoss(s);
+      expect(s.boss!.tier, `diff ${diff}`).toBe(2);
+    }
   });
 });

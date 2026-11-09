@@ -3,7 +3,7 @@
 
 import { BOSS_NAME } from '../content';
 import { REJECT, STAGE_MODE, STAGE_TEXT, fmtGap, fmtStageTime, stageOutro } from '../content/stages';
-import { ACT1, BOSS, LANDMARK } from '../config';
+import { ACT1, BOSS, LANDMARK, STAGE } from '../config';
 import { lmAct } from '../core/landmark';
 import { stageDef, stageScript, type StageResult } from '../core/stage';
 import { STAGES } from '../core/stages';
@@ -54,8 +54,8 @@ export interface HudBar { label: string; fill: number; n: number; end: string }
 const BODY = { bell: LANDMARK.BELL, wind: LANDMARK.WIND, pagoda: LANDMARK.PAGODA, crane: LANDMARK.CRANE } as const;
 
 /** 집행기 체력 막대 — 아케이드 2막 달과 본사 보스 단계가 같이 쓴다 */
-export function executorBar(hp: number): HudBar {
-  return { label: `${BOSS_NAME} ${hp}`, fill: Math.max(0, hp) / BOSS.HP, n: 0, end: '' };
+export function executorBar(hp: number, max: number = BOSS.HP): HudBar {
+  return { label: `${BOSS_NAME} ${hp}`, fill: Math.max(0, hp) / max, n: 0, end: '' };
 }
 
 /**
@@ -73,7 +73,7 @@ export function stageBar(s: GameState): HudBar | null {
     return { label: `${STAGE_MODE.barLeft} ${total - done}`, fill: done / total, n: total, end };
   }
   if (st.phase !== 'boss') return null;
-  if (s.boss) return executorBar(s.boss.hp);
+  if (s.boss) return executorBar(s.boss.hp, STAGE.EXEC_HP); // 본사 집행기 체력은 스테이지 전용
   const lm = s.lm;
   const body = lm?.body ?? s.stack; // 구층탑은 몸이 s.stack이다
   if (!lm || !body) return null;

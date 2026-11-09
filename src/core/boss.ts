@@ -7,7 +7,7 @@ import { registerHit, hurtPlayer, addScore } from './combat';
 import { guardActive } from './player';
 import { rand, randInt } from './rng';
 import { spawnBolt } from './act2';
-import { BOSS, SCORE, SPECIAL, TICK, VIEW } from '../config';
+import { BOSS, SCORE, SPECIAL, STAGE, TICK, VIEW } from '../config';
 
 export function initBoss(): BossState {
   return {
@@ -31,7 +31,8 @@ export function stepBoss(s: GameState): void {
   const p = s.player;
 
   // 티어 전이 체크 (roar/defeated 중엔 무시)
-  const newTier: 0 | 1 | 2 = b.dmg >= BOSS.TIER2_DMG ? 2 : b.dmg >= BOSS.TIER1_DMG ? 1 : 0;
+  const tier2 = s.stage ? STAGE.EXEC_TIER2_DMG[s.stage.diff] : BOSS.TIER2_DMG; // 본사 집행기는 난이도별 스테이지 전용 값
+  const newTier: 0 | 1 | 2 = b.dmg >= tier2 ? 2 : b.dmg >= BOSS.TIER1_DMG ? 1 : 0;
   if (newTier > b.tier && b.st !== 'roar' && b.st !== 'defeated') {
     b.tier = newTier;
     setSt(b, 'roar');
@@ -254,11 +255,12 @@ function stepRabbits(s: GameState): void {
         const dx = px - e.x;
         const dy = py - e.y;
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const shotV = s.stage ? STAGE.EXEC_RABBIT_SHOT_V : BOSS.RABBIT.SHOT_V; // 본사 집행기는 스테이지 전용 탄속
         s.entities.push({
           kind: 'shot', lane: s.player.lane,
           x: e.x, y: e.y,
-          vx: (dx / len) * BOSS.RABBIT.SHOT_V,
-          vy: (dy / len) * BOSS.RABBIT.SHOT_V,
+          vx: (dx / len) * shotV,
+          vy: (dy / len) * shotV,
           guardable: true, cancellable: true,   // [정본: 공격으로 상쇄 가능]
         });
         s.events.push({ kind: 'boltStrike', lane: s.player.lane });
