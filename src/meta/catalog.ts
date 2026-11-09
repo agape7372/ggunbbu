@@ -3,7 +3,6 @@
 
 import { dustCost, orbitCost } from './economy';
 import { KIT_IDS, addItems, kitDef, type Items, type KitPick } from './kit';
-import { WEAPON_IDS } from './loadout';
 import { MASK_MAX } from './mask';
 import { RUNGS, SEASON_THEMES, paidTotal, rungsReach, type Season } from './season';
 
@@ -20,7 +19,6 @@ export type SkuId =
   | 'rookie_sale'
   | 'no_ads'
   | 'salary'
-  | 'knight_set'
   | 'king_set'
   | 'mask_1'
   | 'mask_3'
@@ -59,7 +57,7 @@ const TOOLBOX_ITEMS: KitPick = { life: 5, waza: 5, dust2x: 5 };
 const ROOKIE: Pick<Sku, 'orbit' | 'dust' | 'items' | 'owns'> = {
   orbit: 120, dust: 1000, items: { life: 3, waza: 3, dust2x: 3 }, owns: ['coverall'],
 };
-/** 철거왕 세트의 꾸미기 — 실적으로만 주는 셋(잿빛 · 불씨 · 새싹)은 안 판다 */
+/** 철거왕 세트의 꾸미기 — 실적으로만 주는 셋(잿빛 · 불씨 · 새싹)은 안 판다. 무기는 안 준다(먼지로 버는 진행) */
 const LOOKS_SOLD = ['amber', 'slate', 'rebar', 'crescent', 'stamp', 'orbit', 'coverall', 'arc', 'rivet', 'crown', 'royal', 'gilt'] as const;
 
 export const SKUS: readonly Sku[] = [
@@ -75,14 +73,13 @@ export const SKUS: readonly Sku[] = [
   { id: 'orbit_m', krw: 2900, title: '궤도조각 중', orbit: 220, firstDouble: true },
   { id: 'dust_m', krw: 2900, title: '먼지 한 수레', dust: 2200, firstDouble: true },
   { id: 'salary', krw: 4900, title: '월급 봉투', orbit: 200, salary: true },
-  { id: 'knight_set', krw: 4900, title: '기사 세트', orbit: 450, owns: ['arc', 'rivet'], once: true },
   { id: 'season_pass', krw: 4900, title: '특근 수당', pass: true },
   { id: 'orbit_l', krw: 4900, title: '궤도조각 대', orbit: 420, firstDouble: true },
   { id: 'dust_l', krw: 4900, title: '먼지 한 트럭', dust: 4200, firstDouble: true },
   { id: 'mask_10', krw: 4900, title: '마스크 10개', masks: 10 },
   {
     id: 'king_set', krw: 9900, title: '철거왕 세트',
-    owns: [...WEAPON_IDS, ...LOOKS_SOLD], masks: 10, noAds: true, once: true,
+    orbit: 500, owns: LOOKS_SOLD, masks: 10, noAds: true, once: true,
   },
 ];
 
@@ -142,30 +139,36 @@ export const DUST_WON = skuById('dust_l')!.krw / skuById('dust_l')!.dust!;
 const MASK_WON = skuById('mask_10')!.krw / skuById('mask_10')!.masks!;
 const NO_ADS_WON = skuById('no_ads')!.krw;
 
-function orbitWorth(r: { orbit?: number; items?: KitPick; owns?: readonly string[] }): number {
+/** 지금 가진 것 — 넘기면 값에서 뺀다. 이미 산 꾸미기와 이미 받은 광고 없음은 두 번 치지 않는다 */
+export interface Have {
+  owned?: readonly string[];
+  noAds?: boolean;
+}
+
+function orbitWorth(r: { orbit?: number; items?: KitPick; owns?: readonly string[] }, have?: Have): number {
   let v = r.orbit ?? 0;
   for (const id of KIT_IDS) v += (r.items?.[id] ?? 0) * kitDef(id)!.orbit;
-  for (const id of r.owns ?? []) v += orbitCost(id) ?? 0;
+  for (const id of r.owns ?? []) if (!have?.owned?.includes(id)) v += orbitCost(id) ?? 0;
   return v;
 }
 
-/** 재화 · 단품은 0. 특근은 앞 rungs칸 몫, 월급은 다 받았을 때 몫 */
-export function worthWon(sku: Sku, rungs = RUNGS): number {
+/** 재화 · 단품은 0. 특근은 앞 rungs칸 몫, 월급은 다 받았을 때 몫. have를 넘기면 가진 것은 뺀다 */
+export function worthWon(sku: Sku, rungs = RUNGS, have?: Have): number {
   if (sku.firstDouble || (sku.masks && !sku.owns) || (sku.noAds && !sku.owns)) return 0;
   const pass = sku.pass ? paidTotal(SEASON_THEMES[0], rungs) : null; // 달마다 그림만 다르고 구성은 같다
-  let orbit = orbitWorth(sku) + (pass ? orbitWorth(pass) : 0);
+  let orbit = orbitWorth(sku, have) + (pass ? orbitWorth(pass, have) : 0);
   if (sku.salary) orbit += SALARY_DAYS * orbitWorth(SALARY_DAILY);
-  const dust = (sku.dust ?? 0) + (sku.owns ?? []).reduce((n, id) => n + (dustCost(id) ?? 0), 0);
-  const won = ((sku.masks ?? 0) + (pass?.masks ?? 0)) * MASK_WON + (sku.noAds ? NO_ADS_WON : 0) + dust * DUST_WON;
+  const dust = (sku.dust ?? 0) + (sku.owns ?? []).reduce((n, id) => n + (have?.owned?.includes(id) ? 0 : dustCost(id) ?? 0), 0);
+  const won = ((sku.masks ?? 0) + (pass?.masks ?? 0)) * MASK_WON + (sku.noAds && !have?.noAds ? NO_ADS_WON : 0) + dust * DUST_WON;
   return Math.floor((orbit * ORBIT_WON + won) / 100) * 100;
 }
 
 /** 이 효율부터 인장을 찍는다 — 전용 꾸미기가 값에서 빠지는 세트는 낮게 나오니 「전용」으로 말한다 */
 export const EFF_MIN = 150;
 
-/** 효율(%). 문턱 밑은 0. 특근은 앞 rungs칸 몫 */
-export function effPct(sku: Sku, rungs = RUNGS): number {
-  const p = Math.round((worthWon(sku, rungs) / sku.krw) * 100);
+/** 효율(%). 문턱 밑은 0. 특근은 앞 rungs칸 몫, have를 넘기면 가진 것은 뺀다 */
+export function effPct(sku: Sku, rungs = RUNGS, have?: Have): number {
+  const p = Math.round((worthWon(sku, rungs, have) / sku.krw) * 100);
   return p >= EFF_MIN ? p : 0;
 }
 
@@ -188,14 +191,16 @@ export interface Buyer {
   firstGift: boolean;
 }
 
-/** 더 살 수 없는 상품인가. masks · blanks를 넘기면 마스크 묶음은 가진 장 + 남은 칸이 상한일 때 품절이다. dateKey를 넘기면 오늘 사서 손해인 특근도 품절이다 */
-export function soldOut(b: Pick<Buyer, 'bought' | 'noAds'> & { masks?: readonly unknown[]; blanks?: number; season?: Season }, id: SkuId, dateKey?: string): boolean {
+/** 더 살 수 없는 상품인가. masks · blanks를 넘기면 마스크 묶음은 가진 장 + 남은 칸이 상한일 때 품절이다. dateKey를 넘기면 오늘 사서 손해인 특근도 품절이다.
+ *  owned를 넘기면 꾸미기가 든 1회 상품은 가진 것을 뺀 값이 가격 밑일 때 품절이다 */
+export function soldOut(b: Pick<Buyer, 'bought' | 'noAds'> & { masks?: readonly unknown[]; blanks?: number; season?: Season; owned?: readonly string[] }, id: SkuId, dateKey?: string): boolean {
   const sku = skuById(id);
   if (!sku) return true;
   if (sku.masks && !sku.owns && (b.masks?.length ?? 0) + (b.blanks ?? 0) + sku.masks > MASK_MAX) return true; // 더 받아도 못 그린다(지급 0 실과금 방지)
   if (sku.noAds && !sku.owns && b.noAds) return true; // 철거왕 세트로 이미 받았다
   if (sku.pass) return !!b.season?.pass || (!!dateKey && !!b.season && worthWon(sku, rungsReach(b.season, dateKey)) < sku.krw);
   if (!sku.once) return false;
+  if (sku.owns && worthWon(sku, RUNGS, b) < sku.krw) return true; // 가진 것을 빼면 값이 가격 밑
   const twin = SAME_GOODS[id];
   return b.bought.includes(id) || (twin !== undefined && b.bought.includes(twin));
 }

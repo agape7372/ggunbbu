@@ -9,7 +9,7 @@ import { SKU_IDS, validateRegular, type Regular } from './meta/catalog';
 import { emptyOffers, validateOffers, type Offers } from './meta/offers';
 import { emptySeason, validateSeason, type Season } from './meta/season';
 import { ROOKIE, validateAttend, validateSalary, validateWage, type Attend, type Salary, type Wage } from './meta/progress';
-import { LICENSE_EXAMS } from './meta/economy';
+import { LICENSE_EXAMS, type DayCount } from './meta/economy';
 import { emptyMask, isMaskArt, loadMaskBook } from './meta/mask';
 import type { MaskEntry } from './meta/types';
 import { isOpGrade, isOpId, type OpGrade, type OpId } from './meta/ops';
@@ -63,7 +63,8 @@ export interface SaveData {
   wage: Wage; // 일당 받은 단계 (무버전 추가 키)
   rookie: number; // 신입 과제 받은 단계 수 (무버전 추가 키)
   offers: Offers; // 시간제한 특가 — meta/offers.ts (무버전 추가 키)
-  adDay: { key: string; n: number }; // 상점 광고 궤도조각 하루 횟수 (무버전 추가 키)
+  adDay: DayCount; // 상점 광고 궤도조각 하루 횟수 (무버전 추가 키)
+  exchangeDay: DayCount; // 먼지 → 궤도조각 교환 하루 횟수 (무버전 추가 키)
   iapTokens: string[]; // 처리 끝낸 결제 토큰(최근 것만) — 중복 지급 방지 (무버전 추가 키)
   season: Season; // 이달의 현장 — meta/season.ts (무버전 추가 키)
   regular: Regular; // 단골 도장 (무버전 추가 키)
@@ -126,6 +127,7 @@ export const DEFAULT_SAVE: SaveData = {
   rookie: 0,
   offers: emptyOffers(),
   adDay: { key: '', n: 0 },
+  exchangeDay: { key: '', n: 0 },
   iapTokens: [],
   season: emptySeason(),
   regular: { stamps: 0, got: 0 },
@@ -218,7 +220,8 @@ function normalize(raw: Record<string, unknown>): SaveData {
     wage: validateWage(data.wage),
     rookie: num(data.rookie, 0, ROOKIE.length),
     offers: validateOffers(data.offers),
-    adDay: validateAdDay(data.adDay),
+    adDay: validateDayCount(data.adDay),
+    exchangeDay: validateDayCount(data.exchangeDay),
     iapTokens: strList(data.iapTokens),
     season: validateSeason(data.season),
     regular: validateRegular(data.regular),
@@ -231,7 +234,7 @@ function strList(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 }
 
-function validateAdDay(v: unknown): SaveData['adDay'] {
+function validateDayCount(v: unknown): DayCount {
   const o = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
   return { key: typeof o.key === 'string' ? o.key : '', n: num(o.n, 0, 99) };
 }

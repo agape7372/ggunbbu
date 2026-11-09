@@ -260,6 +260,7 @@
 .sh-earn { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
 .sh-earn .stroke { height: 78px; } /* 이름 + 설명 두 줄 — 붓글씨가 획 위로 넘으면 한지색에 묻힌다 */
 .sh-earn .stroke b { font-size: 28px; }
+.sh-earn .stroke b small { margin-left: 8px; font: 400 16px/1 var(--black); }
 .sh-earn .stroke span { font-size: 14px; line-height: 1.25; }
 
 /* ── 철거 자격 — 등급 도장 + 조건 + 응시. 뜻은 테두리로 남긴다 ── */

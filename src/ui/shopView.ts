@@ -7,7 +7,7 @@
 import './shop.css';
 import { WEAPON } from '../config';
 import {
-  COSMETIC_ORBIT_COST, DUST_EXCHANGE, MASK_DUST_COST, ORBIT_COSTS, ORBIT_PER_AD, WAZA_ORBIT_COST, WEAPON_DUST_COST,
+  COSMETIC_ORBIT_COST, DUST_EXCHANGE, EXCHANGE_DAILY, MASK_DUST_COST, ORBIT_COSTS, ORBIT_PER_AD, WAZA_ORBIT_COST, WEAPON_DUST_COST,
   examStatus, licenseTitle, nextDustGoal, nextExam,
 } from '../meta/economy';
 import type { Loadout, WeaponId } from '../meta/types';
@@ -155,6 +155,8 @@ export interface ShopPaths {
   adLeft: number;
   /** 광고 없는 현장 — 광고 단추가 바로 받기가 된다 */
   adFree: boolean;
+  /** 오늘 남은 먼지 교환 횟수 */
+  exchangeLeft: number;
 }
 /** 지금 탭 — 다시 그려도 남고, 상점을 새로 열면 장비로 돌아간다(showShop이 정한다) */
 let tab: ShopTab = 'gear';
@@ -242,11 +244,11 @@ export function paintShop(
   const looks = (): string => LOOKS.map((g) => `<p class="sh-sub">${g.title}</p><div class="sh-grid">${g.items.filter((it) => !it.how || has(it.id)).map((it) => cell(it, lookArt(it, l))).join('')}</div>`).join('');
   const exam = (): string => examHtml(inv, takeMain);
 
-  const canExchange = inv.dust >= DUST_EXCHANGE.dust;
+  const canExchange = inv.dust >= DUST_EXCHANGE.dust && paths.exchangeLeft > 0;
   // 웹(광고 미배선)에선 광고 칸을 아예 안 그린다 — 무료 지급 위장 금지 (08-30, P0-2)
   const earn = `<div class="sh-earn">
       ${paths.ad ? `<button type="button" class="stroke s2" data-shop-ad="1"${paths.adLeft > 0 ? '' : ' disabled'}><b>${paths.adFree ? '받기' : '광고'}</b><span>궤도조각 +${ORBIT_PER_AD}<br>오늘 ${paths.adLeft}번</span></button>` : ''}
-      <button type="button" class="stroke s2" data-shop-exchange="1"${canExchange ? '' : ' disabled'}><b>바꾸기</b><span>먼지 ${DUST_EXCHANGE.dust} →<br>궤도조각 ${DUST_EXCHANGE.orbit}</span></button>
+      <button type="button" class="stroke s2" data-shop-exchange="1"${canExchange ? '' : ' disabled'}><b>바꾸기<small>${paths.exchangeLeft}/${EXCHANGE_DAILY}</small></b><span>먼지 ${DUST_EXCHANGE.dust} →<br>궤도조각 ${DUST_EXCHANGE.orbit}</span></button>
     </div>`;
 
   const from = fresh && lastWallet ? lastWallet : inv;

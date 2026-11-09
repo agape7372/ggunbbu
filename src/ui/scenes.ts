@@ -54,7 +54,7 @@ import { applySettingsPatch as patchSettings, applySettingsToRuntime, type Setti
 import {
   grant, grantOrbit, MAX_REVIVES_PER_RUN, ORBIT_PER_AD, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
   dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY, MASK_DUST_COST,
-  nextDustGoal, adOrbitLeft, noteAdOrbit, licenseTitle, takeExam,
+  nextDustGoal, adOrbitLeft, noteAdOrbit, exchangeLeft, licenseTitle, takeExam,
 } from '../meta/economy';
 import { equip } from '../meta/loadout';
 import {
@@ -265,7 +265,7 @@ export function createApp(
       regular: priceOf(o.regular),
       until: o.until,
       span: o.span,
-      eff: effPct(skuById(o.sku)!),
+      eff: effPct(skuById(o.sku)!, undefined, save),
     };
   }
 
@@ -484,7 +484,7 @@ export function createApp(
       late: left <= LATE_DAYS,
       price: !soldOut(save, 'season_pass', key) && iap.available() && iap.sellable('season_pass') ? priceOf('season_pass') : null,
       owns: passGoods(key).owns ?? [],
-      eff: effPct(skuById('season_pass')!, rungsReach(save.season, key)),
+      eff: effPct(skuById('season_pass')!, rungsReach(save.season, key), save),
     };
   }
 
@@ -651,7 +651,7 @@ export function createApp(
       bought: save.bought,
       offers: offersNow(now).map(offerRow),
       rows: SKUS.filter((s) => !s.sale && !soldOut(save, s.id, key) && iap.sellable(s.id)).map((s) => ({
-        sku: s.id, title: s.title, price: priceOf(s.id), eff: effPct(s, reach),
+        sku: s.id, title: s.title, price: priceOf(s.id), eff: effPct(s, reach, save),
       })),
       items: save.items,
       orbit: save.orbit,
@@ -670,6 +670,7 @@ export function createApp(
       ad: adPath(),
       adLeft: adOrbitLeft(save.adDay, kstDateKey(Date.now())),
       adFree: adFree(),
+      exchangeLeft: exchangeLeft(save.exchangeDay, kstDateKey(Date.now())),
     }, packView(), tab);
   }
 
@@ -862,7 +863,7 @@ export function createApp(
   }
 
   function doExchange(): void {
-    if (!exchangeDust(save)) { playSfx('uiDeny'); return; }
+    if (!exchangeDust(save, save.exchangeDay, kstDateKey(Date.now()))) { playSfx('uiDeny'); return; }
     saveSave(save);
     playSfx('coin');
     overlay.toast(`먼지 ${DUST_EXCHANGE.dust} → 궤도조각 +${DUST_EXCHANGE.orbit}`);

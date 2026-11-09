@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DUST_EXCHANGE, LICENSE_EXAMS, LICENSE_TITLES, examStatus, exchangeDust, licenseTitle, nextExam, takeExam,
+  DUST_EXCHANGE, EXCHANGE_DAILY, LICENSE_EXAMS, LICENSE_TITLES, examStatus, exchangeDust, exchangeLeft, licenseTitle, nextExam, takeExam,
 } from '../src/meta/economy';
+import { kstDateKey } from '../src/meta/missions';
+import { DEFAULT_SAVE } from '../src/storage';
 
 describe('철거 자격 (C4)', () => {
   const sheet = (license: number, buildings: number, dust: number) => ({ license, dust, stats: { buildings } });
@@ -70,16 +72,55 @@ describe('철거 자격 (C4)', () => {
   });
 });
 
-describe('먼지 교환', () => {
-  it('충분하면 먼지 50이 빠지고 궤도조각 5가 늘며 true', () => {
+describe('먼지 교환 — 하루 10번', () => {
+  const day = () => ({ key: '', n: 0 });
+  const K = '2026-11-10';
+
+  it('충분하면 먼지 50이 빠지고 궤도조각 5가 늘며 횟수를 센다', () => {
     const w = { dust: 120, orbit: 3 };
-    expect(exchangeDust(w)).toBe(true);
+    const d = day();
+    expect(exchangeDust(w, d, K)).toBe(true);
     expect(w).toEqual({ dust: 120 - DUST_EXCHANGE.dust, orbit: 3 + DUST_EXCHANGE.orbit });
+    expect(d).toEqual({ key: K, n: 1 });
+    expect(exchangeLeft(d, K)).toBe(EXCHANGE_DAILY - 1);
   });
 
-  it('모자라면 false, 지갑 불변', () => {
+  it('모자라면 false, 지갑 · 횟수 불변', () => {
     const w = { dust: 49, orbit: 3 };
-    expect(exchangeDust(w)).toBe(false);
+    const d = day();
+    expect(exchangeDust(w, d, K)).toBe(false);
     expect(w).toEqual({ dust: 49, orbit: 3 });
+    expect(d).toEqual({ key: '', n: 0 });
+  });
+
+  it('하루 열 번까지, 열한 번째는 거부하고 지급 0', () => {
+    expect(EXCHANGE_DAILY).toBe(10);
+    const w = { dust: 9999, orbit: 0 };
+    const d = day();
+    for (let i = 0; i < 10; i++) expect(exchangeDust(w, d, K)).toBe(true);
+    expect(w).toEqual({ dust: 9999 - 500, orbit: 50 });
+    expect(exchangeLeft(d, K)).toBe(0);
+    expect(exchangeDust(w, d, K)).toBe(false);
+    expect(w).toEqual({ dust: 9999 - 500, orbit: 50 });
+    expect(d.n).toBe(10);
+  });
+
+  it('새로 세기는 오늘 미션과 같은 05:00 KST — 04:59:59는 어제, 05:00:00부터 0번째', () => {
+    const before = Date.UTC(2026, 10, 9, 19, 59, 59); // 11월 10일 04:59:59 KST
+    const after = before + 1000; // 05:00:00 KST
+    expect(kstDateKey(before)).toBe('2026-11-09');
+    expect(kstDateKey(after)).toBe('2026-11-10');
+    const w = { dust: 9999, orbit: 0 };
+    const d = day();
+    for (let i = 0; i < 10; i++) exchangeDust(w, d, kstDateKey(before));
+    expect(exchangeDust(w, d, kstDateKey(before + 999))).toBe(false); // 아직 어제
+    expect(exchangeLeft(d, kstDateKey(after))).toBe(10);
+    expect(exchangeDust(w, d, kstDateKey(after))).toBe(true);
+    expect(d).toEqual({ key: '2026-11-10', n: 1 });
+  });
+
+  it('옛 저장 기본값은 0번이다', () => {
+    expect(DEFAULT_SAVE.exchangeDay).toEqual({ key: '', n: 0 });
+    expect(exchangeLeft(DEFAULT_SAVE.exchangeDay, K)).toBe(EXCHANGE_DAILY);
   });
 });

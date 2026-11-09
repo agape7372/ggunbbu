@@ -156,7 +156,7 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
       웹 번들 표식: 릴리스 모드로 끝까지 빌드되면 `dist/release-build.txt`가 생기고(`check-release.mjs --mark`), `bundleRelease`·`assembleRelease`는
       앱에 실린 `assets/public/release-build.txt`가 없으면 GradleException. `GUNBBU_RELEASE=1 npm run web:build` 뒤 `npx cap sync android`까지 해야 들어온다.
       표식 없이 일부러 굽는 내부 시험만 `-PallowDevWeb`
-- [ ] **Play Console 상품 설정** — 상품 18개(`src/meta/catalog.ts` `SKUS`). 상품당 구매 옵션은 1개만 둔다. 수량 구매는 끈다(앱은 `quantity: 1`로만 부른다). `once`가 없는 상품은 소비성으로 등록한다. 달마다 다시 사는 `season_pass`(특근 수당)도 소비성이다
+- [ ] **Play Console 상품 설정** — 상품 17개(`src/meta/catalog.ts` `SKUS`). 상품당 구매 옵션은 1개만 둔다. 수량 구매는 끈다(앱은 `quantity: 1`로만 부른다). `once`가 없는 상품은 소비성으로 등록한다. 달마다 다시 사는 `season_pass`(특근 수당)도 소비성이다
 - [ ] **가격을 바꾸면 `src/meta/catalog.ts`의 `krw`도 같이 바꾼다** — 앱 안 가격은 Play 문자열이지만, 특가 할인율(%)과 가격을 못 받았을 때의 대체 표기는 `krw`로 계산한다
 - [ ] 콘텐츠 등급 설문 — 전체이용가(폭력·도박·공포 요소 0)
 - [ ] 스토어 등록정보: 앱 이름 「건뿌 - 떨어지는 건물 베기」, 짧은 설명, 자세한 설명 (원고는 STORE_LISTING.md)
