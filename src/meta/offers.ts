@@ -7,9 +7,6 @@ import type { SkuId } from './catalog';
 const HOUR = 3600_000;
 export const ROOKIE_HOURS = 48;
 export const RESCUE_HOURS = 24;
-/** 월초 특가 — 매월 1일 ~ 이 날짜까지(KST) */
-export const MONTH_LAST_DAY = 3;
-const KST = 9 * HOUR;
 /** 이보다 크게 시계가 뒤로 가 있으면 되돌린 것으로 본다(몇 분의 시각 보정은 봐준다) */
 const ROLLBACK_SLOP = 10 * 60_000;
 
@@ -20,8 +17,6 @@ export interface Offers {
   rescueUntil: number;
   /** 고비 특가를 산 적 있나 */
   rescueUsed: boolean;
-  /** 월초 특가를 산 달 'YYYY-MM' */
-  monthBought: string;
   /** 오퍼 창을 띄운 날(dateKey) — 하루 한 번 */
   popDay: string;
   /** 지금까지 본 가장 늦은 시각 */
@@ -29,11 +24,11 @@ export interface Offers {
 }
 
 export function emptyOffers(): Offers {
-  return { rookieUntil: 0, rescueUntil: 0, rescueUsed: false, monthBought: '', popDay: '', lastSeen: 0 };
+  return { rookieUntil: 0, rescueUntil: 0, rescueUsed: false, popDay: '', lastSeen: 0 };
 }
 
 export interface LiveOffer {
-  id: 'rookie' | 'rescue' | 'month';
+  id: 'rookie' | 'rescue';
   sku: SkuId;
   /** 같은 물건의 정가 상품 */
   regular: SkuId;
@@ -62,15 +57,6 @@ export function armOffers(o: Offers, f: { runs: number; reachedAct2: boolean }, 
   if (o.rescueUntil === 0 && f.reachedAct2) o.rescueUntil = t + RESCUE_HOURS * HOUR;
 }
 
-const monthKey = (t: number): string => new Date(t + KST).toISOString().slice(0, 7);
-
-/** 이달 월초 특가 끝 시각. 지금이 그 안이 아니면 0 */
-function monthUntil(t: number): number {
-  const d = new Date(t + KST);
-  if (d.getUTCDate() > MONTH_LAST_DAY) return 0;
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), MONTH_LAST_DAY + 1) - KST;
-}
-
 /** 지금 살아 있는 특가. 신입 특가는 샀으면 사라진다. 시계를 되돌려 둔 동안은 하나도 안 보인다 */
 export function liveOffers(o: Offers, bought: readonly string[], now: number): LiveOffer[] {
   const t = offerClock(o, now);
@@ -88,14 +74,6 @@ export function liveOffers(o: Offers, bought: readonly string[], now: number): L
       title: '고비 특가', span: RESCUE_HOURS * HOUR,
     });
   }
-  const mu = monthUntil(t);
-  // 고비 특가와 같은 상품이라 둘이 겹치면 고비 특가 하나만 보인다
-  if (mu > t && o.monthBought !== monthKey(t) && !out.some((x) => x.sku === 'toolbox_sale')) {
-    out.push({
-      id: 'month', sku: 'toolbox_sale', regular: 'toolbox', until: mu,
-      title: '월초 특가', span: MONTH_LAST_DAY * 24 * HOUR,
-    });
-  }
   return out;
 }
 
@@ -103,9 +81,7 @@ export function liveOffers(o: Offers, bought: readonly string[], now: number): L
 export function noteOfferBought(o: Offers, sku: SkuId, now: number): void {
   if (sku !== 'toolbox_sale') return;
   const t = offerClock(o, now);
-  const live = liveOffers(o, [], t).find((x) => x.sku === 'toolbox_sale');
-  if (live?.id === 'rescue') o.rescueUsed = true;
-  else if (live?.id === 'month') o.monthBought = monthKey(t); // 끝난 뒤에 늦게 복구된 구매는 이달 특가를 닫지 않는다
+  if (liveOffers(o, [], t).some((x) => x.id === 'rescue')) o.rescueUsed = true; // 끝난 뒤에 늦게 복구된 구매는 닫을 특가가 없다
 }
 
 /** 오늘 오퍼 창을 띄울 특가. 띄울 게 없거나 오늘 이미 띄웠으면 null */
@@ -141,7 +117,6 @@ export function validateOffers(v: unknown): Offers {
     rookieUntil: n(o.rookieUntil),
     rescueUntil: n(o.rescueUntil),
     rescueUsed: o.rescueUsed === true,
-    monthBought: s(o.monthBought),
     popDay: s(o.popDay),
     lastSeen: n(o.lastSeen),
   };

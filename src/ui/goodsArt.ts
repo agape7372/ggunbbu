@@ -8,7 +8,7 @@ import { PUFF_FILL } from '../render/effects';
 import { hs } from '../render/ink';
 
 export type GoodsId =
-  | 'gift' | 'toolbox' | 'envelope' | 'orb1' | 'orb3' | 'orbSack' | 'noads' | 'coverall' | 'look' | 'swords' | 'crown'
+  | 'gift' | 'toolbox' | 'envelope' | 'orb1' | 'orb3' | 'orbSack' | 'noads' | 'coverall' | 'look' | 'crown'
   | 'mask1' | 'mask3' | 'mask10' | 'life' | 'waza' | 'dust2x' | 'calendar' | 'dust' | 'dustShovel' | 'dustCart' | 'dustTruck'
   | 'orb' | 'pass' | 'coffee';
 
@@ -406,18 +406,6 @@ const ART: Record<GoodsId, () => string> = {
     + plate(STEEL, [[64, 34], [74, 39], [71, 45], [61, 40]], 2.4, 326, 0.2)
     + blob(SEAL, [[61, 40], [71, 45], [66, 56], [60, 62], [57, 52]], 2.8, 331),
 
-  // 무기 전부 — 대검 둘이 엇갈린다
-  swords: () => {
-    const blade = (flip: number, seed: number): string => {
-      const q = (x: number, y: number): P => [flip < 0 ? 96 - x : x, y];
-      return plate(STEEL, [q(82, 6), q(90, 6), q(90, 14), q(30, 72), q(22, 64)], 3.4, seed, 0.3)
-        + stick(KRAFT, q(24, 70), q(11, 83), 7, 2.4, seed + 4)
-        + disc(GOLD, flip < 0 ? 90 : 6, 88, 5, 2.4, seed + 8)
-        + stick(GOLD, q(10, 52), q(42, 84), 8, 2.4, seed + 12);
-    };
-    return blade(-1, 341) + blade(1, 361);
-  },
-
   // 왕관 — 금 한 판에 주홍 보석
   crown: () =>
     plate(GOLD, [[14, 80], [8, 34], [29, 54], [48, 18], [67, 54], [88, 34], [82, 80]], 4.4, 381)
@@ -505,7 +493,7 @@ const SKU_ART: Record<SkuId, GoodsId> = {
   dust_s: 'dustShovel', dust_m: 'dustCart', dust_l: 'dustTruck',
   toolbox: 'toolbox', toolbox_sale: 'toolbox',
   rookie_pack: 'gift', rookie_sale: 'gift',
-  no_ads: 'noads', salary: 'envelope', knight_set: 'swords', king_set: 'crown', season_pass: 'pass',
+  no_ads: 'noads', salary: 'envelope', king_set: 'crown', season_pass: 'pass',
   mask_1: 'mask1', mask_3: 'mask3', mask_10: 'mask10',
 };
 

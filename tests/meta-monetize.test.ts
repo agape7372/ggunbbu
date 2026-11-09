@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { advance, applyStartKit, makeState } from '../src/core/sim';
 import { PLAYER, WAZA_GAUGE } from '../src/config';
 import { addItems, buyKit, clampPick, emptyItems, isBare, kitSheetUseful, pickCount, spendKit, validateItems } from '../src/meta/kit';
-import { dustOf, grantSku, orbitOf, SKUS, skuById, soldOut, TOKEN_KEEP, type Buyer } from '../src/meta/catalog';
-import { armOffers, clockOf, emptyOffers, leftText, liveOffers, noteOfferBought, offerClock, offerToPop } from '../src/meta/offers';
+import { dustOf, grantSku, orbitOf, SKUS, SKU_IDS, skuById, soldOut, TOKEN_KEEP, type Buyer } from '../src/meta/catalog';
+import { armOffers, clockOf, emptyOffers, leftText, liveOffers, noteOfferBought, offerClock, offerToPop, validateOffers } from '../src/meta/offers';
 import {
   ACHIEVES, DAILY_POOL, DAILY_PICK, TRACK_BY_ID, applyMissionEvent, ensureDaily, initAchieveProgress, kstDateKey, mergeAchieves, nextRollover, pickDailyIds,
 } from '../src/meta/missions';
@@ -20,7 +20,7 @@ import { DEFAULT_SAVE, loadSave, saveSave } from '../src/storage';
 import { SAVE_KEY } from '../src/config';
 
 const HOUR = 3600_000;
-const T0 = Date.UTC(2026, 10, 10, 3); // 11월 10일 12시 KST — 월초 아님
+const T0 = Date.UTC(2026, 10, 10, 3); // 11월 10일 12시 KST
 
 function buyer(): Buyer {
   return {
@@ -129,14 +129,33 @@ describe('상품 지급', () => {
     expect(soldOut(b, 'rookie_sale')).toBe(true);
   });
 
-  it('철거왕 세트는 무기 전부와 광고 없는 현장을 주고 실적 전용 꾸미기는 안 판다', () => {
+  it('상품은 열일곱 — 기사 세트는 표에 없다', () => {
+    expect(SKUS.length).toBe(17);
+    expect(new Set(SKU_IDS).size).toBe(17);
+    expect(SKU_IDS).not.toContain('knight_set');
+    expect(skuById('knight_set')).toBeUndefined();
+  });
+
+  it('철거왕 세트는 꾸미기 열둘 · 궤도조각 500 · 마스크 10 · 광고 없음. 무기는 없고 실적 전용 꾸미기는 안 판다', () => {
+    const k = skuById('king_set')!;
+    expect(k).toMatchObject({ krw: 9900, orbit: 500, masks: 10, noAds: true, once: true });
+    expect(k.owns).toHaveLength(12);
     const b = buyer();
     grantSku(b, 'king_set', 't1');
     expect(b.noAds).toBe(true);
+    expect(b.orbit).toBe(500); // buyer()는 첫 결제 선물을 이미 받은 사람
     expect(soldOut(b, 'no_ads')).toBe(true);
-    for (const id of WEAPON_IDS.filter((w) => w !== 'sword')) expect(b.owned).toContain(id);
+    for (const id of WEAPON_IDS.filter((w) => w !== 'sword')) expect(b.owned).not.toContain(id);
+    for (const id of ['crown', 'royal', 'gilt', 'arc', 'rivet', 'coverall']) expect(b.owned).toContain(id);
     for (const id of ['ash', 'ember', 'sprout']) expect(b.owned).not.toContain(id);
     expect(b.blanks).toBe(10);
+  });
+
+  it('없어진 기사 세트는 지급도 복구도 아무 일 없이 거절한다', () => {
+    const b = buyer();
+    expect(grantSku(b, 'knight_set' as never, 't1')).toBe(false);
+    expect(soldOut(b, 'knight_set' as never)).toBe(true);
+    expect(b).toEqual(buyer());
   });
 
   it('마스크 묶음은 살 때마다 수량만큼 쌓인다', () => {
@@ -156,7 +175,7 @@ describe('상품 지급', () => {
     expect(soldOut(b, 'mask_1')).toBe(true);
     expect(soldOut(b, 'mask_10')).toBe(true);
     expect(soldOut(b, 'orbit_s')).toBe(false);
-    expect(soldOut(b, 'king_set')).toBe(false); // 무기 · 꾸미기가 함께라 마스크 상한으로 막지 않는다
+    expect(soldOut(b, 'king_set')).toBe(false); // 꾸미기 · 궤도조각이 함께라 마스크 상한으로 막지 않는다
   });
 
   it('월급 봉투는 칸을 더한다', () => {
@@ -255,14 +274,13 @@ describe('특가', () => {
     expect(liveOffers(o, ['rookie_pack'], T0)).toEqual([]);
   });
 
-  it('월초 특가는 1~3일만, 달마다 한 번이다', () => {
+  it('월초 특가는 없다 — 1~3일에도 특가가 안 뜬다', () => {
     const o = emptyOffers();
-    const d2 = Date.UTC(2026, 10, 2, 3);
-    expect(liveOffers(o, [], d2).map((x) => x.id)).toEqual(['month']);
-    expect(liveOffers(o, [], Date.UTC(2026, 10, 4, 3))).toEqual([]);
-    noteOfferBought(o, 'toolbox_sale', d2);
-    expect(liveOffers(o, [], d2)).toEqual([]);
-    expect(liveOffers(o, [], Date.UTC(2026, 11, 1, 3)).map((x) => x.id)).toEqual(['month']);
+    for (const d of [1, 2, 3, 4]) expect(liveOffers(o, [], Date.UTC(2026, 10, d, 3))).toEqual([]);
+    expect('monthBought' in o).toBe(false);
+    const old = validateOffers({ monthBought: '2026-11', rookieUntil: 5 }); // 옛 칸이 있어도 깨지지 않는다
+    expect('monthBought' in old).toBe(false);
+    expect(old.rookieUntil).toBe(5);
   });
 
   it('시계를 되돌린 동안은 특가를 숨기고, 남은 시간은 본 시각 기준이다', () => {
@@ -277,16 +295,11 @@ describe('특가', () => {
     expect(liveOffers(o, [], T0 + 48 * HOUR)).toEqual([]); // 타이머는 실제로 끝난다
   });
 
-  it('끝난 뒤 늦게 복구된 고비 특가는 월초 특가를 닫지 않는다', () => {
+  it('끝난 뒤 늦게 복구된 고비 특가는 아무것도 닫지 않는다', () => {
     const o = emptyOffers();
-    const d10 = Date.UTC(2026, 10, 10, 3);
-    o.rescueUntil = d10 - HOUR; // 이미 끝남
-    noteOfferBought(o, 'toolbox_sale', d10);
-    expect(o.monthBought).toBe('');
-    const d2 = Date.UTC(2026, 10, 2, 3);
-    const m = emptyOffers();
-    noteOfferBought(m, 'toolbox_sale', d2); // 월초에 산 것만 이달을 닫는다
-    expect(m.monthBought).toBe('2026-11');
+    o.rescueUntil = T0 - HOUR; // 이미 끝남
+    noteOfferBought(o, 'toolbox_sale', T0);
+    expect(o.rescueUsed).toBe(false);
   });
 
   it('고비 특가를 사면 고비 특가가 닫힌다', () => {
@@ -295,13 +308,6 @@ describe('특가', () => {
     expect(liveOffers(o, [], T0).map((x) => x.id)).toEqual(['rescue']);
     noteOfferBought(o, 'toolbox_sale', T0);
     expect(liveOffers(o, [], T0)).toEqual([]);
-  });
-
-  it('고비 특가와 월초 특가가 겹치면 하나만 보인다', () => {
-    const o = emptyOffers();
-    const d2 = Date.UTC(2026, 10, 2, 3);
-    armOffers(o, { runs: 1, reachedAct2: true }, d2);
-    expect(liveOffers(o, [], d2).map((x) => x.id)).toEqual(['rescue']);
   });
 
   it('오퍼 창은 하루 한 번이다', () => {
@@ -530,7 +536,7 @@ describe('저장', () => {
     addItems(d.items, { life: 2 });
     d.owned = [...d.owned, 'coverall'];
     d.loadout = { ...d.loadout, body: 'coverall' };
-    d.bought = ['rookie_sale', 'unknown'];
+    d.bought = ['rookie_sale', 'unknown', 'knight_set'];
     d.noAds = true;
     d.salary = { left: 12, key: '2026-11-01' };
     d.attend = { step: 3, key: '2026-11-01' };
@@ -538,6 +544,7 @@ describe('저장', () => {
     d.rookie = 2;
     d.offers.rookieUntil = 123;
     d.adDay = { key: 'k', n: 2 };
+    d.exchangeDay = { key: '2026-11-10', n: 7 };
     d.iapTokens = ['t'];
     d.bestBare = 42;
     saveSave(d);
@@ -552,8 +559,23 @@ describe('저장', () => {
     expect(s.rookie).toBe(2);
     expect(s.offers.rookieUntil).toBe(123);
     expect(s.adDay.n).toBe(2);
+    expect(s.exchangeDay).toEqual({ key: '2026-11-10', n: 7 });
     expect(s.iapTokens).toEqual(['t']);
     expect(s.bestBare).toBe(42);
+  });
+
+  it('옛 저장 — 교환 칸이 없거나 깨졌으면 0번, 월초 특가 칸 · 기사 세트가 남아 있어도 깨지지 않는다', () => {
+    mem.set(SAVE_KEY, JSON.stringify({ v: 1, bought: ['knight_set', 'rookie_pack'], offers: { monthBought: '2026-11', rookieUntil: 9 } }));
+    let s = loadSave();
+    expect(s.exchangeDay).toEqual({ key: '', n: 0 });
+    expect(s.bought).toEqual(['rookie_pack']);
+    expect(s.offers.rookieUntil).toBe(9);
+    expect('monthBought' in s.offers).toBe(false);
+    mem.set(SAVE_KEY, JSON.stringify({ v: 1, exchangeDay: { key: 5, n: 'x' } }));
+    s = loadSave();
+    expect(s.exchangeDay).toEqual({ key: '', n: 0 });
+    mem.set(SAVE_KEY, JSON.stringify({ v: 1, exchangeDay: 'broken' }));
+    expect(loadSave().exchangeDay).toEqual({ key: '', n: 0 });
   });
 
   it('깨진 값은 잘라서 살린다', () => {

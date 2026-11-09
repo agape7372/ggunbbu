@@ -1695,3 +1695,12 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 사용자 「건뿌 머지」. `release/1.0` `a67588e`를 `main`으로 fast-forward push했다(`0e06d62..a67588e`, 47커밋). 다른 가지는 전부 이미 `release/1.0` 안에 있었다(옛 에이전트 작업 폴더 `worktree-agent-aefd5d61…` 소리 커밋 `307cf95` 하나만 밖. 10-28 판 기준이라 그대로 둠).
 - Pages 배포 실행 `41848193592` 성공(CI 안에서 `npm test` · 빌드 통과). 라이브 = `https://agape7372.github.io/ggunbbu/` `index-CS9s727u.js` · 개인정보 처리방침 `privacy.html` 200.
 - 남은 게이트: 공개 릴리스(beta.2 태그) · keystore · AdMob 실 ID · Play 비공개 테스트 · 실기기.
+
+## 2026-11-09 — 유료상품 재정비 구현 (`feat/overhaul-shop`, 정본 `docs/OVERHAUL_2026-11-09.md` §A)
+
+- 상품 18 → 17: `knight_set` 삭제(상품 · 그림 `knight` · 무기 그림 `swords` · Play 표). 철거왕 세트 = 꾸미기 열둘 + 궤도조각 500 + 마스크 10 + 광고 없음(무기 뺌), 효율 166%(₩16,400 ÷ ₩9,900). 옛 저장의 `bought`에 남은 `knight_set`은 저장 검증이 걸러 내고, 스토어 복구는 모르는 상품이라 건너뛴다(소비 · 승인 안 함).
+- `worthWon` · `effPct`에 `have`(owned · noAds) 인자. 가진 것은 값에서 빼고 화면 효율 인장은 이 인자를 넘긴다. 꾸미기가 든 1회 상품은 뺀 값이 가격 밑이면 `soldOut`.
+- 월초 특가 삭제(`MONTH_LAST_DAY` · `monthBought` · `'month'`). 옛 `monthBought` 칸은 읽을 때 버려진다.
+- 먼지 → 궤도조각 교환 하루 10번(`EXCHANGE_DAILY`, 저장 `exchangeDay` = 날짜 키 + 횟수, 날짜 키는 `kstDateKey` 05:00 KST). 단추에 「7/10」.
+- 꾸러미 탭 다섯 → 넷(추천 · 단골 · 재화 · 소장). 옛 「장비」 탭 내용은 재화 탭 끝 「시작 장비」(도구함 패널 + 궤도조각 세 줄), 구매 복원은 소장 탭.
+- 안내 단추 산식 문장: 가진 것은 값에서 뺀다 · 무기 문구 삭제.

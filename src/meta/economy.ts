@@ -109,16 +109,24 @@ export const ORBIT_PER_AD = 8;
 /** 상점 광고 궤도조각 하루 횟수 — 광고 공장을 막는다 */
 export const AD_ORBIT_DAILY = 5;
 
-/** 오늘 남은 상점 광고 횟수 */
-export function adOrbitLeft(day: { key: string; n: number }, dateKey: string): number {
-  return Math.max(0, AD_ORBIT_DAILY - (day.key === dateKey ? day.n : 0));
+/** 하루 횟수 칸 — 날짜 키 + 횟수. 날짜가 바뀌면 0부터 센다 */
+export interface DayCount {
+  key: string;
+  n: number;
 }
 
-/** 상점 광고 한 번을 센다 */
-export function noteAdOrbit(day: { key: string; n: number }, dateKey: string): void {
+const dayLeft = (cap: number, day: DayCount, dateKey: string): number => Math.max(0, cap - (day.key === dateKey ? day.n : 0));
+
+function dayNote(day: DayCount, dateKey: string): void {
   day.n = day.key === dateKey ? day.n + 1 : 1;
   day.key = dateKey;
 }
+
+/** 오늘 남은 상점 광고 횟수 */
+export const adOrbitLeft = (day: DayCount, dateKey: string): number => dayLeft(AD_ORBIT_DAILY, day, dateKey);
+
+/** 상점 광고 한 번을 센다 */
+export const noteAdOrbit = dayNote;
 
 /** 일일/업적 미션 궤도 기본치 */
 export const ORBIT_MISSION_BASE = 12;
@@ -188,11 +196,18 @@ export function spendDust(inv: Wallet, n: number): boolean {
 /** 먼지 → 궤도조각 교환 단위 */
 export const DUST_EXCHANGE = { dust: 50, orbit: 5 } as const;
 
-/** 먼지 50을 궤도조각 5로 바꾼다. 모자라면 false, 지갑 불변. */
-export function exchangeDust(inv: Wallet): boolean {
-  if (inv.dust < DUST_EXCHANGE.dust) return false;
+/** 하루 교환 횟수 — 궤도조각은 영구 사용처가 좁아 무료 공급을 하루 한도로 묶는다. 날짜 키는 오늘 미션과 같은 05:00 KST 경계(kstDateKey) */
+export const EXCHANGE_DAILY = 10;
+
+/** 오늘 남은 교환 횟수 */
+export const exchangeLeft = (day: DayCount, dateKey: string): number => dayLeft(EXCHANGE_DAILY, day, dateKey);
+
+/** 먼지 50을 궤도조각 5로 바꾼다. 하루 횟수를 넘겼거나 모자라면 false, 지갑 · 횟수 불변. */
+export function exchangeDust(inv: Wallet, day: DayCount, dateKey: string): boolean {
+  if (exchangeLeft(day, dateKey) <= 0 || inv.dust < DUST_EXCHANGE.dust) return false;
   inv.dust -= DUST_EXCHANGE.dust;
   inv.orbit += DUST_EXCHANGE.orbit;
+  dayNote(day, dateKey);
   return true;
 }
 

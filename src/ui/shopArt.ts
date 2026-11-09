@@ -8,7 +8,7 @@ import type { Loadout, WeaponId } from '../meta/types';
 import { hs, inkBlot } from '../render/ink';
 import { drawWazaShot } from '../render/wazaShow';
 import { MASK_DRAW } from '../config';
-import { drawGreatsword, drawMask, drawPlayer, playerHead, setPlayerCosmetics, setPlayerWeapon } from '../render/sprites';
+import { drawMask, drawPlayer, playerHead, setPlayerCosmetics, setPlayerWeapon } from '../render/sprites';
 import { BLUE, GOLD, INK, PAPER, SEAL, brush, orb, paintGoods, paintPaths, patch, ring, type P } from './goodsArt';
 
 export interface Look {
@@ -186,8 +186,6 @@ const face = (ctx: Ctx, c: string, h: boolean, pts: readonly P[], seed: number, 
 const blob = (ctx: Ctx, c: string, h: boolean, x: number, y: number, r: number, seed: number): void => face(ctx, c, h, ring(x, y, r, 18).slice(0, 18), seed, Math.max(0.5, r * 0.06));
 /** 아래(0)에서 시계 방향으로 a만큼 돈 쪽으로 L — 팔다리용 */
 const along = (p: P, a: number, L: number): P => [p[0] + Math.sin(a) * L, p[1] + Math.cos(a) * L];
-/** 위(0)에서 시계 방향으로 a만큼 돈 쪽으로 L — 솟는 물건용 */
-const rise = (p: P, a: number, L: number): P => [p[0] + Math.sin(a) * L, p[1] - Math.cos(a) * L];
 const rect = (x0: number, y0: number, x1: number, y1: number): P[] => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 
 const moonD = (m: Moon): string => patch(ring(m.x, m.y, m.r, 26).slice(0, 26), m.seed, 0.9);
@@ -211,39 +209,6 @@ function dual(ctx: Ctx, m: Moon | null, fg: Fg): void {
   ctx.save();
   ctx.clip(new Path2D(moonD(m)));
   fg(INK, false);
-  ctx.restore();
-}
-
-/** 기존 그림(대검 등)을 한 색 실루엣으로 — 먹 테를 두른다 */
-function silhouette(ctx: Ctx, draw: (c: Ctx) => void, color = PAPER): void {
-  const cv = ctx.canvas;
-  const k = ctx.getTransform().a;
-  const base = document.createElement('canvas');
-  base.width = cv.width;
-  base.height = cv.height;
-  const bc = base.getContext('2d');
-  if (!bc) return;
-  bc.setTransform(ctx.getTransform());
-  draw(bc);
-  const tint = (color: string): HTMLCanvasElement => {
-    const t = document.createElement('canvas');
-    t.width = cv.width;
-    t.height = cv.height;
-    const tc = t.getContext('2d');
-    if (tc) {
-      tc.drawImage(base, 0, 0);
-      tc.globalCompositeOperation = 'source-in';
-      tc.fillStyle = color;
-      tc.fillRect(0, 0, t.width, t.height);
-    }
-    return t;
-  };
-  const ink = tint(INK);
-  const body = tint(color);
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  for (let i = 0; i < 8; i++) ctx.drawImage(ink, Math.cos((i * TAU) / 8) * 1.8 * k, Math.sin((i * TAU) / 8) * 1.8 * k);
-  ctx.drawImage(body, 0, 0);
   ctx.restore();
 }
 
@@ -420,47 +385,17 @@ function crane(ctx: Ctx, W: number, H: number, m: Moon, mx: number, wx: number, 
   blob(ctx, SEAL, true, tip, jy + 1, 3, 151);
 }
 
-/** 기사 세트: 달 앞에서 칼을 치켜든 졸라맨, 노랑 칼빛 호 한 획이 달을 가로지른다(잔선 없음) */
-function knight(ctx: Ctx): void {
-  skyline(ctx, 101);
-  ctx.translate(72, -8);
-  ctx.scale(0.82, 0.82);
-  const m: Moon = { x: 168, y: 92, r: 62, seed: 11 };
-  moon(ctx, m, PALETTE.YELLOW);
-  const C: P = [152, 126];
-  const sweep = [-0.2, -0.7, -1.2, -1.75, -2.3, -2.85].map((a) => [C[0] + Math.cos(a) * 66, C[1] + Math.sin(a) * 66] as P);
-  ln(ctx, PALETTE.YELLOW, true, sweep, 17, 1.6, 11);
-  dual(ctx, m, (c, h) => {
-    const [hand] = man(ctx, c, h, 150, 124, 1.3, { lean: 0.12, arm: [2.45, 2.8, 2.2, 2.65], leg: [-0.6, -0.1, 0.7, 0.2] });
-    const guard = rise(hand, 0.55, 8);
-    ln(ctx, c, h, [guard, rise(hand, 0.55, 62)], 7, 1, 12);
-    ln(ctx, c, h, [rise(guard, 0.55 - 1.57, 8), rise(guard, 0.55 + 1.57, 8)], 4.4, 4, 13);
-  });
-}
-
-/** 철거왕 세트: 금 대검을 세우고 위에 왕관, 뒤로 무기가 부채처럼 펴진다 (금) */
+/** 철거왕 세트: 달 앞에 큰 왕관, 왼쪽에 구성품(작업복 · 꾸미기 · 궤도조각) — 무기는 없다 (금) */
 function king(ctx: Ctx): void {
   const m: Moon = { x: 214, y: 64, r: 54, seed: 13 };
   skyline(ctx, 111);
   rays(ctx, m.x, m.y, 60, 190, 18, 112);
   moon(ctx, m, GOLD);
-  // 부채꼴 무기 — 붓 획 칼 넷(굵기 · 길이가 달라 같은 칼이 아니다)
-  dual(ctx, m, (c, h) => {
-    const base: P = [214, 130];
-    ([[-1.05, 6, 84], [-0.58, 9, 92], [0.58, 8, 92], [1.05, 5, 82]] as const).forEach(([a, w, len], i) => {
-      const guard = rise(base, a, 18);
-      ln(ctx, c, h, [guard, rise(base, a, len)], w, 1, 90 + i);
-      ln(ctx, c, h, [rise(guard, a - 1.57, 9), rise(guard, a + 1.57, 9)], 4.4, 4, 94 + i);
-      ln(ctx, c, h, [base, guard], 4.8, 4.2, 98 + i);
-    });
-  });
-  // 가운데 금 대검 — 판의 대검 그림을 금 실루엣으로
-  silhouette(ctx, (c) => {
-    c.translate(214, 130);
-    c.scale(2.8, 1.9);
-    drawGreatsword(c, 'gold', 0, 0, 0, -42);
-  }, GOLD);
-  paintGoods(ctx, 'crown', 214, 30, 62);
+  dual(ctx, m, (c, h) => ground(ctx, c, h));
+  paintGoods(ctx, 'coverall', 34, 94, 44, 0.14);
+  paintGoods(ctx, 'look', 86, 86, 56, -0.08);
+  paintGoods(ctx, 'orbSack', 138, 92, 52, 0.06);
+  paintGoods(ctx, 'crown', 214, 58, 92);
 }
 
 /** 광고 없는 현장: 졸라맨이 「광고」 표지판을 벤다 (주홍) */
@@ -522,7 +457,6 @@ const SCENES: Record<string, (ctx: Ctx) => void> = {
   toolbox, toolbox_sale: (ctx) => toolbox(ctx, false),
   salary,
   season_pass: pass,
-  knight_set: knight,
   king_set: king,
   no_ads: noAds,
   coins,

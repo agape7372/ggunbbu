@@ -1,4 +1,4 @@
-// 상점 「꾸러미」 탭 — 맨 위 고정 묶음(첫 결제 선물 · 공짜 커피 · 단골 도장) + 그림 탭 다섯 + 탭 하나의 상품(패널 · 세로 줄).
+// 상점 「꾸러미」 탭 — 그림 탭 넷(추천 · 단골 · 재화 · 소장) + 탭 하나의 상품(패널 · 세로 줄). 상품 하나 = 탭 하나, 추천만 지금 있는 것을 모아 보인다.
 // 패널 = 먹판 장면(제목 · 효율 인장 · 도화선) + 구성 칸 줄 + 금 획 가격 단추(구석에 도장 쪽지). 설명 글 없음, 구입 안내는 구석 안내 단추 안에.
 // 번쩍임 · 깜빡임 · 재촉 문구 없음. 결제는 웹에 없다(iap = false) — 그때는 커피와 시작 장비만 보인다.
 
@@ -94,8 +94,7 @@ const ITEM: Record<KitId, [GoodsId, string]> = { life: ['life', '목숨'], waza:
 const OWNS: Partial<Record<SkuId, Cell[]>> = {
   rookie_pack: [['coverall', '작업복', '', true]],
   rookie_sale: [['coverall', '작업복', '', true]],
-  knight_set: [['look', '꾸미기', '2', true]],
-  king_set: [['swords', '무기', '전부', true], ['look', '꾸미기', '전부', true]],
+  king_set: [['look', '꾸미기', String(skuById('king_set')!.owns!.length), true]],
 };
 
 const maskArt = (n: number): GoodsId => (n >= 10 ? 'mask10' : n >= 3 ? 'mask3' : 'mask1');
@@ -249,14 +248,14 @@ function coinHtml(r: PackRow, sku: Sku, bought: readonly string[]): string {
 
 const heading = (title: string): string => `<header class="pk-head"><h3 class="pk-title">${title}</h3></header>`;
 
-/** 시작 장비 — 궤도조각으로 사기. 결제 없이도 보인다 */
-function kitBody(v: PackView): string {
+/** 시작 장비 — 현장 도구함 패널(panel) + 궤도조각으로 사기. 결제 없이도 보인다 */
+function kitBody(v: PackView, panel = ''): string {
   const rows = KITS.map((k, i) => `<div class="pk-row t${i + 1}">
       <span class="pk-rart">${goods(ITEM[k.id][0])}</span>
       <span class="pk-rbig"><b class="pk-kn">${k.name}</b><span>보유 ${v.items[k.id]}</span></span>
       <button type="button" class="btn" data-kit-buy="${k.id}" aria-label="${k.name} 사기, 궤도조각 ${k.orbit}"${v.orbit >= k.orbit ? '' : ' disabled'}><span class="cur">${glyph('orb')}${k.orbit}</span></button>
     </div>`).join('');
-  return `${heading('시작 장비')}<div class="pk-rows">${rows}</div>`;
+  return `${heading('시작 장비')}${panel}<div class="pk-rows">${rows}</div>`;
 }
 
 /* ── 맨 위 고정 묶음 ── */
@@ -310,8 +309,7 @@ function regularHtml(r: Regular): string {
 interface Tab { id: string; name: string; art: GoodsId; dot?: boolean; on: boolean; body: () => string }
 
 function tabsOf(v: PackView): Tab[] {
-  const kit: Tab = { id: 'kit', name: '장비', art: 'life', on: true, body: () => (v.iap ? '' : `<div class="pk-fix">${coffeeHtml(v.coffeeOn)}</div>`) + kitBody(v) };
-  if (!v.iap) return [kit];
+  if (!v.iap) return [{ id: 'kit', name: '장비', art: 'life', on: true, body: () => `<div class="pk-fix">${coffeeHtml(v.coffeeOn)}</div>` + kitBody(v) }];
   const row = new Map(v.rows.map((r) => [r.sku, r]));
   const has = (...ids: SkuId[]): boolean => ids.some((id) => row.has(id));
   const listed = (ids: readonly SkuId[]): PackRow[] => ids.map((id) => row.get(id)).filter((r): r is PackRow => !!r);
@@ -331,31 +329,35 @@ function tabsOf(v: PackView): Tab[] {
   })).join('');
   const sold = new Set<SkuId>(v.offers.map((o) => o.of));
   const head = (...parts: string[]): string => (parts.some(Boolean) ? `<div class="pk-fix">${parts.join('')}</div>` : '');
-  const regularDot = v.coffeeOn || regularReady(v.regular) >= 0;
+  const rookie = (): string => (sold.has('rookie_pack') ? '' : panels('rookie_pack'));
   const tabs: Tab[] = [
     {
-      id: 'hot', name: '추천', art: 'gift', dot: v.offers.length > 0, on: v.offers.length > 0 || v.firstGift || v.coffeeOn || has('rookie_pack', 'season_pass'),
-      body: () => head(v.firstGift ? giftHtml() : '', v.coffeeOn ? coffeeHtml(true) : '') + offers() + panels(...(['rookie_pack', 'season_pass'] as const).filter((id) => !sold.has(id))),
+      id: 'hot', name: '추천', art: 'gift', dot: v.offers.length > 0 || v.coffeeOn,
+      on: v.offers.length > 0 || v.firstGift || v.coffeeOn || (has('rookie_pack') && !sold.has('rookie_pack')),
+      body: () => head(v.firstGift ? giftHtml() : '', v.coffeeOn ? coffeeHtml(true) : '') + offers() + rookie(),
     },
-    { id: 'regular', name: '단골', art: 'envelope', dot: regularDot, on: true, body: () => head(coffeeHtml(v.coffeeOn), regularHtml(v.regular)) + panels('season_pass', 'salary', 'no_ads') },
-    { id: 'set', name: '세트', art: 'crown', on: has('knight_set', 'king_set', 'toolbox'), body: () => panels('knight_set', 'king_set', 'toolbox') },
     {
-      id: 'goods', name: '재화', art: 'orbSack', on: has(...COIN_SKUS, ...MASK_SKUS),
+      id: 'regular', name: '단골', art: 'envelope', dot: regularReady(v.regular) >= 0, on: true,
+      body: () => head(regularHtml(v.regular)) + panels('salary', 'season_pass'),
+    },
+    {
+      id: 'goods', name: '재화', art: 'orbSack', on: true,
       body: () => (doubled ? '<div class="pk-top band"><div class="pk-scene" data-scene="coins"></div><h3 class="pk-title">첫 구매 2배</h3></div>' : '')
         + (has(...COIN_SKUS) ? `<div class="pk-coins">${coins()}</div>` : '')
-        + (has(...MASK_SKUS) ? `${heading('마스크')}<div class="pk-rows">${mask()}</div>` : ''),
+        + (has(...MASK_SKUS) ? `${heading('마스크')}<div class="pk-rows">${mask()}</div>` : '')
+        + kitBody(v, panels('toolbox')),
     },
-    kit,
+    { id: 'own', name: '소장', art: 'crown', on: true, body: () => panels('no_ads', 'king_set') || '<div class="pk-reg done"><span class="seal ink"><b>완료</b></span></div>' },
   ];
   return tabs.filter((t) => t.on);
 }
 
-/** 맨 아래 줄 — 구매 복원 + 구석 안내 단추 */
-function legalHtml(): string {
-  return `<div class="pk-legal"><button type="button" class="btn" data-shop-restore="1">구매 복원</button>${infoHtml([
+/** 맨 아래 줄 — 구석 안내 단추. 소장 탭에는 구매 복원이 같이 선다 */
+function legalHtml(restore: boolean): string {
+  return `<div class="pk-legal">${restore ? '<button type="button" class="btn" data-shop-restore="1">구매 복원</button>' : ''}${infoHtml([
     '결제는 Google Play로 처리해요. 전부 정해진 구성이고 뽑기는 없어요.',
     '표시된 가격에는 부가세가 포함돼 있어요.',
-    `효율 = 구성품 값 ÷ 가격이에요. 구성품 값은 따로 파는 것만 더해요. 궤도조각은 대 묶음 단가(개당 ₩${ORBIT_WON.toFixed(1)}), 먼지도 대 묶음 단가(개당 ₩${DUST_WON.toFixed(1)}), 마스크는 10개 묶음 단가, 장비 · 꾸미기 · 무기는 상점 값으로 쳐요. 전용 꾸미기 · 월급의 광고 없음은 안 넣어요. 월급은 ${SALARY_DAYS}번 다 받았을 때, 특근은 매일 다 했을 때 값이에요.`,
+    `효율 = 구성품 값 ÷ 가격이에요. 구성품 값은 따로 파는 것만 더해요. 궤도조각은 대 묶음 단가(개당 ₩${ORBIT_WON.toFixed(1)}), 먼지도 대 묶음 단가(개당 ₩${DUST_WON.toFixed(1)}), 마스크는 10개 묶음 단가, 장비 · 꾸미기는 상점 값으로 쳐요. 이미 가진 꾸미기와 광고 없음은 값에서 빼요. 전용 꾸미기 · 월급의 광고 없음은 안 넣어요. 월급은 ${SALARY_DAYS}번 다 받았을 때, 특근은 매일 다 했을 때 값이에요.`,
     '궤도조각 · 먼지 묶음은 상품마다 첫 구매 한 번만 두 배예요.',
     `단골 도장은 ₩${num(WON_PER_STAMP)}마다 하나예요.`,
     ...BUY_NOTES,
@@ -369,7 +371,7 @@ export function packHtml(v: PackView): string {
     ? `<div class="pk-tabs" role="tablist" aria-label="꾸러미 칸">${tabs.map((t) =>
       `<button type="button" role="tab" aria-selected="${t === cur}" class="pk-tab${t === cur ? ' on' : ''}" data-pack-tab="${t.id}">${goods(t.art)}<span>${t.name}</span>${t.dot ? '<i class="pk-dot"></i>' : ''}</button>`).join('')}</div>`
     : '';
-  return `<div class="pk">${bar}<div class="pk-view">${cur.body()}</div>${v.iap ? legalHtml() : ''}</div>`;
+  return `<div class="pk">${bar}<div class="pk-view">${cur.body()}</div>${v.iap ? legalHtml(cur.id === 'own') : ''}</div>`;
 }
 
 /** 특가 창 본문 — 장면 · 효율 인장 · 정가 → 특가 · 도화선 · 구성 칸 */

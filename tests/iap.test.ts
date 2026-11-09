@@ -127,6 +127,19 @@ describe('iap', () => {
     expect(b.iapTokens).toEqual(['a']);
   });
 
+  it('없어진 상품(기사 세트)이 스토어에 남아 있어도 복구가 깨지지 않고 나머지는 받는다', async () => {
+    const { log } = fakePlugin(new Error('x'), [
+      { productIdentifier: 'knight_set', purchaseToken: 'k', purchaseState: '1', isAcknowledged: true },
+      { productIdentifier: 'no_ads', purchaseToken: 'n', purchaseState: '1', isAcknowledged: true },
+    ]);
+    const b = buyer();
+    const iap = createIapPort();
+    expect(await iap.restore((p) => { grantSku(b, p.id, p.token); })).toBe(1);
+    expect(b.noAds).toBe(true);
+    expect(b.bought).toEqual(['no_ads']);
+    expect(log).toEqual([]); // 모르는 상품은 소비 · 승인도 안 한다
+  });
+
   it('복구를 못 읽은 것은 0건과 다르고, 결제 중에는 복구가 끼어들지 않는다', async () => {
     const { plugin } = fakePlugin(new Error('x'));
     plugin.getPurchases.mockRejectedValueOnce(new Error('offline'));
