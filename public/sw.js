@@ -18,6 +18,9 @@ const APP_SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './fonts/display.woff2',
+  './fonts/brush.woff2',
+  './fonts/body-400.woff2',
+  './fonts/body-700.woff2',
   './fonts/ui-500.woff2',
   './fonts/ui-700.woff2',
   './fonts/mono-500.woff2',
@@ -122,9 +125,10 @@ self.addEventListener('fetch', (event) => {
   if (isCacheableAsset(url)) {
     // 빌드에 포함된 해시 파일은 요청 Origin과 무관하게 같은 내용이다.
     // Vary: Origin 서버에서도 preload와 crossorigin module 요청이 같은 캐시를 쓴다.
-    const bundled = BUILD_ASSETS.some((file) => new URL(file, self.location.href).href === url.href);
+    // 글꼴도 crossorigin 요청이라 Origin이 실린다 — cache.add로 넣은 프리캐시 항목(Origin 없음)과 맞춘다.
+    const anyOrigin = url.pathname.includes('/fonts/') || BUILD_ASSETS.some((file) => new URL(file, self.location.href).href === url.href);
     event.respondWith(
-      caches.match(request, { ignoreVary: bundled }).then((cached) => {
+      caches.match(request, { ignoreVary: anyOrigin }).then((cached) => {
         if (cached) return cached;
         return fetch(request).then((response) => {
           if (response.ok) {

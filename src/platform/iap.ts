@@ -20,7 +20,7 @@ export interface Paid {
 export interface IapPort {
   /** 결제 경로가 실재하는가 — 스토어 연결이 되고 상품을 받았을 때만 true */
   available(): boolean;
-  /** 스토어 연결 + 가격 받기. 실패해도 throw하지 않는다 */
+  /** 스토어 연결 + 가격 받기. 실패해도 throw하지 않고, 다시 부르면 다시 붙는다(겹쳐 부르면 한 번만 돈다) */
   init(): Promise<void>;
   /** 스토어 가격 문자열. 못 받았으면 null — 화면은 krw로 대체 표기 */
   price(id: SkuId): string | null;
@@ -79,6 +79,7 @@ export function createIapPort(): IapPort {
   const prices = new Map<string, string>();
   let ready = false;
   let busy = false;
+  let initing: Promise<void> | null = null;
 
   /** 끝난 구매 하나 처리. 지급과 저장이 끝난 뒤에만 스토어에 알린다 */
   async function finish(p: PurchasesPlugin, tx: Tx, onPaid: (x: Paid) => void): Promise<boolean> {
@@ -115,19 +116,23 @@ export function createIapPort(): IapPort {
       return ready || isDevUnlocked();
     },
 
-    async init(): Promise<void> {
-      const p = getPlugin();
-      if (!p) return;
-      try {
-        await p.configure({ autoFinishTransactions: false });
-        const { isBillingSupported } = await p.isBillingSupported();
-        if (!isBillingSupported) return;
-        const { products } = await p.getProducts({ productIdentifiers: [...SKU_IDS], productType: 'inapp' });
-        for (const x of products) prices.set(x.identifier, x.priceString);
-        ready = products.length > 0;
-      } catch {
-        ready = false;
-      }
+    init(): Promise<void> {
+      // 결제 · 복구 중이면 끼어들지 않는다 — 다음 복귀 · 상점 열기가 다시 부른다. busy는 쥐지 않는다: 준비가 늦어도 복구 · 결제를 막지 않게
+      initing ??= (async () => {
+        const p = getPlugin();
+        if (!p || busy) return;
+        try {
+          await p.configure({ autoFinishTransactions: false });
+          const { isBillingSupported } = await p.isBillingSupported();
+          if (!isBillingSupported) return;
+          const { products } = await p.getProducts({ productIdentifiers: [...SKU_IDS], productType: 'inapp' });
+          for (const x of products) prices.set(x.identifier, x.priceString);
+          ready = products.length > 0;
+        } catch {
+          ready = false;
+        }
+      })().finally(() => { initing = null; });
+      return initing;
     },
 
     price(id: SkuId): string | null {

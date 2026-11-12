@@ -747,6 +747,7 @@ export function createApp(
   }
 
   function openShop(tab?: ShopTab): void {
+    void retryIap(); // 부팅 때 결제 준비가 실패했으면 상점을 열 때 다시 붙는다
     overlay.showShop({
       dust: save.dust, orbit: save.orbit, license: save.license, buildings: save.stats.buildings, loadout: save.loadout,
       maskArt: save.maskArt, masks: save.masks, maskId: save.maskId, blanks: save.blanks,
@@ -1440,13 +1441,23 @@ export function createApp(
   }
   const noteGot = (got: number): void => { if (got > 0) overlay.toast(`못 받은 결제 ${got}건을 받았어요.`); }; // 말없이 늘면 의심한다
 
-  void iap.init().then(pendingBuys).then((got) => {
+  /** 결제가 열렸거나 못 받은 결제를 받았다 — 열린 상점 · 홈(특가)을 다시 그린다 */
+  function iapRedraw(): void {
     const scr = overlay.getScreen();
     if (scr === 'shop') openShop();
     else if (scr === 'title' && !overlay.modalOpen()) {
       overlay.showTitle(titleView());
       homeNudge();
     }
+  }
+  /** 부팅 때 결제 준비가 실패했으면(오프라인 시작 등) 다시 붙고, 열리면 다시 그린다 */
+  function retryIap(): Promise<void> {
+    if (iap.available()) return Promise.resolve();
+    return iap.init().then(() => { if (iap.available()) iapRedraw(); });
+  }
+
+  void iap.init().then(pendingBuys).then((got) => {
+    iapRedraw();
     noteGot(got);
   });
 
@@ -1454,6 +1465,7 @@ export function createApp(
   onLifecycle((fg) => {
     if (fg) {
       resumeIfNeeded();
+      void retryIap(); // 복구와 따로 돈다 — 준비가 늦어도 못 받은 결제는 바로 받는다
       void pendingBuys().then((got) => {
         if (got > 0 && overlay.getScreen() === 'shop') openShop();
         noteGot(got);

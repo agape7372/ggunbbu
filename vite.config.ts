@@ -7,7 +7,8 @@ export default defineConfig({
   base: './',
   server: { port: 5173, strictPort: true },
   preview: { port: 5173, strictPort: true },
-  build: { target: 'es2022', emptyOutDir: true },
+  // 런타임 의존성 0이라 청크를 쪼갤 이득이 없다(main 약 520kB). 크기 상한은 scripts/check-budget.mjs가 지킨다
+  build: { target: 'es2022', emptyOutDir: true, chunkSizeWarningLimit: 600 },
   plugins: [offlineAppShell()],
   test: {
     include: ['tests/**/*.test.{ts,mjs}'],

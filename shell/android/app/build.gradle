@@ -30,6 +30,15 @@ gradle.taskGraph.whenReady { graph ->
             throw new GradleException("AndroidManifest 의 AdMob 앱 ID가 Google 테스트 값이다 (${adId.group(1)}) — 실 앱 ID로 바꾸거나, 일부러 굽는 거라면 -PallowTestAds (정본: docs/RELEASE.md)")
         }
     }
+    // CAP_SERVER_URL(시험판 껍데기) env가 남은 셸에서 sync하면 앱이 실린 번들 대신 그 원격 주소를 띄운다.
+    // 일부러 굽는 내부 시험만 -PallowServerUrl. 출시 셸은 env 없이 npx cap sync android 를 다시 한다.
+    if (wantsRelease && !project.hasProperty('allowServerUrl')) {
+        def capConfig = file('src/main/assets/capacitor.config.json')
+        def serverUrl = capConfig.exists() ? new groovy.json.JsonSlurper().parse(capConfig, "UTF-8")?.server?.url : null
+        if (serverUrl) {
+            throw new GradleException("앱에 실린 capacitor.config.json 에 server.url 이 있다 (${serverUrl}) — CAP_SERVER_URL 없이 npx cap sync android 를 다시 하거나, 일부러 굽는 거라면 -PallowServerUrl (정본: docs/RELEASE.md)")
+        }
+    }
 }
 
 android {
