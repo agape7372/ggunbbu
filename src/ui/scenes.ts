@@ -43,7 +43,7 @@ import { goSeat } from '../input/layout';
 import { mountHud, ensureHudLayer, type HudOp } from './hud';
 import { createRunCaps, type RunCap, type RunCaps } from './runCaps';
 import { bookCount, bookGroups, type RecordView } from './bookView';
-import { fmt } from './ink';
+import { fmt, reduceMotion as osReduceMotion } from './ink';
 import type { KitView } from './kitView';
 import { achieveDetail, attendBoard, type SeasonView, type TakeKind } from './missionView';
 import { goods, skuGoods } from './goodsArt';
@@ -54,7 +54,7 @@ import {
   mountOverlay, ensureOverlayLayer, homeFactsFromSave, titleViewFromSave,
   type GameOverView, type OpsEndView, type OverlayApi, type StoryOpts, type TitleView,
 } from './overlay';
-import { applySettingsPatch as patchSettings, applySettingsToRuntime, type SettingsSinks } from './settings';
+import { applySettingsPatch as patchSettings, applySettingsToRuntime, firstBootFeedback, type SettingsSinks } from './settings';
 import {
   grant, grantOrbit, MAX_REVIVES_PER_RUN, ORBIT_PER_AD, spendOrbit, orbitCost, exchangeDust, DUST_EXCHANGE,
   dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY, MASK_DUST_COST,
@@ -180,6 +180,8 @@ export function createApp(
     setLeftHanded: (on) => { touch?.setLeftHanded(on); },
     setButtonLayout: (layout) => { touch?.setLayout(layout); },
   };
+  const bootFeedback = firstBootFeedback((k) => localStorage.getItem(k), osReduceMotion());
+  if (bootFeedback) Object.assign(save.settings, bootFeedback);
   applySettingsToRuntime(save, settingsSinks);
   initRenderer();
   applyCosmetics(save.loadout, save.maskArt); // 코스메틱 실반영 (08-30, P1-3)
@@ -865,6 +867,7 @@ export function createApp(
     });
     bgm(null);
     playSfx(result.cleared ? 'stamp' : 'runEnd', { delay: result.cleared ? 0 : AUDIO.RUN_END_DELAY });
+    if (result.cleared) playSfx('checkpoint', { delay: AUDIO.RUN_END_DELAY }); // 도장 뒤 맑은 차임 한 번 — 완료가 0.1초 도장 하나로 끝나지 않게(감사 feel-05)
     scene = 'gameover'; // 카드가 뜰 때까지의 박자는 게임오버와 같다. 카드가 뜨면 stageend
     setChrome('gameover');
     gameoverDelay = result.cleared ? 6 : UI_FLOW.GAMEOVER_CARD_DELAY;
@@ -1858,11 +1861,12 @@ export function createApp(
           : save.bestArcade;
       persist();
       bgm(null);
-      playSfx('runEnd', { delay: AUDIO.RUN_END_DELAY }); // 목숨 소리(lifeLost)가 끝난 뒤 판 종료 신호
       scene = 'gameover';
       setChrome('gameover');
       // 카드는 잠깐 뒤에 — 그동안 캔버스가 마지막 장면을 보여 준다
       pendingOver = gameoverView(s, prevBest);
+      // 목숨 소리(lifeLost)가 끝난 뒤 판 종료 신호 — 신기록이면 가라앉는 소리 대신 고비 소리(감사 feel-05)
+      playSfx(pendingOver.best ? 'milestone' : 'runEnd', { delay: AUDIO.RUN_END_DELAY });
       gameoverDelay = UI_FLOW.GAMEOVER_CARD_DELAY;
       overlayTicks = 0;
       return;

@@ -67,6 +67,8 @@ let layerLevel = 0;
 let layerTarget = 0;
 /** resume 대기 중 쌓인 효과음은 최신 1건만 남긴다 */
 let pendingSfx: (() => void) | null = null;
+/** 앱이 숨은 동안 — 효과음 타이머 · 배경음 시작이 멈춘 컨텍스트를 다시 깨우지 않게(감사 feel-02) */
+let hidden = false;
 
 function ramp(p: AudioParam, v: number, tc: number, at: number): void {
   p.cancelScheduledValues(at);
@@ -147,6 +149,7 @@ function snapSchedulerClock(): void {
 
 /** 포그라운드 복귀 시 호출: running이 아니면(suspended · iOS interrupted) resume. */
 export function resumeIfNeeded(): void {
+  hidden = false;
   if (!ctx) return;
   if (ctx.state !== 'running') {
     ctx.resume().then(snapSchedulerClock, () => undefined);
@@ -157,6 +160,8 @@ export function resumeIfNeeded(): void {
 
 /** 백그라운드 진입 시 호출: 소리를 멈춘다. 복귀는 resumeIfNeeded가 한다. */
 export function suspendAudio(): void {
+  hidden = true;
+  pendingSfx = null;
   if (ctx?.state === 'running') ctx.suspend().catch(() => undefined);
 }
 
@@ -201,7 +206,7 @@ export function pulseDuckBgm(level: number = AUDIO.DUCK_PULSE, holdS: number = A
 // ─── SFX ───────────────────────────────────────────────────
 
 export function playSfx(name: SfxName, opts?: { pitchSemitones?: number; delay?: number; pan?: number; dur?: number }): void {
-  if (!ctx || !mix || !soundOn || !sfxOn) return;
+  if (!ctx || !mix || !soundOn || !sfxOn || hidden) return;
   const c = ctx;
   const bus = mix.sfx;
   const pan = opts?.pan ?? 0;
@@ -386,7 +391,7 @@ function haltScheduler(): void {
 function beginScheduler(): void {
   if (!ctx || !mix || !soundOn || !bgmOn || !wantedTrack) return;
   if (currentTrack === wantedTrack && schedulerId !== null) return;
-  if (ctx.state !== 'running') ctx.resume().catch(() => undefined);
+  if (ctx.state !== 'running' && !hidden) ctx.resume().catch(() => undefined);
   haltScheduler();
   currentTrack = wantedTrack;
   stepIndex = 0;

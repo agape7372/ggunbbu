@@ -93,8 +93,8 @@ let popupSeed = 0;
  * 고비(COMBO_MARK.STEPS)마다 효과가 하나씩 는다. 자리는 월드 좌표로 쥐고 그릴 때 카메라를 더한다.
  * age = 마지막 타격 뒤 틱(HOLD + EXIT를 넘기면 접혀서 다음 타격을 기다린다) · burst = 고비 연출 나이(−1 = 없음)
  */
-/** ink = 친 무기의 포인트 색(100부터 붓판 속) */
-interface ComboMark { n: number; x: number; y: number; tx: number; ty: number; age: number; burst: number; step: number; ink: string }
+/** ink = 친 무기의 포인트 색(100부터 붓판 속) · redraw = 붓판을 3틱에 새로 긋는 타격(처음 뜰 때 · 고비 칸이 바뀔 때만) */
+interface ComboMark { n: number; x: number; y: number; tx: number; ty: number; age: number; burst: number; step: number; ink: string; redraw: boolean }
 let mark: ComboMark | null = null;
 const MARK_GONE = COMBO_MARK.HOLD + COMBO_MARK.EXIT;
 /** 끊긴 콤보 — 두 동강 나 떨어지는 숫자. 새 콤보 도장과 따로 논다(끊기자마자 다시 쳐도 끝까지 떨어진다) */
@@ -273,9 +273,11 @@ function markHit(n: number, y: number, ink: string): void {
   const tx = VIEW.LANE_X[0] + C.DX;
   const ty = VIEW.GROUND_Y - y + C.DY;
   // 보스 입장은 끊김 이벤트 없이 콤보를 0으로 돌린다 — 작아진 수는 새 도장
-  if (!mark || n < mark.n) mark = { n: 0, x: tx, y: ty, tx, ty, age: MARK_GONE, burst: -1, step: -1, ink };
+  if (!mark || n < mark.n) mark = { n: 0, x: tx, y: ty, tx, ty, age: MARK_GONE, burst: -1, step: -1, ink, redraw: true };
   const m = mark;
   m.ink = ink;
+  // 떠 있던 도장을 칠 때마다 붓판을 새로 그으면 6틱 연타에 한지색 숫자 끝자리가 늘 판 밖에 남는다(감사 feel-01)
+  m.redraw = m.age >= MARK_GONE || markTier(n) !== markTier(m.n);
   if (m.age >= MARK_GONE) { m.x = tx; m.y = ty; } // 접혀 있던 도장은 맞은 자리에서 다시 편다
   m.tx = tx;
   m.ty = ty;
@@ -360,7 +362,7 @@ function react(s: GameState, e: JuiceEvent): void {
 function playEvents(s: GameState, evs: readonly JuiceEvent[]): void {
   for (const e of evs) react(s, e);
   if (!vibrationOn) return;
-  const pat = pickHaptic(evs, haptic);
+  const pat = pickHaptic(evs, haptic, s.wazaRun !== null);
   if (pat !== null) vibrate(pat); // 네이티브=Haptics(세그먼트 체인), 웹=navigator.vibrate (throw 없음)
 }
 
@@ -817,6 +819,8 @@ const LABEL_FONT = `700 ${COMBO_MARK.LABEL_PX - 2}px "Gunbbu Mono", "Gunbbu Sans
 const markPx = (n: number): number => COMBO_MARK.PX * (1 + (COMBO_MARK.GROW * Math.min(n, 500)) / 500);
 /** 지나온 고비 수 — 10부터 기울고 30부터 먹 그림자 */
 const markTier = (n: number): number => COMBO_MARK.STEPS.filter((st) => n >= st.at).length;
+/** 붓판이 그어진 몫(0..1) */
+const markStroke = (m: ComboMark): number => (m.redraw ? Math.min(1, (m.age + 1) / 3) : 1);
 /** 도장 높이(화면) — 위는 HUD 막대 줄 밑, 아래는 이름표 자리까지 안으로 민다 */
 const markScreenY = (y: number, cam: number, px: number): number =>
   Math.max(COMBO_MARK.TOP + px * 0.5, Math.min(VIEW.FIELD_H - px * 0.5 - COMBO_MARK.LABEL_PX - 10, y + cam));
@@ -879,11 +883,11 @@ function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
   if (!reduceMotion) ctx.rotate((m.n % 2 ? 1 : -1) * C.TILT * pu); // 칠 때마다 번갈아 기울었다 선다
   ctx.scale(sc, sc);
   const seal = m.n >= 500;
-  // 붓판 — 10부터 숫자 밑 붓 한 획, 50부터 숫자 뒤 굵은 먹 획(숫자는 한지색), 100부터 그 속에 무기 포인트 색. 칠 때마다 3틱에 다시 긋는다
+  // 붓판 — 10부터 숫자 밑 붓 한 획, 50부터 숫자 뒤 굵은 먹 획(숫자는 한지색), 100부터 그 속에 무기 포인트 색. 처음 뜰 때 · 고비 칸이 바뀔 때만 3틱에 긋는다
   const board = !seal && tier >= 3;
   if (!seal && tier >= 1) {
     const bw = w + 34;
-    const s1 = Math.min(1, (m.age + 1) / 3);
+    const s1 = markStroke(m);
     ctx.fillStyle = PALETTE.INK;
     if (board) brushLine(ctx, -bw / 2, 3, bw / 2, -3, px * 0.92, 0, s1, 0.45, m.n % 7, 3, PRESS.yi);
     else brushLine(ctx, -bw / 2, px * 0.44, bw / 2, px * 0.38, px * 0.17, 0, s1, 0.5, m.n % 7, 2, PRESS.yi);
@@ -1092,8 +1096,9 @@ function drawHatBand(ctx: CanvasRenderingContext2D, s0: number, s1: number, n: n
 }
 
 /** 시험용 — 지금 콤보 도장(n · 떠 있나 · 고비 칸) · 끊긴 조각 수 · 안전모 연출 나이(−1 = 없음) */
-export function comboMarkView(): { n: number; shown: boolean; step: number; broken: number; hat: number } {
+export function comboMarkView(): { n: number; shown: boolean; step: number; broken: number; hat: number; board: number } {
   return {
+    board: mark ? markStroke(mark) : 0,
     n: mark?.n ?? 0,
     shown: mark !== null && mark.age < MARK_GONE,
     step: mark !== null && mark.burst >= 0 ? mark.step : -1,

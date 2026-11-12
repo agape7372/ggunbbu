@@ -86,12 +86,14 @@ export interface HapticCounters { hit: number; bossHit: number }
 /**
  * 한 틱의 이벤트 묶음에서 쏠 진동 하나를 고른다. 겹치면 가장 긴 패턴 하나만.
  * hit·bossHit는 HIT_THROTTLE회당 1회(3타에 1번)만 후보가 된다 — 카운터는 호출마다 올라간다.
+ * delayedWaza = 시간차 필살이 도는 중(state.wazaRun) — 누름(special)은 짧게, 가장 센 진동은 터짐(wazaBurst) 틱에.
  */
-export function pickHaptic(events: readonly JuiceEvent[], counters: HapticCounters): HapticPattern | null {
+export function pickHaptic(events: readonly JuiceEvent[], counters: HapticCounters, delayedWaza = false): HapticPattern | null {
   let best: HapticPattern | null = null;
   let bestLen = 0;
   for (const e of events) {
-    const pat = (HAPTIC as Record<string, HapticPattern | undefined>)[e.kind];
+    const pat = e.kind === 'special' && delayedWaza ? HAPTIC.wazaPress
+      : (HAPTIC as Record<string, HapticPattern | undefined>)[e.kind];
     if (pat === undefined) continue;
     if (e.kind === 'hit' || e.kind === 'bossHit') {
       counters[e.kind] += 1;

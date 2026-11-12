@@ -1,10 +1,12 @@
 // 렌더러의 이벤트 소비 — 진동 고르기·스로틀, 필살 예비동작(미루기), 보스 상태 읽기.
 // 캔버스는 쓰지 않는다(consumeEvents만) — 그리기 검증은 헤드리스 브라우저 캡처가 맡는다.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BOSS, COMBO_MARK, HAPTIC, JUICE } from '../src/config';
+import { BOSS, COMBO_MARK, HAPTIC, JUICE, WAZA_RUN } from '../src/config';
 import { initBoss } from '../src/core/boss';
-import { makeState } from '../src/core/sim';
-import type { GameState, JuiceEvent } from '../src/core/types';
+import { makeFloor, makeStack } from '../src/core/building';
+import { advance, makeState } from '../src/core/sim';
+import type { GameState, JuiceEvent, Material, WazaId } from '../src/core/types';
+import { hapticLength } from '../src/render/feel';
 
 vi.mock('../src/platform/native', async (orig) => ({
   ...await orig<typeof import('../src/platform/native')>(),
@@ -77,6 +79,20 @@ describe('콤보 도장 — 판 위 타격 자리', () => {
     expect(comboMarkView()).toMatchObject({ n: 10, step: 0 });
     for (let n = 11; n <= 30; n++) hitTo(s, n, n % 2 ? 'hit' : 'floorCollapse');
     expect(comboMarkView()).toMatchObject({ n: 30, step: 1 });
+  });
+
+  it('떠 있던 도장을 다시 친 틱에 판 길이 = 1 — 처음 뜰 때 · 고비 칸이 바뀔 때만 3틱에 긋는다(감사 feel-01)', () => {
+    const s = state();
+    hitTo(s, 1);
+    expect(comboMarkView().board).toBeCloseTo(1 / 3);
+    for (let n = 2; n <= 49; n++) hitTo(s, n);
+    expect(comboMarkView().board).toBe(1);
+    hitTo(s, 50); // 붓판이 처음 깔리는 고비
+    expect(comboMarkView().board).toBeCloseTo(1 / 3);
+    for (let n = 51; n <= 320; n++) {
+      hitTo(s, n);
+      if (!COMBO_MARK.STEPS.some((st) => st.at === n)) expect(comboMarkView().board).toBe(1);
+    }
   });
 
   it('필살이 부순 층(콤보가 안 실린 층 붕괴)은 도장에 안 찍힌다', () => {
@@ -194,6 +210,62 @@ describe('필살 예비동작 — 히트스톱 동안 미루고 끝나는 틱에
     tick(s, [{ kind: 'special', lane: 0 }]); // stackDestroy 없음 → 유령 없음
     for (let i = 0; i < total; i++) tick(s);
     expect(fx.spawnStackShatter).not.toHaveBeenCalled();
+  });
+});
+
+describe('필살 진동 — 누를 때 짧게 · 터질 때 가장 세게(감사 feel-04 · 08)', () => {
+  const IN = { jump: false, guard: false, attack: false, special: false };
+  /** 진짜 시뮬로 필살 한 번 — 틱마다 [틱, 그 틱 사건, 쏜 진동] */
+  function runWaza(waza: WazaId): { t: number; kinds: string[]; pat: unknown }[] {
+    rewind();
+    const s = makeState({ seed: 7 });
+    s.waza = waza;
+    s.wazaGauge = 100;
+    s.stackSpawnCd = 99999;
+    s.stack = makeStack({ variant: 'building', theme: 'europe', floors: ['mid', 'mid', 'mid', 'mid'].map((m) => makeFloor(m as Material)), y: 140, vy: 0 });
+    vi.mocked(vibrate).mockClear();
+    const rows: { t: number; kinds: string[]; pat: unknown }[] = [];
+    let pending: string[] = [];
+    for (let t = 1; t <= 160; t++) {
+      advance(s, { ...IN, special: t === 2 });
+      s.stackSpawnCd = Math.max(s.stackSpawnCd, 9999);
+      pending = pending.concat(s.events.map((e) => e.kind));
+      consumeEvents(s);
+      s.events.length = 0;
+      const calls = vi.mocked(vibrate).mock.calls;
+      if (calls.length) { rows.push({ t, kinds: pending, pat: calls[0][0] }); vi.mocked(vibrate).mockClear(); pending = []; }
+    }
+    return rows;
+  }
+
+  for (const id of ['mukjul', 'dalmuri', 'nakgwan'] as const) {
+    it(`${id} — 누름은 wazaPress, 가장 센 진동은 터짐(wazaBurst) 틱`, () => {
+      const rows = runWaza(id);
+      expect(rows[0].pat).toBe(HAPTIC.wazaPress);
+      const top = rows.reduce((a, b) => (hapticLength(b.pat as never) > hapticLength(a.pat as never) ? b : a));
+      expect(top.kinds).toContain('wazaBurst');
+      expect(top.pat).toBe(HAPTIC.wazaBurst);
+    });
+  }
+
+  it('용오름 — 누름은 짧고 칼 박자마다 진동', () => {
+    const rows = runWaza('baram');
+    expect(rows[0].pat).toBe(HAPTIC.wazaPress);
+    expect(rows.filter((r) => r.kinds.includes('wazaSwing')).length).toBe(WAZA_RUN.baram.hits.length);
+  });
+
+  for (const id of ['tenchi', 'ageba'] as const) {
+    it(`${id} — 누른 박자가 곧 터짐이라 필살 진동(special) 그대로`, () => {
+      expect(runWaza(id)[0].pat).toBe(HAPTIC.special);
+    });
+  }
+
+  it('무게 순서 — 누름 < 터짐 < 보스 격파 · 공중 가드도 땅 가드와 같다', () => {
+    expect(hapticLength(HAPTIC.wazaPress)).toBeLessThan(hapticLength(HAPTIC.wazaBurst));
+    expect(hapticLength(HAPTIC.wazaBurst)).toBeLessThan(hapticLength(HAPTIC.bossDefeat));
+    const s = state();
+    tick(s, [{ kind: 'guardAirBounce', y: 100 }]);
+    expect(vibrate).toHaveBeenCalledWith(HAPTIC.guardAirBounce);
   });
 });
 
