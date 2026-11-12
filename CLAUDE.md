@@ -3,6 +3,7 @@
 키루비루(斬るビル) 메커니즘 재현 + 오리지널 에셋의 모바일 웹 게임.
 계획 정본: `C:\Users\agape\.claude\plans\https-namu-wiki-w-ed-82-a4-eb-a3-a8-eb-b-recursive-clover.md`
 작업 로그: `docs/DEVLOG.md` (마일스톤마다 append — 필수).
+현황 · 재개(2026-11-13): 출시 전 총 감사 정본 = `docs/AUDIT_2026-11-12.md`(검토 목록 · 실기기 확인 · 출시 준비 · 승인 대기는 §4). 가지 `audit/release-1112`(코드 머리 `106b0cf`, 그 위는 문서 커밋)는 미푸시 · 미머지 · 미배포.
 
 ## 불변 규칙
 
@@ -11,8 +12,8 @@
 2. **전 튜닝 상수는 `src/config.ts` 단일 출처.**
    ⚠ **`[정본]` 딱지는 "원작 명시 수치"가 아니다** (2026-08-30 감사). 이 레포의 `[정본]`은
    전부 계획 정본(나무위키 서술 기반 계획서) 유래이고, 원작 exe 대조를 거친 적이 없다.
-   `config.ts` 15건은 `[튜닝]`/`[검증요]`로 강등 완료. **`src/core/`·`tests/` 64건은 미감사 부채**다
-   (core 40·tests 24, 2026-09-05 `grep -c "\[정본" src/core/*.ts tests/*.ts` 실측. 이전 표기 "56건"은
+   `config.ts` 15건은 `[튜닝]`/`[검증요]`로 강등 완료. **`src/core/`·`tests/` 65건은 미감사 부채**다
+   (core 40·tests 25, 2026-11-13 `grep -c "\[정본" src/core/*.ts tests/*.ts` 실측 합. 09-05 표기 64(tests 24)와 그 전 "56건"은
    낡은 값이었다. 09-05에 `sim.ts` 2건이 거짓 주석 정정으로 빠졌고, core 40 중 1건은 딱지가 아니라
    "딱지를 붙이지 않는다"는 서술이다)
    — 이 딱지를 근거로 값을 신성불가침 취급하지 마라. 원작 실측 대조의 정본은
@@ -72,12 +73,13 @@
     필살이 부순 완파엔 발밑 공통 완파 그림을 겹치지 않는다(renderer `byWaza`). 필살 칼이 무너뜨린 층(같은 틱 `wazaSwing`)도 공통 타격 그림을 겹치지 않는다. 가드: `tests/waza-run.test.ts` · `tests/weapon-fx.test.ts`.
 14. **작업 지시서(스테이지 모드)는 결정적이다**(2026-10-31, 정본 = `docs/STAGES_2026-10-31.md`). 같은 입력이면 같은 판이 나온다.
     기한 · 전임자는 봇이 잰 값이다. core · config에서 스테이지 판에 닿는 것(공용 PLAYER · GUARD · WEAPON 포함)이나 대본(`core/stages.ts`)을
-    바꾸면 다시 잰다(문서 §7-1). 어긋나면 `tests/stage.test.ts`가 깨진다. 스테이지 경로에 `Math.pow` · 삼각함수 금지(기기마다 같은 판).
+    바꾸면 다시 잰다(문서 §7-1). 어긋나면 `tests/stage.test.ts`가 깨진다. 스테이지 경로에 `Math.pow` · 삼각함수 금지(기기마다 같은 판, 가드 `tests/invariants-static.test.mjs`).
     **봇이 깬다고 사람이 깨는 게 아니다**(11-01, 봇은 다 깼는데 사용자는 2-1부터 못 깼다). 대본 · 속도를 고치면 사람 대역도 돌린다
     (`HUMAN=1 DIFFS=0,1,2 npx vitest run --no-cache tests/stage-measure.test.ts -t 사람` = 지연 6~16 × 연타 8~12 = 판마다 55판, 문서 §7-2). 대역은 순수 속도를 못 잰다. 속도는 사람 실측에 맞춘다.
     기록 코드 · 공유 · 다시 보기는 없다(2026-11-01 뺌, 되살릴 땐 커밋 `8d30fdf`).
     렌더 · 소리는 GameState를 읽기만 한다. 종은 땅에 닿으면 깨진다(빗나감, 깔지 않는다). 깬 뒤 쓰러짐 연출 중엔 안 다친다.
-    가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts`.
+    「깼다」의 정본 = `src/core/combat.ts` `wonAlready`(지시서 done · 보스 defeated · 명물 down). 피격 · 깔림 · 깔린 채 손실이 모두 이 술어를 본다(아케이드 집행기 포함, 2026-11-13).
+    가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts` · `core-guards.test.ts`.
 15. **메타 화면은 `meta.css` 머리의 글자 값(`--t-*`)과 `.btn.sm` · `.btn.lg` · `.qty` · `.ms-bar`만 쓴다**(2026-11-01, 정본 = `docs/META2_2026-11-01.md`).
     작은 글 13.5px 밑 금지, 외곽선 수량 글씨 금지, 누름 칸 48 이상. 보상은 `rewardFx` 세 단계(S · M · L)로 보이고 토스트로 되돌리지 않는다.
     크기는 11-02 손질 값이다(사용자 「크기좀 적절하게 조절」: 제목 붓 40 · 구획 27 · 이름 16 · 큰 단추 54 · 작은 단추 48 · 탭바 도장 54).
@@ -96,14 +98,15 @@
 
 ## 검증
 
-- `npm test` — 929 테스트(7 건너뜀, 2026-11-11 UI 「현장」 기준, `feat/ui-field`), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- `npm test` — 77파일 1013 통과 / 7 건너뜀(2026-11-13 출시 전 감사 `audit/release-1112` `106b0cf` 기준), 특히 `act2run`(헤드리스 2막 완주) green 필수.
+- 불변 규칙 정적 가드 = `tests/invariants-static.test.mjs`(core 순수 · 런타임 deps 0 · `shadowBlur` 0 · 스테이지 경로 `Math.pow` · 삼각함수 금지. 불변 1 · 6 · 13 · 14).
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
   (원본 TTF 8개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 500/700 · 동해독도 · 고운바탕 400/700.
   `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).
   주석 한 줄 때문이면 서브셋에 있는 말로 주석을 고치는 쪽이 싸다(11-12 주석의 「빽」 한 글자로 떨어졌다). CSS 주석은 안 본다.
 - 디버그 APK: `npm --prefix shell run web:build` → `npm --prefix shell run sync` → `npm --prefix shell run apk`.
-  릴리스 빌드는 `shell/android/key.properties`가 없거나 광고 ID가 테스트 값이거나 웹 번들에 `release-build.txt` 표식이 없으면 gradle이 멈춘다(`docs/RELEASE.md`).
+  릴리스 빌드는 `shell/android/key.properties`가 없거나 광고 ID가 테스트 값이거나 웹 번들에 `release-build.txt` 표식이 없거나 앱에 실린 `capacitor.config.json`에 `server.url`이 있으면 gradle이 멈춘다(`docs/RELEASE.md`).
 - 브라우저 확인: `.claude/launch.json` → 프리뷰(포트 5173), 모바일 뷰포트 375×812.
   화면 검수는 화면비 여럿으로 — 375×812만 보면 무대가 높이에 먼저 닿는 넓은 기기(사용자 실기기 416×657)에서
   메뉴가 화면 폭 61%에 갇힌 걸 못 본다(10-28). 메뉴 폭 ÷ 화면 폭을 숫자로 잰다.
@@ -137,10 +140,10 @@ core/통합/테스트는 메인이 직접.
 - 네이티브(Capacitor/AdMob/OTA)는 `src/platform/`에서만 만난다. 접근은 `window.Capacitor.Plugins`
   **런타임 조회만** — 정적/동적 bare import 금지(웹 번들 오염·WebView 무음 null). 플러그인 패키지는
   `shell/`에만 있고 루트 런타임 의존성은 0을 유지한다. 결제는 `src/platform/iap.ts`만 만난다(구매 → 지급 · 저장 → 소비 · 승인 순서).
-- 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `npm run ota:release -- <version>`이 갱신한다.
+- 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>`이 갱신한다(변수가 없으면 발행이 멈춘다. 기본 주소 없음).
 - 에셋 예산 게이트: `npm run build`가 `scripts/check-budget.mjs`로 dist·이미지 상한과 중복을 검사한다.
 - 앱 아이콘 원본 = `assets/brand/src/gunbbu-icon.svg` 하나. 굽기 = `node scripts/gen-native-icons.mjs --playwright-module <playwright 폴더>`
   (웹 · 스토어 · 런처 · 적응형 전경 · 스플래시 33장, 안전 영역을 화소로 재서 넘치면 실패).
 - 시험판(https://gunbbu-preview.vercel.app) = `VITE_TESTER=1 npm run build` → `D:\gunbbu-preview`에 복사 → `vercel deploy --prod`.
-  디버그 도구(로고 7연타 → 전해금)는 이 판에만 실린다. `GUNBBU_RELEASE=1` 빌드는 `check-release`가 막는다.
+  디버그 도구(로고 7연타 → 전해금)는 이 판에만 실린다. `GUNBBU_RELEASE=1` 빌드는 `check-release`가 막는다(셸 env와 `.env*` 파일 값을 같이 본다).
   배포 전에 라이브 `index-*.js`가 내가 마지막에 올린 판인지부터 본다(다른 세션 판을 덮지 않게).

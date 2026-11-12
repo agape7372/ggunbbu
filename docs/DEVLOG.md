@@ -1742,3 +1742,21 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 검증: tsc 0 · 929 시험(7 건너뜀) · 빌드(dist 41파일 4.27MB) · `map-b.mjs` 네 화면비 오류 0 · 새 문제 0(보스 연습 → 1-B 진입 · 「착수」 ↔ 공격 키 자리 차 0) · `final-b.mjs` map · map-open 다섯 화면비 오류 0 · 펼친 쪽지 위쪽 끝 최소 204.9.
 - 함정: `font-glyphs` 시험이 .ts 주석의 「빽」 한 글자로 한 번 떨어졌다(CSS 주석은 안 봄). 주석을 고쳐 통과.
 - 받아 둔 것: 보스 연습은 두 번 눌러야 나온다 · 잠긴 난이도 단추는 반응 없음(사유는 펼친 면) · 난이도를 고르면 펼친 쪽지가 접힌다(전부터) · 지도에서 기록을 한눈에 훑을 자리 없음 · 실기기 확인 안 함. 미커밋 · 미푸시. 되돌림 패치 `tmp/ckpt/ui-field-final2.patch`.
+
+## 2026-11-13 — 출시 전 총 감사 (`audit/release-1112`, 정본 `docs/AUDIT_2026-11-12.md`)
+
+- 바탕 `50f6d3f` = `feat/overhaul-1109` `5593cba` + `feat/ui-field` 미커밋분 스냅샷. 아홉 갈래 감사 → 근거 줄 직접 확인 → 아홉 갈래 고침 → 합친 diff 독립 반대 검토. P0 없음. 머리 `106b0cf`. 미푸시 · 미머지 · 미배포.
+- build `b0d7f19`: 불변 규칙 정적 가드 `tests/invariants-static.test.mjs`(core 순수 · 런타임 deps 0 · `shadowBlur` 0 · 스테이지 경로 수학, 9건) · OTA 기본 호스트 제거(`VITE_OTA_BASE` 없으면 발행 중단, 옛 `GUNBBU_OTA_BASE` 폐기) · `.gitignore`에 `.env` · `.env.*`(`!.env.example`) · 안드로이드 템플릿 예제 시험 둘 삭제.
+- meta `56228b9`: 하루 횟수(교환 10 · 광고 5)는 시계를 되돌려도 다시 안 찬다 · 웹 탭 둘이면 `storage` 이벤트로 얼리고 다시 읽음 · 본 키가 JSON 배열이면 `.bak` 복구 · 도감 46 「전 칸」 거짓 표시(「마흔여섯 칸」 · 칭호 「대수집가」 · 「도감 완성」은 전 칸일 때만) · 기록 지우기 뒤 첫 출근 창.
+- copy `cd62c7a`: 「먼지 자루」 겹침 → 시작 장비 「먼지 두 배」 · 「체크포인트」 → 「넘긴 곳부터」 · 결제 토스트 · 부팅 실패 문구 · 조작 안내(깔리면 가드 키가 탈출) · 2-B 퇴장 글 · 톱날 대검 설명 · 「2구역 닿기」 · 꾸러미 칸 「시작 장비」 · 본사 쪽지 지시 글 = `REGIONS[4].boss`.
+- render `e8065f8`: 콤보 도장 붓판은 처음 · 고비 때만 긋는다(50~499 연타 중 끝자리 가림) · 숨은 동안 소리 깃발 `hidden` · 새 저장 첫 부팅만 OS 동작 줄이기 반영 · 시간차 필살 진동(`wazaPress` 30 · `wazaSwing` 10 · `wazaHit` 16 · `wazaBurst`) · 점프 가드 진동 15 · 신기록 게임오버 `milestone` · 지시서 완료 `stamp` 뒤 `checkpoint` · 동작 줄이기 보상 창 소리 하나. 가드 `renderer-feel` · `audio-hidden` · `first-boot-motion`.
+- platform `3bdfedc`: `check-release`가 `.env*` 파일 값까지 본다 · 판매자 표시 8자 미만 중단 · gradle 릴리스 가드에 `server.url` 검사(`-PallowServerUrl`) · 결제 준비 재시도(복귀 · 상점 열기) · `sw.js` 글꼴 셋 프리캐시 + `/fonts/` `ignoreVary` · `appCategory="game"` · 처리방침 시행일 2026-11-01 · `chunkSizeWarningLimit` 600 · 광고 경주 시험 7건.
+- perf `57b3f78`: 8초 넘겨 온 그림도 쓴다(층 시트 조각 더 자르기) · 적응형 해상도는 판 프레임만 센다 · 야간 배경 `willReadFrequently`.
+- docs `1bf06f7`: STORE_LISTING 자세한 설명을 코드와 대조해 다시 씀 · 상품 표 이름 · README · RELEASE OTA 명령.
+- core `52acec2`: 「깬 뒤엔 안 다친다」를 술어 하나 `wonAlready(s)`(`combat.ts`)로 묶음 = 지시서 done · 보스 defeated · 명물 down. `hurtPlayer` · `loseLife` · `onPlayerCrushed` · `stepPinned`가 같이 본다. 깬 뒤 깔려 있으면 풀려나고 안전모도 안 깨진다. 필살 버퍼 `bufSpecial`(히트스톱 중 누른 필살이 풀린 첫 틱에) · 용오름 띄움은 필살 면역 건물에 안 건다(3-B 용오름 봇 10086 → 2941틱) · 포효가 끊은 패턴의 드론은 떠나고 대포는 쏘지 않고 물러남 · `s.wazaRun` 동안 모드 전환 미룸 · 콤보 정본 주석. 가드 `core-guards`(13) · `core-fuzz`(20). 사람 대역은 본사만 움직임(견습 51 → 53 · 외주 13 → 14), 기한 그대로.
+- ui `0ed9e60`: 320 폭 공격 키 5.8px 넘침(`#stage { flex: none }`) · 창 · 보상 연출 뒤 `inert`(`syncBehind` 한 곳) · 화면이 바뀌면 화면 뿌리에 포커스 · 판 밖 포커스 단추는 Space로 눌림 · 첫 안내 「시작」이 판을 엶 · 깔린 채 목숨을 잃으면 가드 가르침은 깔림이 풀린 첫 틱 · 버터바 끝 → 회차 화면 · 13.5px 밑 글 여덟 자리.
+- 독립 검토(합친 diff `50f6d3f..2fef39a`): P1 하나 = 앞선 날짜 key를 오늘로 내리던 meta-04가 악용 길을 열었다(오늘 ↔ 내일 열 번 왕복에 출근 11회 · 커피 11회 · 일당 10회). `1d94e4b`에서 meta-04 · 06을 되돌리고 왕복 시험을 넣었다. 같은 커밋 · `c5115ed`에서 결제 준비가 늦게 끝나도 열린 창 · 보상 연출 위로 다시 그리지 않게 했다. `ota-release` 끝 안내 주소는 `${base}`로.
+- 시계 규칙은 하나: 앞선 날짜 key는 그 날짜가 올 때까지 그대로. 하루 횟수의 `>=` 판정은 유지. 월급만 원래부터 내린다.
+- 교훈: 「잠김」을 푸는 고침은 왕복 시험을 같이 넣는다. 앞으로 한 번 · 뒤로 한 번만 본 시험이 악용을 정답으로 굳혔다.
+- 검증: typecheck 0 · 77파일 1013 시험(7 건너뜀) · 빌드(dist 41파일 4.27MB) · `final-b.mjs` 네 화면비 × 16화면 = 64장 측정 이슈 0 · 디버그 APK `assembleDebug` 통과 + 에뮬레이터 부팅(첫 화면 · 첫 실행 안내 창, 잡히지 않은 예외 0) · gradle `server.url` 가드 dry-run(없으면 통과 · 있으면 멈춤 · `-PallowServerUrl` 통과).
+- 남은 것: 검토 목록 · 실기기 확인 · 출시 준비 · 합침 승인은 `docs/AUDIT_2026-11-12.md` §4. 함정: 정션 폴더에서 `cap sync`를 하면 `shell/android/capacitor.settings.gradle`의 플러그인 경로가 다른 작업 폴더(`gunbbu-meta`)로 바뀐다. 합치기 전에 `git status`로 확인한다.

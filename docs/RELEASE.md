@@ -150,12 +150,23 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
       앱 ID는 네이티브라 AAB 재빌드가 필요하다
 - [ ] **릴리스 가드 통과** — 테스트 ID가 실려 나가는 걸 기계가 막는다(2026-10-27).
       웹: `GUNBBU_RELEASE=1 VITE_ADMOB_REWARDED_ID=ca-app-pub-<발급 값> VITE_SELLER_INFO="상호 · 대표 · 연락처" npm run build` — `scripts/check-release.mjs`가 빌드 맨 앞에서
-      빈 값·테스트 단위·형식 오류면 중단한다(`npm run check:release`로 단독 실행). 환경변수로만 읽으므로 `.env` 파일 값은 같이 export 한다.
+      빈 값·테스트 단위·형식 오류면 중단한다(`npm run check:release`로 단독 실행).
+      셸 env만이 아니라 Vite가 번들에 굽는 `.env` · `.env.local` · `.env.production` · `.env.production.local` 값도 같이 본다(2026-11-13, 같은 키는 셸 env가 이김).
+      그래서 `.env.local`에 `VITE_TESTER=1`을 둔 채 릴리스 빌드하면 멈춘다. `--mark`도 같은 값을 보므로 표식도 안 찍힌다.
+      `VITE_SELLER_INFO`는 8자 이상이어야 한다(상호 · 대표 · 연락처). 빈 값이나 점 하나 같은 자리표시는 멈춘다.
       셸: `bundleRelease`·`assembleRelease`는 `AndroidManifest.xml`의 AdMob 앱 ID에 테스트 발행자 번호가 있으면 GradleException.
       테스트 ID로 일부러 굽는 내부 시험만 `-PallowTestAds`. 디버그 빌드는 막지 않는다
       웹 번들 표식: 릴리스 모드로 끝까지 빌드되면 `dist/release-build.txt`가 생기고(`check-release.mjs --mark`), `bundleRelease`·`assembleRelease`는
       앱에 실린 `assets/public/release-build.txt`가 없으면 GradleException. `GUNBBU_RELEASE=1 npm run web:build` 뒤 `npx cap sync android`까지 해야 들어온다.
       표식 없이 일부러 굽는 내부 시험만 `-PallowDevWeb`
+      server.url(2026-11-13): `bundleRelease`·`assembleRelease`는 앱에 실린 `src/main/assets/capacitor.config.json`에 `server.url`이 있으면 GradleException.
+      시험판 껍데기용 `CAP_SERVER_URL`이 남은 셸에서 `npx cap sync android`를 하면 AAB가 실린 번들 대신 그 원격 주소를 띄운다.
+      고치는 법 = `CAP_SERVER_URL` 없이 `npx cap sync android`를 다시 한다. 일부러 굽는 내부 시험만 `-PallowServerUrl`.
+      우회 속성 전체: `-PallowDevWeb`(표식 없음) · `-PallowTestAds`(테스트 AdMob 앱 ID) · `-PallowServerUrl`(server.url).
+      dry-run 확인(11-13): env 없이 sync = 통과 · `CAP_SERVER_URL=https://x.test` sync = 멈춤 · `-PallowServerUrl` = 통과. 첫 `bundleRelease` 때 한 번 더 본다
+- [ ] **결제 준비 재시도 확인(실기기)** — 부팅 때 `iap.init()`이 실패하면(오프라인 시작 · 스토어 연결 실패) 앱 복귀와 상점 열기에서 다시 붙는다(2026-11-13).
+      `init`은 결제 · 복구 중(busy)이면 건너뛸 뿐 busy를 쥐지 않는다. 겹친 호출은 진행 중인 하나를 같이 기다린다. 복귀 때 다시 붙기와 못 받은 결제 받기는 따로 돈다.
+      확인: 비행기 모드로 앱 켜기 → 꾸러미 탭이 커피 · 장비만 → 온라인으로 → 상점을 다시 열거나 앱을 내렸다 올리면 꾸러미 상품 · 구매 복원 단추가 선다
 - [ ] **Play Console 상품 설정** — 상품 17개(`src/meta/catalog.ts` `SKUS`). 상품당 구매 옵션은 1개만 둔다. 수량 구매는 끈다(앱은 `quantity: 1`로만 부른다). `once`가 없는 상품은 소비성으로 등록한다. 달마다 다시 사는 `season_pass`(특근 수당)도 소비성이다
 - [ ] **가격을 바꾸면 `src/meta/catalog.ts`의 `krw`도 같이 바꾼다** — 앱 안 가격은 Play 문자열이지만, 특가 할인율(%)과 가격을 못 받았을 때의 대체 표기는 `krw`로 계산한다
 - [ ] 콘텐츠 등급 설문 — 전체이용가(폭력·도박·공포 요소 0)
