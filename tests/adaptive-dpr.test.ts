@@ -52,4 +52,17 @@ describe('적응형 해상도', () => {
   it('이미 1배면 더 내리지 않는다', () => {
     expect(run(50, 20000, 1).dpr).toBeNull();
   });
+
+  it('판 밖 프레임(상점 · 홈 · 일시정지)은 아무리 늦어도 안 센다', () => {
+    const a = createAdaptiveDpr();
+    let got: number | null = null;
+    for (let i = 0; i < 2000 && got === null; i++) got = a.sample(50, 2, false);
+    expect(got).toBeNull();
+    // 판 밖을 거치면 판에서 쌓던 느림도 처음부터 다시 모은다(일시정지 앞뒤를 잇지 않는다)
+    const b = createAdaptiveDpr();
+    for (let i = 0; i < 75 && got === null; i++) got = b.sample(33, 2, true);  // 약 2.5초: 아직 안 내림
+    for (let i = 0; i < 100 && got === null; i++) got = b.sample(50, 2, false); // 상점
+    for (let i = 0; i < 20 && got === null; i++) got = b.sample(33, 2, true);  // 이었으면 여기서 내렸다
+    expect(got).toBeNull();
+  });
 });

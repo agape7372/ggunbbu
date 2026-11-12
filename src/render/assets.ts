@@ -85,25 +85,38 @@ export function imageSize(image: LoadedImage): { w: number; h: number } {
  */
 const LOAD_TIMEOUT_MS = 8000;
 
+let onLate: ((key: string) => void) | null = null;
+/** 타임아웃 뒤에 도착한 그림을 알린다 — 한 번 굽고 마는 캐시(층 시트 조각)를 다시 만들게 한다. */
+export function onLateAsset(fn: ((key: string) => void) | null): void {
+  onLate = fn;
+}
+
 function loadOne(key: string, entry: AssetEntry): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const store = (image: HTMLImageElement): void => {
+      loaded.set(key, entry.chroma ? applyChroma(image, entry.chroma) : image);
+    };
     // 성공/실패/타임아웃 어느 쪽이든 정확히 1회만 resolve — reject하지 않는다.
     const settle = (image?: HTMLImageElement): void => {
       if (settled) return;
       settled = true;
       if (timer !== undefined) clearTimeout(timer);
-      if (image) loaded.set(key, entry.chroma ? applyChroma(image, entry.chroma) : image);
+      if (image) store(image);
       resolve();
     };
 
     const image = new Image();
-    image.onload = () => settle(image);
+    image.onload = () => {
+      if (!settled) return settle(image);
+      // 타임아웃은 부팅만 풀어 준다 — 늦게 온 그림도 쓴다(안 그러면 세션 내내 폴백 그림)
+      store(image);
+      onLate?.(key);
+    };
     image.onerror = () => settle(); // 실패해도 reject하지 않음 — 이 키만 null로 남고 나머지는 계속 진행
     timer = setTimeout(() => {
-      // 뒤늦게 onload가 오더라도 settled 가드가 막는다(src를 비우면 브라우저에 따라
-      // 현재 문서 URL로 재요청이 나가므로 건드리지 않는다).
+      // src를 비우면 브라우저에 따라 현재 문서 URL로 재요청이 나가므로 건드리지 않는다.
       console.warn(`[assets] "${key}" 로드가 ${LOAD_TIMEOUT_MS}ms를 넘겨 폴백 처리`);
       settle();
     }, LOAD_TIMEOUT_MS);
@@ -252,7 +265,7 @@ export function drawBackdropCached(
     const cv = document.createElement('canvas');
     cv.width = Math.round(dw * BG_SS);
     cv.height = Math.round(dh * BG_SS);
-    const c = cv.getContext('2d');
+    const c = cv.getContext('2d', { willReadFrequently: night }); // 야간은 창 칠하기가 픽셀을 통째로 읽는다
     if (!c) return drawBackdrop(ctx, key, dx, dy, dw, dh);
     c.scale(BG_SS, BG_SS);
     if (!drawBackdrop(c, key, 0, 0, dw, dh)) return false;

@@ -48,3 +48,12 @@ it('does not publish a partially decoded sheet when drawing fails', () => {
   expect(floorSheetTile('europe:weak')).toBeUndefined();
   expect(floorSheetTile('europe:mid')).toBeUndefined();
 });
+
+it('늦게 온 시트만 더 자르고 이미 자른 조각(원본은 놓음)은 지우지 않는다', () => {
+  vi.mocked(img).mockImplementation(key => key === 'floors-europe' ? source(340) : null);
+  refreshFloorSheetAssets();
+  vi.mocked(img).mockImplementation(key => key === 'floors-special' ? source(476) : null); // europe 원본은 놓았다
+  refreshFloorSheetAssets(true);
+  expect(floorSheetTile('europe:weak')).toBeDefined();
+  expect(floorSheetTile('glass')).toBeDefined();
+});

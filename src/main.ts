@@ -4,7 +4,7 @@ import { VIEW, TICK } from './config';
 import { initTouchLayer } from './input/touch';
 import { createInput } from './input/input';
 import { createApp } from './ui/scenes';
-import { preloadAssets } from './render/assets';
+import { onLateAsset, preloadAssets } from './render/assets';
 import { refreshFloorSheetAssets } from './render/floorSheetCache';
 import { createAdaptiveDpr } from './render/adaptiveDpr';
 import { createInsetProbe, fitStageBox } from './render/stageFit';
@@ -70,12 +70,15 @@ await Promise.race([
 ]).catch(() => {});
 await preloadAssets().catch(() => {});
 refreshFloorSheetAssets();
+// 느린 망에서 타임아웃 뒤에 온 층 시트를 그때 자른다. 첫 자르기 뒤에 걸어야 조각을 지우지 않는다
+onLateAsset(() => refreshFloorSheetAssets(true));
 
 // ── 고정 타임스텝 루프 ──
 let acc = 0;
 let last = performance.now();
 let paused = false;
 const adaptiveDpr = createAdaptiveDpr();
+const stageEl = document.getElementById('stage')!; // scenes setChrome이 판 중에만 .playing을 단다
 
 function frame(now: number): void {
   requestAnimationFrame(frame);
@@ -85,9 +88,9 @@ function frame(now: number): void {
   last = now;
   let ticked = false;
   while (acc >= TICK) { app.update(TICK); acc -= TICK; ticked = true; }
-  // 프레임이 계속 늦으면 캔버스 배율을 한 단계 낮춘다.
+  // 판이 도는 동안 프레임이 계속 늦으면 캔버스 배율을 한 단계 낮춘다(상점 같은 DOM 화면의 느림은 안 센다).
   if (curDpr > VIEW.DPR_LADDER[VIEW.DPR_LADDER.length - 1]) {
-    const lower = adaptiveDpr.sample(dtMs, curDpr);
+    const lower = adaptiveDpr.sample(dtMs, curDpr, stageEl.classList.contains('playing'));
     if (lower !== null) { dprCap = lower; setupCanvas(); }
   }
   // 시뮬 틱이 한 번이라도 돈 프레임에만 그린다 — 고주사율 폰에서도 draw당 줄어드는 값(흔들림·번쩍·타이머)이
