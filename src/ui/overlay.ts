@@ -867,7 +867,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     openModal({
       meta: '작업 안내',
       title: '이렇게 부순다',
-      html: `<p class="muted">하늘에서 건물이 떨어진다. 바닥에 닿기 전에 벤다. 깔리면 탈출로 빠져나온다.</p><div class="howto">${rows}</div>`
+      html: `<p class="muted">하늘에서 건물이 떨어진다. 바닥에 닿기 전에 벤다. 깔리면 가드 키가 탈출이 된다. 한 번 누르면 빠져나온다.</p><div class="howto">${rows}</div>`
         + `<p><b>보급 상자</b> <span class="muted">건물 ${SUPPLY.FIRST}채째부터 ${SUPPLY.EVERY}채마다 하나.</span></p><ul class="supply">${supply}</ul>`
         + `<p><b>${escapeHtml(ITEM_COPY.hat.name)}</b> <span class="muted">콤보 ${HAT.COMBO_AT.join(' · ')}에서 하나씩. ${escapeHtml(ITEM_COPY.hat.desc)}</span></p>`,
       actions: [{ label: first ? '시작' : '닫기', act: 'modal-close', kind: first ? 'cta' : 'btn' }],

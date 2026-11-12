@@ -58,7 +58,7 @@ describe('시작 장비', () => {
     expect(kitSheetUseful({ life: 1, waza: 0, dust2x: 0 }, 0)).toBe(true);
   });
 
-  it('먼지 자루만 들면 맨손이다', () => {
+  it('먼지 두 배만 들면 맨손이다', () => {
     expect(isBare({ dust2x: 1 })).toBe(true);
     expect(isBare({ life: 1 })).toBe(false);
   });
@@ -446,7 +446,7 @@ describe('신입 과제', () => {
     const inv = { dust: 0, orbit: 0, items: emptyItems(), owned: ['sprout'], blanks: 0 };
     giveReward(inv, ROOKIE[6].reward);
     expect(inv.owned).toEqual(['sprout']);
-    expect(rewardText(ROOKIE[0].reward)).toBe('먼지 300 · 예비 목숨 3 · 필살 충전 3 · 먼지 자루 2');
+    expect(rewardText(ROOKIE[0].reward)).toBe('먼지 300 · 예비 목숨 3 · 필살 충전 3 · 먼지 두 배 2');
   });
 });
 

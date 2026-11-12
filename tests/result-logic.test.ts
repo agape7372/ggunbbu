@@ -62,10 +62,10 @@ describe('키 얼굴', () => {
     expect(resultFaces(go(), OPENED).jump.tone).toBe('rest');
     expect(resultFaces(go(), OPENED).special.tone).toBe('rest');
   });
-  it('일어나기 보조 글 = 광고면 「광고」 / 「n번 남음」 두 줄, 아니면 「n번 남음」 · 이어하기 = 체크포인트', () => {
+  it('일어나기 보조 글 = 광고면 「광고」 / 「n번 남음」 두 줄, 아니면 「n번 남음」 · 이어하기 = 넘긴 곳부터', () => {
     expect(resultFaces(AD, OPENED).attack).toEqual({ label: '일어나기', tone: 'seal', sub: '광고\n3번 남음' });
     expect(resultFaces(go({ canRevive: true, reviveLeft: 2 }), OPENED).attack.sub).toBe('2번 남음');
-    expect(resultFaces(go({ canRevive: true, canContinue: true }), OPENED).jump).toEqual({ label: '이어하기', tone: 'ink', sub: '체크포인트' });
+    expect(resultFaces(go({ canRevive: true, canContinue: true }), OPENED).jump).toEqual({ label: '이어하기', tone: 'ink', sub: '넘긴 곳부터' });
   });
   it('닫힌(shut) 키만 옅고, 동작 없는 키는 닫혀도 쉰다', () => {
     const f = resultFaces({ kind: 'ending' }, { ...OPENED, guard: true, jump: true });

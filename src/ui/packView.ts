@@ -105,7 +105,7 @@ function passCells(r: Reward): Cell[] {
   if (r.owns?.length) c.push(['look', '꾸미기', String(r.owns.length), true]);
   if (r.orbit) c.push(['orb', '궤도조각', num(r.orbit)]);
   const kit = KIT_IDS.reduce((n, k) => n + (r.items?.[k] ?? 0), 0);
-  if (kit) c.push(['toolbox', '장비', String(kit)]);
+  if (kit) c.push(['toolbox', '시작 장비', String(kit)]);
   if (r.masks) c.push([maskArt(r.masks), '마스크', `${r.masks}개`]);
   return c;
 }
