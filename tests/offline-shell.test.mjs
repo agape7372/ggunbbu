@@ -30,6 +30,34 @@ it('emits an executable service worker with all images and hashed entry chunks',
   }
 });
 
+it('index.html이 preload하는 글꼴은 전부 APP_SHELL에 있다 — 첫 방문 뒤 오프라인에서도 붓 · 바탕 글꼴이 나온다', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const fonts = [...html.matchAll(/href="([^"]+)" as="font"/g)].map((m) => m[1]);
+  expect(fonts.length).toBeGreaterThanOrEqual(4);
+  const sandbox = { self: { addEventListener() {} } };
+  runInNewContext(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8') + '\nglobalThis.shell = APP_SHELL;', sandbox);
+  for (const f of fonts) expect(sandbox.shell).toContain(f);
+});
+
+it('글꼴 요청은 Vary를 무시하고 캐시에서 찾는다 — crossorigin 요청의 Origin이 프리캐시 항목과 어긋나지 않게', async () => {
+  const handlers = {};
+  const asked = [];
+  const sandbox = {
+    URL,
+    self: { location: { href: 'https://x.test/app/', origin: 'https://x.test' }, addEventListener(type, fn) { handlers[type] = fn; } },
+    caches: { match: async (req, opts) => { asked.push([req.url, opts?.ignoreVary]); return 'hit'; } },
+  };
+  runInNewContext(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), sandbox);
+  const fetchOf = async (url) => {
+    let out;
+    handlers.fetch({ request: { url, method: 'GET', mode: 'cors' }, respondWith: (p) => { out = p; } });
+    return out;
+  };
+  expect(await fetchOf('https://x.test/app/fonts/brush.woff2')).toBe('hit');
+  await fetchOf('https://x.test/app/img/a.png');
+  expect(asked).toEqual([['https://x.test/app/fonts/brush.woff2', true], ['https://x.test/app/img/a.png', false]]);
+});
+
 it('stamps a cache version that changes with bundle names or public file contents, and throws when a marker is missing', () => {
   const template = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
   const vals = { BUILD_ASSETS: ['./a.js'], IMAGE_ASSETS: ['./i.png'] };

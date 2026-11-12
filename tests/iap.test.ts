@@ -47,6 +47,32 @@ describe('iap', () => {
     expect(iap.price('toolbox')).toBeNull();
   });
 
+  it('부팅 때 결제 준비가 실패해도 다시 부르면 열린다 — 겹쳐 불러도 한 번만 돈다', async () => {
+    const { plugin } = fakePlugin(new Error('x'));
+    plugin.getProducts.mockRejectedValueOnce(new Error('offline'));
+    const iap = createIapPort();
+    await iap.init();
+    expect(iap.available()).toBe(false);
+    await Promise.all([iap.init(), iap.init()]);
+    expect(iap.available()).toBe(true);
+    expect(iap.price('orbit_s')).toBe('₩900');
+    expect(plugin.getProducts).toHaveBeenCalledTimes(2);
+  });
+
+  it('복구 중에는 결제 준비가 끼어들지 않는다 — 끝난 뒤 다시 부르면 열린다', async () => {
+    const { plugin } = fakePlugin(new Error('x'));
+    let release: (v: { purchases: Tx[] }) => void = () => undefined;
+    plugin.getPurchases.mockImplementationOnce(() => new Promise((r) => { release = r; }));
+    const iap = createIapPort();
+    const restoring = iap.restore(() => undefined);
+    await iap.init();
+    expect(plugin.getProducts).not.toHaveBeenCalled();
+    release({ purchases: [] });
+    expect(await restoring).toBe(0);
+    await iap.init();
+    expect(iap.available()).toBe(true);
+  });
+
   it('반복 상품 — 지급이 먼저, 소비가 나중', async () => {
     const { log } = fakePlugin({ productIdentifier: 'orbit_s', purchaseToken: 't1', purchaseState: '1' });
     const r = await createIapPort().purchase('orbit_s', (p) => log.push(`paid:${p.token}`));
