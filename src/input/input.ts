@@ -69,6 +69,9 @@ export function createInput(touch: TouchInput | null): InputSource {
 
   window.addEventListener('keydown', (e) => {
     if (isTypingTarget(e.target)) return;
+    // 메뉴 얼굴에서 키에 포커스를 두고 Space = 그 키를 누른다. 점프로 먹지 않고 기본 동작(click detail 0 → touch onClick)에 넘긴다.
+    // 플레이 얼굴이거나 포커스가 키 밖이면 그대로 점프다
+    if (e.code === 'Space' && touch?.menu() && e.target instanceof Element && e.target.closest('.tbtn')) return;
     const act = EDGE_KEYS[e.code];
     const isGuard = GUARD_KEYS.has(e.code);
     if (!act && !isGuard) return;

@@ -14,6 +14,7 @@ import { emptyMask, isMaskArt, loadMaskBook } from './meta/mask';
 import type { MaskEntry } from './meta/types';
 import { isOpGrade, isOpId, type OpGrade, type OpId } from './meta/ops';
 import { validateStageRecords, type StageRecord } from './meta/stageRecord';
+import { toJob, type JobId } from './ui/homeLogic';
 
 export interface SaveSettings {
   sound: boolean;
@@ -70,6 +71,7 @@ export interface SaveData {
   regular: Regular; // 단골 도장 (무버전 추가 키)
   firstGift: boolean; // 첫 결제 선물을 받았나 (무버전 추가 키)
   coffee: string; // 공짜 커피를 받은 날 (무버전 추가 키)
+  homeJob: JobId; // 홈에서 마지막에 고른 일감 — ui/homeLogic.ts (무버전 추가 키)
 }
 
 export interface SaveStats {
@@ -133,6 +135,7 @@ export const DEFAULT_SAVE: SaveData = {
   regular: { stamps: 0, got: 0 },
   firstGift: false,
   coffee: '',
+  homeJob: 'arcade',
 };
 
 const BAK_KEY = `${SAVE_KEY}.bak`;
@@ -211,6 +214,7 @@ function normalize(raw: Record<string, unknown>): SaveData {
     // 옛 공방 주인은 여덟 장까지 공짜였다 — 남은 몫을 그대로 쥐여 준다
     blanks: num(data.blanks, owned.includes('mask') ? Math.max(0, 8 - book.masks.length) : 0, 9999),
     stages: validateStageRecords(data.stages),
+    homeJob: toJob(data.homeJob),
     bestBare: num(data.bestBare, 0, 99_999_999),
     items: validateItems(data.items),
     bought: strList(data.bought).filter((id) => (SKU_IDS as readonly string[]).includes(id)),

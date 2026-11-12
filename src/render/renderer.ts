@@ -17,7 +17,8 @@ import {
 } from './sprites';
 import { maskColors, wornMask } from '../meta/mask';
 import { setFxMask } from './weaponFx';
-import { drawChapterBackdrop } from './background';
+import { backdropKey, drawChapterBackdrop, type BackdropInput } from './background';
+import { backdropPaper } from './assets';
 import { cameraFollowY } from './camera';
 import { vibrate } from '../platform/native';
 import {
@@ -498,18 +499,18 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   if (rot !== 0) ctx.rotate(rot);
   ctx.translate(-VIEW.W / 2, -pivotY);
 
-  ctx.fillStyle = bgColor(s);
+  const bg = bgColor(s);
+  syncPageVar('--fr-bg', bg);
+  ctx.fillStyle = bg;
   ctx.fillRect(-48, -48, VIEW.W + 96, VIEW.H + 96); // 흔들림·회전에도 가장자리가 비지 않게 크게
 
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
-  ctx.clip();
+  clipField(ctx);
   // 배경은 얕게만 따라온다 — 하늘이 통째로 딸려 오르면 카메라가 움직인 게 아니라
   // 화면이 흔들린 것처럼 읽힌다(깊이 단서 상실).
   ctx.save();
   ctx.translate(0, cam * CAMERA.BG_PARALLAX);
-  drawChapterBackdrop(ctx, s);
+  syncFieldBg(drawChapterBackdrop(ctx, s), s, bg);
   ctx.restore();
   ctx.translate(0, cam);
   ctx.fillStyle = '#DDD8CC';
@@ -716,6 +717,44 @@ function drawDebris(ctx: CanvasRenderingContext2D, s: GameState, groundY: number
     ctx.strokeRect(d.x - d.w / 2, top, d.w, d.h);
     ctx.restore();
   }
+}
+
+/** 필드(띠 아래 ~ 땅) 밖은 그리지 않는다 — 플레이 · 홈 공통 */
+function clipField(ctx: CanvasRenderingContext2D): void {
+  ctx.beginPath();
+  ctx.rect(0, VIEW.FIELD_TOP, VIEW.W, VIEW.FIELD_H - VIEW.FIELD_TOP);
+  ctx.clip();
+}
+
+const pageVars: Record<string, string> = {};
+/**
+ * 넓은 화면 옆 띠 색. 바뀔 때만 쓴다.
+ * --fr-bg = 캔버스 바탕색(style.css html, body) · --fr-field = 필드 구간 띠와 기둥 끝 마감(#stage::before · ::after)
+ */
+function syncPageVar(name: '--fr-bg' | '--fr-field', c: string): void {
+  if (pageVars[name] === c || typeof document === 'undefined') return;
+  pageVars[name] = c;
+  document.documentElement.style.setProperty(name, c);
+}
+
+/** 필드 구간 띠 = 배경 그림의 종이색(그림을 못 그렸으면 캔버스 바탕색) */
+function syncFieldBg(drawn: boolean, b: BackdropInput, bg: string): void {
+  syncPageVar('--fr-field', (drawn && backdropPaper(backdropKey(b))) || bg);
+}
+
+/**
+ * 홈(현장 화면) 캔버스 — 플레이가 카메라 0에서 보이는 그대로: 바탕 + 원경 + 땅선.
+ * 땅 채움(#DDD8CC)은 필드 클립 밖이라 카메라 0에선 안 보인다. 바탕은 PALETTE.BG 고정.
+ */
+export function drawFieldStill(ctx: CanvasRenderingContext2D, b: BackdropInput): void {
+  syncPageVar('--fr-bg', PALETTE.BG);
+  ctx.fillStyle = PALETTE.BG;
+  ctx.fillRect(0, 0, VIEW.W, VIEW.H);
+  ctx.save();
+  clipField(ctx);
+  syncFieldBg(drawChapterBackdrop(ctx, b), b, PALETTE.BG);
+  fx.drawGroundLine(ctx);
+  ctx.restore();
 }
 
 function bgColor(s: GameState): string {

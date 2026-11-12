@@ -13,9 +13,14 @@ import { FLASH_LABEL, SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
 import { nativeAppVersion } from '../platform/native';
 import { paintOps, type OpsOpts } from './opsView';
-import { createStageUi, paintStageEnd, type StageListOpts, type StageUi } from './stageView';
+import { bindFlip, createStageUi, lastDiffPick, stageReport, type StageListOpts, type StageUi } from './stageView';
 import type { StageEndView } from './stageLogic';
-import { STAGE_MODE } from '../content/stages';
+import { STAGE_MODE, STAGE_TEXT, fmtStageTime } from '../content/stages';
+import { STAGES } from '../core/stages';
+import type { Theme } from '../core/types';
+import { recordOf } from '../meta/stageRecord';
+import { JOBS, butterTier, homeFactsOf, jobBuilding, nextStage, stepJob, type HomeFacts, type JobId } from './homeLogic';
+import { paintHang } from './homeArt';
 import type { StageDiff } from '../core/types';
 import { paintMissions, type MissionView, type TakeKind } from './missionView';
 import { setRewardHost } from './rewardFx';
@@ -30,7 +35,7 @@ import { licenseTitle } from '../meta/economy';
 import { dailyDone } from '../meta/missions';
 import { APP_VERSION } from '../version';
 import type { Loadout } from '../meta/types';
-import { escapeHtml, infoHtml } from './html';
+import { brushNum, escapeHtml, infoHtml } from './html';
 import { countTo, fmt, frameSvg, glyph, installInkVars, reduceMotion, replay, swordSvg } from './ink';
 import { CUT, cutFrom, type CutDir } from './cut';
 import { paintHero } from './heroArt';
@@ -54,9 +59,10 @@ export type OverlayScreen =
   | 'book';
 
 export interface TitleView {
-  selected: number;
-  tokotonOpen: boolean;
-  butterTier: number;
+  /** 크레인에 매단 일감 */
+  job: JobId;
+  /** 일감 판단 재료(ui/homeLogic.ts) — 키 얼굴 · 확인 동작과 같은 것 */
+  facts: HomeFacts;
   bestArcade: number;
   buddhaMode: boolean;
   /** 지갑 */
@@ -72,8 +78,10 @@ export interface TitleView {
   /** 홈 뿌뿌 그림(장착 그대로) */
   loadout: Loadout;
   maskArt: string;
-  /** 홈 건물 그림 = 가장 멀리 연 구역의 층(public/img/floors/<theme>.png) */
-  theme: string;
+  /** 홈 테마 = 가장 멀리 연 구역 — 캔버스 원경 · 매단 건물 */
+  theme: Theme;
+  /** 그 구역 번호(0~3) — 홈 캔버스 원경 */
+  chapter: number;
   /** 홈 한 줄 — 받을 것 · 살아 있는 특가 · 다음 과제 중 하나 */
   note: { text: string; to: 'shop' | 'missions' } | null;
 }
@@ -91,16 +99,11 @@ export interface GameOverView {
   goalId?: string;
   /** 다음 목표가 미션 탭에 있다 — 옆 도장이 미션으로 간다 */
   goalMissions?: boolean;
-  canContinue: boolean;
-  canRevive: boolean;
-  /** 광고 경로 실재 여부 — false(웹)면 광고 문구 없는 "일어나기" (08-30, P0-2) */
-  adRevive: boolean;
-  reviveLeft: number;
   line: string;
   /** 이번 판이 그 모드 최고 기록을 넘었나 */
   best: boolean;
-  /** 떨어진 건물 조각 그림 = 죽은 구역의 층 */
-  theme: string;
+  /** 띠 오른쪽 모드 이름(아케이드 · 야근 · 작전 이름 …) */
+  mode: string;
 }
 
 /** 특별작전 결과 카드 — 한도에 닿았거나 도장을 딴 채 끝난 판 */
@@ -127,6 +130,7 @@ export interface EndingView {
   fullCombo: boolean;
   /** 이번 판이 최고 기록을 넘었나 */
   best: boolean;
+  mode: string;
 }
 
 /** 이야기 판 진입 연출 — 먹 획 와이프 길이(틱)와 도장 */
@@ -142,8 +146,8 @@ export interface PauseView {
 
 export interface OverlayHandlers {
   onBoot(): void;
-  onArcade(): void;
-  onTokoton(): void;
+  /** 홈 이웃 일감(크레인 양옆)을 눌렀다 */
+  onJob(dir: -1 | 1): void;
   onButterRound(round: number): void;
   onButterBack(): void;
   onOpenSettings(): void;
@@ -154,32 +158,22 @@ export interface OverlayHandlers {
   onSettingsPatch(p: Partial<SaveSettings>): void;
   /** 설정 「버튼 배치 · 바꾸기」 — 배치 편집 화면은 씬이 연다 */
   onLayoutEdit(): void;
-  onGameOverContinue(): void;
-  onGameOverRetry(): void;
-  onGameOverTitle(): void;
-  onGameOverRevive(): void;
-  /** 결과 카드의 상점 도장 — 다음 목표를 사러 */
+  /** 결과 꼬리표(상점 · 미션) — 다음 목표를 사러. 결과 화면의 나머지 동작은 조작 키(scenes resultDo) */
   onGameOverShop(): void;
   onGameOverMissions(): void;
-  onOpsEndList(): void;
   /** 철거 자격 응시 */
   onExam(): void;
-  onEndingDone(): void;
-  onEndingRetry(): void;
+  /** 결과 보고서 머리의 작은 글 — 「뿌뿌 · 자격」 */
+  resultWho(): string;
   /** 지금 받을 수 있는 미션 수 — 미션 도장의 먹 점 */
   missionBadge(): number;
   /** 상점 칸 점 — 오늘 공짜 커피가 남았나 */
   shopBadge(): boolean;
   onLogoTap(): void;
   onOpsPick(id: string): void;
-  onOpenOps(): void;
-  /** 작업 지시서 */
-  onOpenStages(): void;
+  /** 쪽지 · 매단 건물 — 작업 지시서는 지도, 나머지는 공격 키와 같은 확인 */
+  onJobTap(): void;
   onStageStart(id: string, diff: StageDiff, fromBoss: boolean): void;
-  /** 철거 보고서 단추 */
-  onStageRetry(): void;
-  onStageNext(): void;
-  onStageList(): void;
   onOpenMissions(): void;
   onOpenShop(): void;
   /** 상점 꾸러미 탭으로 바로 */
@@ -214,7 +208,8 @@ export interface OverlayApi {
   getScreen(): OverlayScreen;
   showBoot(): void;
   showTitle(v: TitleView): void;
-  setTitleSelected(index: number): void;
+  /** 매단 일감을 바꾼다. dir = 넘긴 쪽(짐이 크레인을 따라 그쪽으로 빠지고 반대쪽에서 들어온다) */
+  setTitleJob(job: JobId, facts: HomeFacts, dir: -1 | 1): void;
   showStory(lines: readonly string[], opts?: StoryOpts): void;
   showPause(v: PauseView): void;
   showSettings(s: SaveSettings, fromPause: boolean): void;
@@ -257,8 +252,8 @@ export interface OverlayApi {
 const TOAST_MS = 2400;
 const QUIT_CONFIRM_MS = 3000;
 const SHAKE_MS = 900;
-/** 결과 점수는 조각이 떨어지고 도장이 찍힌 뒤 굴러 올라간다(style.css 결과 안무 1.55초) */
-const SCORE_ROLL_AT = 1550;
+/** 결과 점수는 보고서가 내려앉고 도장이 찍힌 뒤 굴러 올라간다(style.css .ov-rp 안무 0.3초) */
+const SCORE_ROLL_AT = 320;
 const SCORE_ROLL_MS = 750;
 
 /** 홈 뿌뿌 — 가만히 · 두 번째 누름(벤다) · 네 번째부터(뻗는다, 더는 안 받아 준다) */
@@ -275,7 +270,8 @@ function cutDir(from: OverlayScreen, to: OverlayScreen): CutDir | null {
   if (from === to || to === 'boot' || to === 'pause') return null;
   if (from === 'pause' && to !== 'title') return null;
   if ((from === 'none' && to === 'story') || (from === 'story' && to === 'none')) return null;
-  if (RESULTS.has(to)) return CUT.DOWN;
+  // 판 → 결과: 같은 판 위로 사진이 떨어지면 겹상이다 — 베지 않고 보고서가 찍히듯 들어온다(style.css .ov-rp.anim)
+  if (RESULTS.has(to)) return from === 'none' ? null : CUT.DOWN;
   if (to === 'title') {
     if (from === 'boot') return CUT.UP;
     return RESULTS.has(from) || from === 'pause' || from === 'none' || from === 'story' ? CUT.DOWN : CUT.HOME;
@@ -297,82 +293,22 @@ export function ensureOverlayLayer(): HTMLElement {
 
 /* ── 그림 조각(시안 f1-ink 그대로) ───────────────────────── */
 
-/** 제목 「건뿌!!」 — 글꼴이 아니라 붓 획 17개 + 느낌표 넷 */
-const TITLE_SVG = `<svg class="h-title" viewBox="0 0 600 248" role="img" aria-label="건뿌!!" data-act="logo">
-  <path class="s" pathLength="1" style="--d:.05s" stroke-width="24" d="M24 52 Q70 40 118 44 L90 136"/>
-  <path class="s" pathLength="1" style="--d:.2s" stroke-width="16" d="M132 98 Q150 94 166 100"/>
-  <path class="s" pathLength="1" style="--d:.3s" stroke-width="26" d="M178 14 Q182 80 176 158"/>
-  <path class="s" pathLength="1" style="--d:.44s" stroke-width="22" d="M42 148 Q44 180 50 212 Q100 214 162 206"/>
-  <path class="h" pathLength="1" style="--d:.44s" d="M64 208 Q100 210 148 204"/>
-  <path class="s" pathLength="1" style="--d:.6s" stroke-width="20" d="M268 26 L262 118"/>
-  <path class="s" pathLength="1" style="--d:.68s" stroke-width="20" d="M334 22 L338 118"/>
-  <path class="s" pathLength="1" style="--d:.76s" stroke-width="14" d="M262 72 L340 68"/>
-  <path class="s" pathLength="1" style="--d:.84s" stroke-width="18" d="M256 118 L346 114"/>
-  <path class="s" pathLength="1" style="--d:.94s" stroke-width="20" d="M372 24 L366 118"/>
-  <path class="s" pathLength="1" style="--d:1.02s" stroke-width="20" d="M448 20 L452 118"/>
-  <path class="s" pathLength="1" style="--d:1.1s" stroke-width="14" d="M366 70 L452 66"/>
-  <path class="s" pathLength="1" style="--d:1.18s" stroke-width="18" d="M360 118 L460 113"/>
-  <path class="s" pathLength="1" style="--d:1.3s" stroke-width="26" d="M250 156 Q360 146 470 150"/>
-  <path class="h" pathLength="1" style="--d:1.3s" d="M296 155 Q360 148 436 151"/>
-  <path class="s" pathLength="1" style="--d:1.44s" stroke-width="26" d="M362 158 Q366 192 360 232"/>
-  <polygon class="x" style="--d:1.56s" points="492,14 524,20 508,152 494,150"/>
-  <polygon class="x" style="--d:1.62s" points="486,174 516,172 518,204 488,206"/>
-  <polygon class="x" style="--d:1.68s" points="546,8 580,16 564,150 548,146"/>
-  <polygon class="x" style="--d:1.74s" points="540,172 572,170 574,202 542,204"/>
-</svg>`;
+/** 현장 화면(홈 · 결과 넷) = 투명한 화면(밑에 판 캔버스 · 조작 키가 보인다). 누르는 것만 누른다(style.css .ov-field) */
+const FIELD_SCREENS: ReadonlySet<OverlayScreen> = new Set(['title', ...RESULTS]);
 
-/** 떨어지는 건물 뒤 속도선 다섯 */
-const LINES_SVG = `<svg class="h-lines" viewBox="0 0 60 200" aria-hidden="true">
-  <path pathLength="1" style="--d:.55s" stroke-width="3.2" d="M50 4 L24 68"/>
-  <path pathLength="1" style="--d:.62s" stroke-width="2" d="M57 42 L32 112"/>
-  <path pathLength="1" style="--d:.7s" stroke-width="4" d="M44 92 L14 162"/>
-  <path pathLength="1" style="--d:.78s" stroke-width="2.2" d="M58 124 L38 192"/>
-  <path pathLength="1" style="--d:.86s" stroke-width="3" d="M30 0 L8 52"/>
-</svg>`;
+/** 홈 크레인 양옆 이웃 일감 이름 — 짧게 */
+const JOB_SHORT: Record<JobId, string> = {
+  arcade: '아케이드', stage: STAGE_MODE.title, ops: SCREENS.menu.ops, tokoton: SCREENS.menu.tokoton, butter: '버터바',
+};
 
-/** 지붕 능선 — 직접 그은 먹 선 + 바닥 붓 획 */
-const RIDGE_SVG = `<svg class="h-ridge" viewBox="0 0 400 70" preserveAspectRatio="none" aria-hidden="true">
-  <path pathLength="1" style="--d:0s" stroke-width="5" d="M24 22 L94 20"/>
-  <path pathLength="1" style="--d:.04s" stroke-width="3.4" d="M26 22 Q14 34 -4 42 Q-8 40 -10 34 M92 20 Q104 32 120 40 Q124 38 126 32"/>
-  <path pathLength="1" style="--d:.1s" stroke-width="2.2" d="M-2 44 Q58 48 118 42 M4 46 L6 58 M112 44 L112 58"/>
-  <path pathLength="1" style="--d:.14s" stroke-width="1.6" d="M40 30 L50 40 M58 28 L68 38 M76 27 L86 37"/>
-  <path pathLength="1" style="--d:.1s" stroke-width="3.4" d="M134 34 L206 32"/>
-  <path pathLength="1" style="--d:.14s" stroke-width="2.6" d="M136 34 Q124 44 112 50 M204 32 Q216 42 230 48 Q234 46 236 40"/>
-  <path pathLength="1" style="--d:.2s" stroke-width="2" d="M114 52 Q170 55 228 50 M230 50 L230 58"/>
-  <path pathLength="1" style="--d:.16s" stroke-width="2.8" d="M158 33 L158 16 L170 15 L171 32"/>
-  <path pathLength="1" style="--d:.18s" stroke-width="5" d="M248 26 L312 24"/>
-  <path pathLength="1" style="--d:.22s" stroke-width="3.4" d="M250 26 Q238 38 224 46 Q220 44 218 38 M310 24 Q322 36 338 44 Q342 42 344 36"/>
-  <path pathLength="1" style="--d:.28s" stroke-width="2.2" d="M226 48 Q280 52 336 46 M336 47 L337 58"/>
-  <path pathLength="1" style="--d:.3s" stroke-width="1.6" d="M262 34 L272 44 M282 32 L292 42 M300 31 L310 41"/>
-  <path pathLength="1" style="--d:.26s" stroke-width="3" d="M352 38 L396 36"/>
-  <path pathLength="1" style="--d:.3s" stroke-width="2.6" d="M354 38 Q344 46 332 52 M394 36 Q402 44 412 50"/>
-  <path pathLength="1" style="--d:.34s" stroke-width="2" d="M334 54 Q372 57 410 52"/>
-  <path class="gnd" d="M-6 58 Q200 53 406 60 L406 64 Q200 67 -6 68 Z"/>
-</svg>`;
+/** 크레인 팔 — 위 · 아래 현 + X자 격자 */
+/** 크레인 팔 — 위아래 레일 2.5 · 사이는 1.5 먹 선 지그재그 살, 속은 비어 한지가 비친다 */
+const JIB_SVG = `<svg class="hf-jib" aria-hidden="true"><defs><pattern id="hf-lat" y="2.5" width="18" height="15" patternUnits="userSpaceOnUse">`
+  + `<path d="M0 15 L9 0 L18 15" fill="none" stroke="#1A1A20" stroke-width="1.5"/></pattern></defs>`
+  + `<rect x="0" y="2.5" width="100%" height="15" fill="url(#hf-lat)"/><rect x="0" y="0" width="100%" height="2.5"/><rect x="0" y="17.5" width="100%" height="2.5"/></svg>`;
 
-/** 건물 아래 왼쪽 모서리에서 흘러내리는 갈필 세 가닥 */
-const DRIPS_SVG = '<svg viewBox="0 0 72 60" aria-hidden="true"><path d="M4 0 L15 0 L11 58 Z"/><path d="M22 0 L31 0 L28 42 Z"/><path d="M39 0 L47 0 L45 30 Z"/></svg>';
-
-/** 건물 밑에 깔린 뿌뿌(직접 그은 먹 선) */
-const CRUSHED_SVG = `<svg class="g-man" viewBox="0 0 300 130" role="img" aria-label="깔린 뿌뿌">
-  <path class="bl" d="M34 62 L42 70 L8 22 L4 18 Z"/><path class="bl" d="M26 58 L38 72 L34 75 L22 61 Z"/>
-  <g class="ln"><circle cx="150" cy="78" r="17"/><path d="M133 84 L40 68"/><path d="M167 84 L262 66"/><path d="M140 93 L52 120"/><path d="M160 93 L246 122"/><circle cx="40" cy="68" r="4"/></g>
-</svg>`;
-const CLOUD_SVG = '<svg class="g-cloud" viewBox="0 0 110 64" aria-hidden="true"><path d="M12 60 Q-2 44 16 36 Q12 14 38 18 Q50 0 70 14 Q94 8 94 32 Q112 40 98 58 Q80 66 60 60 Q36 66 12 60 Z"/></svg>';
-
-/** 엔딩 — 민들레 하나 + 날아가는 홀씨 넷 */
-const SEEDS_SVG = `<svg class="e-seeds" viewBox="0 0 200 300" aria-hidden="true">
-  <path pathLength="1" style="--d:0s" d="M70 300 Q76 230 66 168"/>
-  <circle pathLength="1" style="--d:.2s" cx="66" cy="158" r="9"/>
-  <path pathLength="1" style="--d:.34s" d="M66 158 L48 132 M66 158 L62 126 M66 158 L80 128 M66 158 L94 140 M66 158 L40 150"/>
-  <path pathLength="1" style="--d:.5s" d="M120 120 L112 138 M120 120 L110 108 M120 120 L121 104 M120 120 L131 109"/>
-  <path pathLength="1" style="--d:.62s" d="M156 70 L150 86 M156 70 L147 59 M156 70 L157 55 M156 70 L166 60"/>
-  <path pathLength="1" style="--d:.74s" d="M178 150 L171 165 M178 150 L169 140 M178 150 L180 136 M178 150 L188 142"/>
-  <path pathLength="1" style="--d:.86s" d="M136 32 L131 45 M136 32 L128 24 M136 32 L138 20 M136 32 L145 26"/>
-</svg>`;
-
-const SPLATS = '<i class="spl" style="--tx:-74px;--ty:-60px"></i><i class="spl" style="--tx:72px;--ty:-54px"></i>'
-  + '<i class="spl" style="--tx:-66px;--ty:58px"></i><i class="spl" style="--tx:78px;--ty:50px"></i>';
+/** 띠 밑 먹 획 — 홈 · 결과 현장 화면이 같이 쓴다 */
+const BAND_LINE = '<svg class="hud-line" viewBox="0 0 360 12" preserveAspectRatio="none" aria-hidden="true"><path d="M0 1 Q150 -1 296 3.5 L306 6 L294 8.5 Q150 11 0 11 Z"/></svg>';
 
 const CLOSE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4 L20 20 M20 4 L4 20"/></svg>';
 
@@ -398,20 +334,23 @@ function levelOf(el: HTMLElement): 0 | 1 | 2 {
   return v === 0 || v === 1 ? v : 2;
 }
 
-/** 미션·상점·작전 겉 틀 — 안(.ov-body)은 각 화면 그리기가 채운다. 맨 아래 = 가는 길 도장 줄 */
-function metaScreen(name: string, frame: string, stamp: string, right: string): string {
+/** 미션·상점·도감·작전 겉 틀 — 안(.ov-body)은 각 화면 그리기가 채운다. 맨 아래 = 가는 길 도장 줄:
+ *  왼쪽부터 홈 · 미션 · 상점 · 도감 자리, 그 화면 자신의 자리(own)엔 장식 도장. own이 없으면(작전) 홈 · 도장 */
+function metaScreen(name: string, frame: string, stamp: string, own?: keyof typeof NAV_TO): string {
+  const mark = `<span class="nav-stamp">${stamp}</span>`;
+  const slots = (Object.keys(NAV_TO) as (keyof typeof NAV_TO)[]).map((k) => (k === own ? mark : NAV_TO[k]));
+  const rest = own ? slots.join('') : `${mark}<span></span>`;
   return `<div class="ov-screen ov-meta" data-screen="${name}" hidden>
       ${frame}
       <div class="ov-body" data-el="body-${name}"></div>
-      <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="meta-back">홈</button><span class="nav-stamp">${stamp}</span>${right}</nav>
+      <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="meta-back">홈</button>${rest}</nav>
     </div>`;
 }
 
 const toMissions = '<button type="button" class="inkseal" data-act="tab-missions" data-badge-host>미션<b class="dot" data-badge hidden></b></button>';
 const toShop = '<button type="button" class="inkseal" data-act="tab-shop">상점<b class="dot" data-shop-dot hidden></b></button>';
 const toBook = '<button type="button" class="inkseal" data-act="tab-book">도감</button>';
-/** 가는 길 줄 오른쪽 도장 둘 */
-const navPair = (a: string, b: string): string => `<span class="nav-pair">${a}${b}</span>`;
+const NAV_TO = { missions: toMissions, shop: toShop, book: toBook } as const;
 
 const HOWTO_ROWS: readonly { key: string; name: string; desc: string }[] = [
   { key: 'k-atk', name: '공격', desc: '닿은 층을 벤다. 이어 베면 콤보.' },
@@ -432,42 +371,32 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <p class="boot-hint">누르면 시작</p>
     </div>
 
-    <div class="ov-screen ov-home" data-screen="title" hidden>
-      ${frameSvg(9, 3.5, 5.5, 10)}
-      <div class="h-top">
-        <div class="h-cap" data-el="title-rank"></div>
-        <div class="h-bld"><img data-el="title-bld" src="./img/floors/europe.png" alt="" draggable="false">${DRIPS_SVG}</div>
-        ${LINES_SVG}
-        ${TITLE_SVG}
-        ${RIDGE_SVG}
-        <div class="h-ppu" data-el="ppu"><canvas data-el="ppu-cv" aria-hidden="true"></canvas></div>
-        <div class="h-bub" data-el="bub" aria-hidden="true"></div>
-        <button type="button" class="h-ppu-hit" data-act="ppu" aria-label="뿌뿌"></button>
+    <div class="ov-screen ov-field" data-screen="title" hidden>
+      <div class="hf-band">
+        <span class="tag hf-rank" data-el="title-rank"></span>
+        <span class="hf-buddha" data-el="buddha" hidden>${SCREENS.title.buddha}</span>
+        <span class="hf-wal" data-el="stats"></span>
       </div>
-      <div class="h-bottom">
-        <div class="h-row">
-          <div class="modes">
-            <button type="button" class="stroke s1" style="--i:0" data-act="tokoton" data-el="tokoton"><b></b><span></span></button>
-            <button type="button" class="stroke s2" style="--i:1" data-act="butter" data-el="butter"><b></b><span></span></button>
-            <button type="button" class="stroke s3" style="--i:2" data-act="ops" data-el="ops"><b></b><span></span></button>
-            <button type="button" class="stroke s4" style="--i:3" data-act="stage" data-el="stage"><b></b><span></span></button>
-          </div>
-          <div class="h-start">
-            <button type="button" class="seal seal-start" data-act="arcade" data-el="arcade" aria-label="${m.arcade}"><small>아케이드</small><b>시작</b></button>
-            ${SPLATS}
-            <div class="h-sub">${m.arcadeSub}</div>
-          </div>
-        </div>
-        <div class="h-stats" data-el="stats"></div>
-        <button type="button" class="h-note" data-act="home-note" data-el="home-note" hidden></button>
-        <p class="h-buddha" data-el="buddha" hidden>${SCREENS.title.buddha}</p>
-        <nav class="h-nav" aria-label="가는 길">
-          <button type="button" class="inkseal" style="--i:0" data-act="tab-missions" data-badge-host>미션<i data-el="nav-today"></i><b class="dot" data-badge hidden></b></button>
-          <button type="button" class="inkseal" style="--i:1" data-act="tab-shop">상점<b class="dot" data-shop-dot hidden></b></button>
-          <button type="button" class="inkseal" style="--i:2" data-act="tab-book">도감</button>
-          <button type="button" class="inkseal" style="--i:3" data-act="tab-more">설정</button>
-        </nav>
-      </div>
+      ${BAND_LINE}
+      <button type="button" class="hf-note" data-act="home-note" data-el="home-note" hidden><span class="tag ink" data-el="note-tag"></span><span class="hf-note-t" data-el="note-line"></span></button>
+      ${JIB_SVG}
+      <button type="button" class="hf-peek hf-pl" data-act="job-prev"><canvas data-el="peek-prev-cv" aria-hidden="true"></canvas><span data-el="peek-prev"></span></button>
+      <button type="button" class="hf-peek hf-pr" data-act="job-next"><canvas data-el="peek-next-cv" aria-hidden="true"></canvas><span data-el="peek-next"></span></button>
+      <button type="button" class="hf-trolley" data-act="logo" aria-label="건뿌"><span aria-hidden="true">건뿌</span></button>
+      <button type="button" class="hf-hang" data-act="hang" data-el="hang" tabindex="-1" aria-hidden="true"><canvas data-el="hang-cv"></canvas></button>
+      <button type="button" class="hf-slip" data-act="stage" data-el="slip">
+        <span class="s-top" data-el="slip-top"></span>
+        <span class="s-nm" data-el="slip-nm"></span>
+        <span class="s-st" data-el="slip-st"></span>
+      </button>
+      <span class="hf-dots" data-el="dots" aria-hidden="true">${JOBS.map(() => '<i></i>').join('')}</span>
+      <button type="button" class="hf-tab tl t1" data-act="tab-missions" data-badge-host><b>미션</b><i data-el="nav-today"></i><b class="dot" data-badge hidden></b></button>
+      <button type="button" class="hf-tab tl t2" data-act="tab-shop"><b>상점</b><b class="dot" data-shop-dot hidden></b></button>
+      <button type="button" class="hf-tab tr t1" data-act="tab-book"><b>도감</b></button>
+      <button type="button" class="hf-tab tr t2" data-act="tab-more"><b>설정</b></button>
+      <div class="h-ppu" data-el="ppu"><canvas data-el="ppu-cv" aria-hidden="true"></canvas></div>
+      <div class="h-bub" data-el="bub" aria-hidden="true"></div>
+      <button type="button" class="h-ppu-hit" data-act="ppu" aria-label="나"></button>
     </div>
 
     <div class="ov-screen ov-story" data-screen="story" data-act="story-skip" hidden>
@@ -532,84 +461,20 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="butter-back">홈</button><span class="nav-stamp">버터 반죽</span><span></span></nav>
     </div>
 
-    <div class="ov-screen ov-result" data-screen="gameover" hidden>
-      ${frameSvg(10, 4, 5, 9)}
-      <div class="g-scene">
-        <div class="g-st k1" style="--i:1"><span>${SCREENS.gameover.buildings}</span><b data-el="go-bld"></b></div>
-        <div class="g-st k2" style="--i:0"><span>최고 콤보</span><b data-el="go-combo"></b></div>
-        <div class="g-st k3" style="--i:2"><span>${SCREENS.gameover.dust}</span><b data-el="go-dust"></b></div>
-        <div class="g-st k4" style="--i:3"><span>${SCREENS.gameover.zone}</span><b data-el="go-zone"></b></div>
-        <div class="g-piece" data-el="go-piece" aria-hidden="true"></div>
-        <div class="g-fall">${CRUSHED_SVG}${CLOUD_SVG}<div class="g-frag" data-el="go-frag" aria-hidden="true"></div></div>
-      </div>
-      <div class="g-head">
-        <h2 class="g-title">${SCREENS.gameover.title}</h2>
-        <div class="seal ink g-stamp" data-el="go-stamp" role="img"></div>
-        <p class="g-bub" data-el="go-line"></p>
-      </div>
-      <div class="g-score"><span>점수</span><b class="g-num" data-el="go-score"></b><i class="g-best" data-el="go-best" hidden>${SCREENS.stamps.best}</i></div>
-      <div class="g-acts">
-        <div class="g-left" data-el="go-left"></div>
-        <button type="button" class="seal g-main" data-el="go-main"></button>
-      </div>
+    <div class="ov-screen ov-field ov-rp" data-screen="gameover" hidden></div>
+    <div class="ov-screen ov-field ov-rp" data-screen="opsend" hidden></div>
+    <div class="ov-screen ov-field ov-rp" data-screen="ending" hidden></div>
+
+    ${metaScreen('ops', frameSvg(8, 4, 5.5, 10), '현장 배정')}
+
+    <div class="ov-screen ov-map" data-screen="stages" hidden>
+      <div class="mp"><div class="mp-in" data-el="body-stages"></div>${BAND_LINE}</div>
     </div>
 
-    <div class="ov-screen ov-result" data-screen="opsend" hidden>
-      ${frameSvg(9, 3.5, 6, 10)}
-      <div class="o-scene">
-        <p class="o-name" data-el="os-name"></p>
-        <div class="o-big"><b data-el="os-big"></b></div>
-        <div class="seal ink o-grade" data-el="os-grade" role="img" hidden></div>
-      </div>
-      <div class="g-head"><h2 class="g-title" data-el="os-title"></h2></div>
-      <div class="o-lines">
-        <p class="o-line" style="--i:0" data-el="os-goal"></p>
-        <p class="o-line muted" style="--i:1" data-el="os-best"></p>
-        <p class="o-line" style="--i:2" data-el="os-prog" hidden></p>
-      </div>
-      <div class="g-acts">
-        <div class="g-left">
-          <button type="button" class="stroke s2" style="--i:0" data-act="ops-list"><b>${SCREENS.ops.list}</b></button>
-          <button type="button" class="stroke s3" style="--i:1" data-act="ops-title"><b>${SCREENS.ops.title}</b></button>
-        </div>
-        <button type="button" class="seal g-main" data-act="ops-retry" aria-label="${SCREENS.ops.retry}"><b>한 판<br>더</b></button>
-      </div>
-    </div>
-
-    <div class="ov-screen ov-result ov-ending" data-screen="ending" hidden>
-      ${frameSvg(10, 3.5, 5, 9)}
-      <div class="e-scene">
-        ${SEEDS_SVG}
-        <p class="e-sub">${SCREENS.result.petals}</p>
-        <p class="e-note" data-el="end-note"></p>
-      </div>
-      <div class="g-head"><h2 class="g-title">${SCREENS.result.success}</h2><div class="seal ink g-stamp" role="img">완료</div></div>
-      <div class="g-score"><span>점수</span><b class="g-num" data-el="end-score"></b><i class="g-best" data-el="end-best" hidden>${SCREENS.stamps.best}</i></div>
-      <div class="g-acts">
-        <div class="g-left">
-          <p class="o-line muted" data-el="end-combo"></p>
-          <button type="button" class="stroke s3" style="--i:0" data-act="end-title"><b>타이틀로</b></button>
-        </div>
-        <button type="button" class="seal g-main" data-act="end-retry" aria-label="한 판 더"><b>한 판<br>더</b></button>
-      </div>
-    </div>
-
-    ${metaScreen('ops', frameSvg(8, 4, 5.5, 10), '현장 배정', '<span></span>')}
-
-    <div class="ov-screen ov-meta" data-screen="stages" hidden>
-      ${frameSvg(9, 3.5, 5.5, 10)}
-      <div class="ov-body" data-el="body-stages"></div>
-      <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="stage-back" data-el="stage-back">${STAGE_MODE.home}</button><span class="nav-stamp">${STAGE_MODE.navStamp}</span><span></span></nav>
-    </div>
-
-    <div class="ov-screen ov-meta ov-stage-end" data-screen="stageend" hidden>
-      ${frameSvg(10, 4, 5, 9)}
-      <div class="ov-body" data-el="body-stageend"></div>
-      <div class="st-acts" data-el="acts-stageend"></div>
-    </div>
-    ${metaScreen('missions', frameSvg(9, 4.5, 5, 9), '출근 도장', navPair(toShop, toBook))}
-    ${metaScreen('shop', frameSvg(8, 4.5, 6, 10), '현장 매점', navPair(toMissions, toBook))}
-    ${metaScreen('book', frameSvg(9, 4, 5.5, 10), '모은 만큼', navPair(toShop, toMissions))}
+    <div class="ov-screen ov-field ov-rp" data-screen="stageend" hidden></div>
+    ${metaScreen('missions', frameSvg(9, 4.5, 5, 9), '출근 도장', 'missions')}
+    ${metaScreen('shop', frameSvg(8, 4.5, 6, 10), '현장 매점', 'shop')}
+    ${metaScreen('book', frameSvg(9, 4, 5.5, 10), '모은 만큼', 'book')}
 
     <div class="ov-modal" data-el="modal" hidden>
       <div class="m-card" role="dialog" aria-modal="true" aria-labelledby="modal-title-text" tabindex="-1" data-el="modal-card">
@@ -652,7 +517,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   const screenEl = (name: OverlayScreen): HTMLElement | null =>
     name === 'none' ? null : root.querySelector<HTMLElement>(`[data-screen="${name}"]`);
 
-  const stageUi: StageUi = createStageUi($('body-stages'), $('stage-back'), {
+  const stageUi: StageUi = createStageUi($('body-stages'), {
     onStart: (id, diff, fromBoss) => h.onStageStart(id, diff, fromBoss),
   });
 
@@ -683,6 +548,10 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     screen = name;
     closeModal();
     root.classList.toggle('is-open', name !== 'none');
+    // 현장 화면 — 메뉴층은 누르기를 흘리고(누르는 DOM만 받는다) 무대엔 조작 키를 띄운다
+    const field = FIELD_SCREENS.has(name);
+    root.classList.toggle('field', field);
+    root.parentElement?.classList.toggle('field', field);
     root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => {
       el.hidden = el.getAttribute('data-screen') !== name;
     });
@@ -701,8 +570,10 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       return;
     }
     const dir = cutDir(prev, name);
-    const src = prev === 'none' || prev === 'pause' ? document.getElementById('game') : screenEl(prev);
-    const cut = dir ? cutFrom(src, dir) : false;
+    const game = document.getElementById('game') as HTMLCanvasElement | null;
+    const src = prev === 'none' || prev === 'pause' ? game : screenEl(prev);
+    // 현장 화면은 투명하다 — 밑의 판 캔버스를 같이 찍어야 조각에 하늘 · 원경이 남는다
+    const cut = dir ? cutFrom(src, dir, FIELD_SCREENS.has(prev) ? game : null) : false;
     paint?.();
     show(name);
     if (!el) return;
@@ -759,44 +630,119 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     idleArm();
   }
 
-  /* ── 홈 ── */
-  function setMode(act: string, name: string, sub: string, open: boolean): void {
-    const row = $(act) as HTMLButtonElement;
-    row.disabled = !open;
-    (row.querySelector('b') as HTMLElement).textContent = name;
-    const sp = row.querySelector('span') as HTMLElement;
-    sp.textContent = sub;
-    sp.hidden = !sub;
-    row.setAttribute('aria-label', sub ? `${name}, ${sub}` : name);
+  /* ── 홈 현장 — 띠 · 쪽지 · 크레인에 매단 일감 · 지시서 쪽지 · 꼬리표 넷. 조작은 진짜 키 넷(scenes · touch.setFaces) ── */
+  let artKey = '';
+  let slideT = 0;
+
+  /** 지시서 쪽지 — 화면 글은 원래 홈 글 · 값만 */
+  function paintSlip(v: TitleView): void {
+    const f = v.facts;
+    let top = '';
+    let nm = `<b>${JOB_SHORT[v.job]}</b>`;
+    let st = '';
+    switch (v.job) {
+      case 'arcade':
+        st = `<span class="ln">${m.arcadeSub}</span><span class="ln">최고 <b class="n">${fmt(v.bestArcade)}</b></span>`;
+        break;
+      case 'stage': {
+        const done = STAGES.filter((d) => recordOf(f.stages, d.id).lamp > 0).length;
+        top = `<span>${STAGE_MODE.title}</span> <b class="n">${done}/${STAGES.length}</b>`;
+        const def = STAGES.find((d) => d.id === nextStage(f.stages));
+        if (!def) { nm = ''; break; }
+        const rec = recordOf(f.stages, def.id);
+        nm = `<b class="n">${def.id}</b> <b>${escapeHtml(STAGE_TEXT[def.id].name)}</b>${def.boss ? ` <span class="tag ink">${STAGE_MODE.bossTag}</span>` : ''}`;
+        st = `다음 차례 · ${rec.best > 0 ? `${STAGE_MODE.myBest} <b class="n">${fmtStageTime(rec.best)}</b>` : '기록 없음'}`;
+        break;
+      }
+      case 'ops': break;
+      case 'tokoton':
+        st = f.act2Cleared || f.allOpen ? m.tokotonSub : m.tokotonLocked;
+        break;
+      case 'butter': {
+        nm = `<b>${m.butter}</b>`;
+        const tier = butterTier(f);
+        st = tier > 0 ? m.butterSub(tier) : m.butterLocked;
+        break;
+      }
+    }
+    const parts: [string, string][] = [['slip-top', top], ['slip-nm', nm], ['slip-st', st]];
+    for (const [k, html] of parts) {
+      const el = $(k);
+      el.innerHTML = html;
+      el.hidden = !html;
+    }
+    $('slip').classList.toggle('long', v.job === 'butter');
+    // 줄(.ln)마다 끊어 읽는다 — 붙여 읽으면 「집행기최고」처럼 붙는다
+    const read = (el: HTMLElement): string => {
+      const lines = [...el.querySelectorAll('.ln')].map((ln) => ln.textContent);
+      return lines.length ? lines.join(', ') : el.textContent ?? '';
+    };
+    $('slip').setAttribute('aria-label', parts.map(([k]) => read($(k))).filter(Boolean).join(', '));
+    $('dots').querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', JOBS[i] === v.job));
+    const prev = stepJob(v.job, -1);
+    const next = stepJob(v.job, 1);
+    $('peek-prev').textContent = `‹\u00a0${JOB_SHORT[prev]}`;
+    $('peek-next').textContent = `${JOB_SHORT[next]}\u00a0›`;
+  }
+
+  /** 매단 건물 · 이웃 둘 — 일감이 바뀔 때만 다시 그린다. 화면이 보일 때만 그릴 수 있다(캔버스 크기) */
+  function paintJobArt(v: TitleView, force = false): void {
+    const hang = $('hang-cv') as HTMLCanvasElement;
+    if (!hang.clientWidth) return;
+    const b = (j: JobId) => jobBuilding(j, v.facts, v.theme);
+    const prev = stepJob(v.job, -1);
+    const next = stepJob(v.job, 1);
+    const key = JSON.stringify([b(v.job), b(prev), b(next)]);
+    if (!force && key === artKey) return;
+    artKey = key;
+    paintHang(hang, b(v.job), 30);
+    paintHang($('peek-prev-cv') as HTMLCanvasElement, b(prev), 20, true);
+    paintHang($('peek-next-cv') as HTMLCanvasElement, b(next), 20, true);
   }
 
   function paintTitle(v: TitleView): void {
     titleView = v;
-    setMode('tokoton', m.tokoton, v.tokotonOpen ? m.tokotonSub : m.tokotonLocked, v.tokotonOpen);
-    setMode('butter', m.butter, v.butterTier > 0 ? m.butterSub(v.butterTier) : m.butterLocked, v.butterTier > 0);
-    setMode('ops', m.ops, '', true);
-    setMode('stage', STAGE_MODE.title, '', true);
-    $('stats').innerHTML =
-      `<span class="cur">${glyph('dust')}${SCREENS.title.dust} <b>${fmt(v.dust)}</b></span>`
-      + `<span class="cur">${glyph('orb')}${SCREENS.title.orbit} <b>${fmt(v.orbit)}</b></span>`
-      + (v.note ? '' : `<span class="cur">최고 <b>${fmt(v.bestArcade)}</b></span>`); // 한 줄 쪽지가 있으면 그 자리를 내준다
+    $('title-rank').textContent = `${SCREENS.license.heading} ${v.rank}`;
+    const wal = $('stats');
+    wal.innerHTML = `${glyph('dust')}<b class="n">${fmt(v.dust)}</b>${glyph('orb')}<b class="n">${fmt(v.orbit)}</b>`;
+    wal.setAttribute('role', 'img');
+    wal.setAttribute('aria-label', `${SCREENS.title.dust} ${fmt(v.dust)} · ${SCREENS.title.orbit} ${fmt(v.orbit)}`);
     const today = $('nav-today');
     today.textContent = v.todayTotal > 0 ? `${v.todayDone}/${v.todayTotal}` : '';
     today.hidden = v.todayTotal <= 0;
+    // 한 줄 쪽지 = 「머리 · 나머지」 — 머리는 먹 꼬리표, 나머지는 한 줄
     const note = $('home-note');
     note.hidden = !v.note;
-    note.textContent = v.note?.text ?? '';
+    const [head, ...rest] = (v.note?.text ?? '').split(' · ');
+    $('note-tag').textContent = head;
+    $('note-line').textContent = rest.join(' · ');
     $('buddha').hidden = !v.buddhaMode;
-    $('title-rank').textContent = `${SCREENS.license.heading} · ${v.rank}`;
-    const bld = $('title-bld') as HTMLImageElement;
-    const src = `./img/floors/${v.theme}.png`;
-    if (bld.getAttribute('src') !== src) bld.setAttribute('src', src);
-    setTitleSelected(v.selected);
+    paintSlip(v);
   }
 
-  function setTitleSelected(index: number): void {
-    if (titleView) titleView.selected = index;
-    ['arcade', 'tokoton', 'butter', 'ops', 'stage'].forEach((act, i) => $(act).classList.toggle('selected', i === index));
+  /** 일감 바꾸기 — 짐이 크레인을 따라 넘긴 쪽 반대로 빠지고, 넘긴 쪽에서 들어온다(합쳐 약 160ms) */
+  function setTitleJob(job: JobId, facts: HomeFacts, dir: -1 | 1): void {
+    const v = titleView;
+    if (!v) return;
+    v.job = job;
+    v.facts = facts;
+    const hang = $('hang');
+    const swap = (): void => { paintSlip(v); paintJobArt(v); };
+    window.clearTimeout(slideT);
+    if (reduceMotion() || screen !== 'title') {
+      hang.style.removeProperty('translate');
+      swap();
+      return;
+    }
+    hang.style.translate = `${-dir * 260}px 0`;
+    slideT = window.setTimeout(() => {
+      swap();
+      hang.style.transition = 'none';
+      hang.style.translate = `${dir * 260}px 0`;
+      void hang.offsetWidth;
+      hang.style.removeProperty('transition');
+      hang.style.translate = '0px 0px';
+    }, 80);
   }
 
   /* ── 설정 ── */
@@ -821,7 +767,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       const open = r <= tier;
       const sub = open && best > 0 ? `${part} · ${SCREENS.butter.best(best)}` : part;
       return `<button type="button" class="stroke s${r}" style="--i:${i}"${open ? ` data-act="butter-${r}"` : ' disabled'}>`
-        + `<b>${escapeHtml(name)}</b><span>${escapeHtml(sub ?? '')}</span></button>`;
+        + `<b>${brushNum(name)}</b><span>${escapeHtml(sub ?? '')}</span></button>`;
     }).join('');
   }
 
@@ -837,7 +783,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     $('modal-card').dataset.tone = o.tone ?? 'ink';
     $('modal-art').innerHTML = o.art ?? '';
     $('modal-meta').textContent = o.meta;
-    $('modal-title').textContent = o.title;
+    // 제목은 붓글씨 — 숫자만 --black(.bn). 구매 확인(금) 창은 상점 흐름이라 그대로 둔다
+    if (o.tone === 'gold') $('modal-title').textContent = o.title;
+    else $('modal-title').innerHTML = brushNum(o.title);
     $('modal-body').innerHTML = o.html;
     $('modal-x').hidden = o.closable === false;
     // 누를 것(시작 · 지우기)은 주홍, 돈을 내는 것은 금, 나머지는 테두리. 닫는 길도 같은 크기다
@@ -953,7 +901,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       title: '기록을 지울까요?',
       html: '<p>최고 점수 · 해금 · 먼지 · 궤도조각 · 장비가 모두 지워져요. 되돌릴 수 없어요.</p>',
       actions: [
-        { label: '그만두기', act: 'modal-close', kind: 'quiet' },
+        { label: '닫기', act: 'modal-close', kind: 'quiet' },
         { label: '지우기', act: 'reset-yes', kind: 'danger' },
       ],
     });
@@ -975,15 +923,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'boot': h.onBoot(); break;
       case 'logo': h.onLogoTap(); break;
       case 'ppu': heroTap(); break;
-      case 'arcade': h.onArcade(); break;
-      case 'tokoton': h.onTokoton(); break;
-      case 'butter': {
-        const tier = titleView?.butterTier ?? 0;
-        if (tier <= 0) break;
-        if (tier === 1) h.onButterRound(1);
-        else api.showButterPick(tier);
-        break;
-      }
+      case 'job-prev': h.onJob(-1); break;
+      case 'job-next': h.onJob(1); break;
       case 'story-skip': h.onStorySkip(); break;
       case 'resume': h.onPauseResume(); break;
       case 'pause-settings': h.onOpenSettings(); break;
@@ -1044,21 +985,12 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'butter-2': h.onButterRound(2); break;
       case 'butter-3': h.onButterRound(3); break;
       case 'butter-back': h.onButterBack(); break;
-      case 'ops': h.onOpenOps(); break;
-      case 'stage': h.onOpenStages(); break;
+      case 'stage':
+      case 'hang': h.onJobTap(); break;
       case 'stage-back': if (!stageUi.back()) h.onMetaBack(); break;
       case 'meta-back': h.onMetaBack(); break;
-      case 'go-revive': h.onGameOverRevive(); break;
-      case 'go-continue': h.onGameOverContinue(); break;
-      case 'go-retry': h.onGameOverRetry(); break;
-      case 'go-title': h.onGameOverTitle(); break;
       case 'go-shop': h.onGameOverShop(); break;
       case 'go-missions': h.onGameOverMissions(); break;
-      case 'ops-retry': h.onGameOverRetry(); break;
-      case 'ops-list': h.onOpsEndList(); break;
-      case 'ops-title': h.onGameOverTitle(); break;
-      case 'end-title': h.onEndingDone(); break;
-      case 'end-retry': h.onEndingRetry(); break;
       case 'tab-missions': h.onOpenMissions(); break;
       case 'tab-shop': h.onOpenShop(); break;
       case 'tab-book': h.onOpenBook(); break;
@@ -1084,6 +1016,36 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     window.setTimeout(() => { if (tk === scoreToken && screen === on) countTo([el], 0, to, SCORE_ROLL_MS); else el.textContent = fmt(to); }, SCORE_ROLL_AT);
   }
 
+  /* ── 결과 넷 = 현장 화면 + 보고서 한 장(style.css .ov-rp). 띠(다음 목표 · 모드) · 왼쪽 꼬리표 하나 · 귀퉁이 먹 도장.
+     누를 것은 조작 키 넷(scenes resultDo · ui/resultLogic.ts). 화면 글은 원래 결과 화면의 말 · 값만 ── */
+  interface RpOpts {
+    goal?: string;
+    goalId?: string;
+    mode: string;
+    /** 귀퉁이 먹 도장 글. grade = 등급 글자(S · A · B — 본문 굵게) */
+    stamp?: string;
+    grade?: boolean;
+    body: string;
+    /** 왼쪽 꼬리표 — 결과의 상점 · 미션 지름길 */
+    tab?: { act: string; label: string };
+  }
+  function paintRp(name: OverlayScreen, o: RpOpts): HTMLElement {
+    const el = screenEl(name) as HTMLElement;
+    const goal = o.goal
+      ? `<span class="rp-goal">${lb(SCREENS.gameover.nextTag)}${o.goalId ? swordSvg(o.goalId) : ''}<span class="t">${escapeHtml(o.goal)}</span></span>`
+      : '';
+    const stamp = o.stamp ? `<span class="rp-stamp${o.grade ? ' grade' : ''}" role="img" aria-label="${escapeHtml(o.stamp)}">${escapeHtml(o.stamp)}</span>` : '';
+    el.innerHTML = `<div class="hf-band">${goal}<span class="tag rp-mode">${escapeHtml(o.mode)}</span></div>${BAND_LINE}`
+      + `<article class="rp" aria-label="${STAGE_MODE.report}"><header class="rp-h"><b>${STAGE_MODE.report}</b><span>${escapeHtml(h.resultWho())}</span></header>${o.body}</article>${stamp}`
+      + (o.tab ? `<button type="button" class="hf-tab tl t2" data-act="${o.tab.act}"><b>${o.tab.label}</b></button>` : '');
+    return el;
+  }
+  const lb = (t: string): string => `<span class="lb">${t}</span>`;
+  const verdict = (t: string): string => `<div class="rp-j">${lb('판정')}<b>${escapeHtml(t)}</b></div>`;
+  const scoreRow = (el: string, best: boolean): string =>
+    `<div class="rp-sc">${lb('점수')}<b class="n" data-el="${el}"></b>${best ? `<i class="rp-best">${SCREENS.stamps.best}</i>` : ''}</div>`;
+  const cell = (dt: string, dd: string, cls = 'n'): string => `<div><dt>${dt}</dt><dd class="${cls}">${dd}</dd></div>`;
+
   const api: OverlayApi = {
     getScreen: () => screen,
     showBoot(): void { enter('boot'); },
@@ -1092,12 +1054,13 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       enter('title', () => paintTitle(v));
       if (same) heroPose(heroCur);
       else heroReset();
+      paintJobArt(v, true);
     },
-    setTitleSelected,
+    setTitleJob,
     showStory(lines: readonly string[], opts: StoryOpts = {}): void {
       enter('story', () => {
         $('story').innerHTML = lines.map((ln) => (ln ? `<p>${escapeHtml(ln)}</p>` : '<p class="ov-gap"></p>')).join('');
-        $('story-stamps').innerHTML = (opts.stamps ?? []).map((t) => `<span class="seal ink">${escapeHtml(t)}</span>`).join('');
+        $('story-stamps').innerHTML = (opts.stamps ?? []).map((t) => `<span class="seal ink">${brushNum(t)}</span>`).join('');
         const scr = screenEl('story') as HTMLElement;
         const wipe = opts.wipeTicks ?? 0;
         scr.classList.toggle('has-wipe', wipe > 0);
@@ -1107,7 +1070,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     showPause(v: PauseView): void {
       disarmQuit();
       enter('pause', () => {
-        $('pause-stats').innerHTML = `<span>점수</span><b>${fmt(v.score)}</b><span>콤보 ${fmt(v.combo)}</span>`;
+        $('pause-stats').innerHTML = `<span>점수</span><b>${fmt(v.score)}</b><span>콤보 <i>${fmt(v.combo)}</i></span>`;
       });
     },
     showSettings(s: SaveSettings, fromPause: boolean): void {
@@ -1122,37 +1085,17 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     showGameOver(v: GameOverView): void {
       enter('gameover', () => {
         const g = SCREENS.gameover;
-        $('go-bld').textContent = g.buildingsUnit(v.buildings);
-        $('go-combo').textContent = fmt(v.combo);
-        $('go-dust').textContent = `+${fmt(v.dustGained)}`;
-        $('go-zone').textContent = v.zone;
-        const bg = `url("./img/floors/${v.theme}.png")`;
-        $('go-piece').style.backgroundImage = bg;
-        $('go-frag').style.backgroundImage = bg;
-        const stamp = $('go-stamp');
-        stamp.textContent = v.best ? g.stampBest : g.stamp;
-        stamp.setAttribute('aria-label', stamp.textContent);
-        $('go-line').textContent = v.line;
-        $('go-best').hidden = !v.best;
-        // 주홍은 하나 — 일어나기 → 이어하기 → 한 판 더 중 먼저 되는 것. 공격 키와 같은 순서
-        const acts: { act: string; seal: string; small?: string; stroke: string; sub?: string }[] = [];
-        if (v.canRevive) {
-          const left = g.reviveLeft(v.reviveLeft);
-          acts.push({ act: 'go-revive', seal: '일어<br>나기', small: v.adRevive ? `광고 · ${left}` : left, stroke: g.reviveFree, sub: left });
-        }
-        if (v.canContinue) acts.push({ act: 'go-continue', seal: '이어<br>하기', small: '체크포인트', stroke: '이어하기', sub: '체크포인트에서' });
-        acts.push({ act: 'go-retry', seal: '한 판<br>더', stroke: '한 판 더' });
-        const [main, ...rest] = acts;
-        const mainEl = $('go-main');
-        mainEl.setAttribute('data-act', main.act);
-        mainEl.setAttribute('aria-label', main.small ? `${main.stroke}, ${main.small}` : main.stroke);
-        mainEl.innerHTML = `<b>${main.seal}</b>${main.small ? `<small>${escapeHtml(main.small)}</small>` : ''}`;
-        const strokes = rest.map((a, i) =>
-          `<button type="button" class="stroke s2" style="--i:${i}" data-act="${a.act}"><b>${a.stroke}</b>${a.sub ? `<span>${escapeHtml(a.sub)}</span>` : ''}</button>`);
-        strokes.push(`<button type="button" class="stroke s3" style="--i:${rest.length}" data-act="go-title"><b>타이틀로</b></button>`);
-        const next = `<div class="g-next"><button type="button" class="inkseal" data-act="${v.goalMissions ? 'go-missions' : 'go-shop'}">${v.goalMissions ? '미션' : '상점'}</button>`
-          + `${v.goalId ? swordSvg(v.goalId) : ''}<span>${escapeHtml(v.goal)}</span></div>`;
-        $('go-left').innerHTML = strokes.join('') + next;
+        paintRp('gameover', {
+          goal: v.goal,
+          goalId: v.goalId,
+          mode: v.mode,
+          stamp: v.best ? g.stampBest : g.stamp,
+          tab: v.goalMissions ? { act: 'go-missions', label: SCREENS.tabs.missions } : { act: 'go-shop', label: SCREENS.tabs.shop },
+          body: verdict(g.title) + scoreRow('go-score', v.best)
+            + `<dl class="rp-tb">${cell(g.buildings, `${fmt(v.buildings)}<small>채</small>`)}${cell('최고 콤보', fmt(v.combo))}`
+            + `${cell(g.dust, `+${fmt(v.dustGained)}`)}${cell(g.zone, escapeHtml(v.zone), 't')}</dl>`
+            + `<p class="rp-bg">${lb('비고')}<span>${escapeHtml(v.line)}</span></p>`,
+        });
       });
       rollScore($('go-score'), v.score, 'gameover');
     },
@@ -1160,18 +1103,18 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       enter('opsend', () => {
         const o = SCREENS.ops;
         const [label, value] = v.rows[0] ?? ['', ''];
-        $('os-name').textContent = label ? `${v.name} · ${label}` : v.name;
-        $('os-big').textContent = value;
-        const stamp = $('os-grade');
-        stamp.hidden = !v.grade;
-        stamp.textContent = v.grade ?? '';
-        stamp.setAttribute('aria-label', v.grade ? `도장 ${v.grade}` : '');
-        $('os-title').textContent = v.grade ? o.doneTitle : o.timeUpTitle;
-        $('os-goal').textContent = `목표 · ${v.goal}`;
-        $('os-best').textContent = `${o.bestStamp} ${v.best ?? o.noStamp}${v.improved ? ` · ${o.stampNew}` : ''}`;
-        const prog = $('os-prog');
-        prog.hidden = !v.progress;
-        prog.textContent = v.progress ? `${SCREENS.gameover.nextTag} · ${v.progress}` : '';
+        const rest = v.rows.slice(1).map(([k, val]) => cell(escapeHtml(k), escapeHtml(val))).join('');
+        paintRp('opsend', {
+          goal: v.progress,
+          mode: SCREENS.menu.ops,
+          stamp: v.grade ?? undefined,
+          grade: true,
+          body: verdict(v.grade ? o.doneTitle : o.timeUpTitle)
+            + `<div class="rp-sc">${lb(escapeHtml(label ? `${v.name} · ${label}` : v.name))}<b class="n">${escapeHtml(value)}</b></div>`
+            + (rest ? `<dl class="rp-tb">${rest}</dl>` : '')
+            + `<p class="rp-ln">목표 · ${escapeHtml(v.goal)}</p>`
+            + `<p class="rp-ln muted">${o.bestStamp} ${v.best ?? o.noStamp}${v.improved ? ` · ${o.stampNew}` : ''}</p>`,
+        });
       });
     },
     showOps(opts): void {
@@ -1182,11 +1125,10 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     },
     stagesBack: () => screen === 'stages' && stageUi.back(),
     showStageEnd(v): void {
-      enter('stageend', () => paintStageEnd(screenEl('stageend') as HTMLElement, v, {
-        onRetry: h.onStageRetry,
-        onNext: h.onStageNext,
-        onList: h.onStageList,
-      }));
+      enter('stageend', () => {
+        const r = stageReport(v);
+        bindFlip(paintRp('stageend', { mode: STAGE_MODE.title, stamp: r.stamp || undefined, body: r.html }));
+      });
     },
     showMissions(v): void {
       enter('missions', () => paintMissions($('body-missions'), v, (id, boost) => h.onClaimMission(id, boost), (kind) => h.onTake(kind), (line) => h.onAchieve(line)));
@@ -1216,7 +1158,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         meta: '시작 장비',
         title: '들고 갈 것',
         html: kitHtml(v, {}),
-        actions: [{ label: '그만두기', act: 'modal-close', kind: 'quiet' }, { label: '시작', act: 'kit-start', kind: 'cta' }],
+        actions: [{ label: '닫기', act: 'modal-close', kind: 'quiet' }, { label: '시작', act: 'kit-start', kind: 'cta' }],
       });
       kit = { view: v, sel: {}, start, buy };
       $('modal-card').classList.add('kit');
@@ -1239,9 +1181,15 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     },
     showEnding(v: EndingView): void {
       enter('ending', () => {
-        $('end-combo').textContent = `최고 콤보 ${fmt(v.maxCombo)}`;
-        $('end-best').hidden = !v.best;
-        $('end-note').textContent = v.fullCombo ? SCREENS.result.fullComboNote : SCREENS.result.tokotonUnlock;
+        const r = SCREENS.result;
+        paintRp('ending', {
+          mode: v.mode,
+          stamp: '완료',
+          body: verdict(r.success) + scoreRow('end-score', v.best)
+            + `<dl class="rp-tb">${cell('최고 콤보', fmt(v.maxCombo))}</dl>`
+            + `<p class="rp-ln">${v.fullCombo ? r.fullComboNote : r.tokotonUnlock}</p>`
+            + `<p class="rp-bg">${lb('비고')}<span>${r.petals}</span></p>`,
+        });
       });
       rollScore($('end-score'), v.score, 'ending');
     },
@@ -1261,14 +1209,18 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   return api;
 }
 
-export function titleViewFromSave(save: SaveData, selected: number, debugOpen = false): TitleView {
+/** 홈 일감 판단 재료 — 화면(titleViewFromSave)과 확인 동작(scenes)이 같은 식으로 만든다 */
+export function homeFactsFromSave(save: SaveData, debugOpen = false): HomeFacts {
+  return homeFactsOf(save, lastDiffPick(), debugOpen || isDevUnlocked());
+}
+
+export function titleViewFromSave(save: SaveData, job: JobId, debugOpen = false): TitleView {
   const unlocked = debugOpen || isDevUnlocked();
   const today = dailyDone(save.daily);
-  const chapters = unlocked ? 3 : save.unlockedChapters;
+  const chapter = Math.min(3, unlocked ? 3 : save.unlockedChapters);
   return {
-    selected,
-    tokotonOpen: unlocked || save.act2Cleared,
-    butterTier: unlocked ? Math.max(3, save.butterTierReached) : save.butterTierReached,
+    job,
+    facts: homeFactsFromSave(save, debugOpen),
     bestArcade: save.bestArcade,
     buddhaMode: save.buddhaMode && import.meta.env.DEV,
     dust: save.dust,
@@ -1279,7 +1231,8 @@ export function titleViewFromSave(save: SaveData, selected: number, debugOpen = 
     rank: licenseTitle(save.license),
     loadout: save.loadout,
     maskArt: save.maskArt,
-    theme: regionOf(Math.min(3, chapters)).theme,
+    theme: regionOf(chapter).theme,
+    chapter,
     note: null,
   };
 }

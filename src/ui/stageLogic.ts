@@ -37,10 +37,9 @@ export function workProgress(id: string, step: number): { done: number; total: n
   return { done: steps.slice(0, step).filter(isWork).length, total: steps.filter(isWork).length };
 }
 
-/** 판 위 한 줄 — 「1-1 회랑 3번지 · 0:12.34」. 걸음 수는 진행 막대(stageBar)가 보인다 */
-export function stageHudLine(o: { id: string; ticks: number }): string {
-  const head = `${o.id} ${STAGE_TEXT[o.id]?.name ?? ''}`.trim();
-  return `${head} · ${fmtStageTime(o.ticks)}`;
+/** 판 위 띠 가운데 — 첫 줄 「1-1 회랑 3번지」 · 둘째 줄 시계 「0:12.34」. 걸음 수는 띠 밑 가로 게이지(stageBar)가 보인다 */
+export function stageHudLine(o: { id: string; ticks: number }): { head: string; line: string } {
+  return { head: `${o.id} ${STAGE_TEXT[o.id]?.name ?? ''}`.trim(), line: fmtStageTime(o.ticks) };
 }
 
 /** 명물 이름 — 집행기는 자기 이름이 따로 있다 */
@@ -172,7 +171,7 @@ export function stampTotals(recs: Readonly<Record<string, StageRecord>>): { stam
 /** real = 기록하는 판 · practice = 보스 연습(기록 없음) */
 export type StageEndKind = 'real' | 'practice';
 
-/** 철거 보고서 한 장에 놓을 것 전부 — 그리기는 stageView.paintStageEnd */
+/** 철거 보고서 한 장에 놓을 것 전부 — 그리기는 stageView.stageReport */
 export interface StageEndView {
   kind: StageEndKind;
   id: string;

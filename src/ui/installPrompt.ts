@@ -142,7 +142,7 @@ function showIosGuide(): void {
         <li><span class="ip-num">3</span><span>오른쪽 위 「추가」를 누르면 끝나요</span></li>
       </ol>
       <p class="ip-note">설치하면 홈에서 바로 열려요. 알림은 보내지 않아요.</p>
-      <button type="button">확인</button>
+      <button type="button">닫기</button>
     </div>
   `;
   const dismiss = (): void => { sheet.remove(); };
@@ -157,6 +157,11 @@ function watchStage(banner: HTMLElement): void {
   const sync = (): void => {
     const hide = stage.classList.contains('playing') || stage.classList.contains('paused');
     banner.style.display = hide ? 'none' : '';
+    // 현장 화면(홈 · 결과)은 아래에 조작 키가, 지도는 공격 키 자리에 「착수」가 있다 — 띠를 위로 올린다
+    // (홈 ↔ 지도는 field 클래스가 바뀌는 순간에 돈다. 관찰자는 show()가 화면을 다 바꾼 뒤에 부른다)
+    const field = stage.classList.contains('field') || !!stage.querySelector('[data-screen="stages"]:not([hidden])');
+    banner.style.top = field ? '8px' : '';
+    banner.style.bottom = field ? 'auto' : '';
   };
   sync();
   new MutationObserver(sync).observe(stage, { attributes: true, attributeFilter: ['class'] });

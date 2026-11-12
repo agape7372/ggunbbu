@@ -44,9 +44,11 @@ function copyCanvas(from: HTMLCanvasElement, to: HTMLCanvasElement): void {
 
 /**
  * from = 지금 보이는 화면(복제한다) 또는 판 캔버스(찍는다).
+ * under = 화면 밑에 깔린 판 캔버스 — 투명한 현장 화면(홈)을 벨 땐 캔버스를 먼저 찍고 그 위에 화면을 얹는다.
+ * 조작 키는 넣지 않는다(판으로 가면 키는 그 자리에 남고, 메뉴로 가면 새 화면이 덮는다).
  * 베는 중이거나 동작 줄이기면 false — 화면은 그냥 바뀐다.
  */
-export function cutFrom(from: HTMLElement | null, dir: CutDir): boolean {
+export function cutFrom(from: HTMLElement | null, dir: CutDir, under: HTMLCanvasElement | null = null): boolean {
   if (!from || busy || reduceMotion()) return false;
   const layer = cutLayer();
   if (!layer) return false;
@@ -61,6 +63,11 @@ export function cutFrom(from: HTMLElement | null, dir: CutDir): boolean {
     piece.style.setProperty('--y0', `${y0}%`);
     piece.style.setProperty('--y1', `${y1}%`);
     piece.style.setProperty('--sx', String(sx));
+    if (under) {
+      const c = document.createElement('canvas');
+      copyCanvas(under, c);
+      piece.appendChild(c);
+    }
     if (from instanceof HTMLCanvasElement) {
       const c = document.createElement('canvas');
       copyCanvas(from, c);

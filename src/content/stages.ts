@@ -7,8 +7,7 @@ import { STAGES } from '../core/stages';
 export const STAGE_MODE = {
   title: '작업 지시서',
   /** 모드 표지 — 처음 열 때 한 번 */
-  cover: ['지시서는 왔다.', '서명은 없다.', '뿌뿌는 간다.'],
-  list: '지시서 목록',
+  cover: ['지시서는 왔다.', '서명은 없다.', '나는 간다.'],
   log: '현장 일지',
   report: '철거 보고서',
   diffs: ['견습', '정규', '외주'],
@@ -19,7 +18,6 @@ export const STAGE_MODE = {
   /** 도장이 찍힌 자리의 인장 글자 */
   stampedMark: '필',
   start: '착수',
-  resubmit: '재제출',
   next: '다음 지시서',
   practice: '보스 연습',
   practiceNote: '보스부터 · 기록 없음',
@@ -52,14 +50,17 @@ export const STAGE_MODE = {
   barAct2: '2막',
   /** 화면 이름표 — ui/stageView.ts */
   home: '홈',
-  back: '목록',
   navStamp: '서명 없음',
+  /** 철거 지도 — 띠의 뒤로(쪽지 접기 · 일지 → 지도) · 다음 판 터의 붓글씨 · 잠긴 판 「착수」 자리 · 고른 터(읽어 주기만) */
+  mapBack: '뒤로',
+  nextTag: '다음',
+  lockKey: '잠김',
+  picked: '고름',
   clears: '철거',
   stampTotal: '정규 도장',
   progress: '걸음',
   tie: '동률',
   ahead: '앞',
-  again: '다시',
   prevBest: '전 기록',
   practiceReport: '연습 · 기록 없음',
   cleared: '철거 완료',
@@ -81,7 +82,7 @@ export const REGIONS: readonly RegionText[] = [
   {
     name: '서쪽 회랑',
     start: ['서쪽 회랑.', '종은 정각마다 울렸다.', '아무도 시간을 안 봤다.'],
-    boss: ['종탑은 철거 보류 3년.', '사유: 시계가 맞음.', '뿌뿌는 시계를 안 본다.'],
+    boss: ['종탑은 철거 보류 3년.', '사유: 시계가 맞음.', '나는 시계를 안 본다.'],
     after: ['종이 열두 번 울렸다.', '하나는 땅에서 울렸다.', '정각이었다. 아마.'],
   },
   {
@@ -99,12 +100,12 @@ export const REGIONS: readonly RegionText[] = [
   {
     name: '철근 해안',
     start: ['철근 해안.', '바다는 매립됐다.', '철근만 파도로 남았다.'],
-    boss: ['크레인이 짐을 내렸다.', '받는 사람 없음.', '반송 담당: 뿌뿌.'],
+    boss: ['크레인이 짐을 내렸다.', '받는 사람 없음.', '반송 담당: 나.'],
     after: ['짐은 다 돌려보냈다.', '수령인 불명.', '크레인이 먼저 퇴근했다.'],
   },
   {
     name: '본사',
-    start: ['본사는 하늘에 있다.', '접견실은 지상에 없다.', '뿌뿌는 1층에서 기다린다.'],
+    start: ['본사는 하늘에 있다.', '접견실은 지상에 없다.', '나는 1층에서 기다린다.'],
     boss: ['집행기는 지시대로 했다.', '지시는 「전부」였다.', '서명란은 비어 있다.'],
     after: ['집행기가 멈췄다.', '지시서는 더 안 온다.', '서명은 끝내 없었다.'],
   },

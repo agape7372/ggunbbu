@@ -2,7 +2,7 @@
 
 import { OPERATION, QUIP_STREAK_FROM } from '../config';
 import { opNeed, opShort, type OpId } from '../meta/ops';
-import { BOSS_NAME, HERO } from './world';
+import { BOSS_NAME } from './world';
 import type { Mode } from '../core/types';
 
 /** 버티기 작전(값 = 버틴 초)인가, 건물 작전(값 = 부순 채 수)인가 */
@@ -20,7 +20,6 @@ export const SCREENS = {
 
   /** 타이틀 메뉴 — 이름표 + 한 줄 보조(잠김이면 여는 조건) */
   menu: {
-    arcade: '아케이드 시작',
     arcadeSub: '4구역 → 집행기',
     tokoton: '야근',
     tokotonSub: '끝없이 떨어진다',
@@ -53,13 +52,11 @@ export const SCREENS = {
     /** 보고서 도장 — 신기록 판은 빨간 반려 대신 잉크 승인(빨강 = 실패·경고만) */
     stamp: '반려',
     stampBest: '승인',
-    continue: '체크포인트에서 이어하기',
-    revive: '광고 보고 일어나기',
+    continue: '이어하기',
     /** 웹(광고 미배선) — 광고를 위장하지 않는다 (08-30, P0-2) */
     reviveFree: '일어나기',
     reviveLeft: (n: number) => `${n}번 남음`,
     buildings: '벤 건물',
-    buildingsUnit: (n: number) => `${n}채`,
     dust: '먼지',
     zone: '도달 구역',
     /** 다음 목표 한 줄 — 가장 싼 미보유 먼지 구매품 */
@@ -98,8 +95,8 @@ export const SCREENS = {
     stampNew: '도장 갱신',
     noStamp: '도장 없음',
     retry: '한 판 더',
-    list: '작전 목록',
-    title: '타이틀로',
+    /** 결과 키 — 작전 목록으로 간다 */
+    list: '목록',
     /** 목표 한 줄 (B 도장 기준) */
     goal: (id: OpId): string => (isSeconds(id)
       ? `${OPERATION[id].grade.B}초 버티기`
@@ -151,7 +148,7 @@ export const GAMEOVER_QUIPS: readonly string[] = [
   '보험: 천재지변 해당 없음',
   '오늘 알바는 여기까지입니다',
   '깔린 채로 퇴근 도장을 찍었습니다',
-  `${HERO} 머리가 납작해졌습니다`,
+  `내 머리가 납작해졌습니다`,
   `${BOSS_NAME}가 평가를 남겼습니다: 「못생김.」`,
   '현장 실습은 학점으로 안 쳐 줍니다',
   '하늘이 한 채 더 던졌습니다',

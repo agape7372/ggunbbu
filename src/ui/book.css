@@ -165,10 +165,6 @@
 [data-screen="book"].anim .bk-sub { animation: wipe 0.26s cubic-bezier(0.87, 0.05, 0.02, 0.97) 0.14s both; }
 [data-screen="book"].anim .bk-cell { animation: popup 0.24s cubic-bezier(0.2, 1.2, 0.4, 1) calc(0.16s + var(--i) * 0.02s) both; }
 
-/* ── 가는 길 줄 · 홈 줄의 네 번째 도장 ── */
-.nav-pair { display: flex; align-items: center; gap: 12px; }
-.h-nav .inkseal:nth-child(4) { rotate: 3deg; }
-
 /* ── 팝업 — 도감 한 쪽 ── */
 
 .bk-pop { display: flex; flex-direction: column; gap: 10px; }

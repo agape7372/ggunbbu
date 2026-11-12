@@ -9,7 +9,7 @@ import { BLADE_IDS, BODY_IDS, LETTERS_IDS } from '../meta/loadout';
 import { rewardText, type Reward } from '../meta/progress';
 import type { Loadout } from '../meta/types';
 import { goods, type GoodsId } from './goodsArt';
-import { escapeHtml } from './html';
+import { brushNum, escapeHtml } from './html';
 import { countTo, fmt, reduceMotion } from './ink';
 import { lettersArt, playerArt, restoreLook } from './shopArt';
 
@@ -73,6 +73,8 @@ export const setRewardHost = (el: HTMLElement): void => { host = el; };
 
 let queue: Promise<void> = Promise.resolve();
 let closeNow: (() => void) | null = null;
+/** 보상 연출이 떠 있나 — 떠 있는 동안 홈 메뉴 키를 먹지 않는다(scenes.update) */
+export const rewardOpen = (): boolean => closeNow !== null;
 
 export function showReward(o: RewardShow): Promise<void> {
   queue = queue.then(() => open(o));
@@ -104,7 +106,7 @@ function open(o: RewardShow): Promise<void> {
       : '';
     el.innerHTML = `<div class="rf-box">
       <div class="rf-stage">${ink}${o.tier === 'l' && o.seal ? `<span class="rf-seal seal"><b>${escapeHtml(o.seal)}</b></span>` : ''}</div>
-      <p class="rf-title">${escapeHtml(o.title)}</p>
+      <p class="rf-title">${o.tone === 'gold' ? escapeHtml(o.title) : brushNum(o.title)}</p>
       ${o.sub ? `<p class="rf-sub">${escapeHtml(o.sub)}</p>` : ''}
       <div class="ms-rew rf-cells">${rewardHtml(o.reward)}</div>
       <button type="button" class="btn cta lg rf-ok">확인</button>

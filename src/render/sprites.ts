@@ -103,7 +103,7 @@ const SPECIAL_MATS: Array<Exclude<Material, Tier>> = ['butter', 'cathedral', 'lo
 // base 대비 밝기 배율(dark×0.84 / light×1.08 / accent×0.55)로 기계적 도출.
 // accent = 창문·창틀용(가장 어두움) — 밝은 배경에서 창문이 뚫린 구멍이 아니라 창으로 읽히려면
 // 반드시 base보다 확연히 어두워야 한다.
-const THEME_TIERS: Record<Theme, Record<Tier, TierColors>> = {
+export const THEME_TIERS: Readonly<Record<Theme, Readonly<Record<Tier, TierColors>>>> = {
   europe: {
     weak: { base: '#C9C2B4', dark: '#a9a397', light: '#d9d2c2', accent: '#6f6b63' }, // 낡은 회반죽+덧창
     mid: { base: '#BCAA9C', dark: '#9e8f83', light: '#cbb8a8', accent: '#675e56' }, // 벽돌+아치창

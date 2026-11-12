@@ -1,9 +1,9 @@
 // 정적 챕터 배경 — 오프스크린 1장에 한 번 굽고 매 프레임 그 한 장만 복사한다(T6 ②).
 // 테마(키)가 바뀌거나 이미지가 다시 로드될 때만 다시 굽는다.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { drawBackdropCached, preloadAssets } from '../src/render/assets';
+import { backdropPaper, drawBackdropCached, preloadAssets } from '../src/render/assets';
 import { drawChapterBackdrop } from '../src/render/background';
-import { VIEW } from '../src/config';
+import { ACT1, VIEW } from '../src/config';
 
 let canvases = 0;
 beforeEach(() => {
@@ -95,12 +95,14 @@ it('야간 배경은 낮 배경과 따로 굽고(창 채움), 낮으로 돌아�
   const { ctx } = fakeCtx();
   const day = { mode: 'act1', chapter: 0, act2Phase: null } as const;
   drawChapterBackdrop(ctx, day);
-  expect(reads).toHaveLength(0);                       // 낮에는 픽셀을 안 읽는다
+  expect(reads).toEqual([36]);                         // 낮에는 종이색 6×6만 읽는다(넓은 화면 옆 띠 색)
   drawChapterBackdrop(ctx, { ...day, gimmick: 'night' });
-  expect(reads).toHaveLength(1);                       // 야간은 한 번 굽는다
+  expect(reads).toHaveLength(2);                       // 야간은 한 번 굽는다(창 채움) — 종이색은 같은 키라 다시 안 잰다
   drawChapterBackdrop(ctx, { ...day, gimmick: 'night' });
-  expect(reads).toHaveLength(1);                       // 프레임마다 다시 안 굽는다
+  expect(reads).toHaveLength(2);                       // 프레임마다 다시 안 굽는다
   expect(canvases).toBe(2);
   drawChapterBackdrop(ctx, day);
   expect(canvases).toBe(3);                            // 낮으로 돌아오면 낮 배경을 다시 굽는다
+  expect(reads).toHaveLength(2);                       // 종이색은 키마다 한 번
+  expect(backdropPaper('bg-' + ACT1.CHAPTER_THEMES[0])).toBe('rgb(0, 0, 0)');
 });

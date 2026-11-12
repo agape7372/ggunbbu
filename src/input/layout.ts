@@ -75,6 +75,26 @@ export function resolveLayout(stored: ButtonLayout | null | undefined, leftHande
   return out;
 }
 
+/**
+ * 넓은 화면에서 키를 옆 띠로 미는 방향(--fr-x 배수). 키 가운데 x < 120 → 왼쪽(−1), > 240 → 오른쪽(+1), 그 밖은 제자리(0).
+ * 화면에 놓인 자리(왼손잡이 뒤집기 뒤) 기준이다.
+ */
+export function spreadSide(action: TouchAction, x: number): -1 | 0 | 1 {
+  const c = x + KEY_SIZE[action].w / 2;
+  return c < 120 ? -1 : c > 240 ? 1 : 0;
+}
+
+/**
+ * 작업 지시서 지도의 「착수」 자리 — 공격 키의 기본 자리. 실제 공격 키(저장 배치 · 왼손잡이 반영) 가운데가 화면 왼쪽 절반이면
+ * 좌우를 뒤집는다. 그래서 자리는 둘뿐이다(오른쪽 · 왼쪽). sx = 넓은 화면 옆 띠로 미는 방향(판의 키와 같은 식)
+ */
+export function goSeat(stored: ButtonLayout | null | undefined, leftHanded: boolean): Pos & { sx: -1 | 0 | 1 } {
+  const at = resolveLayout(stored, leftHanded).attack;
+  const d = DEFAULT_LAYOUT.attack;
+  const x = at.x + KEY_SIZE.attack.w / 2 < ZONE.w / 2 ? mirrorX('attack', d.x) : d.x;
+  return { x, y: d.y, sx: spreadSide('attack', x) };
+}
+
 /** 화면에 놓인 자리 → 저장값(오른손 기준). 전부 기본 자리면 null(= 저장하지 않음) */
 export function toStored(display: Readonly<Record<TouchAction, Pos>>, leftHanded: boolean): ButtonLayout | null {
   const out: ButtonLayout = {};

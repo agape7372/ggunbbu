@@ -31,11 +31,12 @@
 .le-save b { font-size: 32px; }
 
 /* 조작 구역 — style.css #touch-layer 와 같은 자리(top = FIELD_H, 높이 170). 키는 이 안에서만 움직인다 */
-.le-zone { position: absolute; left: 0; width: 100%; box-sizing: border-box; border: 3px dashed var(--ink3); pointer-events: none; }
+.le-zone { position: absolute; left: calc(-1 * var(--fr-x, 0px)); right: calc(-1 * var(--fr-x, 0px)); box-sizing: border-box; border: 3px dashed var(--ink3); pointer-events: none; }
 .le-zone-name { position: absolute; left: 22px; top: 584px; font: 700 12.5px/1.2 var(--body); color: var(--ink2); }
 
 /* 키 — 모양·글씨는 .tbtn 그대로, 그림만 id 대신 클래스로 */
-.le-key { cursor: grab; }
+/* 넓은 화면: 판과 같이 옆 키를 --fr-x 만큼 밖으로 민다(--sx = layout.ts spreadSide) */
+.le-key { cursor: grab; translate: calc(var(--fr-x, 0px) * var(--sx, 0)) 0; }
 .le-key:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
 .le-key.k-attack { background-image: var(--pA); }
 .le-key.k-jump { background-image: var(--pJ); }

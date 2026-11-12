@@ -57,7 +57,11 @@ export function installInkVars(): void {
   for (const [k, [w, h, body, dry]] of Object.entries(PADS)) {
     st.setProperty(`--${k}`, dataURI(blob(w, h, body, dry, INK, false)));
     st.setProperty(`--${k}2`, dataURI(blob(w, h, body, dry, INK, true)));
+    st.setProperty(`--${k}3`, dataURI(blob(w, h, body, dry, INK3, false))); // 메뉴 키 「잠김」
   }
+  // 메뉴 키 인장(착수 · 고르기) — 주홍 일필 원 + 안쪽 한지 선 하나
+  const [aw, ah, abody, adry] = PADS.pA;
+  st.setProperty('--pAs', dataURI(blob(aw, ah, abody, adry, SEAL, true)));
   const [gw, gh, gbody, gdry] = PADS.pG;
   st.setProperty('--pGs', dataURI(blob(gw, gh, gbody, gdry, SEAL, false)));
   st.setProperty('--pGs2', dataURI(blob(gw, gh, gbody, gdry, SEAL, true)));

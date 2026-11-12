@@ -4,7 +4,7 @@
 
 import { playSfx } from '../audio/audio';
 import {
-  KEY_ACTIONS, KEY_SIZE, ZONE, clampPos, findOverlap, resolveLayout, toStored,
+  KEY_ACTIONS, KEY_SIZE, ZONE, clampPos, findOverlap, resolveLayout, spreadSide, toStored,
   type ButtonLayout, type FullLayout,
 } from '../input/layout';
 import type { TouchAction } from '../input/touch';
@@ -111,6 +111,7 @@ export function openLayoutEditor(
     const b = btn(a);
     b.style.left = `${cur[a].x}px`;
     b.style.top = `${cur[a].y}px`;
+    b.style.setProperty('--sx', String(spreadSide(a, cur[a].x))); // 넓은 화면 옆 띠로 미는 방향 — 판과 같은 식
   };
   const say = (text: string): void => { note.textContent = text; };
   for (const a of KEY_ACTIONS) place(a);

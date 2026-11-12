@@ -561,7 +561,7 @@ button.ms-rg:active { scale: 0.97; }
 
 .kt-buy { flex: none; min-height: 52px; min-width: 92px; padding: 0 24px 4px 12px; }
 .kt-buy .gd { width: 26px; height: 26px; }
-.kt-buy b { font: 400 24px/1 var(--brush); }
+.kt-buy b { font: 400 22px/1 var(--black); } /* 가격 = --black(붓글씨 2는 Z로 읽힌다) */
 
 /* 창이 좁으면(폭 330 밑) 그림 · 이름만 한 단 줄여 이름 자리를 번다. 누르는 칸은 그대로 */
 @container (max-width: 330px) {

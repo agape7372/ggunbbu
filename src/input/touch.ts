@@ -4,9 +4,14 @@
 // 버튼 = 먹 덩어리 + 붓글씨 이름표(style.css). 필살은 마름모 — 게이지만큼 먹이 아래에서 차오른다.
 // 가드 키는 방어 게이지가 빈 만큼 위에서부터 옅은 먹이 된다(HUD 옆 게이지 대신).
 
-import { ZONE, resolveLayout, type ButtonLayout } from './layout';
+import { ZONE, resolveLayout, spreadSide, type ButtonLayout } from './layout';
 
 export type TouchAction = 'jump' | 'guard' | 'attack' | 'special';
+
+/** 메뉴 키 얼굴 — 먹(보통) · 주홍(인장, 화면에 하나) · 옅음(잠김) · 쉬는 키(점선 테두리만, 눌리지 않는다) */
+export type KeyTone = 'ink' | 'seal' | 'faint' | 'rest';
+export interface KeyFace { label: string; tone: KeyTone; sub?: string }
+export type KeyFaces = Record<TouchAction, KeyFace>;
 
 export interface TouchInput {
   /** 현재 홀드 중인 버튼들 (레벨) */
@@ -31,6 +36,13 @@ export interface TouchInput {
   setLayout(layout: ButtonLayout | null): void;
   /** 첫 pointerdown 1회 콜백 (오디오 언락용) */
   onFirstGesture(cb: () => void): void;
+  /**
+   * 메뉴 얼굴(현장 화면). 얼굴이 있는 동안 플레이 상태(필살 채움 · 숨 · 가드 먹 · 맥동 · 탈출)는 감추고 값만 받아 둔다.
+   * null = 플레이 얼굴로 되돌린다(받아 둔 상태 그대로). 같은 얼굴이면 아무것도 안 한다.
+   */
+  setFaces(faces: KeyFaces | null): void;
+  /** 메뉴 얼굴이 켜져 있나(setFaces에 얼굴을 받았다) */
+  menu(): boolean;
 }
 
 interface ButtonSpec {
@@ -38,10 +50,11 @@ interface ButtonSpec {
   action: TouchAction;
 }
 
+// 문서 순서 = Tab 순서(메뉴 얼굴일 때만 Tab이 닿는다) — 화면 왼쪽부터: 점프 · 가드 · 공격 · 필살
 const BUTTON_SPECS: ButtonSpec[] = [
   { id: 'btn-jump', action: 'jump' },
-  { id: 'btn-attack', action: 'attack' },
   { id: 'btn-guard', action: 'guard' },
+  { id: 'btn-attack', action: 'attack' },
   { id: 'btn-special', action: 'special' },
 ];
 
@@ -94,6 +107,11 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   let guardFill = -1;
   let layout: ButtonLayout | null = null;
   let leftHanded = false;
+  let guardHint = false;
+  let faces: KeyFaces | null = null;
+  let facesKey = '';
+  /** 키보드 · 보조기기 「누름」(click detail 0)으로 든 가드 — 한 표본만 쥐고 놓는다 */
+  let tapGuard = false;
 
   container.setAttribute('role', 'group');
   container.setAttribute('aria-label', '조작');
@@ -103,20 +121,81 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   }
 
   // 사용자 배치가 있으면 키마다 left/top 을 직접 준다(인라인이 CSS 기본·.mirror 보다 이긴다). 없으면 인라인을 걷어 CSS 로 돌아간다.
+  // 넓은 화면 옆 띠로 미는 방향(--sx)은 배치가 없어도 같은 식으로 정한다(style.css .tbtn translate).
   const applyLayout = (): void => {
-    const at = layout ? resolveLayout(layout, leftHanded) : null;
+    const at = resolveLayout(layout, leftHanded);
     for (const action of ACTIONS) {
       for (const btn of buttonsByAction[action]) {
-        if (at) {
+        if (layout) {
           btn.style.left = `${at[action].x - ZONE.x}px`;
           btn.style.top = `${at[action].y - ZONE.y}px`;
         } else {
           btn.style.removeProperty('left');
           btn.style.removeProperty('top');
         }
+        btn.style.setProperty('--sx', String(spreadSide(action, at[action].x)));
       }
     }
   };
+
+  const paintSpecialFill = (): void => {
+    const v = Math.max(0, specialFill);
+    // 마름모(88칸) 아래에서부터 v%만큼 — 채움 쪽만 필터 없는 svg라 다시 그려도 싸다
+    const h = (88 * v) / 100;
+    for (const btn of buttonsByAction.special) {
+      const r = btn.querySelector('.sp-clip');
+      r?.setAttribute('y', (88 - h).toFixed(1));
+      r?.setAttribute('height', (h + 4).toFixed(1));
+      btn.setAttribute('aria-label', `${BUTTON_LABELS.special} ${v}%`);
+    }
+  };
+
+  /** 플레이 얼굴 — 받아 둔 상태 그대로 다시 입힌다 */
+  const paintPlay = (): void => {
+    container.classList.remove('menu');
+    for (const action of ACTIONS) {
+      for (const btn of buttonsByAction[action]) {
+        btn.classList.remove('f-ink', 'f-seal', 'f-faint', 'f-rest', 'long');
+        btn.removeAttribute('aria-hidden');
+        btn.tabIndex = -1;
+        const label = action === 'guard' && pinned ? BUTTON_PINNED_LABEL : BUTTON_LABELS[action];
+        btn.innerHTML = action === 'special' ? SPECIAL_FACE : `<span>${label}</span>`;
+        btn.setAttribute('aria-label', label);
+      }
+    }
+    for (const btn of buttonsByAction.guard) {
+      btn.classList.toggle('pinned', pinned);
+      btn.classList.toggle('teach', guardHint);
+    }
+    for (const btn of buttonsByAction.special) btn.classList.toggle('ready', specialReady);
+    paintSpecialFill();
+  };
+
+  const paintFaces = (f: KeyFaces): void => {
+    container.classList.add('menu');
+    for (const action of ACTIONS) {
+      const face = f[action];
+      const rest = face.tone === 'rest';
+      for (const btn of buttonsByAction[action]) {
+        btn.classList.remove('f-ink', 'f-seal', 'f-faint', 'f-rest', 'ready', 'teach', 'pinned');
+        btn.classList.add(`f-${face.tone}`);
+        btn.classList.toggle('long', face.label.length > 3); // 「일어나기 · 한 판 더 · 다음 지시서」 — 글씨를 줄인다(style.css)
+        const sub = face.sub ? `<i>${face.sub}</i>` : '';
+        const text = face.label ? `<span>${face.label}${sub}</span>` : '';
+        btn.innerHTML = action === 'special' ? `${MENU_DIAMOND}${text}` : text;
+        btn.tabIndex = rest ? -1 : 0;
+        if (rest) {
+          btn.setAttribute('aria-hidden', 'true');
+          btn.removeAttribute('aria-label');
+        } else {
+          btn.removeAttribute('aria-hidden');
+          btn.setAttribute('aria-label', face.sub ? `${face.label} ${face.sub.replace(/\n/g, ' ')}` : face.label);
+        }
+      }
+    }
+  };
+
+  applyLayout();
 
   const fireFirst = (): void => {
     if (firstGestureFired || !firstGestureCallback) return;
@@ -141,7 +220,8 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     pointerMap.delete(pointerId);
     actionPointers[bind.action].delete(pointerId);
     if (!btnStillHeld(bind.btn)) setBtnActive(bind.btn, false);
-    held[bind.action] = actionPointers[bind.action].size > 0;
+    // 메뉴 얼굴의 가드(다음)는 한 표본 안에 눌렀다 뗀 짧은 탭도 놓치지 않게 다음 표본까지 쥐고 있는다(clearPressed가 놓는다)
+    held[bind.action] = actionPointers[bind.action].size > 0 || (bind.action === 'guard' && tapGuard);
   };
 
   const releaseAll = (): void => {
@@ -160,6 +240,7 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     const action = btn.getAttribute('data-action');
     if (!action || !ACTION_SET.has(action)) return;
     const touchAction = action as TouchAction;
+    if (btn.classList.contains('f-rest')) return; // 쉬는 키는 눌림을 만들지 않는다
 
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
@@ -190,6 +271,7 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     actionPointers[touchAction].add(event.pointerId);
     held[touchAction] = true;
     pressed[touchAction] = true;
+    if (faces && touchAction === 'guard') tapGuard = true;
     setBtnActive(btn as HTMLElement, true);
   };
 
@@ -203,6 +285,17 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     event.preventDefault();
   };
 
+  // 키보드 · 보조기기 「누름」(click detail 0) = 메뉴 얼굴일 때만 같은 동작. 손가락 · 마우스는 pointerdown 이 맡는다
+  const onClick = (event: MouseEvent): void => {
+    if (!faces || event.detail !== 0) return;
+    const btn = (event.target as HTMLElement | null)?.closest?.('.tbtn');
+    const action = btn?.getAttribute('data-action');
+    if (!btn || !action || !ACTION_SET.has(action) || btn.classList.contains('f-rest')) return;
+    fireFirst();
+    pressed[action as TouchAction] = true;
+    if (action === 'guard') { held.guard = true; tapGuard = true; }
+  };
+
   const onTouchMove = (event: TouchEvent): void => {
     if (event.target === container || container.contains(event.target as Node)) {
       event.preventDefault();
@@ -214,6 +307,7 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   container.addEventListener('pointercancel', onPointerEnd, true);
   container.addEventListener('lostpointercapture', onPointerEnd, true);
   container.addEventListener('contextmenu', onContextMenu, true);
+  container.addEventListener('click', onClick);
   container.addEventListener('touchmove', onTouchMove, { passive: false });
 
   document.addEventListener('visibilitychange', () => {
@@ -228,11 +322,17 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
 
     clearPressed() {
       for (const action of ACTIONS) pressed[action] = false;
+      if (tapGuard) {
+        tapGuard = false;
+        held.guard = actionPointers.guard.size > 0;
+      }
     },
 
+    // 얼굴이 있는 동안은 값만 받아 두고, 플레이 얼굴로 돌아갈 때 paintPlay 가 입힌다
     setPinned(next: boolean) {
       if (pinned === next) return;
       pinned = next;
+      if (faces) return;
       const label = pinned ? BUTTON_PINNED_LABEL : BUTTON_LABELS.guard;
       for (const btn of buttonsByAction.guard) {
         btn.innerHTML = `<span>${label}</span>`;
@@ -242,12 +342,15 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     },
 
     setGuardHint(on: boolean) {
+      guardHint = on;
+      if (faces) return;
       for (const btn of buttonsByAction.guard) btn.classList.toggle('teach', on);
     },
 
     setSpecialReady(next: boolean) {
       if (specialReady === next) return;
       specialReady = next;
+      if (faces) return;
       for (const btn of buttonsByAction.special) btn.classList.toggle('ready', next);
     },
 
@@ -255,16 +358,10 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
       const v = Math.max(0, Math.min(100, Math.round(p)));
       if (v === specialFill) return;
       specialFill = v;
-      // 마름모(88칸) 아래에서부터 v%만큼 — 채움 쪽만 필터 없는 svg라 다시 그려도 싸다
-      const h = (88 * v) / 100;
-      for (const btn of buttonsByAction.special) {
-        const r = btn.querySelector('.sp-clip');
-        r?.setAttribute('y', (88 - h).toFixed(1));
-        r?.setAttribute('height', (h + 4).toFixed(1));
-        btn.setAttribute('aria-label', `${BUTTON_LABELS.special} ${v}%`);
-      }
+      if (!faces) paintSpecialFill();
     },
 
+    // --g 는 얼굴과 상관없이 써 둔다 — 메뉴 얼굴에선 CSS(#touch-layer.menu)가 가드 먹을 감춘다
     setGuardFill(p: number) {
       const v = Math.max(0, Math.min(100, Math.round(p)));
       if (v === guardFill) return;
@@ -275,7 +372,7 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     setLeftHanded(mirror: boolean) {
       leftHanded = mirror;
       container.classList.toggle('mirror', mirror);
-      if (layout) applyLayout();
+      applyLayout();
     },
 
     setLayout(next: ButtonLayout | null) {
@@ -286,6 +383,18 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     onFirstGesture(cb: () => void) {
       firstGestureCallback = cb;
     },
+
+    setFaces(next: KeyFaces | null) {
+      const key = next ? JSON.stringify(next) : '';
+      if (key === facesKey) return;
+      facesKey = key;
+      faces = next;
+      releaseAll();
+      if (next) paintFaces(next);
+      else paintPlay();
+    },
+
+    menu: () => faces !== null,
   };
 }
 
@@ -311,3 +420,5 @@ const SPECIAL_FACE = `<svg class="sp-f" viewBox="0 0 88 88" aria-hidden="true">`
   + `<path class="sp-fill" clip-path="url(#sp-clip)" d="${DIAMOND}"/></svg>`
   + `<svg class="sp-o" viewBox="0 0 88 88" aria-hidden="true"><path class="sp-shape" d="${DIAMOND}"/>`
   + `<text class="sp-lbl" x="44" y="52" text-anchor="middle">${BUTTON_LABELS.special}</text></svg>`;
+/** 메뉴 얼굴의 마름모 — 테두리만(쉬는 키는 CSS 가 점선으로) */
+const MENU_DIAMOND = `<svg class="sp-o" viewBox="0 0 88 88" aria-hidden="true"><path class="sp-shape" d="${DIAMOND}"/></svg>`;

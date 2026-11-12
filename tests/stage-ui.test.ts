@@ -42,8 +42,8 @@ describe('반려 사유', () => {
 
 describe('판 위 한 줄과 진척', () => {
   it('「id 이름 · 시간」 — 걸음 수는 진행 막대가 보인다', () => {
-    expect(stageHudLine({ id: '1-1', ticks: 12 * 60 })).toBe('1-1 회랑 3번지 · 0:12.00');
-    expect(stageHudLine({ id: '1-B', ticks: 90 })).toBe('1-B 종탑 · 0:01.50');
+    expect(stageHudLine({ id: '1-1', ticks: 12 * 60 })).toEqual({ head: '1-1 회랑 3번지', line: '0:12.00' });
+    expect(stageHudLine({ id: '1-B', ticks: 90 })).toEqual({ head: '1-B 종탑', line: '0:01.50' });
   });
 
   it('진행 막대: 대본 중엔 치운 걸음 칸이 차고 끝 이름표가 다음을 알린다, 보스 중엔 남은 몸이 준다', () => {

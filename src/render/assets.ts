@@ -218,6 +218,24 @@ export function drawAssetHalo(
  */
 const BG_SS = 2;
 let bgCache: { key: string; image: LoadedImage; dw: number; dh: number; night: boolean; cv: HTMLCanvasElement } | null = null;
+const paperByKey = new Map<string, string>();
+
+/** 배경 그림의 종이색(구울 때 키마다 한 번) — 넓은 화면 옆 띠를 기둥과 같은 색으로 칠한다. 못 읽었으면 undefined */
+export function backdropPaper(key: string): string | undefined {
+  return paperByKey.get(key);
+}
+
+/** 구운 배경 왼쪽 위(하늘) 6×6 평균. 픽셀을 못 읽으면 조용히 건너뛴다 */
+function measurePaper(c: CanvasRenderingContext2D, key: string, h: number): void {
+  if (paperByKey.has(key)) return;
+  try {
+    const d = c.getImageData(0, Math.round(h * 0.2), 6, 6).data;
+    const sum = [0, 0, 0];
+    for (let i = 0; i < d.length; i += 4) { sum[0] += d[i]; sum[1] += d[i + 1]; sum[2] += d[i + 2]; }
+    const n = d.length / 4;
+    paperByKey.set(key, `rgb(${sum.map((v) => Math.round(v / n)).join(', ')})`);
+  } catch { /* 캔버스 바탕색 그대로 */ }
+}
 export function drawBackdropCached(
   ctx: CanvasRenderingContext2D,
   key: string,
@@ -238,6 +256,7 @@ export function drawBackdropCached(
     if (!c) return drawBackdrop(ctx, key, dx, dy, dw, dh);
     c.scale(BG_SS, BG_SS);
     if (!drawBackdrop(c, key, 0, 0, dw, dh)) return false;
+    measurePaper(c, key, cv.height);
     if (night) inkSkylineWindows(c, cv.width, cv.height);
     bgCache = { key, image, dw, dh, night, cv };
   }

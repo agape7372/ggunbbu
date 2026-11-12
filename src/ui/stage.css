@@ -1,111 +1,149 @@
-/* 작업 지시서(st-) — 「먹 한 획」. 지시서 · 보고서는 종이 한 장, 도장 · 반려만 주홍. 색은 토큰만, 섞기 0.
-   주홍 단추는 화면마다 하나(착수 · 재제출). 붓글씨(동해독도)는 25px 이상만.
+/* 작업 지시서(st- · mp-) — 「먹 한 획」. 지도 · 쪽지 · 보고서. 색은 토큰만(터 그림 면 = 판의 건물 색 --bf), 섞기 0.
+   주홍은 화면마다 하나(지도는 「착수」, 보고서는 공격 키). 깬 판 도장(깬 난이도 이름)은 먹. 붓글씨(동해독도)는 25px 이상만.
    논리 무대 높이는 늘 780 — vh·뷰포트 조건 없이 고정 px. 마크업 = ui/stageView.ts */
 
-/* ── 홈 다섯째 모드 — 위 세 줄과 같은 획, 폭만 다르게 ─────── */
-.modes .s4 { width: 90%; margin-left: 4px; rotate: 1deg; background-image: var(--sB); }
+/* ── 철거 지도(「B 현장」 11-11) ─────────────────────────────
+   불투명 화면(바탕 한지). 층은 틀 폭(360 + 2·--fr-x): 위 50 띠 · 지도(58~598, 줄 사이 19) · 쪽지(조작 구역 614~774, 아래에 붙어 위로 큰다).
+   11-12 「너무 빽빽하다」: 터에는 도장 하나만, 접힌 쪽지는 세 줄(머리 · 기록 · 난이도)만 둔다. 줄인 높이는 지도 줄 사이로 돌렸다.
+   「착수」 = 공격 키 모양 DOM 단추(.tbtn · 기본 자리 · 넓은 화면 벌리기 = 판과 같은 식, stageView slipHtml). */
+.mp { position: absolute; top: 0; height: 780px; left: calc(var(--ov-x, 0px) - var(--fr-x, 0px)); right: calc(var(--ov-x, 0px) - var(--fr-x, 0px)); }
+.mp-in { position: absolute; inset: 0; }
+.mp :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 
-/* 판 위 한 줄 — 「다시 보는 중 · 3-1 능선 첫 지붕 · 0:12.34 · 3/7」처럼 길면 접는다 */
-.hud-op { max-width: calc(100% - 24px); white-space: normal; text-align: right; line-height: 1.25; }
+/* 띠 — 뒤로(먹 테 상자) · 제목(붓) · 정규 도장 합계 · 현장 일지 꼬리표. 누름 칸은 ::after로 48 */
+.mp-band { z-index: 2; }
+.mp-back { position: relative; flex: none; height: 42px; padding: 0 12px; border: 2.5px solid var(--ink); background: var(--card); font: 700 15px/1 var(--body); }
+.mp-back::after,
+.mp-log::after { content: ''; position: absolute; inset: -3px; }
+.mp-ttl { margin: 0; padding-top: 3px; font: 400 30px/1 var(--brush); white-space: nowrap; }
+.mp-cnt { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+.mp-cnt small { font: 700 13.5px/1 var(--body); color: var(--ink2); }
+.mp-cnt .n { font: 400 18px/1 var(--black); }
+.mp-log { position: relative; flex: none; }
+.mp-log::after { inset: -11px -3px; }
 
-/* ── 목록 ─────────────────────────────────────────────── */
-.st-h2 { font-size: 44px; white-space: normal; text-wrap: balance; }
-.st-h2 .st-id { font: 400 30px/1 var(--brush); color: var(--ink2); }
+/* 지도 — 위에서부터 본사 · 4 · 3 · 2 · 1구역. 줄마다 왼쪽 세로 딱지(번호 + 구역 이름) + 터 셋 */
+/* 쪽지를 펼친 동안(inert) 덮인 지도는 가라앉는다 — 불투명도만 */
+.mp-map[inert] { opacity: 0.22; } /* 0.3이면 쪽지 오른쪽 가장자리에 반쯤 가린 꼬리표 · 도장이 눈에 걸렸다(11-11). 0.2 밑으로는 내리지 않는다 */
+.mp-map { position: absolute; left: 6px; right: 8px; top: 58px; height: 540px; display: flex; flex-direction: column; justify-content: space-between; }
+.mp-st { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); }
+.mp-rh { margin: 0; writing-mode: vertical-rl; display: flex; align-items: center; gap: 4px; padding-top: 2px; font: 700 13.5px/1 var(--body); white-space: nowrap; pointer-events: none; }
+.mp-rh .n { display: grid; place-items: center; width: 19px; height: 19px; background: var(--ink); color: var(--paper); font: 400 14px/1 var(--black); writing-mode: horizontal-tb; }
+.mp-st.lk .mp-rh { color: var(--ink2); }
+.mp-st.lk .mp-rh .n { background: var(--ink3); color: var(--ink); }
+.mp-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mp-st.hq .mp-row { grid-template-columns: minmax(0, 1fr); }
+.mp-cover { position: absolute; left: 26px; top: 2px; display: flex; flex-direction: column; font: 700 13.5px/1.3 var(--body); color: var(--ink2); white-space: nowrap; pointer-events: none; }
 
-.st-cover {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 8px 6px 2px 2px;
-  padding: 10px 14px;
-  border: 3px solid var(--ink);
-  background: var(--paper);
-  rotate: -1deg;
-  font: 700 15px/1.4 var(--body);
-}
+/* 터 — 그림 칸(.mp-bda) + 이름표(.mp-pl, 윗변 = 지면선). 누름 칸 = 터 전체(폭 1/3 · 높이 96) */
+.mp-lot { position: relative; min-width: 0; display: flex; flex-direction: column; padding: 0; color: var(--ink); text-align: center; }
+.mp-st.hq .mp-lot { justify-self: center; width: 150px; }
+.mp-lot:focus-visible { outline-offset: -3px; }
+.mp-bda { position: relative; height: 56px; display: flex; align-items: flex-end; justify-content: center; }
+.mp-st.hq .mp-bda { height: 40px; }
+.mp-lot:active .mp-bda { scale: 0.95; }
+.mp-art { display: block; width: auto; overflow: visible; }
+.mp-art :is(path, circle) { fill: var(--bf); stroke: var(--ink); stroke-width: 1.5px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.mp-art .w { fill: var(--paper); }
+.mp-art .k { fill: var(--ink); }
+.mp-art .l { fill: none; }
+.a-b1, .a-b2 { height: 38px; }
+.a-bell, .a-wind, .a-pag, .a-crane { height: 56px; }
+.a-hq { height: 34px; }
+.a-rub { height: 19px; }
+.lk .mp-art :is(path, circle) { fill: none; stroke: var(--ink3); }
 
-.st-region { margin-bottom: 6px; }
-.st-rh { margin-top: 16px; }
-.st-lines { display: flex; flex-direction: column; margin: 0 0 10px 2px; font: 700 13px/1.4 var(--body); color: var(--ink2); }
-.st-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 12px; padding-right: 6px; }
+/* 다음 판 = 붓 「다음」 · 깬 판 = 잔해 + 먹 도장 하나(가장 높게 깬 난이도). 기록 · 꼬리표는 터에 안 올린다 — 기록은 쪽지 「내 기록」 */
+/* 「다음」 · 도장은 터 가운데에서 잰다 — 넓은 화면(터 폭 150)에서도 「다음」은 건물 옆, 도장은 잔해 위에 붙는다. 폭 108에서는 옛 자리(왼쪽 2 · 오른쪽 4)와 같다 */
+.mp-nx { position: absolute; right: calc(50% + 26px); top: 0; z-index: 1; font: 400 26px/1 var(--brush); text-shadow: var(--halo); white-space: nowrap; }
+.done .a-rub { margin-right: 45px; }
+.mp-cut { position: absolute; left: 50%; bottom: 6px; display: grid; place-items: center; width: 50px; height: 31px; padding-top: 3px; border: 3px solid var(--ink); font: 400 25px/1 var(--brush); rotate: -8deg; filter: url(#rough2); }
 
-.st-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'id lamp' 'name name' 'sub sub';
-  grid-template-rows: 22px auto auto; /* 이름표가 없는 카드도 이름 줄 높이가 같게 */
-  align-items: center;
-  gap: 3px 6px;
-  min-height: 92px;
-  padding: 10px 12px 10px 14px;
-  text-align: left;
-  color: var(--ink);
-  background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 3px 8px 4px 9px;
-}
+.mp-pl { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 2px 2px; border-top: 3px solid var(--ink); }
+.mp-p1 { display: flex; align-items: center; gap: 4px; height: 15px; }
+.mp-p1 .n { font: 400 15px/1 var(--black); }
+.mp-lot .st-pips { gap: 2px; }
+.mp-lot .st-pips i { width: 7px; height: 9px; border-width: 1.5px; border-color: var(--ink); }
+.mp-nm { max-width: 100%; font: 700 13.5px/1.1 var(--body); white-space: nowrap; }
+.mp-lot.lk { color: var(--ink2); }
+.mp-lot.lk .mp-pl { border-top-color: var(--ink3); }
+.mp-lot.lk .st-pips i { border-color: var(--ink3); }
+/* 고른 터 — 이름표가 먹 바탕으로 뒤집힌다 */
+.mp-lot.on .mp-pl { background: var(--ink); color: var(--paper); border-top-color: var(--ink); }
+.mp-lot.on .st-pips i { border-color: var(--paper); }
+.mp-lot.on .st-pips i.on { background: var(--paper); }
 
-.st-cards > :nth-child(odd) { rotate: -0.5deg; }
-.st-cards > :nth-child(even) { rotate: 0.6deg; }
-.st-card:active:not(:disabled) { scale: 0.96; }
-.st-card:disabled { color: var(--ink2); border-color: var(--ink3); }
+/* 쪽지 — 「착수」의 반대쪽, 아래에 붙어 위로 큰다(stageView가 left · right를 준다). 접힌 쪽지 = 머리 · 기록 셋 · 난이도 셋(높이 160). 머리를 누르면 위로 펼쳐진다 */
+.mp-slip { position: absolute; bottom: 6px; z-index: 3; display: flex; flex-direction: column; padding: 11px 12px 12px; background: var(--card); border: 3px solid var(--ink); clip-path: var(--cutclip); }
+.mp-head { position: relative; display: flex; align-items: center; gap: 6px; height: 30px; min-width: 0; padding: 0; color: var(--ink); text-align: left; white-space: nowrap; }
+.mp-head::after { content: ''; position: absolute; inset: -11px -12px; }
+/* 펼침 표시 — 머리 오른쪽 끝 먹 세모(위 = 위로 펼친다 · 펼치면 아래) */
+.mp-head::before { content: ''; order: 1; flex: none; margin-left: auto; width: 12px; height: 8px; background: var(--ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.mp-slip.open .mp-head::before { rotate: 180deg; }
+.mp-head .n { flex: none; font: 400 20px/1 var(--black); }
+.mp-head .mp-nm { min-width: 0; font: 400 29px/0.95 var(--brush); }
+.mp-head .mp-nm.long { font-size: 25px; }
+.mp-head .tag { flex: none; padding: 4px 5px 3px; }
+.mp-facts { display: grid; grid-template-columns: repeat(3, auto); justify-content: space-between; gap: 6px; margin: 9px 0 0; }
+.mp-facts dt { font: 700 13.5px/1.1 var(--body); color: var(--ink2); white-space: nowrap; }
+.mp-facts dd { margin: 3px 0 0; font: 700 15px/1 var(--body); white-space: nowrap; }
+.mp-facts .n { font: 400 15px/1 var(--black); }
+.mp-diffs { gap: 5px; margin-top: 11px; }
+.mp-diffs.seg button { height: 48px; font: 700 15px/1 var(--body); }
+/* 난이도 세 상태 — 고름(먹 바탕) · 고를 수 있음(먹 테 + 먹 글) · 잠김(옅은 테 + 회색 글) */
+.mp-diffs.seg button:not(:disabled):not(.on) { color: var(--ink); }
+.mp-diffs.seg button:not(:disabled):not(.on)::before { background: var(--ink); }
+.mp-diffs.seg button:disabled { color: var(--ink2); }
+.mp-note { display: flex; flex-direction: column; font: 700 13.5px/1.2 var(--body); color: var(--ink2); white-space: nowrap; }
+.mp-prac { display: flex; align-items: center; gap: 8px; }
+.mp-prac button { position: relative; flex: none; height: 32px; padding: 0 9px; border: 2.5px solid var(--ink); background: var(--paper); font: 700 13.5px/1 var(--body); }
+.mp-prac button::after { content: ''; position: absolute; inset: -8px -4px; }
+.mp-prac button:disabled { border-color: var(--ink3); color: var(--ink2); }
+.mp-prac .nw { white-space: nowrap; }
+.mp-prac small { min-width: 0; font: 700 13.5px/1.2 var(--body); color: var(--ink2); }
+/* 잠긴 판 — 잠금 한 줄만 또렷, 기록 · 난이도는 옅게 */
+.mp-slip.lk .mp-facts { color: var(--ink2); }
+.mp-slip.lk .mp-facts dd { color: var(--ink2); }
+.mp-slip.lk .mp-note { color: var(--ink); }
+
+/* 펼친 면 — 지시서 한 장의 나머지(구역 글 · 지시 · 특기 사항 · 수수께끼 · 참고 · 난이도 글 · 보스 연습). 160ms, 움직임 줄이기면 바로 */
+.mp-more { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 160ms var(--ease-out), visibility 0s 160ms; }
+.mp-slip.open .mp-more { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 160ms var(--ease-out); }
+.mp-more-in { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
+.mp-slip.open .mp-more-in { padding: 4px 0 8px; border-bottom: 2px solid var(--ink); }
+@media (prefers-reduced-motion: reduce) { .mp-more, .mp-slip.open .mp-more { transition: none; } }
+.mp-more .st-reg { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 700 13.5px/1 var(--body); color: var(--ink2); }
+.mp-sign { font-size: 13.5px; color: var(--ink2); border-color: var(--ink3); }
+.st-lines { display: flex; flex-direction: column; font: 700 13.5px/1.4 var(--body); color: var(--ink2); }
+.st-order p { font: 700 16px/1.5 var(--body); }
+.st-slot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font: 700 15px/1 var(--body); }
+.st-got,
+.st-empty { flex: none; width: 60px; height: 60px; display: grid; place-content: center; text-align: center; font-style: normal; }
+.st-empty { border: 3px dashed var(--ink3); }
+.st-got { background: var(--ink); color: var(--paper); font: 700 14px/1.15 var(--body); clip-path: var(--sealclip); rotate: -5deg; padding: 6px; }
+.mp-more .st-riddle { font: 700 14px/1.4 var(--body); color: var(--ink2); }
+.mp-more .st-note { font: 500 13.5px/1.4 var(--body); color: var(--ink2); overflow-wrap: anywhere; word-break: keep-all; }
+
+/* 「착수」 — 공격 키와 같은 주홍 먹 덩어리(ink.ts --pAs). 잠긴 판은 옅은 먹 「잠김」(누르면 거절음) */
+.mp-go { z-index: 3; width: 120px; height: 120px; }
+.mp-go.f-seal { background-image: var(--pAs); }
+.mp-go.f-faint { background-image: var(--pA3); color: var(--ink); }
+.mp-go:active { scale: 0.9; }
+.mp-go:focus-visible { outline-offset: 4px; }
+
+/* 칸 규칙 — 지도 · 일지 · 보고서가 같이 쓴다(.st-sub = 보고서 연습 줄, .st-id = 보고서 머리 · 일지). 목록 카드 시절 값 그대로 */
 .st-id { grid-area: id; font: 700 14px/1 var(--body); color: var(--ink2); }
-/* 보스가 있는 판 = 번호 옆 먹 인장(램프 이름표는 테두리라 겹쳐 읽히지 않는다) */
-.st-boss { margin-left: 4px; padding: 2px 4px 1px; background: var(--ink); color: var(--paper); font: 700 11px/1 var(--body); font-style: normal; vertical-align: 1px; }
-.st-card:disabled .st-boss { background: var(--ink2); }
-.st-name { grid-area: name; font: 700 16px/1.25 var(--body); }
-/* 난이도 이름표 — 보고서 머리(.st-rname small)와 같은 작은 테두리 상자. 아직 안 깬 판엔 없다 */
 .st-lamp { grid-area: lamp; padding: 3px 6px 2px; border: 2px solid var(--ink); font: 700 13px/1 var(--body); white-space: nowrap; }
 .st-sub { grid-area: sub; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; min-height: 16px; }
 .st-pips { display: inline-flex; gap: 3px; }
 .st-pips i { width: 10px; height: 10px; border: 2px solid var(--ink3); }
 .st-pips i.on { background: var(--ink); border-color: var(--ink); }
-.st-best { font: 700 13px/1 var(--body); }
-.st-lock { font: 700 12px/1.3 var(--body); color: var(--ink2); }
 
-.st-foot { display: flex; flex-direction: column; gap: 10px; margin: 22px 0 8px; }
-.st-foot .stroke { width: 88%; rotate: -1deg; }
-.st-foot .stroke + .stroke { margin-left: 8px; rotate: 1deg; }
-
-/* ── 지시서 한 장 ──────────────────────────────────────── */
-.st-paper {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 8px 8px 14px 2px;
-  padding: 16px 16px 14px 18px;
-  background: var(--paper-2);
-  border: 3px solid var(--ink);
-  rotate: -0.6deg;
-}
-
-.st-reg { font: 700 13px/1 var(--body); color: var(--ink2); }
-.st-order p { font: 700 16px/1.55 var(--body); }
-.st-slot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font: 700 15px/1 var(--body); }
-.st-got,
-.st-empty { flex: none; width: 68px; height: 68px; display: grid; place-content: center; text-align: center; font-style: normal; }
-.st-empty { border: 3px dashed var(--ink3); }
-.st-got { background: var(--ink); color: var(--paper); font: 700 15px/1.15 var(--body); clip-path: var(--sealclip); rotate: -5deg; padding: 6px; }
-.st-paper .st-riddle { font: 700 14px/1.4 var(--body); color: var(--ink2); }
-.st-paper .st-note { margin: -4px 0 0; font: 500 12.5px/1.4 var(--body); color: var(--ink2); overflow-wrap: anywhere; word-break: keep-all; }
-.st-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; padding-top: 10px; border-top: 2px solid var(--ink); }
-.st-facts dt { font: 700 12px/1.2 var(--body); color: var(--ink2); }
-.st-facts dd { margin: 3px 0 0; font: 700 17px/1.2 var(--body); }
-
-.st-diffs { gap: 8px; margin: 6px 6px 4px 2px; align-items: flex-start; }
-.st-diff { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.st-diff button { flex: none; width: 100%; min-height: 54px; }
-.st-diff small { font: 700 12px/1.3 var(--body); color: var(--ink2); text-align: center; }
-.seg button:disabled { color: var(--ink2); }
-
-.st-go { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 6px 8px 2px; }
-.st-go-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.st-go-left .stroke { width: 100%; rotate: -1deg; }
-.st-start { flex: none; width: 112px; height: 112px; rotate: -4deg; }
-.st-start b { font-size: 42px; line-height: 0.95; }
-
-/* ── 현장 일지 ─────────────────────────────────────────── */
+/* ── 현장 일지 — 띠 아래 한 장(넘치면 이 칸만 굴린다) ── */
+.mp-logbody { position: absolute; left: 12px; right: 12px; top: 60px; bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding-bottom: 16px; }
+.mp-logbody::-webkit-scrollbar { display: none; }
+.st-total .n,
+.st-lrow .n { font: 400 15px/1 var(--black); color: var(--ink); }
 .st-total { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 6px 2px 8px; font: 700 15px/1.3 var(--body); }
 .st-log { list-style: none; margin: 0; padding: 0; }
 .st-lrow {
@@ -135,83 +173,53 @@
 .st-lrow small { grid-area: small; font: 700 12.5px/1.35 var(--body); color: var(--ink2); }
 .st-lrow.off { color: var(--ink2); }
 
-/* ── 철거 보고서 ───────────────────────────────────────── */
-.st-report {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 8px 8px 10px 2px;
-  padding: 14px 16px 16px 18px;
-  background: var(--paper-2);
-  border: 3px solid var(--ink);
-  rotate: -0.4deg;
-}
-
-.st-rtitle { font: 400 30px/1 var(--brush); letter-spacing: 0.04em; }
-.st-rname { font: 700 18px/1.35 var(--body); }
+/* ── 철거 보고서 속 — 결과 보고서 한 장(style.css .rp) 안. 위 62 ~ 아래 480에 들게 줄을 낮춘다 ── */
+.st-rname { font: 700 17px/1.3 var(--body); }
 .st-rname .st-id { font-size: 15px; }
 .st-rname small { margin-left: 6px; padding: 2px 6px 1px; border: 2px solid var(--ink); font: 700 13px/1 var(--body); white-space: nowrap; }
 .st-sub { font: 700 13px/1.2 var(--body); color: var(--ink2); }
-.st-time { font: 400 56px/1 var(--brush); rotate: -2deg; transform-origin: 0 100%; }
-.st-time.miss { font: 700 40px/1.1 var(--body); color: var(--ink2); rotate: 0deg; }
+.st-time { font: 400 40px/1 var(--black); letter-spacing: 0.01em; }
+.st-time.miss { color: var(--ink2); }
 .st-time small { font: 700 15px/1 var(--body); }
 .st-master { font: 700 15px/1.3 var(--body); }
 .st-line { font: 700 15px/1.4 var(--body); }
 .st-reason { padding-left: 8px; border-left: 4px solid var(--seal); font: 700 15px/1.45 var(--body); }
 .st-news { font: 700 15px/1.4 var(--body); }
-.st-outro { display: flex; flex-direction: column; margin: 8px 0 4px; font: 400 14px/1.55 var(--body); color: var(--ink); }
+.st-outro { display: flex; flex-direction: column; font: 400 14px/1.45 var(--body); color: var(--ink); }
 /* 도장 줄 — 길게 누르면 뒷면(착수 · 철거 · 첫 철거) */
-.st-rows { position: relative; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
-.st-front { list-style: none; margin: 0; padding: 0; }
-.st-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 50px; padding: 2px 4px 2px 0; border-bottom: 2px solid var(--ink3); }
-.st-slotname { display: flex; flex-direction: column; gap: 2px; font: 700 16px/1.25 var(--body); }
-.st-slotname .st-riddle { font: 700 12.5px/1.35 var(--body); color: var(--ink2); }
+.st-rows { position: relative; pointer-events: auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
+/* 다섯 칸 한 줄 — 칸 이름(띄어쓴 곳에서만 두 줄) 위, 도장 아래 */
+.st-front { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-block: 2px solid var(--ink3); }
+.st-row { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 5px; padding: 5px 0 6px; text-align: center; }
+.st-row + .st-row { border-left: 2px solid var(--ink3); }
+.st-slotname { font: 700 13.5px/1.15 var(--body); word-break: keep-all; }
+.st-rows .st-riddle { display: block; margin-top: 4px; font: 700 13.5px/1.3 var(--body); color: var(--ink2); }
+.st-trow { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; }
 
 .st-stamp {
   flex: none;
   display: grid;
   place-content: center;
-  width: 62px;
-  height: 46px;
+  width: 44px;
+  height: 28px;
   color: var(--seal);
   border: 3px solid var(--seal);
-  font: 400 28px/1 var(--brush);
+  font: 400 25px/1 var(--brush);
   font-style: normal;
   rotate: -6deg;
   filter: url(#rough2);
   animation: stamp 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2) calc(0.4s + var(--i, 0) * 0.3s) both;
 }
 
-.st-row.rej .st-stamp { width: 76px; rotate: 5deg; border-width: 5px; border-style: double; }
-.st-row.new .st-stamp { scale: 1.25; border-width: 4px; margin-right: 6px; }
+.st-row.rej .st-stamp { width: 52px; rotate: 5deg; border-width: 5px; border-style: double; }
+.st-row.new .st-stamp { scale: 1.15; border-width: 4px; }
 /* 못 깬 판의 나머지 자리 — 아직 심사 전이라 흐린 빈칸(애니메이션 없음) */
-.st-row.void .st-stamp { width: 62px; color: var(--ink3); border: 3px dashed var(--ink3); filter: none; animation: none; }
+.st-row.void .st-stamp { width: 44px; color: var(--ink3); border: 3px dashed var(--ink3); filter: none; animation: none; }
 .st-row.void .st-slotname { color: var(--ink2); }
-.st-back { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; visibility: hidden; background: var(--paper-2); font: 700 15px/1.6 var(--body); }
+.st-back { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; visibility: hidden; background: var(--card); font: 700 15px/1.6 var(--body); }
 .st-rows.back .st-front { visibility: hidden; }
 .st-rows.back .st-back { visibility: visible; }
 
-/* 외주를 깼으면 도장 줄 대신 먹 인장 하나 */
-.st-ink {
-  align-self: flex-start;
-  display: grid;
-  place-content: center;
-  width: 66px;
-  height: 66px;
-  color: var(--paper);
-  background: var(--ink);
-  clip-path: var(--sealclip);
-  font: 400 28px/1 var(--brush);
-  font-style: normal;
-  rotate: -5deg;
-  animation: stamp 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.4s both;
-}
-
-.st-acts { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; padding: 4px 6px 0 2px; }
-.st-acts-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.st-acts-left .stroke { width: 100%; height: 56px; rotate: -1deg; }
-
 /* ── 등장 안무(0.7초 안) ─────────────────────────────── */
-[data-screen='stages'].anim .meta-title { animation: wipe 0.28s ease-out both; }
-[data-screen='stages'].anim .st-card { animation: rise 0.3s var(--ease-out) calc(var(--i, 0) * 45ms) both; }
-[data-screen='stageend'].anim .st-report { animation: rise 0.3s var(--ease-out) both; }
+[data-screen='stages'].anim .mp-ttl { animation: wipe 0.28s ease-out both; }
+[data-screen='stages'].anim .mp-lot { animation: rise 0.3s var(--ease-out) calc(var(--i, 0) * 45ms) both; }

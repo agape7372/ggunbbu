@@ -41,7 +41,8 @@ function fitStage(): void {
   const { scale, dx, dy, ox } = fitStageBox(window.innerWidth, window.innerHeight, insetProbe.read());
   stage.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
   stage.style.setProperty('--ov-x', `${ox}px`); // 메뉴층이 좌우 여백까지 편다(style.css #overlay-layer)
-  stage.dataset.wide = ox >= 48 ? '1' : '0'; // 좌우 띠가 넉넉하면 멈춤 단추를 띠로 내보낸다
+  // 틀 폭 = 360 + 2·fr-x. 판 띠 · 띠 밑 가로 게이지 · 꼬리표 · 키가 이 틀 가장자리에 붙는다. 캔버스는 360 그대로
+  stage.style.setProperty('--fr-x', `${Math.min(ox, 120)}px`);
 }
 
 setupCanvas();

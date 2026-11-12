@@ -6,7 +6,7 @@ import type { Act2Phase, GimmickId, ItemId, Theme, WazaId, WeaponId } from '../c
 import type { FxSlot, Tier } from '../meta/tier';
 
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
-export const HERO = '뿌뿌';
+export const HERO = '나';
 
 /** 2막 보스. 하늘에서 건물을 집어 던지는 무인 철거 집게보. */
 export const BOSS_NAME = '집행기';
