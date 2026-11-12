@@ -170,7 +170,7 @@ export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   crowbar: { name: '빠루', desc: '멀리 닿는다. 필살이 느리다.' },
   grinder: { name: '그라인더', desc: '필살이 빨리 찬다. 덜 띄운다.' },
   iron: { name: '무쇠 대검', desc: '길게 닿는다. 필살이 조금 느리다.' },
-  saw: { name: '톱날 대검', desc: '필살이 빨리 찬다. 덜 띄운다.' },
+  saw: { name: '톱날 대검', desc: '조금 멀리 닿는다. 필살이 빨리 찬다. 덜 띄운다.' },
   hazard: { name: '공사중 대검', desc: '멀리 닿고 높이 띄운다. 필살이 느리다.' },
   beam: { name: '철골 대검', desc: '가장 높이 띄운다. 짧다.' },
   flame: { name: '화염 대검', desc: '멀리 닿고 필살이 빨리 찬다. 덜 띄운다.' },

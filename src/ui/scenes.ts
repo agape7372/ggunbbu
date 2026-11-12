@@ -1022,7 +1022,7 @@ export function createApp(
     if (overlay.getScreen() === 'shop') openShop();
     else if (overlay.getScreen() === 'missions') openMissions();
     if (!fresh) {
-      overlay.toast(got > 0 ? `못 받은 결제 ${got}건을 받았어요.` : '남은 결제를 정리했어요. 다시 눌러 주세요.');
+      overlay.toast(got > 0 ? `못 받은 결제 ${got}건을 받았어요.` : '지난 결제가 걸려 있었어요. 다시 눌러 주세요.');
       return;
     }
     const owns = (sku.owns?.length ?? 0) > 3 ? [] : [...(sku.owns ?? [])]; // 철거왕 세트의 긴 목록은 칸 하나로 못 보인다

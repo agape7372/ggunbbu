@@ -135,13 +135,13 @@ export const STAGE_TEXT: Readonly<Record<string, StageText>> = {
   '4-1': { name: '해안 1부두', order: R[3].start, riddle: '철근은 하늘에서 받는다.' },
   '4-2': { name: '매립지 끝', order: ['매립지 끝.', '철근, 기와, 급한 집.', '전부 오늘 마감이다.'], riddle: '손으로만.' },
   '4-B': { name: '타워크레인', order: R[3].boss, riddle: '짐은 땅에 내려놓지 않는다.', note: '줄은 짐보다 약하다.' },
-  HQ: { name: '본사', order: R[4].start, riddle: '마지막 한 수는 아껴 둔 것.' },
+  HQ: { name: '본사', order: R[4].boss, riddle: '마지막 한 수는 아껴 둔 것.' },
 };
 
 /** 보스판 퇴장 대사 — 2판 기믹 > 특기 사항 > 필살 마무리 > 베기 마무리 순으로 하나 */
 const OUTROS: Readonly<Record<string, { cut: readonly string[]; special?: readonly string[]; secret: readonly string[]; extra?: readonly string[] }>> = {
   '1-B': { cut: ['종탑은 시간을 알렸다.', '이제 아무도 안 늦는다.'], special: ['종이 한 번에 울렸다.', '정각은 아니었다.'], secret: ['종은 끝까지 종이었다.'], extra: ['13시였다.'] },
-  '2-B': { cut: ['바람이 멎었다.', '값은 그대로다.'], special: ['탑이 한 숨에 갔다.', '날숨이었다.'], secret: ['좌판은 끝내 땅을 안 봤다.'], extra: ['좌판은 상인 것이었다.'] },
+  '2-B': { cut: ['바람이 멎었다.', '값은 내일 내린다.'], special: ['탑이 한 숨에 갔다.', '날숨이었다.'], secret: ['좌판은 끝내 땅을 안 봤다.'], extra: ['좌판은 상인 것이었다.'] },
   '3-B': { cut: ['탑은 아홉 층이었다.', '지금은 터다.'], special: ['탑이 한 층이 됐다.', '심사는 다음 달이다.'], secret: ['기와는 한 장도 안 깨졌다.', '탑만 없다.'], extra: ['풍경이 아홉 번 울렸다.'] },
   '4-B': { cut: ['짐은 전부 돌려보냈다.', '수령인 불명.'], special: ['짐이 한 번에 올라갔다.', '영수증은 없다.'], secret: ['짐은 한 번도 땅을 안 밟았다.', '받은 사람도 없다.'] },
   // 본사 특기 사항이 곧 필살 마무리라 필살 줄을 따로 두지 않는다

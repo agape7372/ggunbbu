@@ -19,7 +19,7 @@ export interface KitDef {
 export const KITS: readonly KitDef[] = [
   { id: 'life', name: '예비 목숨', desc: '목숨 한 칸 더', max: 2, orbit: 30 },
   { id: 'waza', name: '필살 충전', desc: '게이지를 채워 시작 · 쓰면 다시 찬다', max: 3, orbit: 25 },
-  { id: 'dust2x', name: '먼지 자루', desc: '이번 판 먼지 두 배', max: 1, orbit: 20 },
+  { id: 'dust2x', name: '먼지 두 배', desc: '이번 판 먼지 두 배', max: 1, orbit: 20 },
 ];
 
 export const KIT_IDS: readonly KitId[] = KITS.map((k) => k.id);
@@ -72,7 +72,7 @@ export function kitSheetUseful(items: Items, orbit: number): boolean {
   return KITS.some((k) => items[k.id] > 0 || orbit >= k.orbit);
 }
 
-/** 맨손 판인가 — 먼지 자루는 판 내용을 안 바꾸니 장비로 치지 않는다 */
+/** 맨손 판인가 — 먼지 두 배는 판 내용을 안 바꾸니 장비로 치지 않는다 */
 export function isBare(pick: KitPick): boolean {
   return !pick.life && !pick.waza;
 }

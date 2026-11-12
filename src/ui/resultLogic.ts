@@ -63,7 +63,7 @@ export function resultFaces(c: ResultCtx, shut: Readonly<Record<TouchAction, boo
       const left = SCREENS.gameover.reviveLeft(c.reviveLeft);
       f.sub = c.adRevive ? `광고\n${left}` : left; // 광고 / n번 남음 — 뜻 단위 두 줄(pre-line)
     }
-    if (a === 'continue') f.sub = '체크포인트';
+    if (a === 'continue') f.sub = '넘긴 곳부터';
     return f;
   };
   return { jump: face('jump'), guard: face('guard'), attack: face('attack'), special: face('special') };
