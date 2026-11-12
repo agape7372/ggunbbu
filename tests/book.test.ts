@@ -1,7 +1,9 @@
 // 도감 칸 목록 — 묶음 · 가짐 · 번호 · 모은 수 (순수 함수만; 그리기는 화면 검수)
 import { describe, expect, it } from 'vitest';
 import { WEAPON_IDS } from '../src/meta/loadout';
-import { bookCount, bookGroups } from '../src/ui/bookView';
+import { bookCount, bookGroups, goalHtml } from '../src/ui/bookView';
+import { ACHIEVES } from '../src/meta/missions';
+import { TITLES } from '../src/meta/progress';
 
 const flat = (owned: ReadonlySet<string>) => bookGroups(owned).flatMap((g) => g.entries);
 
@@ -39,5 +41,17 @@ describe('도감', () => {
     const masks = g.find((x) => x.id === 'mask')!.entries;
     expect(masks.map((e) => e.key)).toEqual(['mask:a', 'mask:b']);
     expect(masks.every((e) => e.has)).toBe(true);
+  });
+
+  it('46칸 · 전체 49면 완성 표시가 아니다', () => {
+    const bk = ACHIEVES.find((d) => d.id === 'ach_bk46')!;
+    expect(bk.goal).toBe(46);
+    expect(bk.desc).toBe('마흔여섯 칸을 채웠다.');
+    expect(TITLES.find((t) => t.id === 'ach_bk46')!.name).toBe('대수집가');
+    const short = goalHtml(46, 49);
+    expect(short).not.toContain('도감 완성');
+    expect(short).toContain('남은 칸');
+    expect(short).toMatch(/<b>3</);
+    expect(goalHtml(49, 49)).toContain('도감 완성');
   });
 });

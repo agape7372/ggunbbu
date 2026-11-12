@@ -12,7 +12,7 @@ import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, TEACH, UI_FLOW, VIEW, WAZA_GA
 import { drawGame, drawFieldStill, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { homeFaces, jobAction, stepJob, type HomeFacts, type JobId } from './homeLogic';
 import { gateStep, reviveKey, newGate, resultActs, resultFaces, type ResultAct, type ResultCtx, type ResultGate } from './resultLogic';
-import { loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
+import { freezeSaves, isSaveChange, loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
 import type { TouchInput } from './touchLayer';
 import {
@@ -71,7 +71,7 @@ import {
 } from '../meta/catalog';
 import { OFFER_RUNS, armOffers, leftText, liveOffers, noteOfferBought, offerClock, offerToPop, type LiveOffer } from '../meta/offers';
 import {
-  ATTEND, FREE_COFFEE, ROOKIE, ROOKIE_TITLE, TITLES, TITLE_TOTAL, attendReady, claimAttend, claimSalary, claimWage, coffeeReady, demoSite, factsOf, giveReward,
+  ATTEND, FREE_COFFEE, ROOKIE, ROOKIE_TITLE, TITLES, TITLE_TOTAL, attendReady, claimAttend, claimSalary, claimWage, coffeeReady, demoSite, factsOf, giveReward, pullBack,
   readyAchieves, rewardText, rookieReady, salaryAdFree, salaryReady, syncAchieves, titlesOf, wageReady, type Reward,
 } from '../meta/progress';
 import {
@@ -670,9 +670,15 @@ export function createApp(
     });
   }
 
+  /** 앞당긴 시계에서 받은 커피 날짜는 오늘로 내린다(오늘 몫은 받은 것) */
+  function coffeeFree(key: string): boolean {
+    save.coffee = pullBack(save.coffee, key);
+    return coffeeReady(save.coffee, key);
+  }
+
   function takeCoffee(): void {
     const key = kstDateKey(Date.now());
-    if (!coffeeReady(save.coffee, key)) { playSfx('uiDeny'); return; }
+    if (!coffeeFree(key)) { playSfx('uiDeny'); return; }
     save.coffee = key;
     giveReward(save, FREE_COFFEE);
     saveSave(save);
@@ -732,7 +738,7 @@ export function createApp(
       items: save.items,
       orbit: save.orbit,
       firstGift: !save.firstGift,
-      coffeeOn: coffeeReady(save.coffee, key),
+      coffeeOn: coffeeFree(key),
       regular: save.regular,
       passGoods: passGoods(key),
     };
@@ -949,6 +955,8 @@ export function createApp(
   function resetData(): void {
     resetSave();
     save = loadSave();
+    rookieAsked = false; // 지운 기록엔 첫 출근 창 · 출근 창이 다시 떠야 한다
+    attendAsked = '';
     applySettingsToRuntime(save, settingsSinks);
     applyCosmetics(save.loadout, save.maskArt);
     homeJob = save.homeJob;
@@ -1376,7 +1384,7 @@ export function createApp(
         + Number(rookieReady(save.rookie, facts()))
         + Number(seasonReady(save.season));
     },
-    shopBadge: () => coffeeReady(save.coffee, kstDateKey(Date.now())),
+    shopBadge: () => coffeeFree(kstDateKey(Date.now())),
     onLogoTap: () => {
       if (!DEV_TOOLS) return;
       titleTaps += 1;
@@ -1395,7 +1403,7 @@ export function createApp(
     },
     onStageStart: (id, diff, fromBoss) => { playSfx('uiOk'); startStageRun(id, diff, fromBoss); },
     onOpenMissions: () => { playSfx('uiBlip'); openMissions(); },
-    onOpenShop: () => { playSfx('uiBlip'); openShop(coffeeReady(save.coffee, kstDateKey(Date.now())) ? 'pack' : 'gear'); },
+    onOpenShop: () => { playSfx('uiBlip'); openShop(coffeeFree(kstDateKey(Date.now())) ? 'pack' : 'gear'); },
     onOpenPack: () => { playSfx('uiBlip'); openShop('pack'); },
     onOpenBook: () => { playSfx('uiBlip'); openBook(); },
     onMetaBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
@@ -1454,6 +1462,16 @@ export function createApp(
     saveSave(save);
   });
   onBackButton(handleBack);
+
+  // 웹 탭 둘: 다른 탭이 저장을 바꾸면 이 탭이 든 옛 저장으로 덮지 않게 얼리고 다시 읽는다. 자기 탭 저장엔 이 이벤트가 안 와서 앱(WebView 하나)은 그대로다
+  let staleSave = false;
+  window.addEventListener('storage', (e) => {
+    if (staleSave || e.storageArea !== localStorage || !isSaveChange(e.key)) return;
+    staleSave = true;
+    freezeSaves();
+    if (!document.hidden) location.reload();
+    else document.addEventListener('visibilitychange', () => location.reload(), { once: true });
+  });
 
   // 웹에서 폰을 가로로 눕히면 「세로로 돌려 주세요」 판이 덮는다(style.css) — 그 뒤에서 판이 흘러가지 않게 멈춘다
   window.matchMedia?.('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)')

@@ -115,10 +115,12 @@ export interface DayCount {
   n: number;
 }
 
-const dayLeft = (cap: number, day: DayCount, dateKey: string): number => Math.max(0, cap - (day.key === dateKey ? day.n : 0));
+// 되돌린 날(key가 오늘보다 앞섬)도 앞선 날의 횟수를 센다 — 키를 내리면 쓴 횟수가 다시 찬다
+const dayLeft = (cap: number, day: DayCount, dateKey: string): number => Math.max(0, cap - (day.key >= dateKey ? day.n : 0));
 
 function dayNote(day: DayCount, dateKey: string): void {
-  day.n = day.key === dateKey ? day.n + 1 : 1;
+  if (day.key >= dateKey) { day.n += 1; return; }
+  day.n = 1;
   day.key = dateKey;
 }
 
