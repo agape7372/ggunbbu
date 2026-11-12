@@ -36,9 +36,10 @@ function sliceSheet(assetKey: string, keys: readonly string[]): void {
   releaseAsset(assetKey); // 조각이 원본을 대신한다 — 시트를 한 번 더 들고 있지 않는다
 }
 
-/** preload 완료 뒤 호출. 다시 로드할 때 실패한 옛 PNG가 남지 않게 교체한다. */
-export function refreshFloorSheetAssets(): void {
-  tiles.clear();
+/** preload 완료 뒤 호출. 다시 로드할 때 실패한 옛 PNG가 남지 않게 교체한다.
+ *  keep = 늦게 도착한 시트만 더 자른다. 이미 자른 시트는 원본을 놓아서 다시 못 자르니 조각을 지우지 않는다. */
+export function refreshFloorSheetAssets(keep = false): void {
+  if (!keep) tiles.clear();
   for (const theme of ACT1.CHAPTER_THEMES) {
     sliceSheet(`floors-${theme}`, FLOOR_ROWS.map(row => `${theme}:${row}`));
   }

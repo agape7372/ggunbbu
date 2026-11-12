@@ -8,8 +8,9 @@ export function nextDprStep(current: number): number | null {
 }
 
 export interface AdaptiveDpr {
-  /** 프레임 간격(ms)과 지금 dpr을 넣는다. 한 단계 내릴 때만 새 dpr을 돌려준다. */
-  sample(dtMs: number, dpr: number): number | null;
+  /** 프레임 간격(ms)과 지금 dpr을 넣는다. 한 단계 내릴 때만 새 dpr을 돌려준다.
+   *  live = 판이 도는 프레임. 아니면(상점 · 홈 · 일시정지) 세지 않고 창을 비운다 — DOM 화면의 느림은 판 캔버스 탓이 아니다. */
+  sample(dtMs: number, dpr: number, live?: boolean): number | null;
 }
 
 export function createAdaptiveDpr(): AdaptiveDpr {
@@ -17,7 +18,8 @@ export function createAdaptiveDpr(): AdaptiveDpr {
   let sum = 0;
   let slowMs = 0;
   return {
-    sample(dtMs, dpr) {
+    sample(dtMs, dpr, live = true) {
+      if (!live) { win.length = 0; sum = 0; slowMs = 0; return null; }
       const dt = Math.min(dtMs, VIEW.ADAPT_MAX_DT_MS);
       win.push(dt);
       sum += dt;
