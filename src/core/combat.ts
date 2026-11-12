@@ -1,12 +1,14 @@
 // 타격 판정·콤보·점수·게이지 이벤트 처리.
 //
 // 콤보 전수 [정본] — 다른 경로 없음. cap 999.
-//   +1: 건물 세그 타격 / 번개탄 파괴 / 화산탄 타격 / 토끼탄 상쇄 / 보스·드론·대포 타격.
+//   +1: 건물 세그 타격 / 번개탄 파괴 / 화산탄 타격 / 토끼탄 상쇄 / 보스·드론·대포 타격
+//       / 명물 몸 타격(landmark.ts tryHitLandmark) / 시간차 필살의 연참·검풍 한 타(sim.ts wazaHit).
 //       (바닥 화산탄 파밍은 SCORE.GROUND_ROCK_COMBO, 기본 off)
-//   →0: ① 지면 가드 바운스 ② 구조물 접지(깔림) ③ 플레이어 피격 전부
-//       ④ 집행기 보스 개시 — 카운터만 0, fullCombo 유지, comboBreak 이벤트 없음
+//   →0: ① 지면 가드 바운스 · 종탑 내려찍기를 지면 가드로 막음(landmark.ts stepSlam)
+//       ② 구조물 접지(깔림) · 버터바 뭉개짐 ③ 플레이어 피격 전부
+//       ④ 집행기 보스 개시(2막 달 · 작업 지시서 HQ) — 카운터만 0, fullCombo 유지, comboBreak 이벤트 없음
 //       ⑤ 2막 이어하기 — 콤보를 체크포인트(40/148/168)로 재설정, fullCombo 소멸
-//   유지: 헛스윙 / 점프 가드 / 점프 / 시간 경과 / 1막→2막 / 필살기 / 가드 브레이크
+//   유지: 헛스윙 / 점프 가드 / 점프 / 시간 경과 / 1막→2막 / 필살기 발동·터짐 / 가드 브레이크
 //         / 안전모가 대신 받은 깔림(items.ts absorbWithHat — ②에서 빠진다).
 
 import type { GameState, Lane } from './types';
@@ -176,11 +178,16 @@ export function tryGuardBounce(
   return false;
 }
 
+/** 판을 깼다(보스 · 명물이 쓰러졌거나 작업 지시서가 끝났다). 이 뒤엔 피격 · 깔림 · 깔린 채 손실 모두 없다 —
+ *  쓰러지는 연출 동안 날아오던 탄이나 더미에 깬 판이 게임오버 · 「미완료」가 되지 않게 */
+export function wonAlready(s: GameState): boolean {
+  return s.stage?.phase === 'done' || s.boss?.st === 'defeated' || s.lm?.st === 'down';
+}
+
 /** 플레이어 피격 공통 처리 (무적 중이면 무시) */
 export function hurtPlayer(s: GameState): boolean {
   const p = s.player;
-  // 작업 지시서를 깬 뒤(보스 쓰러짐 연출)엔 안 다친다 — 날아오던 철근에 깬 판이 「미완료」가 되지 않게
-  if (p.invulnTicks > 0 || p.pose === 'special' || s.stage?.phase === 'done') return false;
+  if (p.invulnTicks > 0 || p.pose === 'special' || wonAlready(s)) return false;
   s.lives -= 1;
   p.invulnTicks = PLAYER.HIT_IFRAMES;
   breakCombo(s);

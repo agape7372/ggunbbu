@@ -133,6 +133,8 @@ export interface PlayerState {
   bufAttack: number;
   bufJump: number;
   bufGuard: number;
+  /** 히트스톱 중 누른 필살 — 풀린 첫 틱에 쓰고 비운다 */
+  bufSpecial: number;
   /** 깔림 반복 라이프 손실 타이머 */
   pinTick: number;
   /** 이번 attack 판정 묶음에서 이미 명중했는가 (묶음당 1히트) */
