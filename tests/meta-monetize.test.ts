@@ -11,7 +11,7 @@ import {
 import {
   ATTEND, achieveLines, attendReady, claimAttend, claimSalary, claimWage, factsOf, giveReward, rewardText, ROOKIE, ROOKIE_TITLE,
   rookieReady, salaryAdFree, salaryReady, syncAchieves, titlesOf, validateSalary, wageReady, wageReward, type Facts,
-  coffeeReady, pullBack,
+  coffeeReady,
 } from '../src/meta/progress';
 import { emptySeason } from '../src/meta/season';
 import { adOrbitLeft, noteAdOrbit, AD_ORBIT_DAILY } from '../src/meta/economy';
@@ -410,49 +410,44 @@ describe('출근부 · 일당 · 월급', () => {
     expect(s.left).toBe(4);
   });
 
-  describe('시계를 사흘 앞당겨 받고 되돌리면 — 월급과 같은 식', () => {
-    const real = Date.UTC(2026, 10, 13, 3); // 11-13 KST 12시
-    const fut = real + 3 * 86_400_000;
-    const today = kstDateKey(real);
-    const tomorrow5 = Date.UTC(2026, 10, 13, 20); // 11-14 KST 05:00
+  describe('시계를 오가도 하루 몫은 한 번 — 앞선 날짜 key는 내리지 않는다', () => {
+    const D0 = '2026-11-13';
+    const D1 = '2026-11-14';
+    const t0 = Date.UTC(2026, 10, 13, 3); // 11-13 KST 12시
+    const t1 = t0 + 86_400_000;
 
-    it('오늘 작업: 오늘 몫은 받은 것으로 치고, 다음 날 05:00에 새로 뽑는다', () => {
-      const d = ensureDaily(null, fut);
-      d.items[0].claimed = true;
-      const back = ensureDaily(d, real);
-      expect(back).toBe(d);
-      expect(back.dateKey).toBe(today);
-      expect(back.items[0].claimed).toBe(true); // 같은 날 두 번은 못 받는다
-      expect(ensureDaily(back, tomorrow5 - 60_000)).toBe(back);
-      const next = ensureDaily(back, tomorrow5);
-      expect(next.dateKey).toBe('2026-11-14');
-      expect(next.items.some((p) => p.claimed)).toBe(false);
-    });
-
-    it('출근부: 오늘은 못 받고 다음 날 05:00에 다음 칸', () => {
+    it('출근부: 오늘 ↔ 내일 열 번 오가도 두 칸뿐', () => {
       const a = { step: 0, key: '' };
-      expect(claimAttend(a, kstDateKey(fut))).toEqual(ATTEND[0]);
-      expect(attendReady(a, today)).toBe(false);
-      expect(claimAttend(a, today)).toBeNull();
-      expect(claimAttend(a, kstDateKey(tomorrow5))).toEqual(ATTEND[1]);
+      let got = 0;
+      if (claimAttend(a, D0)) got++;
+      for (let i = 0; i < 10; i++) {
+        if (claimAttend(a, D1)) got++;
+        if (claimAttend(a, D0)) got++;
+        attendReady(a, D0); // 홈 배지가 그리며 부른다 — key를 건드리면 안 된다
+      }
+      expect(got).toBe(2);
+      expect(a.key).toBe(D1);
     });
 
-    it('일당: 끌어내린 오늘 작업으로 두 번 못 받는다', () => {
+    it('오늘 작업 · 일당: 되돌린 날로는 새로 안 뽑고 일당도 다시 안 준다', () => {
       const w = { key: '', got: 0 };
-      const items = [0, 1, 2, 3].map((i) => ({ id: `m${i}`, count: 1, claimed: true }));
-      expect(claimWage(w, { dateKey: kstDateKey(fut), items })).not.toBeNull();
-      expect(claimWage(w, { dateKey: kstDateKey(fut), items })).not.toBeNull();
-      expect(wageReady(w, { dateKey: today, items })).toBe(-1);
-      expect(claimWage(w, { dateKey: today, items })).toBeNull();
-      expect(wageReady(w, { dateKey: '2026-11-14', items })).toBe(0);
+      let wages = 0;
+      let d = ensureDaily(null, t0);
+      for (let i = 0; i < 5; i++) {
+        d = ensureDaily(d, t1);
+        d.items.forEach((q) => { q.claimed = true; });
+        while (claimWage(w, d)) wages++;
+        expect(ensureDaily(d, t0)).toBe(d); // 앞선 날의 판 그대로
+        wageReady(w, d); // 홈 배지가 그리며 부른다
+      }
+      expect(d.dateKey).toBe(D1);
+      expect(wages).toBe(2);
     });
 
-    it('공짜 커피: 오늘은 받은 것으로 치고 다음 날 05:00에 다시', () => {
-      const key = pullBack(kstDateKey(fut), today);
-      expect(key).toBe(today);
-      expect(coffeeReady(key, today)).toBe(false);
-      expect(coffeeReady(key, kstDateKey(tomorrow5))).toBe(true);
-      expect(pullBack('2026-11-01', today)).toBe('2026-11-01');
+    it('공짜 커피: 앞선 날에 받았으면 그 날이 지나야 다시', () => {
+      expect(coffeeReady(D1, D0)).toBe(false);
+      expect(coffeeReady(D1, D1)).toBe(false);
+      expect(coffeeReady(D1, '2026-11-15')).toBe(true);
     });
   });
 

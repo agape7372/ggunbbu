@@ -152,13 +152,11 @@ describe('특근 수당 · 첫 결제 선물', () => {
     expect(soldOut(b, 'season_pass')).toBe(false);
   });
 
-  it('앞당긴 달을 되돌린 뒤 산 특근 수당은 실제 달에 붙고 다음 달에 끝난다', () => {
+  it('앞당긴 달에 산 특근 수당은 그 달 판에 붙는다 — 구매 창에 보인 꾸미기 그대로 받는다', () => {
     const b = buyer();
     rollSeason(b.season, '2026-12-02'); // 앞당김
     expect(grantSku(b, 'season_pass', 't9', '2026-11-20')).toBe(true);
-    expect(b.season).toMatchObject({ key: '2026-11', pass: true });
-    rollSeason(b.season, '2026-12-01');
-    expect(b.season.pass).toBe(false);
+    expect(b.season).toMatchObject({ key: '2026-12', pass: true });
   });
 
   it('오늘 사도 값이 가격에 못 미치면 특근을 안 판다', () => {

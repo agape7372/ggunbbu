@@ -65,13 +65,8 @@ export interface Attend {
   key: string;
 }
 
-/** 미래 날짜 key(시계가 앞서 갔다 돌아온 흔적)는 오늘로 내린다. 오늘 몫은 받은 것으로 친다 — 월급과 같은 식 */
-export const pullBack = (key: string, dateKey: string): string => (key > dateKey ? dateKey : key);
-
-export function attendReady(a: Attend, dateKey: string): boolean {
-  a.key = pullBack(a.key, dateKey);
-  return dateKey > a.key;
-}
+// 앞선 날짜 key(시계가 앞서 갔다 돌아온 흔적)는 내리지 않는다 — 내리면 시계를 오갈 때마다 다시 받는다. 그 날짜까지 잠기는 것이 값이다
+export const attendReady = (a: Attend, dateKey: string): boolean => dateKey > a.key;
 
 /** 오늘 칸을 받는다(제자리). 이미 받았으면 null */
 export function claimAttend(a: Attend, dateKey: string): Reward | null {
@@ -105,7 +100,6 @@ const claimedToday = (d: DailyState | null): number => d?.items.filter((p) => p.
 /** 지금 받을 수 있는 일당 단계. 없으면 -1 */
 export function wageReady(w: Wage, d: DailyState | null): number {
   if (!d) return -1;
-  w.key = pullBack(w.key, d.dateKey); // 앞선 날에 받은 단계는 오늘 받은 것으로 친다
   const got = wageToday(w, d.dateKey);
   return got < WAGE_STEPS.length && claimedToday(d) >= WAGE_STEPS[got] ? got : -1;
 }

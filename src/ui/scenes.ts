@@ -71,7 +71,7 @@ import {
 } from '../meta/catalog';
 import { OFFER_RUNS, armOffers, leftText, liveOffers, noteOfferBought, offerClock, offerToPop, type LiveOffer } from '../meta/offers';
 import {
-  ATTEND, FREE_COFFEE, ROOKIE, ROOKIE_TITLE, TITLES, TITLE_TOTAL, attendReady, claimAttend, claimSalary, claimWage, coffeeReady, demoSite, factsOf, giveReward, pullBack,
+  ATTEND, FREE_COFFEE, ROOKIE, ROOKIE_TITLE, TITLES, TITLE_TOTAL, attendReady, claimAttend, claimSalary, claimWage, coffeeReady, demoSite, factsOf, giveReward,
   readyAchieves, rewardText, rookieReady, salaryAdFree, salaryReady, syncAchieves, titlesOf, wageReady, type Reward,
 } from '../meta/progress';
 import {
@@ -672,15 +672,9 @@ export function createApp(
     });
   }
 
-  /** 앞당긴 시계에서 받은 커피 날짜는 오늘로 내린다(오늘 몫은 받은 것) */
-  function coffeeFree(key: string): boolean {
-    save.coffee = pullBack(save.coffee, key);
-    return coffeeReady(save.coffee, key);
-  }
-
   function takeCoffee(): void {
     const key = kstDateKey(Date.now());
-    if (!coffeeFree(key)) { playSfx('uiDeny'); return; }
+    if (!coffeeReady(save.coffee, key)) { playSfx('uiDeny'); return; }
     save.coffee = key;
     giveReward(save, FREE_COFFEE);
     saveSave(save);
@@ -740,7 +734,7 @@ export function createApp(
       items: save.items,
       orbit: save.orbit,
       firstGift: !save.firstGift,
-      coffeeOn: coffeeFree(key),
+      coffeeOn: coffeeReady(save.coffee, key),
       regular: save.regular,
       passGoods: passGoods(key),
     };
@@ -1388,7 +1382,7 @@ export function createApp(
         + Number(rookieReady(save.rookie, facts()))
         + Number(seasonReady(save.season));
     },
-    shopBadge: () => coffeeFree(kstDateKey(Date.now())),
+    shopBadge: () => coffeeReady(save.coffee, kstDateKey(Date.now())),
     onLogoTap: () => {
       if (!DEV_TOOLS) return;
       titleTaps += 1;
@@ -1407,7 +1401,7 @@ export function createApp(
     },
     onStageStart: (id, diff, fromBoss) => { playSfx('uiOk'); startStageRun(id, diff, fromBoss); },
     onOpenMissions: () => { playSfx('uiBlip'); openMissions(); },
-    onOpenShop: () => { playSfx('uiBlip'); openShop(coffeeFree(kstDateKey(Date.now())) ? 'pack' : 'gear'); },
+    onOpenShop: () => { playSfx('uiBlip'); openShop(coffeeReady(save.coffee, kstDateKey(Date.now())) ? 'pack' : 'gear'); },
     onOpenPack: () => { playSfx('uiBlip'); openShop('pack'); },
     onOpenBook: () => { playSfx('uiBlip'); openBook(); },
     onMetaBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
@@ -1444,8 +1438,9 @@ export function createApp(
   /** 결제가 열렸거나 못 받은 결제를 받았다 — 열린 상점 · 홈(특가)을 다시 그린다 */
   function iapRedraw(): void {
     const scr = overlay.getScreen();
+    if (overlay.modalOpen()) return; // 열린 창은 닫지 않는다 — 다음 그리기 때 반영된다
     if (scr === 'shop') openShop();
-    else if (scr === 'title' && !overlay.modalOpen()) {
+    else if (scr === 'title') {
       overlay.showTitle(titleView());
       homeNudge();
     }

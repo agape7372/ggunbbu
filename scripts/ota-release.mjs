@@ -210,5 +210,5 @@ if (zips.length > KEEP) {
 
 console.log('');
 console.log('다음: cd ota && npx vercel --prod');
-console.log('     확인: curl -s https://gunbbu-ota.vercel.app/manifest.json');
+console.log(`     확인: curl -s ${base}/manifest.json`);
 console.log('     ★src/version.ts 변경분을 커밋할 것 — 다음 세션이 버전 출처를 잃지 않게.');

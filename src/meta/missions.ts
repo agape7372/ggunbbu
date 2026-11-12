@@ -349,8 +349,6 @@ export function pickDailyIds(dateKey: string, allowAd = true, reached = 3): stri
 export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = true, reached = 3): DailyState {
   const dateKey = kstDateKey(nowMs);
   if (state && state.dateKey >= dateKey) {
-    // 미래 날짜(시계가 앞서 갔다 돌아온 흔적)는 오늘로 내린다. 받은 칸은 그대로라 오늘 몫은 받은 것으로 친다 — 월급과 같은 식
-    if (state.dateKey > dateKey) state.dateKey = dateKey;
     // 광고 경로가 사라진 환경에서 이미 뽑힌 광고 미션은 그날 안에 영구 미달성 — 그 항목만 걷어낸다
     if (!allowAd && state.items.some((p) => TRACK_BY_ID[p.id] === 'ad')) {
       return { dateKey: state.dateKey, items: state.items.filter((p) => TRACK_BY_ID[p.id] !== 'ad') };

@@ -235,11 +235,7 @@ export function grantSku(b: Buyer, id: SkuId, token: string, dateKey = ''): bool
     b.salary = { ...b.salary, left: b.salary.left + SALARY_DAYS };
     if (dateKey) b.salary.adUntil = addDays(dateKey > (b.salary.adUntil ?? '') ? dateKey : b.salary.adUntil!, SALARY_DAYS);
   }
-  if (sku.pass) {
-    const month = dateKey.slice(0, 7);
-    if (month && b.season.key > month) b.season.key = month; // 앞당긴 시계가 넘긴 달이면 오늘 달에 붙인다 — 안 그러면 실제 다음 달까지 이어진다
-    b.season.pass = true;
-  }
+  if (sku.pass) b.season.pass = true;
   if (!b.firstGift) {
     b.firstGift = true;
     b.orbit += FIRST_GIFT.orbit;
