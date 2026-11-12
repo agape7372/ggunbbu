@@ -1760,3 +1760,12 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 교훈: 「잠김」을 푸는 고침은 왕복 시험을 같이 넣는다. 앞으로 한 번 · 뒤로 한 번만 본 시험이 악용을 정답으로 굳혔다.
 - 검증: typecheck 0 · 77파일 1013 시험(7 건너뜀) · 빌드(dist 41파일 4.27MB) · `final-b.mjs` 네 화면비 × 16화면 = 64장 측정 이슈 0 · 디버그 APK `assembleDebug` 통과 + 에뮬레이터 부팅(첫 화면 · 첫 실행 안내 창, 잡히지 않은 예외 0) · gradle `server.url` 가드 dry-run(없으면 통과 · 있으면 멈춤 · `-PallowServerUrl` 통과).
 - 남은 것: 검토 목록 · 실기기 확인 · 출시 준비 · 합침 승인은 `docs/AUDIT_2026-11-12.md` §4. 함정: 정션 폴더에서 `cap sync`를 하면 `shell/android/capacitor.settings.gradle`의 플러그인 경로가 다른 작업 폴더(`gunbbu-meta`)로 바뀐다. 합치기 전에 `git status`로 확인한다.
+
+## 2026-11-13 — main 합침 · Pages 배포 (출시 전 총 감사)
+
+- 사용자 「승인」. `audit/release-1112` `16de8d5`를 `release/1.0` · `main`으로 fast-forward push했다(`18c7d7a..16de8d5`, 27커밋). `feat/overhaul-1109` · `feat/ui-field`(지도 다이어트 스냅샷 `50f6d3f`)가 같이 들어갔다.
+- push 전 `16de8d5`에서 CI와 같은 순서로 다시 돌렸다: `gen-icons` · typecheck 0 · 77파일 1013 통과 / 7 건너뜀 · 빌드 · 예산.
+- Pages 배포 실행 `43317968485` 성공(CI 안에서 `npm test` · 빌드 통과). 라이브 = `https://agape7372.github.io/ggunbbu/` `index-N6zLWaoJ.js` · `main-BFW_Py84.js`(로컬 빌드와 바이트 동일) · 개인정보 처리방침 `privacy.html` 200(시행일 2026-11-01) · `sw.js` 글꼴 프리캐시 반영.
+- 배포 판 연기 시험(`tmp/cap/live-smoke.mjs`, 416×657): 표지 → 홈 → 미션 → 상점 → 설정 → 판 → 멈춤. 콘솔 오류 0 · 글꼴 넷 로드. 도구의 저장 값이 출근부 창이 생기기 전 것이라 홈에서 막혔다. 저장에 `rookie: 99` · `attend.key: "9999-12-31"`을 넣어 고쳤다(`final-b.mjs`와 같은 식).
+- 시험판(`gunbbu-preview.vercel.app`)은 올리지 않았다. Play 쪽(AAB · 콘솔)도 그대로다.
+- 남은 게이트: 검토 목록 · 실기기 확인 · 출시 준비(`docs/AUDIT_2026-11-12.md` §4).
