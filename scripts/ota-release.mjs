@@ -17,7 +17,6 @@ import path from 'node:path';
 import { collectFiles, makeZip } from './lib/zip.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DEFAULT_BASE = 'https://gunbbu-ota.vercel.app';
 const KEEP = 4; // ota/bundles/에 남길 최근 번들 수
 
 function usage() {
@@ -46,6 +45,15 @@ if (!version) {
 }
 if (!/^\d+\.\d+\.\d+$/.test(version)) {
   console.error(`버전 형식이 잘못됐습니다: "${version}" (semver 예: 1.0.1)`);
+  process.exit(1);
+}
+
+// 배포처는 앱이 읽는 빌드 변수 VITE_OTA_BASE 하나다(src/platform/ota.ts). 기본 주소는 없다: 주인 없는 이름으로 매니페스트가 나가지 않게 멈춘다.
+// --dry-run은 파일을 안 쓰니 변수 없이 돈다. 이 변수가 있으면 아래 npm run build에 그대로 실려 번들과 매니페스트가 같은 주소를 가리킨다.
+const base = (process.env.VITE_OTA_BASE || '').replace(/\/+$/, '');
+if (!dryRun && !/^https:\/\/[^/]+/.test(base)) {
+  console.error('발행 중단: VITE_OTA_BASE가 없거나 https 주소가 아닙니다. 우리가 소유한 호스트를 먼저 세우고 그 주소를 넣으세요(docs/RELEASE.md OTA 절).');
+  console.error('예:   VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- 1.0.1');
   process.exit(1);
 }
 
@@ -156,7 +164,6 @@ if (dryRun) {
   process.exit(0);
 }
 
-const base = process.env.GUNBBU_OTA_BASE || DEFAULT_BASE;
 const manifest = {
   version,
   url: `${base}/bundles/${version}.zip`,
