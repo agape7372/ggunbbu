@@ -235,7 +235,7 @@ export const ACHIEVES: readonly MissionDef[] = [
   { id: 'ach_bk25', kind: 'achieve', title: '도감 25칸', desc: '전용 졸라맨 잿빛.', goal: 25, rewardDust: 150, rewardOrbit: 40, owns: ['ash'], line: '도감', stat: 'book' },
   { id: 'ach_bk30', kind: 'achieve', title: '도감 30칸', desc: '수집가입니다.', goal: 30, rewardDust: 300, rewardOrbit: 80, line: '도감', stat: 'book' },
   { id: 'ach_bk40', kind: 'achieve', title: '도감 40칸', desc: '창고가 모자란다.', goal: 40, rewardDust: 500, rewardOrbit: 120, line: '도감', stat: 'book' },
-  { id: 'ach_bk46', kind: 'achieve', title: '도감 46칸', desc: '전 칸을 채웠다.', goal: 46, rewardDust: 0, rewardOrbit: 300, line: '도감', stat: 'book' },
+  { id: 'ach_bk46', kind: 'achieve', title: '도감 46칸', desc: '마흔여섯 칸을 채웠다.', goal: 46, rewardDust: 0, rewardOrbit: 300, line: '도감', stat: 'book' },
   { id: 'ach_w3', kind: 'achieve', title: '연장 셋', desc: '무기 세 자루를 갖는다.', goal: 3, rewardDust: 50, rewardOrbit: 15, line: '무기', stat: 'weapons' },
   { id: 'ach_w6', kind: 'achieve', title: '연장 여섯', desc: '무기 여섯 자루를 갖는다.', goal: 6, rewardDust: 120, rewardOrbit: 30, line: '무기', stat: 'weapons' },
   { id: 'ach_w12', kind: 'achieve', title: '연장 전부', desc: '열두 자루를 다 갖는다.', goal: 12, rewardDust: 300, rewardOrbit: 80, line: '무기', stat: 'weapons' },
@@ -349,6 +349,8 @@ export function pickDailyIds(dateKey: string, allowAd = true, reached = 3): stri
 export function ensureDaily(state: DailyState | null, nowMs: number, allowAd = true, reached = 3): DailyState {
   const dateKey = kstDateKey(nowMs);
   if (state && state.dateKey >= dateKey) {
+    // 미래 날짜(시계가 앞서 갔다 돌아온 흔적)는 오늘로 내린다. 받은 칸은 그대로라 오늘 몫은 받은 것으로 친다 — 월급과 같은 식
+    if (state.dateKey > dateKey) state.dateKey = dateKey;
     // 광고 경로가 사라진 환경에서 이미 뽑힌 광고 미션은 그날 안에 영구 미달성 — 그 항목만 걷어낸다
     if (!allowAd && state.items.some((p) => TRACK_BY_ID[p.id] === 'ad')) {
       return { dateKey: state.dateKey, items: state.items.filter((p) => TRACK_BY_ID[p.id] !== 'ad') };

@@ -65,7 +65,13 @@ export interface Attend {
   key: string;
 }
 
-export const attendReady = (a: Attend, dateKey: string): boolean => dateKey > a.key;
+/** 미래 날짜 key(시계가 앞서 갔다 돌아온 흔적)는 오늘로 내린다. 오늘 몫은 받은 것으로 친다 — 월급과 같은 식 */
+export const pullBack = (key: string, dateKey: string): string => (key > dateKey ? dateKey : key);
+
+export function attendReady(a: Attend, dateKey: string): boolean {
+  a.key = pullBack(a.key, dateKey);
+  return dateKey > a.key;
+}
 
 /** 오늘 칸을 받는다(제자리). 이미 받았으면 null */
 export function claimAttend(a: Attend, dateKey: string): Reward | null {
@@ -99,6 +105,7 @@ const claimedToday = (d: DailyState | null): number => d?.items.filter((p) => p.
 /** 지금 받을 수 있는 일당 단계. 없으면 -1 */
 export function wageReady(w: Wage, d: DailyState | null): number {
   if (!d) return -1;
+  w.key = pullBack(w.key, d.dateKey); // 앞선 날에 받은 단계는 오늘 받은 것으로 친다
   const got = wageToday(w, d.dateKey);
   return got < WAGE_STEPS.length && claimedToday(d) >= WAGE_STEPS[got] ? got : -1;
 }
@@ -277,7 +284,7 @@ export const TITLES: readonly { id: string; name: string }[] = [
   { id: 'ach_l3', name: '1급 기사' },
   { id: 'combo_999', name: '카운터 스톱' },
   { id: 'bare_moon', name: '맨손 철거' },
-  { id: 'ach_bk46', name: '도감 완성' },
+  { id: 'ach_bk46', name: '대수집가' },
   { id: 'ach_b10000', name: '만 채 철거' },
 ];
 

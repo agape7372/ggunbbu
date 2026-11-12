@@ -11,6 +11,7 @@ import {
 import {
   ATTEND, achieveLines, attendReady, claimAttend, claimSalary, claimWage, factsOf, giveReward, rewardText, ROOKIE, ROOKIE_TITLE,
   rookieReady, salaryAdFree, salaryReady, syncAchieves, titlesOf, validateSalary, wageReady, wageReward, type Facts,
+  coffeeReady, pullBack,
 } from '../src/meta/progress';
 import { emptySeason } from '../src/meta/season';
 import { adOrbitLeft, noteAdOrbit, AD_ORBIT_DAILY } from '../src/meta/economy';
@@ -409,6 +410,52 @@ describe('출근부 · 일당 · 월급', () => {
     expect(s.left).toBe(4);
   });
 
+  describe('시계를 사흘 앞당겨 받고 되돌리면 — 월급과 같은 식', () => {
+    const real = Date.UTC(2026, 10, 13, 3); // 11-13 KST 12시
+    const fut = real + 3 * 86_400_000;
+    const today = kstDateKey(real);
+    const tomorrow5 = Date.UTC(2026, 10, 13, 20); // 11-14 KST 05:00
+
+    it('오늘 작업: 오늘 몫은 받은 것으로 치고, 다음 날 05:00에 새로 뽑는다', () => {
+      const d = ensureDaily(null, fut);
+      d.items[0].claimed = true;
+      const back = ensureDaily(d, real);
+      expect(back).toBe(d);
+      expect(back.dateKey).toBe(today);
+      expect(back.items[0].claimed).toBe(true); // 같은 날 두 번은 못 받는다
+      expect(ensureDaily(back, tomorrow5 - 60_000)).toBe(back);
+      const next = ensureDaily(back, tomorrow5);
+      expect(next.dateKey).toBe('2026-11-14');
+      expect(next.items.some((p) => p.claimed)).toBe(false);
+    });
+
+    it('출근부: 오늘은 못 받고 다음 날 05:00에 다음 칸', () => {
+      const a = { step: 0, key: '' };
+      expect(claimAttend(a, kstDateKey(fut))).toEqual(ATTEND[0]);
+      expect(attendReady(a, today)).toBe(false);
+      expect(claimAttend(a, today)).toBeNull();
+      expect(claimAttend(a, kstDateKey(tomorrow5))).toEqual(ATTEND[1]);
+    });
+
+    it('일당: 끌어내린 오늘 작업으로 두 번 못 받는다', () => {
+      const w = { key: '', got: 0 };
+      const items = [0, 1, 2, 3].map((i) => ({ id: `m${i}`, count: 1, claimed: true }));
+      expect(claimWage(w, { dateKey: kstDateKey(fut), items })).not.toBeNull();
+      expect(claimWage(w, { dateKey: kstDateKey(fut), items })).not.toBeNull();
+      expect(wageReady(w, { dateKey: today, items })).toBe(-1);
+      expect(claimWage(w, { dateKey: today, items })).toBeNull();
+      expect(wageReady(w, { dateKey: '2026-11-14', items })).toBe(0);
+    });
+
+    it('공짜 커피: 오늘은 받은 것으로 치고 다음 날 05:00에 다시', () => {
+      const key = pullBack(kstDateKey(fut), today);
+      expect(key).toBe(today);
+      expect(coffeeReady(key, today)).toBe(false);
+      expect(coffeeReady(key, kstDateKey(tomorrow5))).toBe(true);
+      expect(pullBack('2026-11-01', today)).toBe('2026-11-01');
+    });
+  });
+
   it('광고 궤도조각 하루 상한', () => {
     const day = { key: '', n: 0 };
     expect(adOrbitLeft(day, 'a')).toBe(AD_ORBIT_DAILY);
@@ -418,6 +465,9 @@ describe('출근부 · 일당 · 월급', () => {
     expect(adOrbitLeft(day, 'b')).toBe(AD_ORBIT_DAILY);
     noteAdOrbit(day, 'b');
     expect(day).toEqual({ key: 'b', n: 1 });
+    noteAdOrbit(day, 'a'); // 되돌린 날 — 앞선 날의 횟수에 더한다
+    expect(day).toEqual({ key: 'b', n: 2 });
+    expect(adOrbitLeft(day, 'a')).toBe(AD_ORBIT_DAILY - 2);
   });
 });
 

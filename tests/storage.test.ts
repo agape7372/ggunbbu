@@ -1,6 +1,6 @@
 // ★08-30: 세이브 전멸 지뢰 제거 가드 — v 불일치·손상에도 기록을 살린다 (levain 사다리 이식)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loadSave, saveSave, resetSave, DEFAULT_SAVE } from '../src/storage';
+import { loadSave, saveSave, resetSave, isSaveChange, DEFAULT_SAVE } from '../src/storage';
 import { SAVE_KEY } from '../src/config';
 
 // node 환경 — 최소 localStorage 폴리필
@@ -115,6 +115,19 @@ describe('백업 사다리 (T7)', () => {
     const setItem = ls.setItem;
     ls.setItem = (k, v) => { if (k === BAD) throw new Error('QuotaExceededError'); setItem(k, v); };
     expect(loadSave().bestArcade).toBe(9999);
+  });
+
+  it('본 키가 JSON 배열이면 .bak으로 살린다', () => {
+    saveSave({ ...structuredClone(DEFAULT_SAVE), dust: 777 });
+    store.set(SAVE_KEY, '[]');
+    expect(loadSave().dust).toBe(777);
+  });
+
+  it('다른 탭 저장으로 치는 키 = 본 키 · 전부 지우기(null)', () => {
+    expect(isSaveChange(SAVE_KEY)).toBe(true);
+    expect(isSaveChange(null)).toBe(true);
+    expect(isSaveChange(BAK)).toBe(false);
+    expect(isSaveChange('other')).toBe(false);
   });
 
   it('둘 다 깨지면 기본값', () => {

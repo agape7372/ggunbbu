@@ -173,7 +173,7 @@ function parseSlot(raw: string | null): SaveData | null {
   } catch {
     return null;
   }
-  if (typeof parsed !== 'object' || parsed === null) return null;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null; // 배열도 객체라 통과하면 빈 저장이 .bak까지 덮는다
   return normalize(parsed as Record<string, unknown>);
 }
 
@@ -352,6 +352,9 @@ function clampButterBest(v: unknown): Record<number, number> {
   return out;
 }
 
+
+/** 다른 탭이 저장을 바꿨나 — storage 이벤트의 key. null = 전부 지움 */
+export const isSaveChange = (key: string | null): boolean => key === null || key === SAVE_KEY;
 
 let frozen = false;
 

@@ -119,6 +119,16 @@ describe('먼지 교환 — 하루 10번', () => {
     expect(d).toEqual({ key: '2026-11-10', n: 1 });
   });
 
+  it('시계를 오가도 하루 10번 — 되돌린 날에 다시 차지 않는다', () => {
+    const w = { dust: 100_000, orbit: 0 };
+    const d = day();
+    let n = 0;
+    for (const key of ['2026-11-13', '2026-11-12', '2026-11-13', '2026-11-12']) while (exchangeDust(w, d, key)) n++;
+    expect(n).toBe(EXCHANGE_DAILY);
+    expect(d.key).toBe('2026-11-13');
+    expect(exchangeLeft(d, '2026-11-14')).toBe(EXCHANGE_DAILY);
+  });
+
   it('옛 저장 기본값은 0번이다', () => {
     expect(DEFAULT_SAVE.exchangeDay).toEqual({ key: '', n: 0 });
     expect(exchangeLeft(DEFAULT_SAVE.exchangeDay, K)).toBe(EXCHANGE_DAILY);

@@ -290,8 +290,8 @@ function recordHtml(r: RecordView): string {
 
 const BOOK_GOALS = ACHIEVES.filter((d) => d.stat === 'book');
 
-/** 보상 눈금 막대 + 다음 보상 — 눈금 = 도감 실적 문턱(총칸 대비 위치), 다 채웠으면 「도감 완성」 */
-function goalHtml(have: number, total: number): string {
+/** 보상 눈금 막대 + 다음 보상 — 눈금 = 도감 실적 문턱(총칸 대비 위치). 전 칸이면 「도감 완성」, 보상만 다 받았으면 남은 칸 */
+export function goalHtml(have: number, total: number): string {
   const at = (n: number): number => Math.min(100, Math.round((1000 * n) / total) / 10);
   const ticks = BOOK_GOALS.map((d) => {
     const p = at(d.goal);
@@ -301,7 +301,9 @@ function goalHtml(have: number, total: number): string {
   const more = next
     ? `<p class="bk-nh"><span>다음 보상 · ${next.goal}칸</span><b>${next.goal - have}<small>칸 더</small></b></p>
       <div class="ms-rew">${rewardHtml({ dust: next.rewardDust, orbit: next.rewardOrbit, owns: next.owns })}</div>`
-    : '<p class="bk-nh is-full"><i class="bk-done" aria-hidden="true">완</i><b>도감 완성</b></p>';
+    : have >= total
+      ? '<p class="bk-nh is-full"><i class="bk-done" aria-hidden="true">완</i><b>도감 완성</b></p>'
+      : `<p class="bk-nh"><span>남은 칸</span><b>${total - have}<small>칸</small></b></p>`;
   return `<section class="bk-goal">
     <div class="bk-scale" role="img" aria-label="모은 것 ${have}/${total}, 보상 눈금 ${BOOK_GOALS.map((d) => d.goal).join(' · ')}">
       <span class="bk-gbar"><i style="width:${at(have)}%"></i></span>${ticks}
