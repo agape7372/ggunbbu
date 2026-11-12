@@ -5,7 +5,7 @@
 import type { GameState, InputFrame } from './types';
 import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carryUnderStack } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
-import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, registerHit } from './combat';
+import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, registerHit, wonAlready } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
 import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN } from '../config';
 import type { WazaRunId } from '../config';
@@ -79,7 +79,10 @@ export function advance(s: GameState, input: InputFrame): void {
   const countsDrops = s.mode === 'act1' || s.mode === 'tokoton';
 
   // ── 필살기 발동 (게이지 100, 깔림 중에도 가능 [정본]) ──
-  if (input.special && s.player.pose !== 'dead' && s.player.pose !== 'special') {
+  // 히트스톱 중 누른 것도 여기서 한 번만 쓴다. 판정 뒤엔 늘 비워 필살 자세 중 누른 것은 쌓이지 않는다
+  const wantSpecial = s.player.bufSpecial > 0;
+  s.player.bufSpecial = 0;
+  if (wantSpecial && s.player.pose !== 'dead' && s.player.pose !== 'special') {
     // 시간차 필살이 아직 안 터졌으면 새 필살은 거부 — 베어 둔 건물이 사라지지 않게
     if (s.wazaGauge < WAZA_GAUGE.COST || !hasSpecialTarget(s) || s.wazaRun) {
       // 조용한 무반응 금지 (08-30, D-5·P1-4): 게이지 부족·허공 발동은 거부음으로 알린다.
@@ -289,7 +292,7 @@ function wazaHit(s: GameState, r: NonNullable<GameState['wazaRun']>, lift: boole
   const yHit = st.y;
   const res = damageStack(st, s.player.lane, st.y - 1, st.y + 1, 1);
   if (res === 'miss') return;
-  if (lift) {
+  if (lift && !st.specialImmune) { // 면역 건물(명물 · 2막)은 안 띄운다 — 구층탑이 화면 위로 떠 1분 넘게 손이 안 닿았다
     st.vy = Math.max(st.vy, STACK.GUARD_GROUND_V);
     st.resting = false;
   }
@@ -390,8 +393,8 @@ function stepPinned(s: GameState, input: InputFrame): void {
   const byStack = !!(stack && stack.resting);
   // ★08-30: 화산탄 더미 깔림도 같은 상태기계를 탄다 (sim 착지 검사에서 진입)
   const byRocks = !byStack && s.groundRocks > 0;
-  if (!byStack && !byRocks) {
-    // 깔림 원인이 사라졌으면 자동 해방
+  if ((!byStack && !byRocks) || wonAlready(s)) {
+    // 깔림 원인이 사라졌거나 판을 깼으면 자동 해방
     p.pose = 'idle';
     p.poseTick = 0;
     return;
@@ -549,6 +552,7 @@ function onStackGrounded(s: GameState): void {
 
 /** 깔림 진입 [정본: 접지 = 라이프 1 손실]. 안전모를 쓰고 있으면 모자가 대신 받는다 */
 function onPlayerCrushed(s: GameState): void {
+  if (wonAlready(s)) return; // 안전모도 안 깨진다 — 깬 뒤 모자가 깨지면 「이상 없음」 도장을 잃는다
   if (s.hat) {
     absorbWithHat(s);
     return;
@@ -599,13 +603,15 @@ export function grantMercyLife(s: GameState): void {
 }
 
 // ── 1막 ─────────────────────────────────────────────────────────
+// 모드 전환(구역 · 2막 · 버터바 들고 남)은 시간차 필살(s.wazaRun)이 터진 뒤로 미룬다 — 전환이 s.stack을 비워
+// 베어 둔 건물 · 쓴 게이지가 사라졌다. 넷 다 조건에 !s.wazaRun을 둔다(stepAct1 둘 · stepTokoton · stepBonus)
 function stepAct1(s: GameState): void {
   s.p = Math.min(1, s.score / ACT1.UNLOCK_SCORE);
 
   // 챕터 전환 → 해금 이벤트 + 버터바 보너스 스테이지 진입
   // 특별작전(기믹 판)은 시간제라 경계를 넘어도 그 구역에 머문다 — 난이도만 p를 따라 오른다
   const ch = chapterOf(s.p);
-  if (ch > s.chapter && s.gimmick === 'none') {
+  if (ch > s.chapter && s.gimmick === 'none' && !s.wazaRun) {
     s.chapter = ch;
     s.events.push({ kind: 'chapterUnlock', n: ch });
     enterBonus(s, ch); // 회차 = 통과한 경계 수 (1~3)
@@ -613,7 +619,7 @@ function stepAct1(s: GameState): void {
   }
 
   // 2막 전환 [정본: 게이지 리셋, 콤보 유지]
-  if (s.score >= ACT1.UNLOCK_SCORE && s.gimmick === 'none') {
+  if (s.score >= ACT1.UNLOCK_SCORE && s.gimmick === 'none' && !s.wazaRun) {
     enterAct2(s);
     return;
   }
@@ -638,7 +644,7 @@ function stepTokoton(s: GameState): void {
   // ★08-30: `tick % CYCLE === 0` 정확 일치는 경계 틱이 히트스톱에 삼켜지면 그 사이클의
   // 버터바가 통째로 소실됐다(검증 실측, 시드 18). 사이클 인덱스 비교로 스킵 내성 확보.
   const cyc = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS);
-  if (cyc > s.tokotonCycle) {
+  if (cyc > s.tokotonCycle && !s.wazaRun) {
     s.tokotonCycle = cyc;
     enterBonusTokoton(s);
     return;
@@ -686,7 +692,7 @@ function stepBonus(s: GameState): void {
     }
   }
 
-  const done = (b.queue.length === 0 && !s.stack) || b.ticksLeft <= 0;
+  const done = ((b.queue.length === 0 && !s.stack) || b.ticksLeft <= 0) && !s.wazaRun;
   if (done) {
     if (b.destroyed >= b.total) {
       b.perfect = true;

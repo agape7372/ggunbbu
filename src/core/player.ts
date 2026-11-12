@@ -10,7 +10,7 @@ export function makePlayer(): PlayerState {
     lane: 0, y: 0, vy: 0,
     pose: 'idle', poseTick: 0,
     invulnTicks: 0,
-    bufAttack: 0, bufJump: 0, bufGuard: 0,
+    bufAttack: 0, bufJump: 0, bufGuard: 0, bufSpecial: 0,
     pinTick: 0,
     attackHit: false, attackFromAir: false,
   };
@@ -37,6 +37,7 @@ export function collectBuffers(p: PlayerState, input: InputFrame): void {
   if (input.attack) p.bufAttack = PLAYER.INPUT_BUFFER;
   if (input.jump) p.bufJump = PLAYER.INPUT_BUFFER;
   if (input.guard) p.bufGuard = PLAYER.INPUT_BUFFER;
+  if (input.special) p.bufSpecial = PLAYER.INPUT_BUFFER;
 }
 
 /** 플레이어 1틱. pinned/dead는 sim이 별도 처리(여기선 무시). */

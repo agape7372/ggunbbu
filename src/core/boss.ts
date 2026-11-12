@@ -38,6 +38,11 @@ export function stepBoss(s: GameState): void {
     setSt(b, 'roar');
     b.hittable = false;
     b.y = BOSS.HOVER_HIGH;
+    // 끊긴 패턴의 드론 · 대포는 쏘지 않고 물러난다(포효 동안 떠남을 마저 돈다). 안 그러면 다음 같은 패턴까지 그 자리에 언다
+    for (const e of s.entities) {
+      if (e.kind === 'rabbit' && e.leaveTicks < 0) e.leaveTicks = BOSS.RABBIT.LEAVE;
+      if (e.kind === 'cannon' && e.fireTicks > 0) e.fireTicks = -1;
+    }
     s.events.push({ kind: 'phaseClear', n: 100 + newTier }); // 렌더: 포효 연출
     return;
   }
@@ -62,6 +67,8 @@ export function stepBoss(s: GameState): void {
       break;
     }
     case 'roar': {
+      stepRabbits(s);
+      stepCannons(s, b);
       if (b.stTick >= BOSS.ROAR_TICKS) { setSt(b, 'idle'); b.hittable = true; }
       break;
     }
