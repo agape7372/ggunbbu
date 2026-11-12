@@ -435,7 +435,7 @@ button.ms-rg:active { scale: 0.97; }
   text-shadow: var(--halo);
 }
 
-.op-cut small { position: relative; z-index: 7; font: 700 13px/1.3 var(--body); }
+.op-cut small { position: relative; z-index: 7; font: 700 13.5px/1.3 var(--body); }
 .op-why,
 .op-cut:disabled .op-name { color: var(--ink2); }
 .op-why { text-shadow: var(--halo); }

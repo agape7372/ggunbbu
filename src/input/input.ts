@@ -47,6 +47,15 @@ export function debounceSpecial(
   return { fire: true, nextLast: now };
 }
 
+/**
+ * Space를 포커스된 단추의 기본 동작(click)에 넘기나. 넘기지 않으면 점프다.
+ * 조작 키는 메뉴 얼굴일 때만 넘긴다(click detail 0 → touch onClick). 다른 단추는 판이 돌지 않을 때(판 · 이야기 밖) 넘긴다
+ */
+export function spaceToFocused(onButton: boolean, onKey: boolean, menu: boolean, running: boolean): boolean {
+  if (onKey) return menu;
+  return onButton && !running;
+}
+
 export function createInput(touch: TouchInput | null): InputSource {
   const edges = new Set<'jump' | 'attack' | 'special'>();
   const heldGuardKeys = new Set<string>();
@@ -69,9 +78,9 @@ export function createInput(touch: TouchInput | null): InputSource {
 
   window.addEventListener('keydown', (e) => {
     if (isTypingTarget(e.target)) return;
-    // 메뉴 얼굴에서 키에 포커스를 두고 Space = 그 키를 누른다. 점프로 먹지 않고 기본 동작(click detail 0 → touch onClick)에 넘긴다.
-    // 플레이 얼굴이거나 포커스가 키 밖이면 그대로 점프다
-    if (e.code === 'Space' && touch?.menu() && e.target instanceof Element && e.target.closest('.tbtn')) return;
+    if (e.code === 'Space' && e.target instanceof Element && spaceToFocused(
+      !!e.target.closest('button'), !!e.target.closest('.tbtn'), !!touch?.menu(), !!document.querySelector('#stage.playing, #stage.story'),
+    )) return;
     const act = EDGE_KEYS[e.code];
     const isGuard = GUARD_KEYS.has(e.code);
     if (!act && !isGuard) return;

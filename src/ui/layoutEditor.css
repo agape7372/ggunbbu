@@ -32,7 +32,7 @@
 
 /* 조작 구역 — style.css #touch-layer 와 같은 자리(top = FIELD_H, 높이 170). 키는 이 안에서만 움직인다 */
 .le-zone { position: absolute; left: calc(-1 * var(--fr-x, 0px)); right: calc(-1 * var(--fr-x, 0px)); box-sizing: border-box; border: 3px dashed var(--ink3); pointer-events: none; }
-.le-zone-name { position: absolute; left: 22px; top: 584px; font: 700 12.5px/1.2 var(--body); color: var(--ink2); }
+.le-zone-name { position: absolute; left: 22px; top: 584px; font: 700 13.5px/1.2 var(--body); color: var(--ink2); }
 
 /* 키 — 모양·글씨는 .tbtn 그대로, 그림만 id 대신 클래스로 */
 /* 넓은 화면: 판과 같이 옆 키를 --fr-x 만큼 밖으로 민다(--sx = layout.ts spreadSide) */
@@ -54,5 +54,5 @@
 /* ── 설정 화면의 한 줄: 「버튼 배치」 + 바꾸기 ── */
 .set-layout { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; }
 .set-layout-name { display: flex; flex-direction: column; gap: 2px; font: 700 17px/1.2 var(--body); }
-.set-layout-name small { font: 700 12.5px/1.2 var(--body); color: var(--ink2); }
+.set-layout-name small { font: 700 13.5px/1.2 var(--body); color: var(--ink2); }
 .set-layout .inkseal { width: auto; height: 52px; padding: 0 18px; font-size: 25px; }

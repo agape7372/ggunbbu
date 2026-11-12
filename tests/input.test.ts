@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EMPTY_INPUT, type InputFrame } from '../src/core/types';
-import { debounceSpecial, mergeFrame, SPECIAL_DEBOUNCE_MS } from '../src/input/input';
+import { debounceSpecial, mergeFrame, spaceToFocused, SPECIAL_DEBOUNCE_MS } from '../src/input/input';
 
 function f(p: Partial<InputFrame>): InputFrame {
   return { ...EMPTY_INPUT, ...p };
@@ -21,6 +21,23 @@ describe('mergeFrame', () => {
   it('한쪽만 true여도 true (OR)', () => {
     expect(mergeFrame(f({ jump: true }), f({ jump: false })).jump).toBe(true);
     expect(mergeFrame(f({ special: false }), f({ special: true })).special).toBe(true);
+  });
+});
+
+describe('spaceToFocused — Space가 포커스된 단추를 누르나(아니면 점프)', () => {
+  it('판이 돌지 않을 때 포커스된 단추는 Space로 눌린다(감사 ui-03)', () => {
+    expect(spaceToFocused(true, false, false, false)).toBe(true);
+  });
+  it('판 · 이야기 중에는 단추에 포커스가 있어도 점프다', () => {
+    expect(spaceToFocused(true, false, false, true)).toBe(false);
+  });
+  it('조작 키는 메뉴 얼굴일 때만 그 키를 누른다', () => {
+    expect(spaceToFocused(true, true, true, false)).toBe(true);
+    expect(spaceToFocused(true, true, false, false)).toBe(false);
+    expect(spaceToFocused(true, true, false, true)).toBe(false);
+  });
+  it('단추 밖이면 점프다', () => {
+    expect(spaceToFocused(false, false, true, false)).toBe(false);
   });
 });
 

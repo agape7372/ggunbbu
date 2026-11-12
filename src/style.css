@@ -129,6 +129,7 @@ img { display: block; -webkit-user-drag: none; }
 
 /* 키보드로 다니는 사람을 위한 포커스 — 먹 획. 손가락(터치)에는 안 뜬다 */
 :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+[data-screen]:focus-visible { outline: none; } /* 화면 뿌리(show가 포커스를 옮기는 곳)는 테두리 없음 */
 
 .ink-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ic { display: block; width: 20px; height: 20px; flex: 0 0 auto; }
@@ -147,6 +148,7 @@ img { display: block; -webkit-user-drag: none; }
   width: 360px;
   height: 780px;
   transform-origin: center;
+  flex: none; /* 창이 360보다 좁아도 무대 폭 360을 지킨다(줄어들면 키 · 캔버스가 어긋난다). 배율은 main fitStage 몫 */
 }
 
 /* 넓은 화면 옆 띠의 필드 구간(위 띠 아래 ~ 지면선) = 배경 그림의 종이색(renderer.ts syncFieldBg). 위 띠 · 조작 구역은 --fr-bg 그대로 */
@@ -831,7 +833,7 @@ img { display: block; -webkit-user-drag: none; }
 .set-link::after { content: '→'; font: 400 28px/1 var(--brush); }
 /* 지우기는 누를 것이 아니다 — 주홍 대신 옅게 */
 .set-link.danger { color: var(--ink2); }
-.set-foot { font: 700 12.5px/1.6 var(--body); color: var(--ink2); }
+.set-foot { font: 700 13.5px/1.6 var(--body); color: var(--ink2); }
 @media (hover: none) and (pointer: coarse) { .kbd-hint { display: none; } }
 
 /* ── 버터바 회차 고르기 ─────────────────────────────────── */

@@ -23,7 +23,7 @@ import { JOBS, butterTier, homeFactsOf, jobBuilding, nextStage, stepJob, type Ho
 import { paintHang } from './homeArt';
 import type { StageDiff } from '../core/types';
 import { paintMissions, type MissionView, type TakeKind } from './missionView';
-import { setRewardHost } from './rewardFx';
+import { setRewardHost, syncBehind } from './rewardFx';
 import { paintShop, type ShopInv, type ShopPaths, type ShopTab } from './shopView';
 import { bookPopup, paintBook, type BookGo, type BookMask, type RecordView } from './bookView';
 import { kitHtml, type KitView } from './kitView';
@@ -197,7 +197,8 @@ export interface OverlayHandlers {
   onEquip(slot: string, id: string): void;
   onKitBuy(id: string): void;
   onRestore(): void;
-  onHowtoDone(): void;
+  /** start = 첫 실행 안내의 「시작」을 눌렀다(뒤로 · Esc로 닫으면 false) */
+  onHowtoDone(start: boolean): void;
   onResetData(): void;
 }
 
@@ -494,6 +495,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   toastEl.className = 'toast';
   toastEl.setAttribute('role', 'status');
   (root.parentElement ?? root).appendChild(toastEl);
+  root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => { el.tabIndex = -1; }); // 화면 뿌리는 포커스만 받는다(show)
   let toastTimer = 0;
 
   let screen: OverlayScreen = 'none';
@@ -542,8 +544,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   }
 
   function show(name: OverlayScreen): void {
+    const moved = name !== screen;
     // 다른 화면으로 옮기면 앞 화면의 알림은 거둔다 — 탭을 바꿔도 2.4초 남아 새 목록을 가렸다(10-28)
-    if (name !== screen) { window.clearTimeout(toastTimer); toastEl.classList.remove('on'); }
+    if (moved) { window.clearTimeout(toastTimer); toastEl.classList.remove('on'); }
     if (name !== 'title') stopHero();
     screen = name;
     closeModal();
@@ -555,6 +558,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => {
       el.hidden = el.getAttribute('data-screen') !== name;
     });
+    // 화면이 바뀌면 낭독 · 키보드가 새 화면에서 시작하게 — 뿌리에만 준다(단추에 주면 결과 키 연타 게이트를 건너뛴다)
+    if (moved) screenEl(name)?.focus({ preventScroll: true });
     if (name === 'title' || name === 'shop' || name === 'missions' || name === 'book') paintBadges();
   }
 
@@ -792,21 +797,23 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     const cls = (k: ModalAction['kind']): string => (k === 'cta' || k === 'danger' ? ' cta' : k === 'pay' ? ' pay' : '');
     $('modal-actions').innerHTML = o.actions.map((a) => `<button type="button" class="btn${cls(a.kind)}" data-act="${a.act}">${a.label}</button>`).join('');
     $('modal').hidden = false;
+    syncBehind();
     root.classList.add('is-open'); // 플레이 중(오버레이 닫힘)에도 뜰 수 있게
     $('modal-card').focus({ preventScroll: true }); // 화면 낭독·키보드가 창 안에서 시작하게
   }
 
-  function closeModal(): void {
+  function closeModal(start = false): void {
     const md = $('modal');
     if (md.hidden) return;
     md.hidden = true;
+    syncBehind();
     $('modal-card').classList.remove('bk-card', 'kit');
     $('modal-body').innerHTML = ''; // iframe 정리
     resetArmed = false;
     kit = null;
     askOk = null;
     if (screen === 'none') root.classList.remove('is-open');
-    if (howtoFirst) { howtoFirst = false; h.onHowtoDone(); }
+    if (howtoFirst) { howtoFirst = false; h.onHowtoDone(start); }
   }
 
   function openDoc(title: string, src: string): void {
@@ -959,7 +966,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'reset-yes':
         if (resetArmed) { closeModal(); h.onResetData(); }
         break;
-      case 'modal-close': closeModal(); break;
+      case 'modal-close': closeModal(true); break;
       case 'book-go': closeModal(); if (bookGo) h.onBookGo(bookGo); break;
       case 'kit-toggle':
       case 'kit-plus':
@@ -1195,7 +1202,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     },
     showHowto,
     modalOpen: () => !$('modal').hidden,
-    closeModal,
+    closeModal: () => closeModal(),
     toast(text: string): void {
       window.clearTimeout(toastTimer);
       if (!text) { toastEl.classList.remove('on'); return; }
