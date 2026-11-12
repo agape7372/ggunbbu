@@ -685,7 +685,9 @@ export const HAPTIC = {
   supply: 10, hatBreak: [30, 20, 30], hatGet: [15, 40, 30], pinEscape: [20, 30, 20],
   bossHit: 14, lifeLost: [60, 40, 90], gaugeFull: [12, 30, 12], guardDenied: 10,
   boltStrike: 25, bonusPerfect: [20, 30, 20, 30, 40], phaseClear: [20, 30, 40],
-  HIT_THROTTLE: 3,        // 연타 시 3회당 1회 (hit·bossHit는 카운터를 따로 쓴다)
+  // 시간차 필살(WAZA_RUN)은 누를 때 짧게(wazaPress가 special 대신) · 칼 박자마다 톡 · 터질 때 가장 세게(바로 터지는 필살의 special과 같은 무게)
+  wazaPress: 30, wazaSwing: 10, wazaHit: 16, wazaBurst: [100, 50, 200], guardAirBounce: 15,
+  HIT_THROTTLE: 3,       // 연타 시 3회당 1회 (hit·bossHit는 카운터를 따로 쓴다)
 } as const;
 
 // ── 코스메틱 색 (P1-3 실구현 — 팔리는 물건은 실제로 바뀐다) ─────

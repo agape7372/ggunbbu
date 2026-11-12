@@ -140,7 +140,11 @@ function open(o: RewardShow): Promise<void> {
         if (n?.dataset.n) n.textContent = fmt(Number(n.dataset.n));
       }
     };
-    if (quiet) { timers.forEach(clearTimeout); el.classList.add('end'); }
+    if (quiet) {
+      timers.forEach(clearTimeout);
+      el.classList.add('end');
+      playSfx(o.tier === 'l' ? 'milestone' : 'coin'); // 움직임만 줄인다 — 받았다는 소리는 남긴다(감사 feel-07)
+    }
     else later(endAt, finish);
 
     const opened = performance.now();

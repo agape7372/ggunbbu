@@ -1,6 +1,7 @@
 // 설정 적용 레이어. DOM 화면은 overlay.ts 「작업 수칙」이 담당 — 여기선 중복 그리지 않는다.
 // leftHanded → touch.setLeftHanded, shake/vibration → renderer.setFeedbackOptions, sound → audio.
 
+import { SAVE_KEY } from '../config';
 import type { ButtonLayout } from '../input/layout';
 import { saveSave, type SaveData, type SaveSettings } from '../storage';
 
@@ -49,4 +50,18 @@ export function applySettingsToRuntime(save: SaveData, sinks: SettingsSinks): vo
   sinks.setFeedbackOptions(feedbackOf(save.settings));
   sinks.setLeftHanded(save.settings.leftHanded);
   sinks.setButtonLayout(save.settings.buttonLayout ?? null);
+}
+
+/**
+ * 새 저장의 첫 부팅 한 번 — OS가 「동작 줄이기」면 흔들림 · 번쩍임 기본값을 약하게(1)로 둔다(감사 feel-03).
+ * 저장이 하나라도 있으면(본 키 · .bak — storage.ts loadSave의 사다리) 사용자가 고른 값이라 건드리지 않는다.
+ */
+export function firstBootFeedback(stored: (key: string) => string | null, reduceMotion: boolean): Partial<SaveSettings> | null {
+  if (!reduceMotion) return null;
+  try {
+    if (stored(SAVE_KEY) !== null || stored(`${SAVE_KEY}.bak`) !== null) return null;
+  } catch {
+    return null;
+  }
+  return { shakeLevel: 1, flashLevel: 1 };
 }
