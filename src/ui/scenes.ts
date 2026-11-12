@@ -10,7 +10,7 @@ import { judgeStage, stageScript, stageSeed, startStage } from '../core/stage';
 import { STAGES } from '../core/stages';
 import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, TEACH, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { drawGame, drawFieldStill, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
-import { homeFaces, jobAction, stepJob, type HomeFacts, type JobId } from './homeLogic';
+import { butterTier, homeFaces, jobAction, stepJob, type HomeFacts, type JobId } from './homeLogic';
 import { gateStep, reviveKey, newGate, resultActs, resultFaces, type ResultAct, type ResultCtx, type ResultGate } from './resultLogic';
 import { freezeSaves, isSaveChange, loadSave, resetSave, saveSave, type SaveData, type SaveSettings } from '../storage';
 import type { InputSource } from '../input/input';
@@ -155,6 +155,7 @@ export function createApp(
   // 가드 가르치기: 평생 첫 목숨 손실 때 판을 잠깐 세우고 가드 키를 맥동시킨다 (C1)
   let teachFreeze = 0;
   let teachPulse = 0;
+  let teachDue = false; // 깔린 채 목숨을 잃었다 — 가르침은 깔림이 풀린 첫 틱(가운데 키가 다시 「가드」 얼굴)에
   let storyLock = 0; // 이야기 판에 들어선 직후 연타로 넘어가지 않게 잠그는 틱
   // 「한 판 더」는 방금 그 모드로 — 구역 작전·야근에서 죽었는데 아케이드로 튕기지 않게
   let lastRun: () => void = () => startArcade();
@@ -414,6 +415,7 @@ export function createApp(
   function endTeach(): void {
     teachFreeze = 0;
     teachPulse = 0;
+    teachDue = false;
     hud.teach(false);
     touch?.setGuardHint(false);
   }
@@ -1424,7 +1426,8 @@ export function createApp(
     onUnlockDust: (id) => unlockDustItem(id),
     onEquip: (slot, id) => doEquip(slot, id),
     onExchangeDust: doExchange,
-    onHowtoDone: () => { save.howtoSeen = true; saveSave(save); homeNudge(); },
+    // 「시작」 = 홈 「착수」와 같은 판. 출근부 · 신입 과제는 그 판이 끝나 홈에 설 때(goTitle → homeNudge) 뜬다
+    onHowtoDone: (start) => { save.howtoSeen = true; saveSave(save); if (start) confirmTitle(); else homeNudge(); },
     onResetData: resetData,
   });
 
@@ -1570,6 +1573,7 @@ export function createApp(
         handleTransitions(s, wasMode, wasPhase);
         s.events.length = 0;
         touch?.setPinned(s.player.pose === 'pinned');
+        if (teachDue && s.player.pose !== 'pinned' && !s.over && scene === 'play') { teachDue = false; startTeach(); }
         touch?.setSpecialReady(s.wazaGauge >= 100);
         touch?.setSpecialFill(s.wazaGauge);
         touch?.setGuardFill(s.guardGauge);
@@ -1687,7 +1691,9 @@ export function createApp(
       }
       if (e.kind === 'supply' && e.item === 'dust') earnDust(DUST_PER_SUPPLY);
       if (e.kind === 'hatBreak') runHatBreaks += 1;
-      if (e.kind === 'lifeLost' && !s.over && !save.guardTaught) startTeach();
+      if (e.kind === 'lifeLost' && !s.over && !save.guardTaught) {
+        if (s.player.pose === 'pinned') teachDue = true; else startTeach();
+      }
     }
     showCaps(runCaps.observe({ combo: s.combo, score: s.score }));
     if (statTick) {
@@ -1838,7 +1844,8 @@ export function createApp(
       const perfect = s.events.some((e) => e.kind === 'bonusPerfect');
       persist();
       showOverlay(butterChallengeEnd(s.score), 60 * 3, () => {
-        goTitle();
+        goTitle(false); // 회차 고르는 화면으로 — 다음 회차를 바로 고르게
+        overlay.showButterPick(butterTier(homeFactsFromSave(save, debugOpen())));
       }, {
         ...wipe,
         stamps: [...(newBest ? [SCREENS.stamps.best] : []), ...(perfect ? [SCREENS.stamps.perfect] : [])],

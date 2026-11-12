@@ -71,6 +71,24 @@ let host: HTMLElement | null = null;
 /** overlay가 뿌리 칸을 넘긴다 — 무대 배율 안에서 그린다 */
 export const setRewardHost = (el: HTMLElement): void => { host = el; };
 
+/**
+ * 창 · 보상 연출이 떠 있으면 맨 위 하나만 남기고 뒤(화면 · HUD · 조작 키)를 inert로 막는다. 열고 닫을 때마다 부른다.
+ * 키보드 입력(window keydown)과 뒤로 가기는 inert와 무관하게 돈다
+ */
+export function syncBehind(): void {
+  const root = host;
+  if (!root) return;
+  const rf = root.querySelectorAll(':scope > .rf');
+  const top = rf[rf.length - 1] ?? root.querySelector(':scope > .ov-modal:not([hidden])');
+  const behind = [...root.children, ...root.parentElement?.querySelectorAll(':scope > #hud-layer, :scope > #touch-layer') ?? []];
+  // 내가 건 것만 푼다(data-behind) — 도트판 · 배치 편집이 건 inert는 그쪽이 푼다
+  for (const el of behind as HTMLElement[]) {
+    const want = !!top && el !== top;
+    if (want && !el.inert) { el.inert = true; el.dataset.behind = '1'; }
+    else if (!want && el.dataset.behind) { el.inert = false; delete el.dataset.behind; }
+  }
+}
+
 let queue: Promise<void> = Promise.resolve();
 let closeNow: (() => void) | null = null;
 /** 보상 연출이 떠 있나 — 떠 있는 동안 홈 메뉴 키를 먹지 않는다(scenes.update) */
@@ -112,6 +130,7 @@ function open(o: RewardShow): Promise<void> {
       <button type="button" class="btn cta lg rf-ok">확인</button>
     </div>`;
     parent.appendChild(el);
+    syncBehind();
 
     const cells = [...el.querySelectorAll<HTMLElement>('.rf-cells .rw')];
     const start = o.tier === 'l' ? 620 : 120;
@@ -152,6 +171,7 @@ function open(o: RewardShow): Promise<void> {
       timers.forEach(clearTimeout);
       closeNow = null;
       el.remove();
+      syncBehind();
       done();
     };
     closeNow = close;

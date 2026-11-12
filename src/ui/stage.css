@@ -133,7 +133,7 @@
 
 /* 칸 규칙 — 지도 · 일지 · 보고서가 같이 쓴다(.st-sub = 보고서 연습 줄, .st-id = 보고서 머리 · 일지). 목록 카드 시절 값 그대로 */
 .st-id { grid-area: id; font: 700 14px/1 var(--body); color: var(--ink2); }
-.st-lamp { grid-area: lamp; padding: 3px 6px 2px; border: 2px solid var(--ink); font: 700 13px/1 var(--body); white-space: nowrap; }
+.st-lamp { grid-area: lamp; padding: 3px 6px 2px; border: 2px solid var(--ink); font: 700 13.5px/1 var(--body); white-space: nowrap; }
 .st-sub { grid-area: sub; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; min-height: 16px; }
 .st-pips { display: inline-flex; gap: 3px; }
 .st-pips i { width: 10px; height: 10px; border: 2px solid var(--ink3); }
@@ -170,14 +170,14 @@
 
 .st-lrow:nth-child(even)::after { width: 82%; rotate: 0.5deg; }
 .st-lrow b { grid-area: name; font: 700 16px/1.25 var(--body); }
-.st-lrow small { grid-area: small; font: 700 12.5px/1.35 var(--body); color: var(--ink2); }
+.st-lrow small { grid-area: small; font: 700 13.5px/1.35 var(--body); color: var(--ink2); }
 .st-lrow.off { color: var(--ink2); }
 
 /* ── 철거 보고서 속 — 결과 보고서 한 장(style.css .rp) 안. 위 62 ~ 아래 480에 들게 줄을 낮춘다 ── */
 .st-rname { font: 700 17px/1.3 var(--body); }
 .st-rname .st-id { font-size: 15px; }
-.st-rname small { margin-left: 6px; padding: 2px 6px 1px; border: 2px solid var(--ink); font: 700 13px/1 var(--body); white-space: nowrap; }
-.st-sub { font: 700 13px/1.2 var(--body); color: var(--ink2); }
+.st-rname small { margin-left: 6px; padding: 2px 6px 1px; border: 2px solid var(--ink); font: 700 13.5px/1 var(--body); white-space: nowrap; }
+.st-sub { font: 700 13.5px/1.2 var(--body); color: var(--ink2); }
 .st-time { font: 400 40px/1 var(--black); letter-spacing: 0.01em; }
 .st-time.miss { color: var(--ink2); }
 .st-time small { font: 700 15px/1 var(--body); }
