@@ -1438,7 +1438,7 @@ export function createApp(
   /** 결제가 열렸거나 못 받은 결제를 받았다 — 열린 상점 · 홈(특가)을 다시 그린다 */
   function iapRedraw(): void {
     const scr = overlay.getScreen();
-    if (overlay.modalOpen()) return; // 열린 창은 닫지 않는다 — 다음 그리기 때 반영된다
+    if (overlay.modalOpen() || rewardOpen()) return; // 열린 창 · 보상 연출은 건드리지 않는다 — 다음 그리기 때 반영된다
     if (scr === 'shop') openShop();
     else if (scr === 'title') {
       overlay.showTitle(titleView());
