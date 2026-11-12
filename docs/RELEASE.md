@@ -1,7 +1,7 @@
 <!-- ★08-30: levain(르방이) 셸 릴리스 절차서를 건뿌용으로 각색 이식(ROADMAP Wave 4).
      루트≠셸 구조 차이: 건뿌는 웹 게임이 루트, 셸은 shell/ 하위 별도 패키지다.
      아래 본문에서 android/ 는 shell/android/, 프로젝트 루트 명령은 shell/ 기준으로 읽는다.
-     ★08-30 갱신: OTA는 배선 완료(§8) — 호스팅 gunbbu-ota.vercel.app, 버전 출처는 src/version.ts 하나.
+     ★08-30 갱신: OTA는 배선 완료(§8) — 호스팅 <우리 호스트>(`VITE_OTA_BASE`), 버전 출처는 src/version.ts 하나.
      ★10-25 정정: AdMob은 "해당 없음"이 아니다(보상형 광고 실사용) · 개인정보처리방침은 public/privacy.html 하나(§7·§8) · Play 첫 출시 절차 §7-1 추가. -->
 
 # 건뿌 — 빌드·릴리스 절차
@@ -32,9 +32,9 @@ npm run dev           # 웹 확인 (Chrome 모바일 뷰포트)
 **규칙**: 웹 자산(dist/에 들어가는 전부 — JS·CSS·이미지·문구·상수)을 고쳐 APK/AAB를 재빌드했으면, **같은 코드로 OTA를 한 번 더 발행**해 매니페스트를 그 이상으로 올린다.
 
 ```bash
-npm run ota:release -- <versionName보다 높은 버전>   # 예: 네이티브 1.0 → 1.0.2
+VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <versionName보다 높은 버전>   # 예: 네이티브 1.0 → 1.0.2
 cd ota && npx vercel --prod --scope jirings-projects
-curl -s https://gunbbu-ota.vercel.app/manifest.json   # version 확인
+curl -s https://<우리 호스트>/manifest.json   # version 확인
 ```
 
 `versionName`을 올리는 빌드라면 OTA 버전도 그보다 높게 잡는다. 발행을 건너뛰려면 매니페스트가 네이티브 이하여야 한다(그 경우 OTA 자체가 무효). 적용 트리거는 §8대로 **백그라운드 전환 후 복귀**.
@@ -197,7 +197,7 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 > 3. 아직 없는 것 — **출처 서명**. 체크섬이 같은 매니페스트에서 오므로 호스트를 소유한 사람이 곧 신뢰 근거다.
 >    켜기 전에 Capgo 서명(공개키를 `shell/capacitor.config.ts`에 넣고 번들에 서명) 또는 허용 SHA 고정 중 하나를 넣을 것.
 
-`@capgo/capacitor-updater`(shell/ 의존성) + 정적 호스팅 `https://gunbbu-ota.vercel.app`
+`@capgo/capacitor-updater`(shell/ 의존성) + 정적 호스팅 `https://<우리 호스트>`
 (`manifest.json` + `bundles/*.zip` 두 파일뿐, 서버 로직 없음). 앱이 부팅 3초 뒤 매니페스트를 읽고
 새 버전이면 백그라운드로 받아 두었다가, **앱을 백그라운드로 보냈다 다시 열 때** 적용한다
 (세션 중에는 화면이 갈아끼워지지 않는다). 완전 종료 후 재시작만으로는 적용되지 않는다 —
@@ -220,13 +220,15 @@ Capgo 클라우드 URL 3종 공백으로 차단) · `scripts/ota-release.mjs`(�
 **릴리스 절차**
 
 ```bash
-npm run ota:release -- <version>             # 예: 1.0.1 — 빌드 → zip → sha256 → ota/ 산출물
-npm run ota:release -- <version> --dry-run   # 파일 쓰기 없이 빌드·zip·체크섬만 확인
-npm run ota:release -- <version> --min-native=<x.y>   # 새 네이티브 플러그인을 전제한 번들이면
+VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>   # 예: 1.0.1 — 빌드 → zip → sha256 → ota/ 산출물 (변수가 없으면 멈춘다)
+npm run ota:release -- <version> --dry-run   # 파일 쓰기 없이 빌드·zip·체크섬만 확인 (변수 없이 된다)
+VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version> --min-native=<x.y>   # 새 네이티브 플러그인을 전제한 번들이면
 
 cd ota && npx vercel --prod --scope jirings-projects   # 실제 배포는 이 한 줄
-curl -s https://gunbbu-ota.vercel.app/manifest.json   # version 확인
+curl -s https://<우리 호스트>/manifest.json   # version 확인
 ```
+
+OTA를 켜는 날 `scripts/ota-release.mjs`가 릴리스 가드(`scripts/check-release.mjs`의 `checkRelease`)를 통과한 번들만 올리게 고칠 것(지금 1.0은 OTA 꺼짐).
 
 스크립트가 하는 일(levain 정본 + 건뿌 보강 3가지):
 
