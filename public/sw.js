@@ -23,7 +23,6 @@ const APP_SHELL = [
   './fonts/body-700.woff2',
   './fonts/ui-500.woff2',
   './fonts/ui-700.woff2',
-  './fonts/mono-500.woff2',
   './fonts/mono-700.woff2',
   './privacy.html',
 ];

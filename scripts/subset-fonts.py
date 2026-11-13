@@ -32,7 +32,6 @@ FONTS = [
     ('BlackHanSans-Regular.ttf', 'display.woff2', True, None),
     ('IBMPlexSansKR-Medium.ttf', 'ui-500.woff2', True, 'Gunbbu Sans'),
     ('IBMPlexSansKR-Bold.ttf', 'ui-700.woff2', True, 'Gunbbu Sans'),
-    ('IBMPlexMono-Medium.ttf', 'mono-500.woff2', False, 'Gunbbu Mono'),
     ('IBMPlexMono-Bold.ttf', 'mono-700.woff2', False, 'Gunbbu Mono'),
     # UI 「먹 한 획」(2026-10-31): 붓글씨 = 동해독도, 본문 = 고운바탕. 둘 다 예약 이름이 없어 그대로 둔다.
     ('EastSeaDokdo-Regular.ttf', 'brush.woff2', True, None),

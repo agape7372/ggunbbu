@@ -102,7 +102,7 @@
 - 불변 규칙 정적 가드 = `tests/invariants-static.test.mjs`(core 순수 · 런타임 deps 0 · `shadowBlur` 0 · 스테이지 경로 `Math.pow` · 삼각함수 금지. 불변 1 · 6 · 13 · 14).
 - **새 한글은 주석까지 글꼴 서브셋에 들어가야 한다** — src `.ts`·`.json`·html에 처음 쓰는 글자가 있으면
   `tests/font-glyphs.test.mjs`가 깨진다 → `python scripts/subset-fonts.py tmp/fonts-src`로 다시 굽는다
-  (원본 TTF 8개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 500/700 · 동해독도 · 고운바탕 400/700.
+  (원본 TTF 7개 = Black Han Sans · IBM Plex Sans KR 500/700 · IBM Plex Mono 700 · 동해독도 · 고운바탕 400/700.
   `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).
   주석 한 줄 때문이면 서브셋에 있는 말로 주석을 고치는 쪽이 싸다(11-12 주석의 「빽」 한 글자로 떨어졌다). CSS 주석은 안 본다.
 - 디버그 APK: `npm --prefix shell run web:build` → `npm --prefix shell run sync` → `npm --prefix shell run apk`.

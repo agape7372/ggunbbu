@@ -42,6 +42,13 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />
+
+        <!-- 광고 SDK는 기본값이면 앱이 켜지자마자 측정 자료를 Google로 보낸다. 처리방침은
+             「광고 보기 버튼을 누르지 않으면 전송되지 않습니다」라고 적었으니, 첫 광고 요청
+             (`src/platform/ads.ts` ensureInitialized) 전까지 미룬다. 빼면 방침 문장이 거짓이 된다. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
+            android:value="true" />
     </application>
 
     <!-- Permissions -->

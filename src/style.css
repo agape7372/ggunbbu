@@ -44,12 +44,6 @@
 }
 @font-face {
   font-family: 'Gunbbu Mono';
-  src: url('/fonts/mono-500.woff2') format('woff2');
-  font-weight: 400 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Gunbbu Mono';
   src: url('/fonts/mono-700.woff2') format('woff2');
   font-weight: 700 900;
   font-display: swap;
