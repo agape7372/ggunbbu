@@ -43,9 +43,9 @@ export const STAGES: readonly StageDef[] = [
     script: '', boss: 'wind' },
   // ── 3 기와능선: 화산탄(기와) ──
   { id: '3-1', region: 2, theme: 'eastasia', speed: 0.15, secret: 'pile3', par: 4110, master: 3150,
-    script: 'R . R . R2 . wwww . R2 . wmww . R3 . wmww . mwwww . R4 . wmwww . R3 . mmwww . R2 . wmwwww+R' },
-  { id: '3-2', region: 2, theme: 'eastasia', speed: 0.2, secret: 'quad', par: 4200, master: 3240,
-    script: 'R2 . wwmw . R3 . wmwm+R . wwmw . R . R4 . mmwmw . wwwmw . R2 . mhwmm+R .. mwmmw . R . R3 . mwwww+R' },
+    script: 'wmww R R2 . wwmww R3 . www+R mwwww . mwww+R . R4 wmwww . R2 . wmwwww+R' },
+  { id: '3-2', region: 2, theme: 'eastasia', speed: 0.16, secret: 'quad', par: 4200, master: 3240,
+    script: 'wwmww R2 . www+R wmwmw . R4 mwmmw . R3 >mhwmm . wwwmw . wmwm+R' },
   { id: '3-B', region: 2, theme: 'eastasia', speed: 0, secret: 'tileZero', par: 4050, master: 3120,
     script: '', boss: 'pagoda' },
   // ── 4 철근 해안: 번개(철근) ──

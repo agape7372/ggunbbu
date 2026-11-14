@@ -149,7 +149,9 @@ function stepScript(s: GameState): void {
   // 1막 trySpawn과 같은 셈 — 0이 된 다음 틱에 나온다(▼ 예고 · incoming 소리가 그 박을 안다)
   if (s.stackSpawnCd > 0) { s.stackSpawnCd -= 1; return; }
   if (st.wait > 0) { st.wait -= 1; return; }
-  for (const it of steps[st.step].items) emit(s, it);
+  const items = steps[st.step].items;
+  const withBuild = items.some((it) => it.k === 'build');
+  for (const it of items) emit(s, it, withBuild);
   st.step += 1;
   st.armed = false;
 }
@@ -172,7 +174,7 @@ function stepHasty(s: GameState): void {
   }
 }
 
-function emit(s: GameState, it: ScriptItem): void {
+function emit(s: GameState, it: ScriptItem, withBuild: boolean): void {
   const st = s.stage!;
   const def = stageDef(st.id);
   const diff = STAGE.DIFF[st.diff];
@@ -191,7 +193,8 @@ function emit(s: GameState, it: ScriptItem): void {
     for (let i = 0; i < it.n; i++) spawnBolt(s, 0, Math.max(1 - ACT2.BOLT_CUE_TICKS, i * STAGE.BOLT_STAGGER + diff.cue));
   } else if (it.k === 'rock') {
     for (let i = 0; i < it.n; i++) {
-      s.entities.push({ kind: 'rock', lane: 0, y: VIEW.H + i * STAGE.ROCK_SPACING, vy: 0, hp: ACT2.ROCK_HP });
+      // 건물과 같이 나온 기와(+R)만 난이도 배율로 떨어진다(STAGE.ROCK_FALL) — 견습에서 기와만 먼저 와 더미가 되지 않게
+      s.entities.push({ kind: 'rock', lane: 0, y: VIEW.H + i * STAGE.ROCK_SPACING, vy: 0, hp: ACT2.ROCK_HP, fall: withBuild ? STAGE.ROCK_FALL[st.diff] : 1 });
     }
     s.events.push({ kind: 'boltCue', lane: 0 }); // 2막 화산탄과 같은 낙하 예고
   }
