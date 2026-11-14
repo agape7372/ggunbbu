@@ -11,7 +11,7 @@ import { fmtStageTime } from '../src/content/stages';
 import { runStage } from './stageBot';
 import { emptyRecord, mergeResult, stampBits } from '../src/meta/stageRecord';
 import {
-  arcadeBar, bossName, endView, masterLine, pickReason, progressText, stageBar, stageHudLine, stampTotals, workProgress,
+  arcadeBar, bossName, endView, masterLine, pickReason, progressText, stageBar, stageHudLine, stampTotals, workTotal,
 } from '../src/ui/stageLogic';
 
 const ALL = { done: true, safe: true, inTime: true, secret: true, master: true };
@@ -53,7 +53,7 @@ describe('판 위 한 줄과 진척', () => {
       for (let i = 0; i < ticks; i++) advance(s, EMPTY_INPUT);
       return s;
     };
-    const total = workProgress('2-1', 0).total;
+    const total = workTotal('2-1');
     expect(stageBar(at('2-1'))).toEqual({ label: `남은 ${total}`, fill: 0, n: total, end: '끝' });
     const first = at('2-1', false, STAGE.FIRST_WAIT + 2);
     expect(first.stack).not.toBeNull();
@@ -87,10 +87,9 @@ describe('판 위 한 줄과 진척', () => {
     for (const d of STAGES.filter((x) => !x.boss)) {
       const run = runStage(d.id, 1);
       expect(run.result.cleared, d.id).toBe(true);
-      expect(workProgress(d.id, 0), d.id).toEqual({ done: 0, total: run.result.splits.length });
+      expect(workTotal(d.id), d.id).toBe(run.result.splits.length);
     }
-    expect(workProgress('1-2', 0).total).toBe(9);
-    expect(workProgress('1-2', 999).done).toBe(9); // 끝까지 가면 총 걸음과 같다
+    expect(workTotal('1-2')).toBe(9);
   });
 
   it('못 깬 진척: 대본 중이면 걸음, 명물 앞이면 명물 이름(집행기는 자기 이름)', () => {

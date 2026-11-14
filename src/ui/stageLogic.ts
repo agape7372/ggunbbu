@@ -27,20 +27,16 @@ export function masterLine(ticks: number, master: number): string {
   return ticks < master ? `${t} · ${fmtGap(master - ticks)}초 ${STAGE_MODE.ahead}` : t;
 }
 
-/**
- * 걸음 셈 — 쉼(.)은 걸음이 아니다(core/stage.ts 와 같은 판정).
- * step = 대본에서 지나간 칸 수(쉼 포함), done = 그중 걸음, total = 대본 전체 걸음
- */
-export function workProgress(id: string, step: number): { done: number; total: number } {
-  const steps = stageScript(id);
-  const isWork = (x: (typeof steps)[number]): boolean => x.items[0].k !== 'rest';
-  return { done: steps.slice(0, step).filter(isWork).length, total: steps.filter(isWork).length };
+/** 대본 전체 걸음 수 — 쉼(.)은 걸음이 아니다(core/stage.ts 와 같은 판정) */
+export function workTotal(id: string): number {
+  return stageScript(id).filter((x) => x.items[0].k !== 'rest').length;
 }
 
-/** 판의 걸음 진행 = 치운 걸음(tally.splits) / 대본 전체 걸음. 판 위 막대 · 못 깬 보고서 「N/M」 · 「미처리 N건」이 같은 수를 본다(떨어지는 중인 걸음은 아직 남은 셈) */
+/** 판의 걸음 진행 = 치운 걸음(tally.splits) / 대본 전체 걸음. 판 위 막대 · 못 깬 보고서 「N/M」 · 「미처리 N건」이 같은 수를 본다(떨어지는 중인 걸음은 아직 남은 셈).
+ *  대본 커서(stage.step)로 세지 않는다 — 커서는 떨어지는 중인 걸음까지 지나가 있어 하나 앞선다(11-14 결함 A) */
 export function stageSteps(s: GameState): { done: number; total: number } {
   const st = s.stage!;
-  return { done: st.tally.splits.length, total: workProgress(st.id, 0).total };
+  return { done: st.tally.splits.length, total: workTotal(st.id) };
 }
 
 /** 판 위 띠 가운데 — 첫 줄 「1-1 회랑 3번지」 · 둘째 줄 시계 「0:12.34」. 걸음 수는 띠 밑 가로 게이지(stageBar)가 보인다 */

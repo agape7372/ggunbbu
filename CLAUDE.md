@@ -77,12 +77,13 @@
 14. **작업 지시서(스테이지 모드)는 결정적이다**(2026-10-31, 정본 = `docs/STAGES_2026-10-31.md`). 같은 입력이면 같은 판이 나온다.
     기한 · 전임자는 봇이 잰 값이다. core · config에서 스테이지 판에 닿는 것(공용 PLAYER · GUARD · WEAPON 포함)이나 대본(`core/stages.ts`)을
     바꾸면 다시 잰다(문서 §7-1). 어긋나면 `tests/stage.test.ts`가 깨진다. 스테이지 경로에 `Math.pow` · 삼각함수 금지(기기마다 같은 판, 가드 `tests/invariants-static.test.mjs`).
-    **봇이 깬다고 사람이 깨는 게 아니다**(11-01, 봇은 다 깼는데 사용자는 2-1부터 못 깼다). 대본 · 속도를 고치면 사람 대역도 돌린다
-    (`HUMAN=1 DIFFS=0,1,2 npx vitest run --no-cache tests/stage-measure.test.ts -t 사람` = 지연 6~16 × 연타 8~12 = 판마다 55판, 문서 §7-2). 대역은 순수 속도를 못 잰다. 속도는 사람 실측에 맞춘다.
+    **봇이 깬다고 사람이 깨는 게 아니다**(11-01, 봇은 다 깼는데 사용자는 2-1부터 못 깼다). 대본 · 속도 · 보스 값을 고치면 **사용자 대역**을 돌린다
+    (`USER_BOT=1 DIFFS=0,1,2 npx vitest run --no-cache tests/stage-measure.test.ts -t 사용자` = 지연 6~16 × 연타 5~9 × 손 늦음 J5 = 판마다 55판. 사용자 10-31 기록 넷에 맞췄다. 목표 띠 = `docs/OVERHAUL_2026-11-14.md` §3, 문서 §7-3).
+    사람 대역(`HUMAN=1 … -t 사람`, §7-2)은 사용자보다 세다(옛 2-1 87% · 사용자 대역 2%). 연타 절벽 감시로만 쓴다(정규 ≥ 40%). 대역은 순수 속도를 못 잰다. 속도는 사람 실측에 맞춘다.
     기록 코드 · 공유 · 다시 보기는 없다(2026-11-01 뺌, 되살릴 땐 커밋 `8d30fdf`).
     렌더 · 소리는 GameState를 읽기만 한다. 종은 땅에 닿으면 깨진다(빗나감, 깔지 않는다). 깬 뒤 쓰러짐 연출 중엔 안 다친다.
     「깼다」의 정본 = `src/core/combat.ts` `wonAlready`(지시서 done · 보스 defeated · 명물 down). 피격 · 깔림 · 깔린 채 손실이 모두 이 술어를 본다(아케이드 집행기 포함, 2026-11-13).
-    가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts` · `core-guards.test.ts`.
+    가드: `tests/stage.test.ts` · `landmark.test.ts` · `stage-records.test.ts` · `core-guards.test.ts` · `stage-fixes.test.ts`(11-14 결함 고침).
 15. **메타 화면은 `meta.css` 머리의 글자 값(`--t-*`)과 `.btn.sm` · `.btn.lg` · `.qty` · `.ms-bar`만 쓴다**(2026-11-01, 정본 = `docs/META2_2026-11-01.md`).
     작은 글 13.5px 밑 금지, 외곽선 수량 글씨 금지, 누름 칸 48 이상. 보상은 `rewardFx` 세 단계(S · M · L)로 보이고 토스트로 되돌리지 않는다.
     크기는 11-02 손질 값이다(사용자 「크기좀 적절하게 조절」: 제목 붓 40 · 구획 27 · 이름 16 · 큰 단추 54 · 작은 단추 48 · 탭바 도장 54).

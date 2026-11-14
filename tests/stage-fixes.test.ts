@@ -48,6 +48,24 @@ describe('11-14 스테이지 결함 고침', () => {
     });
   }
 
+  // C — 종이 판에 없을 때 쓴 용오름: 필살 틱엔 종이 없고, 뒤따른 회오리가 종을 친다(wazaHit 갈래만 센다)
+  it('C 1-B: 종 오기 전에 쓴 용오름이 뒤에 온 종을 치면 종을 벤 것이다', () => {
+    const s = start('1-B', 1, 'baram');
+    let used = false;
+    while (!s.over && s.tick < MAX) {
+      let f = stageBot(s);
+      if (!used && s.lm?.st === 'play' && !s.stack && s.lm.cue >= 1 && s.lm.cue <= 4) {
+        s.wazaGauge = WAZA_GAUGE.MAX;
+        f = X;
+        used = true;
+      }
+      step(s, f);
+    }
+    expect(used).toBe(true);
+    expect(s.stage!.tally.bellCuts).toBeGreaterThan(0);
+    expect(judgeStage(s).stamps.secret).toBe(false);
+  });
+
   it('B 2-B: 천지로 부순 좌판도 벤 것이다 — 장터가 안 열린다', () => {
     const s = start('2-B', 1, 'tenchi');
     let used = false;

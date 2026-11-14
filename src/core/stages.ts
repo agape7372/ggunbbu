@@ -44,13 +44,13 @@ export const STAGES: readonly StageDef[] = [
   // ── 3 기와능선: 화산탄(기와) ──
   { id: '3-1', region: 2, theme: 'eastasia', speed: 0.15, secret: 'pile3', par: 3180, master: 2460,
     script: 'wmww R R2 . wwmww R3 . www+R mwwww . mwww+R . R4 wmwww . R2 . wmwwww+R' },
-  { id: '3-2', region: 2, theme: 'eastasia', speed: 0.16, secret: 'quad', par: 2820, master: 2190,
-    script: 'wwmww R2 . www+R wmwmw . R4 mwmmw . R3 >mhwmm . wwwmw . wmwm+R' },
+  { id: '3-2', region: 2, theme: 'eastasia', speed: 0.16, secret: 'quad', par: 2850, master: 2190,
+    script: 'wwmww R2 . www+R wmwmw . R3 >mhwmm . wwwmw . R4 mwmmw . wmwm+R' },
   { id: '3-B', region: 2, theme: 'eastasia', speed: 0, secret: 'tileZero', par: 3900, master: 3000,
     script: '', boss: 'pagoda' },
   // ── 4 철근 해안: 번개(철근) ──
-  { id: '4-1', region: 3, theme: 'modern', speed: 0.2, secret: 'airBolt', par: 3210, master: 2460,
-    script: 'wmww . Z wwmww . Z2 mwww . wwww+Z mmww . Z3 wmww+Z . wwmww Z2 . wmwww+Z .. wmwwww+Z2' },
+  { id: '4-1', region: 3, theme: 'modern', speed: 0.2, secret: 'airBolt', par: 3090, master: 2370,
+    script: 'wmww . Z wwmww . Z2 mwww . wwww+Z mmww . Z3 wmww+Z . wwmww+Z2 . wmwww+Z .. wmwwww+Z2' },
   { id: '4-2', region: 3, theme: 'modern', speed: 0.17, secret: 'noSpecial', par: 3270, master: 2310,
     script: 'wmww wwmww . mwww~ R2 . wmwww! Z . wmwww R3 . hmww! . R4 hmww+Z . hmwww!+Z' },
   { id: '4-B', region: 3, theme: 'modern', speed: 0, secret: 'cargoAir', par: 4170, master: 3210,

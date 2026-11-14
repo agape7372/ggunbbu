@@ -773,7 +773,7 @@ function bgColor(s: GameState): string {
 /**
  * 다음 건물 예고. 완파 후 스폰까지의 공백이 아무 신호 없는 빈 화면이었다(08-30 7차).
  * 번개 큐와 같은 규칙을 따른다 — 카메라 변환 **밖**, 필드 상단 고정, 잉크 실루엣.
- * 렌더 전용이라 시뮬은 안 건드린다: 읽는 값은 `stackSpawnCd` 하나뿐이다.
+ * 렌더 전용이라 시뮬은 안 건드린다: 읽는 값은 `spawnCueCd(s)`(core/landmark) 하나뿐이다.
  */
 function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 명물 창 · 올라가기 중엔 0 — 예고음(audio/consume.ts)과 같은 값을 읽는다
