@@ -1837,3 +1837,10 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 검수 도구(`tmp/cap`, git 밖): `node tmp/cap/motion.mjs <개발 서버 주소> <출력 폴더> [무기,...] [clean|hit]` → `python tmp/cap/motion-sheet.py <출력 폴더> <무기,...>`(검수 장) · `python tmp/cap/motion-grid.py <출력 폴더> <무기,...> grid`(영상용 격자 프레임).
 - 검증: typecheck 0 · 77파일 1013 시험(7 건너뜀) · 실제 렌더러 틱 캡처(건물 없는 판 · 치는 판). 실기기 손맛은 안 봤다.
 - 남은 것: 필살 여섯 · 점프 · 가드는 4판 그대로다. 공중 베기는 윗몸만 무기별이다. 사용자 영상 판정 → 합침.
+
+## 2026-11-14 (6) — 모션 개편 main 합침 · Pages · 시험판 배포
+
+- 사용자 「일단 앱승격까지」. `feat/motion-overhaul` `ab5bf32`를 `release/1.0` · `main`으로 fast-forward push했다(`82f1646..ab5bf32`).
+- Pages 배포 실행 `43564344882` 성공.
+- 시험판: 배포 전 라이브가 마지막 판 `index-Bbci56rg.js` 그대로인 걸 확인했다. `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview` 복사 → `vercel deploy --prod`. 라이브 `index-CpifcJGu.js`, 375×812에서 페이지 오류 0.
+- 앱 껍데기가 시험판을 띄우니 앱을 다시 켜면 새 모션이 보인다. 네이티브 변경은 없어 APK는 그대로다. 실기기 손맛은 아직 안 봤다.
