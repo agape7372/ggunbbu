@@ -788,7 +788,7 @@ describe('2판 그림 — 종탑', () => {
   it('3막: 점수가 종 수(12)를 넘어도 칸은 12개로 깨지지 않고, 절반 눈금과 「이번 파는 안전」 신호는 없다', () => {
     expect(bellTally(15, 9, 12, false)).toHaveLength(12);
     expect(bellTally(15, 9, 12, false).every((c) => c === 'full')).toBe(true);
-    const snap = (act: 1 | 3) => snapAt('1-B', { st: 'play', act, wave: 3, got: 5 });
+    const snap = (act: 1 | 3) => snapAt('1-B', { st: 'play', act, wave: LANDMARK.BELL.ACT3_WAVE, got: 5 });
     expect(sndNames(snap(1), { ...snap(1), tick: 11, got: 6 })).toEqual(['uiOk']); // 12시 1막: 절반(6)에 닿는다
     expect(sndNames(snap(3), { ...snap(3), tick: 11, got: 6 })).toEqual([]);
     // 눈금: 시각 칸 뒤의 짧은 세로선(길이 칸+6)이 3막에만 없다
@@ -806,7 +806,7 @@ describe('2판 그림 — 종탑', () => {
       });
       return n;
     };
-    expect(ticks(4)).toBe(1);
+    expect(ticks(LANDMARK.BELL.FLOORS)).toBe(1);
     expect(ticks(1)).toBe(0);
   });
 

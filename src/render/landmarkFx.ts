@@ -345,7 +345,7 @@ function drawBellGhost(ctx: CanvasRenderingContext2D, g: number): void {
 
 // ── 몸 · 장식 ───────────────────────────────────────────────────
 
-/** 시계 — 몸 최하층 가운데. 시침 = 그 파의 시각(3 · 6 · 9 · 12), 초침은 cue가 줄어드는 동안 똑딱 */
+/** 시계 — 몸 최하층 가운데. 시침 = 그 파의 시각(3 · 6 · 12), 초침은 cue가 줄어드는 동안 똑딱 */
 function drawClock(ctx: CanvasRenderingContext2D, lm: LandmarkState, y: number, block = -1): void {
   const R = 22; // 아랫단에 문턱 칸이 들어갈 자리를 남긴다
   ctx.save();
