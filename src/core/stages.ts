@@ -35,10 +35,10 @@ export const STAGES: readonly StageDef[] = [
   { id: '1-B', region: 0, theme: 'europe', speed: 0, secret: 'bellNoCut', par: 5550, master: 1560,
     script: '', boss: 'bell' },
   // ── 2 강턱 시장: 빠른 낙하 · 붙어 오기 · 성급한 건물 ──
-  { id: '2-1', region: 1, theme: 'asia', speed: 0.1, secret: 'noJump', par: 3060, master: 2370,
-    script: 'wwww wwwww wmwww . www! wwww! . wmwww! wwww! >www! . mwwww! >wmwww! . wmwww! >mwwww!' },
+  { id: '2-1', region: 1, theme: 'asia', speed: 0.15, secret: 'noJump', par: 3060, master: 2370,
+    script: 'wmwww . www! wwwww! . wwww >wmwww . mwww! >wwww! . mmww! . mwwww! >wmwww!' },
   { id: '2-2', region: 1, theme: 'asia', speed: 0.12, secret: 'noHasty', par: 3420, master: 2640,
-    script: 'mwwww mwww~ . mwwww wwww! . hmww wwwww! . mmmww! >mwww~ . hmww >wmwww! . hmww~ . hmmw~' },
+    script: 'mwwww . whmww hmww . mww~ mmwww . hww~ >mmwww! . wmmwww hmwww . hmw~' },
   { id: '2-B', region: 1, theme: 'asia', speed: 0.25, secret: 'stall7', par: 3390, master: 2610,
     script: '', boss: 'wind' },
   // ── 3 기와능선: 화산탄(기와) ──
