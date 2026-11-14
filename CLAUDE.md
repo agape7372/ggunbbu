@@ -3,7 +3,7 @@
 키루비루(斬るビル) 메커니즘 재현 + 오리지널 에셋의 모바일 웹 게임.
 계획 정본: `C:\Users\agape\.claude\plans\https-namu-wiki-w-ed-82-a4-eb-a3-a8-eb-b-recursive-clover.md`
 작업 로그: `docs/DEVLOG.md` (마일스톤마다 append — 필수).
-현황 · 재개(2026-11-13): 출시 전 총 감사 정본 = `docs/AUDIT_2026-11-12.md`(검토 목록 · 실기기 확인 · 출시 준비 · 승인 대기는 §4). 11-13에 `release/1.0` · `main`으로 합쳐 push · Pages 배포했다(DEVLOG 「2026-11-13 — main 합침 · Pages 배포」). 시험판 · Play는 그대로다.
+현황 · 재개(2026-11-14 · 처리방침 실측 `1e87013`까지 main · Pages · 시험판 배포. AUDIT §8): 출시 전 총 감사 정본 = `docs/AUDIT_2026-11-12.md`(검토 목록 · 실기기 확인 · 출시 준비 · 승인 대기는 §4). 11-13에 `release/1.0` · `main`으로 합쳐 push · Pages 배포했다(DEVLOG 「2026-11-13 — main 합침 · Pages 배포」). 시험판 · Play는 그대로다.
 
 ## 불변 규칙
 

@@ -1780,3 +1780,10 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 검증: typecheck 0 · 77파일 1013 시험(7 건너뜀) · 빌드(dist 40파일 4.26MB) · 디버그 APK · 에뮬레이터 실행 + 구글 시험 광고 뜸.
 - 교훈: 통신 문장은 SDK 문서가 아니라 UID 통신량으로 잰다. 전송 주체는 로그의 `Making request to`와 앱 자료 폴더의 대기열 DB로 가린다(디버그 빌드면 `run-as`로 꺼낸다).
 - 남은 것: 합침 · Pages 배포 승인(방침 페이지가 바뀐다) · §4의 결정 · 실기기 · 출시 준비.
+
+## 2026-11-14 (2) — main 합침 · Pages · 시험판 배포
+
+- 사용자 「합쳐」. `chore/review-1114` `1e87013`을 `release/1.0` · `main`으로 fast-forward push했다(`6bd845a..1e87013`, 하나씩).
+- Pages 배포 실행 `43549204468` 성공. 라이브 `index-ti-r4I_I.js`(로컬 빌드와 같은 이름) · `privacy.html` 시행일 2026-11-14.
+- 시험판(`gunbbu-preview.vercel.app`): 배포 전 라이브가 폴더의 마지막 판 `index-DDXcpgfF.js` 그대로인 걸 확인했다. `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview` 복사 → `vercel deploy --prod`. 라이브 `index-Bbci56rg.js`. 11-13 감사 고침도 이번에 처음 시험판에 들어갔다.
+- 매니페스트 깃발(`DELAY_APP_MEASUREMENT_INIT`)은 네이티브라 웹 배포로는 안 들어간다. 디버그 APK(`1e87013`)를 사용자에게 보냈다.
