@@ -223,7 +223,7 @@ function finishScript(s: GameState): void {
   if (def.boss === 'executor') {
     st.phase = 'boss';
     s.boss = initBoss();
-    s.boss.hp = STAGE.EXEC_HP; // 스테이지 전용 체력 — 아케이드 BOSS.HP는 그대로
+    s.boss.hp = STAGE.EXEC_HP[st.diff]; // 스테이지 전용 체력 — 아케이드 BOSS.HP는 그대로
     s.combo = 0; // 2막 달 개시와 같다 — 연습(보스부터)과 본판이 같은 조건에서 싸운다. 끊김 이벤트 없음
     // 집행기 패턴 난수는 대본 층을 다 베어 치운 판의 자리에서 시작한다(층마다 잔해가 DEBRIS_RANDS번 뽑는다).
     // 연습 · 필살 · 깔림 Z로 층을 지운 판도 같은 패턴 순서를 받는다

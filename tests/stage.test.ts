@@ -5,7 +5,7 @@ import { STAGES } from '../src/core/stages';
 import { stageDef, stageScript, stageSeed, startStage } from '../src/core/stage';
 import { makeState, advance } from '../src/core/sim';
 import { EMPTY_INPUT } from '../src/core/types';
-import { BOSS, HAT, MAT_HP, STAGE } from '../src/config';
+import { ACT2, BOSS, HAT, MAT_HP, STAGE } from '../src/config';
 import { initBoss, stepBoss } from '../src/core/boss';
 import { addCombo, hurtPlayer } from '../src/core/combat';
 import { runStage, fmtTicks, stageBot, expertBot } from './stageBot';
@@ -164,13 +164,40 @@ describe('판정', () => {
 
 describe('본사 집행기 전용 값(11-09) — 아케이드 BOSS는 그대로', () => {
   it('체력 · 둘째 단계 · 탄속은 판에서만 바뀐다', () => {
-    const s = makeState({ seed: stageSeed('HQ') });
-    startStage(s, { id: 'HQ', diff: 1, weapon: 'sword', waza: 'tenchi', fromBoss: true });
-    advance(s, EMPTY_INPUT);
-    expect(s.boss!.hp).toBe(STAGE.EXEC_HP);
-    expect(STAGE.EXEC_HP).not.toBe(BOSS.HP);
-    expect(STAGE.EXEC_TIER2_DMG[0], '견습은 둘째 단계 없음').toBeGreaterThan(BOSS.HP);
+    for (const diff of [0, 1, 2] as const) {
+      const s = makeState({ seed: stageSeed('HQ') });
+      startStage(s, { id: 'HQ', diff, weapon: 'sword', waza: 'tenchi', fromBoss: true });
+      advance(s, EMPTY_INPUT);
+      expect(s.boss!.hp, `diff ${diff}`).toBe(STAGE.EXEC_HP[diff]);
+    }
+    expect(STAGE.EXEC_TIER2_DMG[0], '견습은 둘째 단계 없음').toBeGreaterThan(Math.max(...STAGE.EXEC_HP));
     expect(initBoss().hp).toBe(BOSS.HP);
+  });
+
+  it('번개 예고는 대본 번개처럼 난이도 cue를 받고, 예고 길이는 판 전용 값이다 — 아케이드는 그대로', () => {
+    const boltCue = (s: ReturnType<typeof makeState>) => {
+      const e = s.entities.find((x) => x.kind === 'bolt');
+      return e?.kind === 'bolt' ? e.cueTicks : -1;
+    };
+    for (const diff of [0, 1, 2] as const) {
+      const s = makeState({ seed: stageSeed('HQ') });
+      startStage(s, { id: 'HQ', diff, weapon: 'sword', waza: 'tenchi', fromBoss: true });
+      advance(s, EMPTY_INPUT);
+      Object.assign(s.boss!, { pattern: 'riseBolt5', st: 'attacking', stTick: 0, step: 0 });
+      stepBoss(s);
+      expect(boltCue(s), `diff ${diff}`).toBe(ACT2.BOLT_CUE_TICKS + STAGE.DIFF[diff].cue);
+      Object.assign(s.boss!, { pattern: 'charge', st: 'telegraph', stTick: STAGE.EXEC_TELE - 1 });
+      stepBoss(s);
+      expect(s.boss!.st).toBe('descend');
+    }
+    const a = makeState({ seed: 1 });
+    a.boss = initBoss();
+    Object.assign(a.boss, { pattern: 'riseBolt5', st: 'attacking', stTick: 0, step: 0 });
+    stepBoss(a);
+    expect(boltCue(a)).toBe(ACT2.BOLT_CUE_TICKS);
+    Object.assign(a.boss, { pattern: 'charge', st: 'telegraph', stTick: STAGE.EXEC_TELE - 1 });
+    stepBoss(a);
+    expect(a.boss.st, '아케이드는 BOSS.CHARGE.TELE').toBe(BOSS.CHARGE.TELE > STAGE.EXEC_TELE ? 'telegraph' : 'descend');
   });
 
   it('둘째 단계 문턱은 난이도를 따라간다', () => {

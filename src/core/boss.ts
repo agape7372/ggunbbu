@@ -78,8 +78,8 @@ export function stepBoss(s: GameState): void {
         b.y = 64; // [정본] 영거리 순간이동
       }
       const dur = b.pattern === 'pbCharge' ? BOSS.PB_CHARGE.TELEPORT + BOSS.PB_CHARGE.TELE
-        : b.pattern === 'cannons' ? BOSS.CANNON.AIM_TELE
-        : BOSS.CHARGE.TELE;
+        : b.pattern === 'cannons' ? aimTele(s)
+        : tele(s);
       if (b.stTick >= dur) {
         if (b.pattern === 'charge' || b.pattern === 'multiCharge') setSt(b, 'descend');
         else if (b.pattern === 'pbCharge') setSt(b, 'charging');
@@ -108,7 +108,7 @@ export function stepBoss(s: GameState): void {
           if (b.pattern === 'multiCharge' && b.step < BOSS.MULTI_CHARGE.COUNT - 1) {
             b.step += 1;                          // [정본] 1·2회 저지해도 반복 돌진
             setSt(b, 'telegraph');
-            b.stTick = BOSS.CHARGE.TELE - BOSS.MULTI_CHARGE.REAIM; // 재조준 단축
+            b.stTick = tele(s) - BOSS.MULTI_CHARGE.REAIM; // 재조준 단축
           } else {
             setSt(b, 'stagger');
             s.events.push({ kind: 'guardBounce', y: 64 });
@@ -122,7 +122,7 @@ export function stepBoss(s: GameState): void {
           if (b.pattern === 'multiCharge' && b.step < BOSS.MULTI_CHARGE.COUNT - 1) {
             b.step += 1;
             setSt(b, 'telegraph');
-            b.stTick = BOSS.CHARGE.TELE - BOSS.MULTI_CHARGE.REAIM;
+            b.stTick = tele(s) - BOSS.MULTI_CHARGE.REAIM;
           } else {
             setSt(b, 'rising');
           }
@@ -133,7 +133,7 @@ export function stepBoss(s: GameState): void {
         if (b.pattern === 'multiCharge' && b.step < BOSS.MULTI_CHARGE.COUNT - 1) {
           b.step += 1;
           setSt(b, 'telegraph');
-          b.stTick = BOSS.CHARGE.TELE - BOSS.MULTI_CHARGE.REAIM;
+          b.stTick = tele(s) - BOSS.MULTI_CHARGE.REAIM;
         } else if (b.pattern === 'charge' && b.tier >= 1 && rand(s) < BOSS.PB_CHARGE.CHAIN_CHANCE) {
           // [정본] B티어: 돌진 후 영거리 연계
           b.pattern = 'pbCharge';
@@ -177,6 +177,20 @@ export function stepBoss(s: GameState): void {
   }
 }
 
+/** 예고 길이 — 본사 집행기는 스테이지 전용 값 */
+function tele(s: GameState): number {
+  return s.stage ? STAGE.EXEC_TELE : BOSS.CHARGE.TELE;
+}
+
+function aimTele(s: GameState): number {
+  return s.stage ? STAGE.EXEC_AIM_TELE : BOSS.CANNON.AIM_TELE;
+}
+
+/** 번개 예고에 더하는 틱 — 본사 집행기는 대본 번개처럼 난이도를 따른다(결함 J) */
+function boltCue(s: GameState): number {
+  return s.stage ? STAGE.DIFF[s.stage.diff].cue : 0;
+}
+
 function setSt(b: BossState, st: BossState['st']): void {
   b.st = st;
   b.stTick = 0;
@@ -198,7 +212,7 @@ function stepAttackPattern(s: GameState, b: BossState): void {
   if (pat === 'riseBolt5') {
     b.hittable = false;
     if (b.step < 5 && b.stTick % BOSS.RISE.BOLT_GAP_5 === 1) {
-      spawnBolt(s, 0);  // 단일 레인 — 이동 회피 불가, 존 16f 창에서 베어라 [정본]
+      spawnBolt(s, 0, boltCue(s));  // 단일 레인 — 이동 회피 불가, 존 16f 창에서 베어라 [정본]
       b.step += 1;
     }
     if (b.step >= 5 && !s.entities.some((e) => e.kind === 'bolt')) setSt(b, 'stagger');
@@ -206,7 +220,8 @@ function stepAttackPattern(s: GameState, b: BossState): void {
     b.hittable = false;
     if (b.step < 3 && b.stTick % BOSS.RISE.WAVE_GAP_9 === 1) {
       // [정본 재해석] 9발 유지. 원작 3레인 동시 → 단일 레인에선 12f 시차 3연발로 흩는다.
-      spawnBolt(s, 0, 0); spawnBolt(s, 0, 12); spawnBolt(s, 0, 24);
+      const c = boltCue(s);
+      spawnBolt(s, 0, c); spawnBolt(s, 0, 12 + c); spawnBolt(s, 0, 24 + c);
       b.step += 1;
     }
     if (b.step >= 3 && !s.entities.some((e) => e.kind === 'bolt')) setSt(b, 'stagger');
@@ -262,7 +277,7 @@ function stepRabbits(s: GameState): void {
         const dx = px - e.x;
         const dy = py - e.y;
         const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const shotV = s.stage ? STAGE.EXEC_RABBIT_SHOT_V : BOSS.RABBIT.SHOT_V; // 본사 집행기는 스테이지 전용 탄속
+        const shotV = s.stage ? STAGE.EXEC_RABBIT_SHOT_V[s.stage.diff] : BOSS.RABBIT.SHOT_V; // 본사 집행기는 스테이지 전용 탄속
         s.entities.push({
           kind: 'shot', lane: s.player.lane,
           x: e.x, y: e.y,

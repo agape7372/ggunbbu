@@ -56,6 +56,6 @@ export const STAGES: readonly StageDef[] = [
   { id: '4-B', region: 3, theme: 'modern', speed: 0, secret: 'cargoAir', par: 4680, master: 3600,
     script: '', boss: 'crane' },
   // ── 본사: 전부 섞고 집행기 ──
-  { id: 'HQ', region: 4, theme: 'modern', speed: 0.2, secret: 'finishSpecial', par: 9120, master: 6930,
-    script: 'mwwww . R2 . mmwww! . R3 . mwww~ . >mwwww! >mwwww! . R4 . Z2 . Z+R2 .. hmwww! ..', boss: 'executor' },
+  { id: 'HQ', region: 4, theme: 'modern', speed: 0.12, secret: 'finishSpecial', par: 9120, master: 6930,
+    script: 'mwwww R2 . mmwww! R3 . hmww~ >mwwww! >mwwww! . R4 . Z2 .. hmwww! ..', boss: 'executor' },
 ];
