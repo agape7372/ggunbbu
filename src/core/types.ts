@@ -77,6 +77,8 @@ export interface Rock {
   hp: number;
   /** 격파 연출 잔해 — 타격 시 콤보만, 착지 무해 [정본] */
   remnant?: boolean;
+  /** 낙하 배율(G · 끝속도). 건물과 같이 나온 대본 화산탄만 난이도 값을 단다(stage.ts emit). 없으면 1 = 아케이드 그대로 */
+  fall?: number;
 }
 
 export interface Shot {

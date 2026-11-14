@@ -168,8 +168,9 @@ export function stepEntities(s: GameState): void {
         remove.push(i);
       }
     } else if (e.kind === 'rock') {
-      e.vy -= STACK.ROCK_G * TICK;
-      if (e.vy < -STACK.ROCK_VTERM) e.vy = -STACK.ROCK_VTERM;
+      const k = e.fall ?? 1;
+      e.vy -= STACK.ROCK_G * k * TICK;
+      if (e.vy < -STACK.ROCK_VTERM * k) e.vy = -STACK.ROCK_VTERM * k;
       e.y += e.vy * TICK;
       if (e.y <= 0) {
         if (e.remnant) {
