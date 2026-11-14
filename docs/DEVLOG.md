@@ -1853,3 +1853,10 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 결과 넷: 조작 키를 메뉴로 쓰는 건 홈뿐(`#stage.keys`). 결과는 키를 숨기고 조작 구역에 `.rp-acts`(공격 자리 = 주홍 폭 단추, 점프 · 필살 · 가드 자리 = 곧은 테 한 줄)를 그린다. 얼굴은 `resultFaces` 그대로(`overlay.setResultKeys`). 누름은 `onResultKey` → 다음 표본에서 그 키 누름으로 `gateStep`에 들어가 연타 · 광고 일어나기 보호가 키와 같다. 상점 · 미션 꼬리표와 띠의 「다음 목표」는 보고서 끝 줄 `.rp-next` 하나로 합쳤다.
 - 멈춤: 위에서 아래로 계속 부수기(주홍 폭) → 설정(`.rk`) → 그만두기(밑줄 글, 두 번 눌러야). 확인 상태도 먹(주홍은 하나).
 - 검증: `tsc` 0 · `npm test` 1010 통과 / 7 건너뜀(goSeat 시험 셋 삭제) · `final-b.mjs` 390×844 · 416×657 지도 · 지도 펼침 · 결과 셋 · 멈춤 · 홈 · 상점 · 미션 · 도감 · 설정 · 판 = 문제 0 · 오류 0. 캡처 도구의 현장 화면 집합과 결과 열림 기준을 `.rk-main:not(.shut)`으로 바꿨다(레포 밖).
+
+## 2026-11-14 (8) — 배치 손질 main 합침 · Pages · 시험판 배포
+
+- 사용자 「나머지 앱승격까지」. `feat/ui-layout-1114` `15cef3b`를 `release/1.0` · `main`으로 fast-forward push했다(`9f2166a..15cef3b`).
+- Pages 배포 실행 `43583936698` 성공.
+- 시험판: 배포 전 라이브가 마지막 판 `index-CpifcJGu.js` 그대로인 걸 확인했다. `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview` 복사 → `vercel deploy --prod`. 라이브 `index-C4sJb9R0.js`, `live-smoke.mjs` 오류 0 · 글꼴 넷 로드.
+- 네이티브 변경은 없어 APK는 그대로다(앱을 다시 켜면 새 판). 실기기 확인은 아직이다.
