@@ -188,7 +188,10 @@ function emit(s: GameState, it: ScriptItem): void {
       vy: it.fast ? STAGE.FAST_SPAWN_VY : STAGE.SPAWN_VY,
     });
   } else if (it.k === 'bolt') {
-    for (let i = 0; i < it.n; i++) spawnBolt(s, 0, Math.max(1 - ACT2.BOLT_CUE_TICKS, i * STAGE.BOLT_STAGGER + diff.cue));
+    // 존을 지나는 속도도 건물 낙하 배율을 따른다 — 견습은 벨 틈이 길다(예고만 늘리면 늦게 보는 손엔 소용없었다, 11-14)
+    for (let i = 0; i < it.n; i++) {
+      spawnBolt(s, 0, Math.max(1 - ACT2.BOLT_CUE_TICKS, i * STAGE.BOLT_STAGGER + diff.cue)).zoneV = ACT2.BOLT_ZONE_V * diff.fall;
+    }
   } else if (it.k === 'rock') {
     for (let i = 0; i < it.n; i++) {
       s.entities.push({ kind: 'rock', lane: 0, y: VIEW.H + i * STAGE.ROCK_SPACING, vy: 0, hp: ACT2.ROCK_HP });

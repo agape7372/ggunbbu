@@ -67,6 +67,8 @@ export interface Bolt {
   vy: number;
   /** 발사 전 예고 카운트다운 (틱). >0이면 아직 낙하 전(큐 표시 구간) */
   cueTicks: number;
+  /** 존 통과 속도(px/s). 없으면 ACT2.BOLT_ZONE_V — 작업 지시서 대본 번개만 난이도별로 넣는다 */
+  zoneV?: number;
 }
 
 export interface Rock {

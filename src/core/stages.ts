@@ -50,9 +50,9 @@ export const STAGES: readonly StageDef[] = [
     script: '', boss: 'pagoda' },
   // ── 4 철근 해안: 번개(철근) ──
   { id: '4-1', region: 3, theme: 'modern', speed: 0.2, secret: 'airBolt', par: 4440, master: 3420,
-    script: 'Z . Z . Z . wwww . Z2 . wwwww . wwww+Z . wmwww Z2 . wmww+Z . Z3 . wwwww+Z . wmww . wwwww+Z2 . wmww+Z . Z3 Z3 . wwww . wmwwww+Z2' },
-  { id: '4-2', region: 3, theme: 'modern', speed: 0.23, secret: 'noSpecial', par: 3840, master: 2970,
-    script: 'wmww . Z R2 . wmwww . mwww~ . wmwww! . wmwww R3 . hmwww! . R4 . wmww . hmww+Z . hmwww!+Z . hhmww' },
+    script: 'wmww . Z wwmww . Z2 mwww . wwww+Z mmww . Z3 wmww+Z . wwmww Z2 . wmwww+Z .. wmwwww+Z2' },
+  { id: '4-2', region: 3, theme: 'modern', speed: 0.17, secret: 'noSpecial', par: 3840, master: 2970,
+    script: 'wmww wwmww . mwww~ R2 . wmwww! Z . wmwww R3 . hmww! . R4 hmww+Z . hmwww!+Z' },
   { id: '4-B', region: 3, theme: 'modern', speed: 0, secret: 'cargoAir', par: 4680, master: 3600,
     script: '', boss: 'crane' },
   // ── 본사: 전부 섞고 집행기 ──
