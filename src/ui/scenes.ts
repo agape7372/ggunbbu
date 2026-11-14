@@ -34,7 +34,7 @@ import {
 import { introFor } from '../content/story';
 import { STAGE_MODE, STAGE_TEXT } from '../content/stages';
 import { diffUnlocked, kstDate, mergeResult, recordOf, stageUnlocked, type RecordNews, type StageRecord } from '../meta/stageRecord';
-import { bossName, endView, newHintMemo, nextHint, stageHudLine, workProgress, type HintMemo, type StageEndView } from './stageLogic';
+import { bossName, endView, newHintMemo, nextHint, stageHudLine, stageSteps, type HintMemo, type StageEndView } from './stageLogic';
 import { HERO, OPERATIONS, WEAPON_COPY } from '../content/world';
 import { MASK_MAX, createMask, deleteMask, ownedMasks, updateMask, wearMask, wornMaskId } from '../meta/mask';
 import { closeMaskEditor, openMaskEditor } from './maskEditor';
@@ -867,7 +867,7 @@ export function createApp(
     }
     const i = STAGES.findIndex((d) => d.id === run.id);
     const nx = STAGES[i + 1];
-    const w = workProgress(run.id, st.step);
+    const w = stageSteps(s); // 판 위 막대와 같은 수 — 치운 걸음
     pendingStage = endView({
       kind, result, lifeLost: st.tally.lifeLost, finishSpecial: st.tally.finishSpecial,
       step: w.done, total: w.total, phase: st.phase, news, rec,

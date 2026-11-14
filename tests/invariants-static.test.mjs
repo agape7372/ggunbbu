@@ -90,7 +90,14 @@ const rel = (f) => f.slice(ROOT.length).replace(/\\/g, '/');
 const scanFiles = (files, fn) => files.flatMap((f) => fn(read(f)).map((h) => `${rel(f)}:${h}`));
 
 const coreFiles = walk(join(ROOT, 'src/core'), /\.ts$/);
-const stagePathFiles = coreFiles.filter((f) => /^(stage.*|landmark|script)\.ts$/.test(basename(f)));
+// 판이 도는 core 파일 전부(sim · combat · player · building · act2 · boss · items … 판 전용 넷만 보던 것을 11-14에 넓혔다).
+// spawner.ts만 뺀다 — 1막 건물 · 버터바 스폰이라 판(mode 'stage')은 부르지 않는다
+const stagePathFiles = coreFiles.filter((f) => basename(f) !== 'spawner.ts');
+// 판이 안 지나는 줄(아케이드 분기)은 줄 내용으로 예외를 둔다. 줄을 고치면 예외가 안 맞아 다시 보게 된다
+const STAGE_MATH_EXEMPT = [
+  // stackPhysics 1막 낙하 곡선 — 판은 위의 `s.mode === 'stage'` 줄에서 돌아간다
+  /^src\/core\/building\.ts:\d+: const vterm = STACK\.ACT1_VTERM\[0\] \+ .*Math\.pow\(p, 0\.7\);$/,
+];
 
 describe('불변 규칙 정적 가드', () => {
   it('src/core는 DOM · 시계 · Math.random · 렌더 계층에 닿지 않는다', () => {
@@ -107,9 +114,15 @@ describe('불변 규칙 정적 가드', () => {
     expect(scanFiles(files, shadowBlurHits)).toEqual([]);
   });
 
-  it('스테이지 경로(stage*.ts · landmark.ts · script.ts)에 Math.pow · 삼각함수 · ** 가 없다', () => {
-    expect(stagePathFiles.map((f) => basename(f)).sort()).toEqual(['landmark.ts', 'script.ts', 'stage.ts', 'stages.ts']);
-    expect(scanFiles(stagePathFiles, nondetMathHits)).toEqual([]);
+  it('스테이지 경로(spawner.ts 뺀 core 전부)에 Math.pow · 삼각함수 · ** 가 없다', () => {
+    const names = stagePathFiles.map((f) => basename(f));
+    for (const n of ['sim.ts', 'combat.ts', 'player.ts', 'building.ts', 'act2.ts', 'boss.ts', 'items.ts', 'camera.ts', 'rng.ts', 'stage.ts', 'stages.ts', 'landmark.ts', 'script.ts']) {
+      expect(names, n).toContain(n);
+    }
+    const hits = scanFiles(stagePathFiles, nondetMathHits);
+    expect(hits.filter((h) => !STAGE_MATH_EXEMPT.some((re) => re.test(h)))).toEqual([]);
+    // 예외는 저마다 꼭 한 줄에 맞는다(낡은 예외가 남지 않게)
+    for (const re of STAGE_MATH_EXEMPT) expect(hits.filter((h) => re.test(h)), String(re)).toHaveLength(1);
   });
 });
 

@@ -243,6 +243,14 @@ describe('consumeAudio — 낙하 예고음 · 완파 덕킹', () => {
     consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS + 1 }));
     expect(names()).toEqual([]);
   });
+  it('명물이 창 · 올라가기 중이면 멈춘 대기 값에 울리지 않고, 다시 던지기 시작하는 틱에 운다(렌더 ▼와 같은 값, 11-14 결함 D)', () => {
+    const lm = (st: string) => ({ id: 'wind', st, body: null, wave: 0, n: 0, got: 0, cue: 0, air: 0, k: 0, flying: false, x: 0 });
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS, lm: lm('sit') as never }));
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS, lm: lm('rise') as never }));
+    expect(names().filter((n) => n === 'incoming')).toEqual([]);
+    consumeAudio(tick({ stackSpawnCd: STACK.SPAWN_CUE_TICKS, lm: lm('play') as never }));
+    expect(names().filter((n) => n === 'incoming')).toEqual(['incoming']);
+  });
   it('완파는 가벼운 덕킹, 필살이 같이 오면 깊은 덕킹 한 번', () => {
     consumeAudio(tick({ events: [{ kind: 'stackDestroy', n: 3 }] as JuiceEvent[] }));
     expect(duck).toHaveBeenLastCalledWith(AUDIO.DUCK_DESTROY, AUDIO.DUCK_DESTROY_S);

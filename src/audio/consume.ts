@@ -5,7 +5,7 @@ import { AUDIO, BOSS, HAT_FX, JUICE, STACK, TPS, WAZA_RUN } from '../config';
 import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
 import { landmarkSounds, snapOf, type LmSnap } from './landmarkSfx';
-import { lmAct } from '../core/landmark';
+import { lmAct, spawnCueCd } from '../core/landmark';
 
 const STRONG_MAT: ReadonlySet<Material> = new Set(['hard', 'cathedral', 'lobby', 'penthouse']);
 
@@ -84,7 +84,7 @@ export function consumeAudio(s: GameState): void {
   }
 
   // 다음 건물 낙하 예고(렌더의 ▼가 뜨는 바로 그 틱) — 히트스톱으로 틱이 반복돼도 한 번만
-  const cue = !s.over && s.stack === null && s.stackSpawnCd === STACK.SPAWN_CUE_TICKS;
+  const cue = spawnCueCd(s) === STACK.SPAWN_CUE_TICKS;
   if (cue && !incomingFired) playSfx('incoming');
   incomingFired = cue;
 

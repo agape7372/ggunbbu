@@ -103,6 +103,9 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   return true;
 }
 
+/** spawnFloorDebris 한 번이 뽑는 난수 수(조각 셋 × 다섯). 작업 지시서 집행기 난수가 이 값으로 대본 잔해를 건너뛴다(stage.ts finishScript) */
+export const DEBRIS_RANDS = 15;
+
 function spawnFloorDebris(s: GameState, yHit: number): void {
   const cx = VIEW.LANE_X[0];
   const fw = VIEW.LANE_W;

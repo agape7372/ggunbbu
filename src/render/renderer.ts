@@ -20,6 +20,7 @@ import { setFxMask } from './weaponFx';
 import { backdropKey, drawChapterBackdrop, type BackdropInput } from './background';
 import { backdropPaper } from './assets';
 import { cameraFollowY } from '../core/camera';
+import { spawnCueCd } from '../core/landmark';
 import { vibrate } from '../platform/native';
 import {
   drawBackEffects, drawEffects, pointInk, resetEffects, setSlashColor, spawnBellClang, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,
@@ -775,10 +776,8 @@ function bgColor(s: GameState): string {
  * 렌더 전용이라 시뮬은 안 건드린다: 읽는 값은 `stackSpawnCd` 하나뿐이다.
  */
 function drawSpawnCue(ctx: CanvasRenderingContext2D, s: GameState): void {
-  if (s.stack || s.over) return;
-  // 명물 보스는 창 · 올라가기 · 등장 · 쓰러짐 동안 대기 값이 멈춰 있어(바람탑 STALL_GAP) ▼가 맥박만 친다 — 그리지 않는다
-  if (s.lm && s.lm.st !== 'play' && s.lm.st !== 'slam') return;
-  const cd = s.stackSpawnCd;
+  // 명물 창 · 올라가기 중엔 0 — 예고음(audio/consume.ts)과 같은 값을 읽는다
+  const cd = spawnCueCd(s);
   if (cd <= 0 || cd > STACK.SPAWN_CUE_TICKS) return;
 
   const x = VIEW.LANE_X[s.player.lane] ?? VIEW.LANE_X[0];

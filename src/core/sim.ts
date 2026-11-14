@@ -12,7 +12,7 @@ import type { WazaRunId } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { absorbWithHat, onBuildingDown } from './items';
 import { specialHitBoss } from './boss';
-import { stepStage } from './stage';
+import { stepStage, tallyGuard } from './stage';
 import { specialHitLandmark } from './landmark';
 
 export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): GameState {
@@ -64,6 +64,7 @@ export function advance(s: GameState, input: InputFrame): void {
 
   // 히트스톱 중에도 입력 버퍼는 수집 (연타 리듬 보존)
   collectBuffers(s.player, input);
+  tallyGuard(s, input); // 버퍼와 같은 자리에서 센다 — 히트스톱 중 누른 가드도 쓰인다
   if (s.hitstop > 0) {
     s.hitstop -= 1;
     return;
@@ -170,7 +171,7 @@ export function advance(s: GameState, input: InputFrame): void {
   else if (s.mode === 'tokoton') stepTokoton(s);
   else if (s.mode === 'bonus') stepBonus(s);
   else if (s.mode === 'act2') stepAct2(s);
-  else if (s.mode === 'stage') stepStage(s, input, evStart);
+  else if (s.mode === 'stage') stepStage(s, evStart);
 
   // ── 보급 상자 (완파 수) ── 완파 경로가 여럿(타격·필살·깔림 Z)이라 이벤트로 모아 센다
   if (countsDrops) {

@@ -509,7 +509,7 @@ export const LANDMARK = {
     LIGHT: [6, 7, 9] as const, // 가벼운 좌판: 이만큼 띄운 좌판의 다음 가드는 숨과 상관없이 역풍(견습 · 정규 · 외주)
     RETURN_TICKS: 90,        // 2막 맞바람: 탑에 튕겨 나온 좌판이 날숨을 타는 틱
     BREATH_SIT_DY: 64,       // 3막 마지막 숨: 들숨엔 앉은 몸 밑면이 SIT_Y + 이만큼(점프 베기만 닿는다)
-    MARKET_G: 300, MARKET_V: 120, // 장터(좌판 여섯 = 14층)가 둥실 내려와 SIT_Y에서 멈춘다
+    MARKET_G: 300, MARKET_V: 120, // 장터(좌판 여섯 = 15층)가 둥실 내려와 SIT_Y에서 멈춘다
   },
   PAGODA: {
     FLOORS: 9, HP: 14,       // 11-09: HP 8 → 14 (층당 타수)

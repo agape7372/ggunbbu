@@ -10,6 +10,11 @@ export function rngNext(state: number): { value: number; state: number } {
   return { value, state: a };
 }
 
+/** n번 뽑은 뒤의 상태 — 상태는 한 번 뽑을 때마다 0x6d2b79f5씩 더해진다(rngNext) */
+export function rngSkip(state: number, n: number): number {
+  return (state + Math.imul(n, 0x6d2b79f5)) | 0;
+}
+
 /** GameState를 직접 진행시키는 헬퍼 */
 export function rand(s: { rngState: number }): number {
   const r = rngNext(s.rngState);

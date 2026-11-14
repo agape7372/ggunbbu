@@ -5,8 +5,10 @@
 // 도장 판정용 집계(tally)는 이 틱의 이벤트와 개체 수 차이로만 센다 — 기존 규칙 코드는 모른다.
 
 import type { GameState, InputFrame, StageDiff, StageTally, WazaId, WeaponId } from './types';
-import { ACT1, ACT2, LANDMARK, STAGE, VIEW } from '../config';
-import { parseScript, type ScriptItem, type ScriptStep } from './script';
+import { ACT1, ACT2, LANDMARK, MAT_HP, STAGE, VIEW } from '../config';
+import { parseScript, scriptStats, type ScriptItem, type ScriptStep } from './script';
+import { DEBRIS_RANDS } from './combat';
+import { rngSkip } from './rng';
 import { STAGES, type SecretId, type StageDef } from './stages';
 import { makeFloor, makeStack } from './building';
 import { cameraFollowY } from './camera';
@@ -73,7 +75,15 @@ export function startStage(s: GameState, o: StageStart): void {
   };
 }
 
-export function stepStage(s: GameState, input: InputFrame, evStart: number): void {
+/** 가드 새 누름 — sim.advance가 히트스톱 앞에서 부른다. 히트스톱 중 누른 가드도 버퍼에 남아 깔림 탈출 · 가드에 쓰인다 */
+export function tallyGuard(s: GameState, input: InputFrame): void {
+  const t = s.stage?.tally;
+  if (!t) return;
+  if (input.guard && !t.guardHeld) t.guardPress += 1;
+  t.guardHeld = input.guard;
+}
+
+export function stepStage(s: GameState, evStart: number): void {
   const st = s.stage;
   if (!st) return;
   const t = st.tally;
@@ -97,8 +107,6 @@ export function stepStage(s: GameState, input: InputFrame, evStart: number): voi
   while (t.rockKills.length > 0 && s.tick - t.rockKills[0] > 60) t.rockKills.shift();
   if (t.rockKills.length >= 4) t.quad = true;
 
-  if (input.guard && !t.guardHeld) t.guardPress += 1;
-  t.guardHeld = input.guard;
   for (let i = evStart; i < s.events.length; i++) {
     const k = s.events[i].kind;
     if (k === 'jump') t.jumps += 1;
@@ -211,6 +219,9 @@ function finishScript(s: GameState): void {
     s.boss = initBoss();
     s.boss.hp = STAGE.EXEC_HP; // 스테이지 전용 체력 — 아케이드 BOSS.HP는 그대로
     s.combo = 0; // 2막 달 개시와 같다 — 연습(보스부터)과 본판이 같은 조건에서 싸운다. 끊김 이벤트 없음
+    // 집행기 패턴 난수는 대본 층을 다 베어 치운 판의 자리에서 시작한다(층마다 잔해가 DEBRIS_RANDS번 뽑는다).
+    // 연습 · 필살 · 깔림 Z로 층을 지운 판도 같은 패턴 순서를 받는다
+    s.rngState = rngSkip(stageSeed(st.id), DEBRIS_RANDS * scriptStats(stageScript(st.id), MAT_HP).floors);
     return;
   }
   if (def.boss) {

@@ -76,6 +76,14 @@ export function lmAct(s: GameState): 1 | 2 | 3 {
   return floors <= a3 ? 3 : floors <= a2 ? 2 : 1;
 }
 
+/** 다음 건물 예고(렌더 ▼ · 예고음)가 읽는 대기 틱. 0 = 예고 없음.
+ *  명물은 창 · 올라가기 · 등장 · 쓰러짐 동안 대기 값이 멈춰 있다(바람탑 STALL_GAP) — 그동안은 예고가 없다 */
+export function spawnCueCd(s: GameState): number {
+  if (s.stack || s.over) return 0;
+  if (s.lm && s.lm.st !== 'play' && s.lm.st !== 'slam') return 0;
+  return s.stackSpawnCd;
+}
+
 function moveBody(lm: LandmarkState, target: number): void {
   if (lm.body) lm.body.y += (target - lm.body.y) * L.EASE;
 }
@@ -232,7 +240,9 @@ function stepBell(s: GameState, lm: LandmarkState, evStart: number): void {
   const isBell = s.stack?.floors[0]?.mat === 'bell';
   for (let i = evStart; i < s.events.length; i++) {
     const e = s.events[i];
-    if (e.kind === 'hit' && e.mat === 'bell') t.bellCuts += 1;
+    // 필살도 벤 것이다 — 연참 · 검풍 한 타(wazaHit), 천지 · 올려베기(이벤트 없이 종을 친다 · special 틱에 종이 있으면 맞았다)
+    if ((e.kind === 'hit' || e.kind === 'wazaHit') && e.mat === 'bell') t.bellCuts += 1;
+    else if (isBell && e.kind === 'special') t.bellCuts += 1;
     // 마지막 가드가 정한다 — 공중 가드로 올린 종은 꽂히면 2점
     else if (isBell && e.kind === 'guardAirBounce') lm.flying = true;
     else if (isBell && e.kind === 'guardBounce') lm.flying = false;
@@ -374,7 +384,8 @@ function stepWind(s: GameState, lm: LandmarkState, evStart: number): void {
   const t = st.tally;
   for (let i = evStart; i < s.events.length; i++) {
     const e = s.events[i];
-    if (lm.st === 'play' && s.stack && (e.kind === 'hit' || e.kind === 'floorCollapse')) t.stallCuts += 1;
+    // 필살도 벤 것이다(연참 wazaHit · 천지 완파 stackDestroy). 완파 틱엔 좌판이 이미 없어 s.stack을 안 본다
+    if (lm.st === 'play' && (e.kind === 'hit' || e.kind === 'floorCollapse' || e.kind === 'wazaHit' || e.kind === 'stackDestroy')) t.stallCuts += 1;
     if ((e.kind !== 'guardBounce' && e.kind !== 'guardAirBounce') || !s.stack || lm.k < 0) continue; // 젖은 좌판은 셈이 멈춘다
     const light = lm.k >= W.LIGHT[d]; // 가벼운 좌판 — 이만큼 띄운 좌판의 다음 가드
     lm.k += 1;
@@ -458,7 +469,7 @@ function stepPagoda(s: GameState, lm: LandmarkState, evStart: number): void {
   }
   const chimed = hitTower && lm.cue > 0; // 풍경 창에서 벤 타격
   if (!stk) { // 아홉 층을 다 베었다
-    if (chimed && d >= 1) t.chimeBreaks += 1; // 아홉 번은 정규 · 외주만
+    if (chimed && d >= 1) t.chimeBreaks += 1; // 아홉 번은 정규만(외주는 풍경이 안 울린다)
     defeat(s, lm);
     return;
   }
