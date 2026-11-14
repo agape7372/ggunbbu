@@ -9,6 +9,7 @@ import { ACT1, ACT2, LANDMARK, STAGE, VIEW } from '../config';
 import { parseScript, type ScriptItem, type ScriptStep } from './script';
 import { STAGES, type SecretId, type StageDef } from './stages';
 import { makeFloor, makeStack } from './building';
+import { cameraFollowY } from './camera';
 import { spawnBolt, stepEntities } from './act2';
 import { initBoss, stepBoss } from './boss';
 import { initLandmark, stepLandmark } from './landmark';
@@ -183,6 +184,7 @@ function emit(s: GameState, it: ScriptItem): void {
     st.hastyT = 0;
     s.stack = makeStack({
       variant: 'building', theme: def.theme, floors: it.floors.map(makeFloor),
+      y: VIEW.GROUND_Y - VIEW.FIELD_TOP + cameraFollowY(s) + STAGE.SPAWN_ABOVE,
       vy: it.fast ? STAGE.FAST_SPAWN_VY : STAGE.SPAWN_VY,
     });
   } else if (it.k === 'bolt') {

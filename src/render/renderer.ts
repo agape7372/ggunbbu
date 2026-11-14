@@ -19,7 +19,7 @@ import { maskColors, wornMask } from '../meta/mask';
 import { setFxMask } from './weaponFx';
 import { backdropKey, drawChapterBackdrop, type BackdropInput } from './background';
 import { backdropPaper } from './assets';
-import { cameraFollowY } from './camera';
+import { cameraFollowY } from '../core/camera';
 import { vibrate } from '../platform/native';
 import {
   drawBackEffects, drawEffects, pointInk, resetEffects, setSlashColor, spawnBellClang, spawnBossBreak, spawnFloorShatter, spawnFromEvent, spawnStackShatter, tickEffects,

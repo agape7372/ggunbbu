@@ -1,4 +1,4 @@
-import type { GameState } from '../core/types';
+import type { GameState } from './types';
 import { CAMERA, PLAYER, VIEW } from '../config';
 
 /**
@@ -19,6 +19,7 @@ import { CAMERA, PLAYER, VIEW } from '../config';
  * 데드존(150)과 짧아진 체공(1.60초)이다.
  * 되돌리려면 config.ts CAMERA 주석의 개정 사유부터 뒤집을 것.
  *
+ * core에 둔 이유: stage.ts가 건물 생김 높이(화면 맨 위 + STAGE.SPAWN_ABOVE)를 이 값으로 낸다.
  * 순수 목표값만 반환한다. 프레임간 보간(`CAMERA.LERP`)은 renderer가 쥔다 — 여기에 상태를 두면
  * 테스트가 시뮬 상태만으로 카메라를 단언할 수 없게 된다.
  */

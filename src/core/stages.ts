@@ -28,34 +28,34 @@ export interface StageDef {
 
 export const STAGES: readonly StageDef[] = [
   // ── 1 서쪽 회랑: 베기 · 지면 가드 · 정석 ──
-  { id: '1-1', region: 0, theme: 'europe', speed: 0, secret: 'noGuard', par: 3060, master: 2280,
+  { id: '1-1', region: 0, theme: 'europe', speed: 0, secret: 'noGuard', par: 2700, master: 2010,
     script: 'www wwww wwww wmwww . wwwww mwwww wwmwww . mmwww wmwwww' },
-  { id: '1-2', region: 0, theme: 'europe', speed: 0, secret: 'noBreak', par: 3720, master: 2850,
+  { id: '1-2', region: 0, theme: 'europe', speed: 0, secret: 'noBreak', par: 3330, master: 2580,
     script: 'hwww whww hwwww . hhww whwww . hhhww mhhmw . whhhww . hhmwww~' },
   { id: '1-B', region: 0, theme: 'europe', speed: 0, secret: 'bellNoCut', par: 5550, master: 1560,
     script: '', boss: 'bell' },
   // ── 2 강턱 시장: 빠른 낙하 · 붙어 오기 · 성급한 건물 ──
-  { id: '2-1', region: 1, theme: 'asia', speed: 0.1, secret: 'noJump', par: 3420, master: 2640,
+  { id: '2-1', region: 1, theme: 'asia', speed: 0.1, secret: 'noJump', par: 3060, master: 2370,
     script: 'wwww wwwww wmwww . www! wwww! . wmwww! wwww! >www! . mwwww! >wmwww! . wmwww! >mwwww!' },
-  { id: '2-2', region: 1, theme: 'asia', speed: 0.12, secret: 'noHasty', par: 3750, master: 2880,
+  { id: '2-2', region: 1, theme: 'asia', speed: 0.12, secret: 'noHasty', par: 3420, master: 2640,
     script: 'mwwww mwww~ . mwwww wwww! . hmww wwwww! . mmmww! >mwww~ . hmww >wmwww! . hmww~ . hmmw~' },
   { id: '2-B', region: 1, theme: 'asia', speed: 0.25, secret: 'stall7', par: 3390, master: 2610,
     script: '', boss: 'wind' },
   // ── 3 기와능선: 화산탄(기와) ──
-  { id: '3-1', region: 2, theme: 'eastasia', speed: 0.15, secret: 'pile3', par: 4290, master: 3300,
+  { id: '3-1', region: 2, theme: 'eastasia', speed: 0.15, secret: 'pile3', par: 4110, master: 3150,
     script: 'R . R . R2 . wwww . R2 . wmww . R3 . wmww . mwwww . R4 . wmwww . R3 . mmwww . R2 . wmwwww+R' },
-  { id: '3-2', region: 2, theme: 'eastasia', speed: 0.2, secret: 'quad', par: 4410, master: 3420,
+  { id: '3-2', region: 2, theme: 'eastasia', speed: 0.2, secret: 'quad', par: 4200, master: 3240,
     script: 'R2 . wwmw . R3 . wmwm+R . wwmw . R . R4 . mmwmw . wwwmw . R2 . mhwmm+R .. mwmmw . R . R3 . mwwww+R' },
   { id: '3-B', region: 2, theme: 'eastasia', speed: 0, secret: 'tileZero', par: 4050, master: 3120,
     script: '', boss: 'pagoda' },
   // ── 4 철근 해안: 번개(철근) ──
-  { id: '4-1', region: 3, theme: 'modern', speed: 0.2, secret: 'airBolt', par: 4740, master: 3630,
+  { id: '4-1', region: 3, theme: 'modern', speed: 0.2, secret: 'airBolt', par: 4440, master: 3420,
     script: 'Z . Z . Z . wwww . Z2 . wwwww . wwww+Z . wmwww Z2 . wmww+Z . Z3 . wwwww+Z . wmww . wwwww+Z2 . wmww+Z . Z3 Z3 . wwww . wmwwww+Z2' },
-  { id: '4-2', region: 3, theme: 'modern', speed: 0.23, secret: 'noSpecial', par: 4020, master: 3090,
+  { id: '4-2', region: 3, theme: 'modern', speed: 0.23, secret: 'noSpecial', par: 3840, master: 2970,
     script: 'wmww . Z R2 . wmwww . mwww~ . wmwww! . wmwww R3 . hmwww! . R4 . wmww . hmww+Z . hmwww!+Z . hhmww' },
   { id: '4-B', region: 3, theme: 'modern', speed: 0, secret: 'cargoAir', par: 4680, master: 3600,
     script: '', boss: 'crane' },
   // ── 본사: 전부 섞고 집행기 ──
-  { id: 'HQ', region: 4, theme: 'modern', speed: 0.2, secret: 'finishSpecial', par: 9180, master: 7050,
+  { id: 'HQ', region: 4, theme: 'modern', speed: 0.2, secret: 'finishSpecial', par: 9120, master: 6930,
     script: 'mwwww . R2 . mmwww! . R3 . mwww~ . >mwwww! >mwwww! . R4 . Z2 . Z+R2 .. hmwww! ..', boss: 'executor' },
 ];

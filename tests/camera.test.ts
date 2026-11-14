@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cameraFollowY } from '../src/render/camera';
+import { cameraFollowY } from '../src/core/camera';
 import { makeState } from '../src/core/sim';
 import { CAMERA, PLAYER, VIEW } from '../src/config';
 
