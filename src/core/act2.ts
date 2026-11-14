@@ -1,7 +1,7 @@
 // 2막 페이즈 FSM: cathedral → tower → bolt → rock → moon.
 // 체크포인트 산술 [정본]: 30 → 40 → 148 → 168 → 180 → 228 → 달 230+.
 
-import type { GameState, Lane } from './types';
+import type { Bolt, GameState, Lane } from './types';
 import { makeFloor, makeStack } from './building';
 import { registerHit, hurtPlayer, addScore, addGauge, addCombo, hitGauge } from './combat';
 import { guardActive, makePlayer } from './player';
@@ -133,9 +133,11 @@ function stepBoltSpawner(s: GameState, c: { bolts: number; cd: number }): void {
 }
 
 /** cueDelay = 큐 지연(틱). 단일 레인에서 다발 볼트를 시차로 흩기 위해 사용. */
-export function spawnBolt(s: GameState, lane: Lane, cueDelay = 0): void {
-  s.entities.push({ kind: 'bolt', lane, y: VIEW.H, vy: 0, cueTicks: ACT2.BOLT_CUE_TICKS + cueDelay });
+export function spawnBolt(s: GameState, lane: Lane, cueDelay = 0): Bolt {
+  const e: Bolt = { kind: 'bolt', lane, y: VIEW.H, vy: 0, cueTicks: ACT2.BOLT_CUE_TICKS + cueDelay };
+  s.entities.push(e);
   s.events.push({ kind: 'boltCue', lane });
+  return e;
 }
 
 // ── 화산탄 ──────────────────────────────────────────────────────
@@ -159,7 +161,7 @@ export function stepEntities(s: GameState): void {
     const e = s.entities[i];
     if (e.kind === 'bolt') {
       if (e.cueTicks > 0) { e.cueTicks -= 1; continue; }
-      e.vy = e.y > ACT2.BOLT_ZONE_Y ? -ACT2.BOLT_FALL_V : -ACT2.BOLT_ZONE_V;
+      e.vy = e.y > ACT2.BOLT_ZONE_Y ? -ACT2.BOLT_FALL_V : -(e.zoneV ?? ACT2.BOLT_ZONE_V);
       e.y += e.vy * TICK;
       if (e.y <= 0) {
         // 낙뢰 [정본: 가드 불가]. 단일 레인이라 회피 불가 — 존 16f 창에서 베는 것이 유일 해법.
