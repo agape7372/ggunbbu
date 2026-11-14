@@ -63,7 +63,7 @@ describe('판 위 한 줄과 진척', () => {
     expect(stageBar(at('HQ'))?.end).toBe(bossName('HQ')); // 본사는 끝에 집행기가 있다
     const bell = stageBar(at('1-B', false, 2))!;
     expect(bell).toMatchObject({ label: '종탑', fill: 1, n: LANDMARK.BELL.FLOORS, end: '' });
-    expect(stageBar(at('HQ', true, 2))).toMatchObject({ label: `${bossName('HQ')} ${STAGE.EXEC_HP}`, fill: 1, n: 0 });
+    expect(stageBar(at('HQ', true, 2))).toMatchObject({ label: `${bossName('HQ')} ${STAGE.EXEC_HP[1]}`, fill: 1, n: 0 });
   });
 
   it('아케이드 막대: 1막은 장 네 칸 끝 「2막」, 2막은 남은 단계 끝 집행기, 특별작전 · 버터바엔 없다', () => {

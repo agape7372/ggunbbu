@@ -72,7 +72,7 @@ export function stageBar(s: GameState): HudBar | null {
     return { label: `${STAGE_MODE.barLeft} ${total - done}`, fill: done / total, n: total, end };
   }
   if (st.phase !== 'boss') return null;
-  if (s.boss) return executorBar(s.boss.hp, STAGE.EXEC_HP); // 본사 집행기 체력은 스테이지 전용
+  if (s.boss) return executorBar(s.boss.hp, STAGE.EXEC_HP[st.diff]); // 본사 집행기 체력은 스테이지 전용
   const lm = s.lm;
   const body = lm?.body ?? s.stack; // 구층탑은 몸이 s.stack이다
   if (!lm || !body) return null;
