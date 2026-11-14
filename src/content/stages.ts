@@ -124,7 +124,7 @@ const R = REGIONS;
 
 export const STAGE_TEXT: Readonly<Record<string, StageText>> = {
   '1-1': { name: '회랑 3번지', order: R[0].start, riddle: '막지 않아도 되는 날이 있다.' },
-  '1-2': { name: '회랑 끝 집', order: ['회랑 끝 집.', '돌벽은 세 번 쳐야 무너진다.', '급한 집이 하나 섞였다.'], riddle: '끊지 말고 띄워라.' },
+  '1-2': { name: '회랑 끝 집', order: ['회랑 끝 집.', '돌벽은 세 번 쳐야 무너진다.', '급한 집이 섞였다.'], riddle: '끊지 말고 띄워라.' },
   '1-B': { name: '종탑', order: R[0].boss, riddle: '종은 베는 게 아니다.', note: '시계는 열두 번 친다. 보통은.' },
   '2-1': { name: '강턱 장터', order: R[1].start, riddle: '발은 땅에.' },
   '2-2': { name: '강턱 밤장', order: ['밤장이 선다.', '좌판이 서둘러 내려온다.', '급한 건 먼저 무너진다.'], riddle: '기다리면 떨어진다.' },

@@ -29,9 +29,9 @@ export interface StageDef {
 export const STAGES: readonly StageDef[] = [
   // ── 1 서쪽 회랑: 베기 · 지면 가드 · 정석 ──
   { id: '1-1', region: 0, theme: 'europe', speed: 0, secret: 'noGuard', par: 2700, master: 2010,
-    script: 'www wwww wwww wmwww . wwwww mwwww wwmwww . mmwww wmwwww' },
+    script: 'www wwww wwwww wmwww . wwww mwwww wwmwww . mmwww wmwwww' },
   { id: '1-2', region: 0, theme: 'europe', speed: 0, secret: 'noBreak', par: 3330, master: 2580,
-    script: 'hwww whww hwwww . hhww whwww . hhhww mhhmw . whhhww . hhmwww~' },
+    script: 'wmwm hwwww whmww hhww mwwww~ . whhww hmwww~ . hhhww . hhmwww~' },
   { id: '1-B', region: 0, theme: 'europe', speed: 0, secret: 'bellNoCut', par: 5550, master: 1560,
     script: '', boss: 'bell' },
   // ── 2 강턱 시장: 빠른 낙하 · 붙어 오기 · 성급한 건물 ──
