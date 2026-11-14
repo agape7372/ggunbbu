@@ -27,10 +27,10 @@ export const MUKJUL_STAR = 35;
 type Pt = readonly [number, number];
 type Ease = (u: number) => number;
 const io: Ease = (u) => (1 - Math.cos(Math.PI * u)) / 2; // 천천히 옮긴다
-const out: Ease = (u) => 1 - (1 - u) ** 3; // 확 들어가 선다(베기 · 휘두르기)
+export const out: Ease = (u) => 1 - (1 - u) ** 3; // 확 들어가 선다(베기 · 휘두르기)
 
 /** [이 키의 프레임, 자세, 앞 키에서 오는 이음새(기본 io)] */
-type Key = readonly [number, Body, Ease?];
+export type Key = readonly [number, Body, Ease?];
 
 /** 서기 — buildIdle과 같은 자리(필살이 끝나 구운 서기로 넘어갈 때 튀지 않게) */
 export const STAND: Body = {
@@ -38,7 +38,7 @@ export const STAND: Body = {
   sa: Math.atan2(25, 4), sl: 1.05, eF: 0, eB: 0, turn: 1,
 };
 /** 대검 서기 — 칼끝을 앞 바닥에 댄다(buildIdle의 대검 칼과 같은 자리). 시간표의 처음 · 끝 키가 무기에 맞춰 이쪽을 쓴다 */
-const STAND_GREAT: Body = { ...STAND, sa: Math.atan2(29, 16), sl: 1 };
+export const STAND_GREAT: Body = { ...STAND, sa: Math.atan2(29, 16), sl: 1 };
 
 const ARM = 13;
 
@@ -46,7 +46,7 @@ const ARM = 13;
  * 자세 — 머리 · 골반 · 두 발 + 팔 각(어깨에서 0 = 앞, π/2 = 아래, 길이 ARM)과 칼 각. 손을 팔 길이 안에 놓아야 팔이 늘어나 보이지 않는다.
  * aB 'grip' = 뒷손도 칼자루(앞손 바로 뒤). 머리 위로 쳐든 손만 lF로 조금 더 뻗는다(어깨 → 머리 꼭대기가 팔 길이와 같다)
  */
-function pose(head: Pt, hip: Pt, fF: Pt, fB: Pt, aF: number, aB: number | 'grip', sa: number, o: Partial<Body> & { lF?: number } = {}): Body {
+export function pose(head: Pt, hip: Pt, fF: Pt, fB: Pt, aF: number, aB: number | 'grip', sa: number, o: Partial<Body> & { lF?: number } = {}): Body {
   const [sx, sy] = shoulderOf(head, hip);
   const lF = o.lF ?? ARM;
   const hF: Pt = [sx + Math.cos(aF) * lF, sy + Math.sin(aF) * lF];
@@ -57,7 +57,7 @@ function pose(head: Pt, hip: Pt, fF: Pt, fB: Pt, aF: number, aB: number | 'grip'
 const lerp = (a: number, b: number, u: number): number => a + (b - a) * u;
 const lerpP = (a: Pt, b: Pt, u: number): Pt => [lerp(a[0], b[0], u), lerp(a[1], b[1], u)];
 
-function mix(a: Body, b: Body, u: number): Body {
+export function mix(a: Body, b: Body, u: number): Body {
   return {
     head: lerpP(a.head, b.head, u), hip: lerpP(a.hip, b.hip, u),
     fF: lerpP(a.fF, b.fF, u), fB: lerpP(a.fB, b.fB, u),
@@ -67,7 +67,7 @@ function mix(a: Body, b: Body, u: number): Body {
   };
 }
 
-function play(keys: readonly Key[], f: number): Body {
+export function play(keys: readonly Key[], f: number): Body {
   if (f <= keys[0][0]) return keys[0][1];
   for (let i = 1; i < keys.length; i++) {
     const [f1, b1, e = io] = keys[i];
@@ -80,7 +80,7 @@ function play(keys: readonly Key[], f: number): Body {
 }
 
 /** 발은 땅에 둔 채 몸만 d px 내려앉힌다(− = 솟는다) — 닿은 뒤 가라앉기 · 숨 */
-function sink(b: Body, d: number, da = 0): Body {
+export function sink(b: Body, d: number, da = 0): Body {
   const m = (p: Pt): Pt => [p[0], p[1] + d];
   return { ...b, head: m(b.head), hip: m(b.hip), hF: m(b.hF), hB: m(b.hB), sa: b.sa + da };
 }

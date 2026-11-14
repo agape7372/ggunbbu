@@ -393,7 +393,7 @@ const WCX = 22;
 const FLAT_W = 48, FLAT_H = 28;
 
 // 신체 랜드마크 (STAND/WIDE 공통, CX=WCX=22 기준)
-const HEAD_R = 5;         // PNG 머리와 같은 크기
+const HEAD_R = 6;         // 11-14 모션 개편 — 머리를 키웠다
 const HEAD_Y = 12;       // 머리 중심
 const SHOULDER_Y = 23;   // 팔이 갈라지는 지점
 const HIP_Y = 38;        // 다리가 갈라지는 지점
@@ -401,7 +401,7 @@ const FOOT_Y = 60;       // 바닥선 (= STAND_H = WIDE_H, 기존 프레임 발 
 
 // 08-30(P1-3): 코스메틱 실구현 — 상점이 파는 body(선 색)·blade(참격 색)가 실제 렌더를 바꾼다.
 let LINE = '#1A1A20';   // body 코스메틱
-const LINE_W = 1.4;      // PNG 졸라맨 선(약 1.2px)에 맞춤 — 무기를 바꿔도 선 굵기가 같아야 한다
+const LINE_W = 1.6;      // 11-14 모션 개편 — 머리와 같이 키웠다. 무기를 바꿔도 선 굵기가 같아야 한다
 let ARC = '#FFD200';    // blade 코스메틱 (참격 궤적)
 
 const DEFAULT_LINE = '#1A1A20';
@@ -1482,6 +1482,13 @@ export function drawPlayer(
 ): void {
   initSprites();
   if (live) {
+    // 타격 틱의 참격 호 — 구운 타격 프레임에 있던 그 호(칼빛 꾸미기가 여기서 산다)
+    if (pose === 'attack' && animTick >= PLAYER.ATTACK_PRE && animTick < PLAYER.ATTACK_PRE + PLAYER.ATTACK_ACTIVE) {
+      ctx.save();
+      ctx.translate(x - WCX, footCanvasY - FOOT_Y);
+      slashArc(ctx);
+      ctx.restore();
+    }
     drawLiveBody(ctx, live, x, footCanvasY);
     return;
   }
