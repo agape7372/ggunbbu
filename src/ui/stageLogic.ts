@@ -77,8 +77,9 @@ export function stageBar(s: GameState): HudBar | null {
   const body = lm?.body ?? s.stack; // 구층탑은 몸이 s.stack이다
   if (!lm || !body) return null;
   const { FLOORS, HP } = BODY[lm.id];
+  const n = typeof FLOORS === 'number' ? FLOORS : FLOORS[st.diff]; // 바람탑은 난이도별
   const left = body.floors.reduce((a, f) => a + Math.max(0, f.segs[0]?.hp ?? 0), 0);
-  return { label: bossName(st.id), fill: Math.min(1, left / (FLOORS * HP)), n: FLOORS, end: '' };
+  return { label: bossName(st.id), fill: Math.min(1, left / (n * HP)), n, end: '' };
 }
 
 const ACT2_ORDER: readonly Act2Phase[] = ['cathedral', 'tower', 'bolt', 'rock'];

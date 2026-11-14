@@ -630,6 +630,18 @@ describe('바람탑 2판', () => {
     s.lm!.x = 80;
     stepN(s, 60);
     expect(s.lm!.body!.y).toBeCloseTo(LANDMARK.SIT_Y + LANDMARK.WIND.BREATH_SIT_DY, 0);
+    // 3막 들숨엔 창 시간이 멈춘다
+    const h = bossStage('2-B');
+    skipEnter(h);
+    setFloors(h, 1);
+    h.lm!.body!.floors[0].segs[0].hp = 999;
+    h.lm!.st = 'sit'; h.lm!.t = 0;
+    breath(h, 0);
+    stepN(h, LANDMARK.SIT_TICKS[1] + 30);
+    expect(h.lm!.st, '들숨').toBe('sit');
+    breath(h, 1);
+    stepN(h, LANDMARK.SIT_TICKS[1] + 1);
+    expect(h.lm!.st, '날숨').not.toBe('sit');
   });
 
   it('좌판 벤 수(stallCuts)는 몸이 안 앉은 동안의 타격만 센다', () => {

@@ -45,7 +45,7 @@ export function initLandmark(s: GameState, id: LandmarkId): void {
   };
   const top = VIEW.H + 40;
   if (id === 'bell') lm.body = { floors: floorsOf(L.BELL.FLOORS, L.BELL.HP, 'hard'), y: top };
-  else if (id === 'wind') lm.body = { floors: floorsOf(L.WIND.FLOORS, L.WIND.HP, 'mid'), y: top };
+  else if (id === 'wind') lm.body = { floors: floorsOf(L.WIND.FLOORS[diffOf(s)], L.WIND.HP, 'mid'), y: top };
   else if (id === 'crane') lm.body = { floors: floorsOf(L.CRANE.FLOORS, L.CRANE.HP, 'hard'), y: top };
   else {
     s.stack = makeStack({
@@ -131,7 +131,8 @@ function stepSitRise(s: GameState, lm: LandmarkState): boolean {
     const half = lm.id === 'crane' && lm.cue === 2;
     const breath = lm.id === 'wind' && lmAct(s) === 3 && lm.air === 0;
     moveBody(lm, half ? L.CRANE.HALF_Y : breath ? L.SIT_Y + L.WIND.BREATH_SIT_DY : L.SIT_Y);
-    if (lm.t >= (half ? L.CRANE.HALF_TICKS : L.SIT_TICKS[diffOf(s)])) {
+    if (breath) lm.t -= 1; // 들숨 동안 창 시간은 멈춘다 — 땅에서 날숨을 기다려 베도 된다
+    if (lm.t >= (half ?L.CRANE.HALF_TICKS : L.SIT_TICKS[diffOf(s)])) {
       setSt(lm, 'rise');
       if (half) lm.cue = 1; // 걸어 둔 채 올라간다 — 다음 짐이 온창
     }
