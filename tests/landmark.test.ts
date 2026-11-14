@@ -36,7 +36,7 @@ function stepN(s: GameState, n: number, f: InputFrame = EMPTY_INPUT): void {
   for (let i = 0; i < n; i++) step(s, f);
 }
 
-/** 몸의 층 수를 맞춘다. 막: 종탑 4~3 / 2 / 1 · 바람탑 5~4 / 3~2 / 1 · 크레인 5~4 / 3~2 / 1 */
+/** 몸의 층 수를 맞춘다. 막: 종탑 3 / 2 / 1 · 바람탑 5~4 / 3~2 / 1 · 크레인 5~4 / 3~2 / 1 */
 function setFloors(s: GameState, n: number): void {
   s.lm!.body!.floors.length = n;
 }
@@ -346,7 +346,24 @@ describe('종탑 2판', () => {
     expect(s2.lm!.st).toBe('sit');
   });
 
-  it('반격 창: 내려찍기를 지면 가드로 막으면 몸이 땅에 머문다(견습 60 · 정규 45), 못 막으면 올라간다', () => {
+  it('앞 종이 올라가는 동안 다음 종 똑딱을 미리 센다 — 떨어지는 동안은 안 센다', () => {
+    const s = bossStage('1-B');
+    skipEnter(s);
+    waitStack(s);
+    const tell = s.lm!.cue;
+    expect(tell).toBe(LANDMARK.BELL.TELL[0]);
+    stepN(s, 10);
+    expect(s.lm!.cue, '떨어지는 중').toBe(tell);
+    groundGuardPose(s);
+    s.stack!.y = 40; s.stack!.vy = -200;
+    step(s, GUARD);
+    for (let i = 0; i < 90 && s.stack; i++) step(s);
+    expect(s.stack).toBeNull();
+    expect(s.lm!.cue).toBeLessThan(tell);
+    expect(s.lm!.cue).toBeGreaterThan(0);
+  });
+
+  it('반격 창: 내려찍기를 지면 가드로 막으면 몸이 땅에 머문다(견습 90 · 정규 75), 못 막으면 올라간다', () => {
     for (const diff of [0, 1] as const) {
       const s = bossStage('1-B', diff);
       skipEnter(s);
@@ -391,7 +408,7 @@ describe('종탑 2판', () => {
     expect(s.stack!.floors.every((f) => f.mat === 'bell')).toBe(true);
     expect(late(2, 2, 1).stack!.floors).toHaveLength(5);
     expect(late(0, 2, 1).stack!.floors, '견습').toHaveLength(1);
-    expect(late(1, 4, 1).stack!.floors, '1막').toHaveLength(1);
+    expect(late(1, LANDMARK.BELL.FLOORS, 1).stack!.floors, '1막').toHaveLength(1);
     expect(late(1, 2, 5).stack!.floors, '남은 종 하나').toHaveLength(1);
     // 제때 떨어지면 덩이가 아니다
     const s2 = bossStage('1-B');

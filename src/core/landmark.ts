@@ -255,7 +255,7 @@ function stepBell(s: GameState, lm: LandmarkState, evStart: number): void {
         if (damageBody(s, lm, pts)) s.events.push({ kind: 'floorCollapse', y, mat });
         if (lm.st === 'down' && lm.n === hours && d >= 1) lm.x = 1; // 열두 번째 종으로 쓰러뜨렸다 — 13시
       }
-    }
+    } else if (s.stack.vy > 0 && lm.cue > 0) lm.cue -= 1; // 앞 종이 올라가는 동안 다음 종 똑딱을 미리 센다
     return;
   }
   // 1 · 2막은 점수가 종 수에 닿으면 남은 종을 안 떨어뜨리고 끝낸다. 시보엔 조기 종료가 없다
