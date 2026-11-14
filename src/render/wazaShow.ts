@@ -14,6 +14,7 @@ import { makeFloor, makeStack } from '../core/building';
 import { pointInk, spawnStackShatter } from './effects';
 import { bloodSpray, weaponBurst } from './bladeFx';
 import { flashK, inkFrame } from './screenfx';
+import { kitOf } from './moveBody';
 import { MUKJUL_STAR, wazaBodyAt, type WazaShowView } from './wazaBody';
 
 /** 예비동작 길이 — 이 프레임에 renderer가 쥐었던 묶음을 푼다(천지개벽 · 올려베기가 실제로 부서지는 순간) */
@@ -547,7 +548,7 @@ export function drawWazaShot(ctx: CanvasRenderingContext2D, id: WazaId, x: numbe
   if (id === 'dalmuri') dalNight(ctx, sh, g - y / k, false);
   if (typeof document !== 'undefined') {
     // 졸라맨도 그 프레임의 몸 연기 자세(판과 같은 시간표)
-    setLiveBody(wazaBodyAt(viewOf(sh), !!greatLook(weapon)));
+    setLiveBody(wazaBodyAt(viewOf(sh), kitOf(weapon)));
     drawPlayer(ctx, 'special', 0, VIEW.LANE_X[0], g);
     setLiveBody(null);
   }
@@ -762,7 +763,7 @@ function mukjul(ctx: CanvasRenderingContext2D, sh: Show, s: GameState, top: numb
     const st = expectedBurst('mukjul') - MUKJUL_STAR;
     if (f >= st && f < st + 8) {
       const great = !!greatLook(sh.weapon);
-      const [, , tx, ty] = liveBlade(wazaBodyAt(viewOf(sh), great), great);
+      const [, , tx, ty] = liveBlade(wazaBodyAt(viewOf(sh), kitOf(sh.weapon)), great);
       star(ctx, px + tx, foot + ty, 26 * (1 - grow(f, st, 8)), 4, 0.4);
     }
     return;

@@ -7,7 +7,15 @@
 
 import { JUICE, WAZA_RUN } from '../config';
 import type { GameState, WazaId } from '../core/types';
-import { greatLook, shoulderOf, type Body } from './sprites';
+import { shoulderOf, type Body } from './sprites';
+
+/** 필살 몸에 입히는 무기 — 서기 + 길이 배수 + 무게(낮은 자세가 더 내려앉는 px) + 한 손 */
+export interface Kit {
+  stand: Body;
+  long?: number;
+  heft?: number;
+  oneHand?: boolean;
+}
 
 /** 연출이 넘기는 박자 — wazaShowState() */
 export interface WazaShowView {
@@ -113,27 +121,27 @@ function burstAt(v: WazaShowView): number {
 
 // ── 천지개벽 — 칼을 거꾸로 쥐고 머리 위로 들었다가 땅에 꽂으며 한 무릎으로 앉는다. 벼락이 그 자리에서 하늘로 솟는다 ──
 
-const T_RAISE = pose([-1, -50], [-1, -24], [8, 0], [-6, 0], -Math.PI / 2 + 0.3, 'grip', Math.PI / 2, { lF: 16, eF: 2 });
-const T_PLANT = pose([6, -30], [-3, -11], [10, 0], [-16, -1], -0.05, 'grip', Math.PI / 2 + 0.05, { lF: 11 });
+const T_RAISE = pose([-3, -51], [-1, -24.5], [8, 0], [-6, 0], -Math.PI / 2 + 0.15, 'grip', Math.PI / 2, { lF: 16, eF: 2 });
+const T_PLANT = pose([8, -27], [-3, -9.5], [11, 0], [-19, -1], 0.1, 'grip', Math.PI / 2 + 0.05, { lF: 11 });
 const T_PULL = pose([3, -44], [0, -20], [9, 0], [-8, 0], 0.35, 'grip', Math.PI / 2 + 0.15);
 
 function tenchi(f: number, st: Body): Body {
   return play([
-    [0, st], [4, T_RAISE], [P - 2, sink(T_RAISE, -1)], [P, T_PLANT, out], [P + 2, sink(T_PLANT, 2), out],
+    [0, st], [2, sink(st, 3), out], [5, T_RAISE, out], [P - 2, sink(T_RAISE, -1)], [P, T_PLANT, out], [P + 2, sink(T_PLANT, 2), out],
     [P + 28, sink(T_PLANT, 2)], [P + 36, T_PULL], [P + 44, st],
   ], f);
 }
 
 // ── 올려베기 — 칼끝을 뒤 땅에 끌며 웅크렸다가 한 프레임에 하늘로 쳐올리며 뛰어오른다 ──
 
-const A_LOW = pose([3, -34], [-5, -13], [11, 0], [-12, 0], Math.PI - 0.6, 0.6, Math.PI - 0.5, { eF: 2 });
-const A_UP = shift(pose([6, -52], [3, -26], [7, -2], [-4, 0], -Math.PI / 2 + 0.35, 'grip', -Math.PI / 2 + 0.2, { lF: 16, eF: 2 }), 0, -8);
-const A_LAND = pose([4, -42], [1, -18], [9, 0], [-9, 0], 0.15, 'grip', -0.35);
+const A_LOW = pose([5, -30], [-5, -11], [12, 0], [-13, 0], Math.PI - 0.6, 0.6, Math.PI - 0.4, { eF: 2 });
+const A_UP = shift(pose([6, -52], [3, -26], [7, -2], [-4, 0], -Math.PI / 2 + 0.35, 'grip', -Math.PI / 2 + 0.2, { lF: 16, eF: 2 }), 0, -12);
+const A_LAND = pose([5, -33], [-2, -12.5], [10, 0], [-12, 0], 0.15, 'grip', -0.35);
 
 function ageba(f: number, st: Body): Body {
   return play([
     [0, st], [P - 4, A_LOW], [P - 1, sink(A_LOW, 1)], [P, A_UP, out], [P + 4, shift(A_UP, 0, -2), out],
-    [P + 10, shift(A_UP, 0, 4)], [P + 13, A_LAND, out], [P + 24, st],
+    [P + 10, shift(A_UP, 0, 4)], [P + 13, A_LAND, out], [P + 16, sink(A_LAND, 1.5), out], [P + 28, st],
   ], f);
 }
 
@@ -141,9 +149,9 @@ function ageba(f: number, st: Body): Body {
 //    칼을 수평으로 뻗은 낮은 돌진 자세로 정적 → 반쯤 일어나 칼끝을 앞 아래로 → 칼을 머리 위로 휘두르며 한 바퀴(칼끝 별빛) →
 //    칼을 비스듬히 치켜든 가드로 서서 기다리면 터진다 → 칼을 어깨에 걸치고 선다 ──
 
-const M_COIL = pose([7, -34], [-3, -14], [12, 0], [-13, 0], Math.PI - 0.45, 0.35, Math.PI - 0.2);
-const M_SWING = pose([9, -37], [1, -15], [16, 0], [-14, 0], -0.15, Math.PI - 0.2, -0.08, { sl: 1.15 });
-const M_LUNGE = pose([10, -37], [2, -14], [18, 0], [-17, 0], -0.06, Math.PI + 0.3, 0, { sl: 1.1 });
+const M_COIL = pose([8, -30], [-4, -11.5], [12, 0], [-14, 0], Math.PI - 0.45, 0.35, Math.PI - 0.2);
+const M_SWING = pose([11, -34], [1, -13.5], [17, 0], [-17, 0], -0.15, Math.PI - 0.2, -0.08, { sl: 1.2 });
+const M_LUNGE = pose([13, -32], [0, -12.5], [19, 0], [-19, 0], -0.06, Math.PI + 0.3, 0, { sl: 1.1 });
 const M_RISE = pose([6, -44], [1, -19], [14, 0], [-12, 0], 0.5, Math.PI - 0.7, 0.7);
 const M_OVER = pose([1, -48], [0, -22], [10, 0], [-9, 0], -Math.PI / 2 + 0.2, Math.PI - 0.4, -Math.PI / 2 - 0.7, { lF: 15, eF: 2, turn: -1 });
 const M_GUARD = pose([1, -47], [0, -21], [11, 0], [-10, 0], -0.3, 1.9, -Math.PI / 2 - 0.12, { eF: 2 });
@@ -164,10 +172,10 @@ function mukjul(v: WazaShowView, st: Body): Body {
 // ── 월하난무 — 월영즉식: 두 팔을 크게 벌림 → 칼을 두 손으로 머리 위에 수직으로 세우고 고요(밤의 구가 몸을 감싼다) →
 //    첫 칼에 내리베며 한 무릎으로 앉는다(보름달 앞 실루엣) → 웅크린 채 칼 넷이 몸을 떨게 하고 → 터지며 일어나 칼을 낮게 늘어뜨린다 ──
 
-const D_SPREAD = pose([0, -49], [0, -23], [9, 0], [-9, 0], -0.3, Math.PI + 0.3, -0.85);
+const D_SPREAD = pose([-1, -50], [0, -22], [8, 0], [-8, 0], -0.5, Math.PI + 0.5, -1.0);
 const D_RAISE = pose([-1, -48], [0, -22], [8, 0], [-8, 0], -Math.PI / 2 + 0.65, 'grip', -Math.PI / 2, { lF: 16, sl: 1.12, eF: 2 });
 const D_WIND = pose([-1, -47], [0, -21], [9, 0], [-9, 0], -Math.PI / 2 + 0.5, 'grip', -Math.PI / 2 - 0.6, { lF: 16, sl: 1.12, eF: 2 });
-const D_KNEEL = pose([8, -31], [-2, -11], [14, 0], [-14, 0], 0.5, 'grip', 0.42, { sl: 1.12 });
+const D_KNEEL = pose([10, -28], [-2, -9.5], [14, 0], [-17, 0], 0.55, 'grip', 0.42, { sl: 1.12 });
 const D_UP = pose([5, -44], [1, -19], [15, 0], [-13, 0], 0.75, Math.PI - 0.6, 1.0);
 const D_LOW = pose([3, -46], [0, -21], [13, 0], [-12, 0], 1.05, Math.PI - 0.9, 1.25);
 
@@ -189,12 +197,12 @@ function dalmuri(v: WazaShowView, st: Body): Body {
 
 const N_READY = pose([1, -44], [-1, -19], [11, 0], [-11, 0], -Math.PI / 2 + 0.5, 'grip', -1.9, { lF: 15, eF: 2 });
 const N_CUT = [
-  pose([5, -43], [2, -19], [13, 0], [-10, 0], 0.6, 'grip', 0.5),
-  pose([-1, -45], [-1, -20], [11, 0], [-11, 0], -Math.PI / 2 - 0.1, 'grip', -2.2, { lF: 15 }),
-  pose([6, -42], [3, -18], [14, 0], [-11, 0], -0.05, 'grip', -0.15),
-  pose([3, -46], [0, -21], [11, 0], [-11, 0], -1.2, 'grip', -1.1, { lF: 14 }),
+  pose([9, -36], [1, -15], [14, 0], [-15, 0], 0.6, 'grip', 0.5),
+  pose([-3, -47], [-1, -21], [9, 0], [-9, 0], -Math.PI / 2 - 0.1, 'grip', -2.2, { lF: 15 }),
+  pose([10, -38], [3, -15.5], [16, 0], [-13, 0], -0.05, 'grip', -0.15, { sl: 1.12 }),
+  pose([3, -49], [1, -22], [8, 0], [-6, 0], -1.2, 'grip', -1.1, { lF: 15 }),
 ];
-const N_FIN = pose([3, -40], [-2, -16], [12, 0], [-14, 0], 0.7, Math.PI - 0.5, 0.35);
+const N_FIN = pose([8, -33], [-2, -12.5], [12, 0], [-17, 0], 0.7, Math.PI - 0.5, 0.35);
 
 function nakgwan(v: WazaShowView, st: Body): Body {
   const k = v.hitF.length;
@@ -210,9 +218,9 @@ function nakgwan(v: WazaShowView, st: Body): Body {
 
 // ── 용오름 — 웅크려 칼을 뒤로 감았다가 제자리에서 팽이처럼 돈다. 회오리가 솟을 때마다 칼을 하늘로 쳐올린다 ──
 
-const R_COIL = pose([-5, -38], [-2, -15], [10, 0], [-10, 0], Math.PI - 0.7, Math.PI - 1.0, Math.PI - 0.2);
+const R_COIL = pose([-6, -33], [-3, -12.5], [10, 0], [-11, 0], Math.PI - 0.7, Math.PI - 1.0, Math.PI - 0.2);
 const R_SPIN = pose([0, -47], [0, -23], [5, 0], [-5, 0], 0, Math.PI, 0.05);
-const R_GUST = pose([2, -50], [1, -25], [5, -1], [-5, 0], -1.2, Math.PI + 0.6, -1.4, { lF: 15, eF: 2 });
+const R_GUST = shift(pose([2, -50], [1, -25], [5, -1], [-5, 0], -1.2, Math.PI + 0.6, -1.4, { lF: 15, eF: 2 }), 0, -3);
 const SPIN = 8; // 한 바퀴 프레임
 
 function baram(v: WazaShowView, st: Body): Body {
@@ -231,26 +239,33 @@ function baram(v: WazaShowView, st: Body): Body {
 }
 
 /** 박자 v에서의 몸 — 판(wazaBody) · 상점 칸(drawWazaShot) · 연출의 칼끝 별빛이 같은 시간표를 읽는다. great = 대검(서기가 다르다) */
-export function wazaBodyAt(v: WazaShowView, great = false): Body {
-  const st = great ? STAND_GREAT : STAND;
+export function wazaBodyAt(v: WazaShowView, k: Kit): Body {
+  const long = k.long ?? 1;
+  const st: Body = { ...k.stand, sl: k.stand.sl / long }; // 아래에서 다시 곱한다 — 서기는 제 길이로 돌아온다
+  let b: Body;
   switch (v.id) {
-    case 'tenchi': return tenchi(v.f, st);
-    case 'ageba': return ageba(v.f, st);
-    case 'mukjul': return mukjul(v, st);
-    case 'dalmuri': return dalmuri(v, st);
-    case 'nakgwan': return nakgwan(v, st);
-    case 'baram': return baram(v, st);
+    case 'tenchi': b = tenchi(v.f, st); break;
+    case 'ageba': b = ageba(v.f, st); break;
+    case 'mukjul': b = mukjul(v, st); break;
+    case 'dalmuri': b = dalmuri(v, st); break;
+    case 'nakgwan': b = nakgwan(v, st); break;
+    case 'baram': b = baram(v, st); break;
   }
+  // 무기 특성 — 무거우면 낮은 자세가 더 내려앉고(서 있을 땐 0), 길면 더 뻗고, 한 손 무기는 뒷손을 허리 뒤에 둔다
+  const low = Math.min(1, Math.max(0, (b.head[1] + 48) / 16));
+  if (k.heft) b = sink(b, k.heft * low);
+  b = { ...b, sl: b.sl * long };
+  if (k.oneHand) b = { ...b, hB: [b.hip[0] - 5, b.hip[1] - 4], eB: -2 };
+  return b;
 }
 
 /**
  * 판 졸라맨의 몸 — 필살 자세 동안, 그리고 자세가 풀린 뒤에도 연출이 남아 있고 졸라맨이 가만히 서 있으면 시간표를 끝까지 연기한다.
  * 딴 동작(점프 · 공격 · 가드 · 다침)을 하면 거둔다(free). 연출 없이 필살 자세만 남은 틱은 서기.
  */
-export function wazaBody(s: GameState, v: WazaShowView | null): Body | null {
+export function wazaBody(s: GameState, v: WazaShowView | null, k: Kit): Body | null {
   const p = s.player.pose;
-  const great = !!greatLook(s.weapon);
-  if (p === 'special') return v ? wazaBodyAt(v, great) : great ? STAND_GREAT : STAND;
-  if (p === 'idle' && v && !v.free) return wazaBodyAt(v, great);
+  if (p === 'special') return v ? wazaBodyAt(v, k) : k.stand;
+  if (p === 'idle' && v && !v.free) return wazaBodyAt(v, k);
   return null;
 }

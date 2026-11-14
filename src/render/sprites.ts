@@ -662,7 +662,25 @@ function weapon(
 // ── 대검 참격 호 ─────────────────────────────────────────────
 // 칼끝(발 +46,−4)에서 머리 위 뒤(+20,−66)까지 한 곡선 위에 칼마다 다른 띠를 그린다. t = 0이 칼끝 쪽(지금 칼이 있는 곳),
 // 1이 휘두르기 시작한 쪽 — 칼끝 쪽이 두껍고 꼬리로 가늘어진다. 띠 몸통은 칼빛(ARC)이라 상점 칼빛이 대검에서도 산다.
-const GA = [WCX + 46, 56, WCX + 62, 18, WCX + 20, -6] as const;
+const GA_BAKED: readonly number[] = [WCX + 46, 56, WCX + 62, 18, WCX + 20, -6];
+/** 지금 호 — 구운 프레임은 GA_BAKED, 살아 있는 몸은 그 무기의 칼끝 길(setLiveBody가 준다) */
+let GA: readonly number[] = GA_BAKED;
+/** 호가 휘는 쪽(+1 = 구운 호와 같은 쪽) — 칼끝 길이 반대로 휘면 띠의 바깥 · 몸 쪽을 뒤집는다 */
+let gaSide = 1;
+/** 살아 있는 몸의 칼끝 길(프레임 좌표 x, y 열한 점 · 닿은 쪽이 먼저). null = 구운 호 */
+let liveArc: readonly number[] | null = null;
+
+function setArc(pts: readonly number[] | null): void {
+  liveArc = pts;
+  if (!pts) { GA = GA_BAKED; gaSide = 1; return; }
+  const n = pts.length;
+  const [x0, y0, mx, my, x2, y2] = [pts[0], pts[1], pts[n / 2 - 1], pts[n / 2], pts[n - 2], pts[n - 1]];
+  const cx = 2 * mx - (x0 + x2) / 2;
+  const cy = 2 * my - (y0 + y2) / 2;
+  GA = [x0, y0, cx, cy, x2, y2];
+  // 구운 호는 (끝 − 처음) × (굽이 − 처음) < 0
+  gaSide = (x2 - x0) * (cy - y0) - (y2 - y0) * (cx - x0) <= 0 ? 1 : -1;
+}
 
 /** 호 위의 점 — 볼록한 바깥 쪽 법선으로 off만큼(음수면 몸 쪽) */
 function arcAt(t: number, off: number): [number, number] {
@@ -670,7 +688,7 @@ function arcAt(t: number, off: number): [number, number] {
   const u = 1 - t;
   const dx = u * (x1 - x0) + t * (x2 - x1);
   const dy = u * (y1 - y0) + t * (y2 - y1);
-  const d = Math.hypot(dx, dy) || 1;
+  const d = (Math.hypot(dx, dy) || 1) * gaSide;
   return [u * u * x0 + 2 * u * t * x1 + t * t * x2 - (dy / d) * off, u * u * y0 + 2 * u * t * y1 + t * t * y2 + (dx / d) * off];
 }
 
@@ -822,8 +840,8 @@ function slashArc(c: CanvasRenderingContext2D): void {
   }
   // 연장 — 휘두른 자리에서 댄 데가 굵고 끝이 빠지는 먹 한 획 + 앞쪽 획 속만 그 연장 포인트 색(먹 한 획 2판)
   const [x0, y0, qx, qy, x1, y1, w] = TOOL_ARC[playerWeapon as keyof typeof TOOL_ARC] ?? TOOL_ARC.sword;
-  const pts: number[] = [];
-  for (let i = 0; i <= 10; i++) {
+  const pts: number[] = liveArc ? [...liveArc] : [];
+  for (let i = 0; i <= 10 && !liveArc; i++) {
     const t = i / 10;
     const u = 1 - t;
     pts.push(WCX + u * u * x0 + 2 * u * t * qx + t * t * x1, u * u * y0 + 2 * u * t * qy + t * t * y1);
@@ -1027,7 +1045,10 @@ function pickPlayerFrame(pose: PlayerPose, animTick: number, ss = SS_MIN): PFram
   let f = m[k];
   if (!f) {
     bakeSS = ss;
+    const keep = liveArc;
+    setArc(null); // 구운 프레임은 구운 호로
     f = m[k] = BUILD[k]();
+    setArc(keep);
   }
   return f;
 }
@@ -1080,8 +1101,10 @@ export function shoulderOf(head: Pt, hip: Pt): [number, number] {
 let live: Body | null = null;
 
 /** 렌더러가 판 졸라맨을 그리는 동안만 건다 — drawPlayer · playerHead · playerBlade · 숨쉬기가 구운 프레임 대신 이 몸을 본다 */
-export function setLiveBody(b: Body | null): void {
+export function setLiveBody(b: Body | null, slash: readonly number[] | null = null): void {
   live = b;
+  // slash = 그 무기의 칼끝 길(발 기준) — 참격 호 · 대검 붓 잔상(greatArcPoint)이 이 길을 따른다. 몸을 거둘 때는 그대로 둔다
+  if (b) setArc(slash && slash.map((v, i) => v + (i % 2 ? FOOT_Y : WCX)));
 }
 
 /** 0을 지나는 돌기에도 변환이 뒤집히지 않게 — 옆으로 선 한 줄 대신 아주 얇은 몸 */

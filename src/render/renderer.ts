@@ -31,7 +31,7 @@ import { bladeAura, drawBladeFx } from './bladeFx';
 import {
   drawWazaMid, drawWazaTitle, drawWazaWorld, resetWazaShow, startWazaShow, stepWazaShow, takeWazaJolt, wazaShowEvent, wazaShowState,
 } from './wazaShow';
-import { moveBody } from './moveBody';
+import { kitOf, moveBody, slashOf } from './moveBody';
 import { wazaBody } from './wazaBody';
 import { bossBodyHit, introFloorTop, resetBossFx, stepBossFx } from './executor';
 import { addTrauma, defeatSlow, kickPx, pickHaptic, shakePx, shakeSample, type HapticCounters } from './feel';
@@ -565,7 +565,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES && !wazaShowState();
   setPlayerWeapon(s.weapon);
   const move = moveBody(s); // 평소 몸 연기 — 필살 중에도 불러 자세 바뀜을 놓치지 않는다
-  setLiveBody(wazaBody(s, wazaShowState()) ?? move); // 필살 몸 연기 — 그리는 동안만(칼 기운 · 졸라맨 · 마스크 · 안전모가 같은 몸을 본다)
+  setLiveBody(wazaBody(s, wazaShowState(), kitOf(s.weapon)) ?? move, slashOf(s.weapon)); // 필살 몸 연기 — 그리는 동안만(칼 기운 · 졸라맨 · 마스크 · 안전모가 같은 몸을 본다)
   bladeAura(s); // 대검 칼 기운 — 지금 포즈의 칼날에서
   if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
     const px = VIEW.LANE_X[s.player.lane];
