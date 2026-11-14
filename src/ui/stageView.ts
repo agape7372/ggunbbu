@@ -1,12 +1,11 @@
 // 작업 지시서 화면 — 철거 지도(터 열셋 · 쪽지 · 착수) · 현장 일지(createStageUi) + 철거 보고서 속(stageReport · 결과 화면 틀은 overlay).
-// 「먹 한 획」: 주홍은 「착수」 하나(공격 키 자리). 깬 판은 먹 도장 하나(가장 높게 깬 난이도). 숫자는 --black, 붓은 제목 · 다음 · 도장 · 착수에만.
+// 「먹 한 획」: 주홍은 「착수」 하나(쪽지 맨 아래 폭 단추). 깬 판은 먹 도장 하나(가장 높게 깬 난이도). 숫자는 --black, 붓은 제목 · 다음 · 도장 · 착수에만.
 // 규칙 · 기록은 core · meta가 갖고 있다. 여기는 부르기만 한다. 화면 글은 content/stages.ts 한 곳.
 
 import './stage.css';
 import { REGIONS, STAGE_MODE, STAGE_TEXT, fmtStageTime } from '../content/stages';
 import { STAGES, type StageDef } from '../core/stages';
 import type { StageDiff } from '../core/types';
-import { KEY_SIZE, ZONE, type Pos } from '../input/layout';
 import { STAMP_KEYS, diffUnlocked, hasStamp, recordOf, stageUnlocked, type StageRecord } from '../meta/stageRecord';
 import { THEME_TIERS } from '../render/sprites';
 import { nextStage, nextStageDef } from './homeLogic';
@@ -18,8 +17,6 @@ export interface StageListOpts {
   recs: Readonly<Record<string, StageRecord>>;
   /** 시험판 전해금 — 다 열린다. 기록은 꾸미지 않는다 */
   allOpen: boolean;
-  /** 「착수」 자리(input/layout goSeat) — 공격 키 기본 자리, 실제 공격 키가 있는 쪽 */
-  seat: Pos & { sx: -1 | 0 | 1 };
 }
 
 export interface StageHandlers {
@@ -38,8 +35,6 @@ let diffPick: StageDiff = 1;
 /** 홈 「착수」가 읽는다(ui/homeLogic.ts) */
 export const lastDiffPick = (): StageDiff => diffPick;
 
-/** 쪽지와 「착수」 사이 */
-const SLIP_GAP = 12;
 /** 위에서부터 본사 · 4 · 3 · 2 · 1구역 */
 const ROWS = [4, 3, 2, 1, 0] as const;
 
@@ -56,12 +51,6 @@ const dotWrap = (s: string): string => s.split(' · ').map((c, i, a) => `<span c
 const lampTag = (lamp: number): string => (lamp > 0 ? `<span class="st-lamp">${STAGE_MODE.diffs[lamp - 1]}</span>` : '');
 
 const stampCount = (bits: number): number => STAMP_KEYS.filter((k) => hasStamp(bits, k)).length;
-
-/** 정규 도장 다섯 칸 */
-function pips(bits: number): string {
-  return `<span class="st-pips" role="img" aria-label="${STAGE_MODE.stampTotal} ${stampCount(bits)}/${STAMP_KEYS.length}">${
-    STAMP_KEYS.map((k) => `<i${hasStamp(bits, k) ? ' class="on"' : ''}></i>`).join('')}</span>`;
-}
 
 /** 위 띠 — 지도면 「홈」(쪽지를 펼친 동안은 「뒤로」 = 접기, fold가 바꾼다) · 일지면 「뒤로」(지도) · 제목 · 오른쪽 칸 */
 const band = (title: string, back: string, right = ''): string =>
@@ -87,7 +76,7 @@ function lotHtml(o: StageListOpts, d: StageDef, i: number, sel: string, next: st
   const cls = `${!open ? ' lk' : done ? ' done' : nx ? ' nx' : ''}${d.id === sel ? ' on' : ''}`;
   return `<button type="button" class="mp-lot${cls}" data-st="pick" data-id="${d.id}" aria-pressed="${d.id === sel}" aria-label="${esc(label)}"
     style="--bf:${done ? tier.mid.base : tier.weak.base};--i:${i}"><span class="mp-bda">${body}</span>
-    <span class="mp-pl"><span class="mp-p1"><b class="n">${esc(d.id)}</b>${pips(rec.stamps)}</span><span class="mp-nm">${esc(name)}</span></span></button>`;
+    <span class="mp-pl"><span class="mp-p1"><b class="n">${esc(d.id)}</b></span><span class="mp-nm">${esc(name)}</span></span></button>`;
 }
 
 function mapHtml(o: StageListOpts, sel: string): string {
@@ -108,7 +97,7 @@ function mapHtml(o: StageListOpts, sel: string): string {
 }
 
 /**
- * 쪽지(「착수」의 반대쪽) + 「착수」(공격 키 기본 자리). 접힌 쪽지 = 머리 · 기록 셋 · 난이도 셋뿐(11-12 줄임, 사유는 stage.css 머리).
+ * 쪽지(화면 폭 전체 아래 판) — 맨 아래 「착수」 폭 단추(11-14 배치 시안: 판 조작 키 자리를 메뉴로 쓰지 않는다). 접힌 쪽지 = 머리 · 기록 셋 · 난이도 셋뿐(11-12 줄임, 사유는 stage.css 머리).
  * 머리를 누르면 위로 펼쳐져 지시서 한 장의 나머지(구역 글 · 지시 · 특기 사항 · 난이도 글 · 보스 연습)가 보인다
  */
 function slipHtml(o: StageListOpts, id: string): string {
@@ -144,23 +133,17 @@ function slipHtml(o: StageListOpts, id: string): string {
   const diffs = ([0, 1, 2] as const).map((v) => `<button type="button" data-st="diff" data-v="${v}" aria-pressed="${v === diffPick}"${
     open && ok(v) ? '' : ' disabled'}${v === diffPick ? ' class="on"' : ''}>${STAGE_MODE.diffs[v]}</button>`).join('');
   const fact = (k: string, v: string): string => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
-  const s = o.seat;
-  const w = KEY_SIZE.attack.w;
-  // 「착수」가 오른쪽이면 쪽지는 왼쪽. 넓은 화면에선 「착수」가 틀 끝까지 밀리니(sx) 틀 가장자리에서 잰 간격은 그대로다
-  const right = s.x + w / 2 > ZONE.w / 2;
-  const at = right ? `left:14px;right:${ZONE.w - s.x + SLIP_GAP}px` : `left:${s.x + w + SLIP_GAP}px;right:14px`;
   const go = open ? STAGE_MODE.start : STAGE_MODE.lockKey;
   const name = esc(t.name);
-  return `<section class="mp-slip${open ? '' : ' lk'}" style="${at}" aria-label="${esc(id)} ${name}">
+  return `<section class="mp-slip${open ? '' : ' lk'}" aria-label="${esc(id)} ${name}">
       <button type="button" class="mp-head" data-st="fold" aria-expanded="false" aria-controls="mp-more">
         <b class="n">${esc(id)}</b><b class="mp-nm${t.name.length > 4 ? ' long' : ''}">${name}</b>${d.boss ? `<span class="tag ink">${STAGE_MODE.bossTag}</span>` : ''}</button>
       ${more}
       <dl class="mp-facts">${fact(STAGE_MODE.par, `<b class="n">${fmtStageTime(d.par)}</b>`)}${fact(STAGE_MODE.master, `<b class="n">${fmtStageTime(d.master)}</b>`)}${
         fact(STAGE_MODE.myBest, rec.best > 0 ? `<b class="n">${fmtStageTime(rec.best)}</b>` : STAGE_MODE.none)}</dl>
       <div class="mp-diffs seg" role="group" aria-label="${STAGE_MODE.title}">${diffs}</div>
-    </section>
-    <button type="button" class="tbtn mp-go ${open ? 'f-seal' : 'f-faint'}" data-st="start" aria-label="${go} ${esc(id)} ${name}${open ? ` ${STAGE_MODE.diffs[diffPick]}` : ''}"
-      style="left:calc(var(--fr-x, 0px) + ${s.x}px);top:${s.y}px;--sx:${s.sx}"><span>${go}</span></button>`;
+      <button type="button" class="seal mp-go${open ? '' : ' lk'}" data-st="start" aria-label="${go} ${esc(id)} ${name}${open ? ` ${STAGE_MODE.diffs[diffPick]}` : ''}">${go}</button>
+    </section>`;
 }
 
 function logHtml(o: StageListOpts): string {
@@ -179,7 +162,7 @@ function logHtml(o: StageListOpts): string {
 }
 
 export function createStageUi(root: HTMLElement, h: StageHandlers): StageUi {
-  let opts: StageListOpts = { recs: {}, allOpen: false, seat: { x: 0, y: 0, sx: 0 } };
+  let opts: StageListOpts = { recs: {}, allOpen: false };
   let view: 'map' | 'log' = 'map';
   let sel = '';
 

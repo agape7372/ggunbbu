@@ -3,9 +3,9 @@
    논리 무대 높이는 늘 780 — vh·뷰포트 조건 없이 고정 px. 마크업 = ui/stageView.ts */
 
 /* ── 철거 지도(「B 현장」 11-11) ─────────────────────────────
-   불투명 화면(바탕 한지). 층은 틀 폭(360 + 2·--fr-x): 위 50 띠 · 지도(58~598, 줄 사이 19) · 쪽지(조작 구역 614~774, 아래에 붙어 위로 큰다).
-   11-12 「너무 빽빽하다」: 터에는 도장 하나만, 접힌 쪽지는 세 줄(머리 · 기록 · 난이도)만 둔다. 줄인 높이는 지도 줄 사이로 돌렸다.
-   「착수」 = 공격 키 모양 DOM 단추(.tbtn · 기본 자리 · 넓은 화면 벌리기 = 판과 같은 식, stageView slipHtml). */
+   불투명 화면(바탕 한지). 층은 틀 폭(360 + 2·--fr-x): 위 50 띠 · 지도(58~536) · 쪽지(화면 폭 아래 판, 아래에 붙어 위로 큰다).
+   11-12 「너무 빽빽하다」: 터에는 도장 하나만, 접힌 쪽지는 머리 · 기록 · 난이도 · 착수만 둔다.
+   11-14 배치 시안: 「착수」는 공격 키 자리가 아니라 쪽지 맨 아래 주홍 폭 단추(.seal). 터 이름 옆 도장 칸 □□□□□은 지웠다(합계는 띠 · 쪽지). */
 .mp { position: absolute; top: 0; height: 780px; left: calc(var(--ov-x, 0px) - var(--fr-x, 0px)); right: calc(var(--ov-x, 0px) - var(--fr-x, 0px)); }
 .mp-in { position: absolute; inset: 0; }
 .mp :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
@@ -25,15 +25,16 @@
 /* 지도 — 위에서부터 본사 · 4 · 3 · 2 · 1구역. 줄마다 왼쪽 세로 딱지(번호 + 구역 이름) + 터 셋 */
 /* 쪽지를 펼친 동안(inert) 덮인 지도는 가라앉는다 — 불투명도만 */
 .mp-map[inert] { opacity: 0.22; } /* 0.3이면 쪽지 오른쪽 가장자리에 반쯤 가린 꼬리표 · 도장이 눈에 걸렸다(11-11). 0.2 밑으로는 내리지 않는다 */
-.mp-map { position: absolute; left: 6px; right: 8px; top: 58px; height: 540px; display: flex; flex-direction: column; justify-content: space-between; }
-.mp-st { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); }
-.mp-rh { margin: 0; writing-mode: vertical-rl; display: flex; align-items: center; gap: 4px; padding-top: 2px; font: 700 13.5px/1 var(--body); white-space: nowrap; pointer-events: none; }
-.mp-rh .n { display: grid; place-items: center; width: 19px; height: 19px; background: var(--ink); color: var(--paper); font: 400 14px/1 var(--black); writing-mode: horizontal-tb; }
+/* 11-14 배치 시안: 쪽지가 화면 폭 아래 판(착수 포함)이 되어 지도는 58~536. 구역 이름은 가로 두 줄(세로 글 금지) */
+.mp-map { position: absolute; left: 8px; right: 8px; top: 58px; height: 478px; display: flex; flex-direction: column; justify-content: space-between; }
+.mp-st { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); }
+.mp-rh { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-top: 2px; font: 700 13.5px/1.1 var(--body); word-break: break-all; pointer-events: none; }
+.mp-rh .n { display: grid; place-items: center; width: 19px; height: 19px; background: var(--ink); color: var(--paper); font: 400 14px/1 var(--black); }
 .mp-st.lk .mp-rh { color: var(--ink2); }
 .mp-st.lk .mp-rh .n { background: var(--ink3); color: var(--ink); }
 .mp-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .mp-st.hq .mp-row { grid-template-columns: minmax(0, 1fr); }
-.mp-cover { position: absolute; left: 26px; top: 2px; display: flex; flex-direction: column; font: 700 13.5px/1.3 var(--body); color: var(--ink2); white-space: nowrap; pointer-events: none; }
+.mp-cover { position: absolute; left: 40px; top: 2px; display: flex; flex-direction: column; font: 700 13.5px/1.3 var(--body); color: var(--ink2); white-space: nowrap; pointer-events: none; }
 
 /* 터 — 그림 칸(.mp-bda) + 이름표(.mp-pl, 윗변 = 지면선). 누름 칸 = 터 전체(폭 1/3 · 높이 96) */
 .mp-lot { position: relative; min-width: 0; display: flex; flex-direction: column; padding: 0; color: var(--ink); text-align: center; }
@@ -62,19 +63,15 @@
 .mp-pl { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 2px 2px; border-top: 3px solid var(--ink); }
 .mp-p1 { display: flex; align-items: center; gap: 4px; height: 15px; }
 .mp-p1 .n { font: 400 15px/1 var(--black); }
-.mp-lot .st-pips { gap: 2px; }
-.mp-lot .st-pips i { width: 7px; height: 9px; border-width: 1.5px; border-color: var(--ink); }
 .mp-nm { max-width: 100%; font: 700 13.5px/1.1 var(--body); white-space: nowrap; }
 .mp-lot.lk { color: var(--ink2); }
 .mp-lot.lk .mp-pl { border-top-color: var(--ink3); }
-.mp-lot.lk .st-pips i { border-color: var(--ink3); }
 /* 고른 터 — 이름표가 먹 바탕으로 뒤집힌다 */
 .mp-lot.on .mp-pl { background: var(--ink); color: var(--paper); border-top-color: var(--ink); }
-.mp-lot.on .st-pips i { border-color: var(--paper); }
-.mp-lot.on .st-pips i.on { background: var(--paper); }
 
-/* 쪽지 — 「착수」의 반대쪽, 아래에 붙어 위로 큰다(stageView가 left · right를 준다). 접힌 쪽지 = 머리 · 기록 셋 · 난이도 셋(높이 160). 머리를 누르면 위로 펼쳐진다 */
-.mp-slip { position: absolute; bottom: 6px; z-index: 3; display: flex; flex-direction: column; padding: 11px 12px 12px; background: var(--card); border: 3px solid var(--ink); clip-path: var(--cutclip); }
+/* 쪽지 — 화면 폭 아래 판, 아래에 붙어 위로 큰다. 접힌 쪽지 = 머리 · 기록 셋 · 난이도 셋 · 착수(높이 약 236). 머리를 누르면 위로 펼쳐진다.
+   곧은 3px 먹 테(잘라 낸 가장자리 금지, 11-14 「흐린테두리도쓰지마」) */
+.mp-slip { position: absolute; left: 12px; right: 12px; bottom: 8px; z-index: 3; display: flex; flex-direction: column; padding: 10px 12px 12px; background: var(--card); border: 3px solid var(--ink); }
 .mp-head { position: relative; display: flex; align-items: center; gap: 6px; height: 30px; min-width: 0; padding: 0; color: var(--ink); text-align: left; white-space: nowrap; }
 .mp-head::after { content: ''; position: absolute; inset: -11px -12px; }
 /* 펼침 표시 — 머리 오른쪽 끝 먹 세모(위 = 위로 펼친다 · 펼치면 아래) */
@@ -124,20 +121,16 @@
 .mp-more .st-riddle { font: 700 14px/1.4 var(--body); color: var(--ink2); }
 .mp-more .st-note { font: 500 13.5px/1.4 var(--body); color: var(--ink2); overflow-wrap: anywhere; word-break: keep-all; }
 
-/* 「착수」 — 공격 키와 같은 주홍 먹 덩어리(ink.ts --pAs). 잠긴 판은 옅은 먹 「잠김」(누르면 거절음) */
-.mp-go { z-index: 3; width: 120px; height: 120px; }
-.mp-go.f-seal { background-image: var(--pAs); }
-.mp-go.f-faint { background-image: var(--pA3); color: var(--ink); }
-.mp-go:active { scale: 0.9; }
+/* 「착수」 — 쪽지 맨 아래 주홍 폭 단추(.seal). 잠긴 판은 옅은 먹 「잠김」(누르면 거절음) */
+.mp-go { height: 56px; margin-top: 10px; font: 400 30px/1 var(--brush); }
+.mp-go.lk { background: var(--ink3); color: var(--ink); }
+.mp-go.lk::after { display: none; }
 .mp-go:focus-visible { outline-offset: 4px; }
 
 /* 칸 규칙 — 지도 · 일지 · 보고서가 같이 쓴다(.st-sub = 보고서 연습 줄, .st-id = 보고서 머리 · 일지). 목록 카드 시절 값 그대로 */
 .st-id { grid-area: id; font: 700 14px/1 var(--body); color: var(--ink2); }
 .st-lamp { grid-area: lamp; padding: 3px 6px 2px; border: 2px solid var(--ink); font: 700 13.5px/1 var(--body); white-space: nowrap; }
 .st-sub { grid-area: sub; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; min-height: 16px; }
-.st-pips { display: inline-flex; gap: 3px; }
-.st-pips i { width: 10px; height: 10px; border: 2px solid var(--ink3); }
-.st-pips i.on { background: var(--ink); border-color: var(--ink); }
 
 /* ── 현장 일지 — 띠 아래 한 장(넘치면 이 칸만 굴린다) ── */
 .mp-logbody { position: absolute; left: 12px; right: 12px; top: 60px; bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding-bottom: 16px; }

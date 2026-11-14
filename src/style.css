@@ -2,7 +2,9 @@
    모든 화면은 붓으로 그은 만화 컷이고, 넘어갈 때 칼이 화면을 사선으로 갈라 두 쪽이 떨어진다(ui/cut.ts).
    색: 한지 · 먹(연먹·옅은 먹은 같은 먹의 밝기 단계) · 주홍 = 「지금 누를 것」 화면당 하나 · 참격 노랑 = 베는 순간만.
    도장 문법: 주홍(안쪽 한지 테두리) = 누를 것 · 먹 채움 = 판정·상태(누를 수 없음) · 먹 테두리만 = 가는 길 · 옅은 먹 = 아직 못 함.
-   섞기 0 — 그라데이션·blur·blend 없음, 반투명은 창 뒤 먹 막 하나뿐. 칸은 그림자 없이 거친 먹 사각으로 만든다. 거친 가장자리 = index.html 필터 #rough · #rough2 · 또는 clip-path(작은 칸 --sealclip · 큰 칸 --cutclip · 띠 --bandclip).
+   섞기 0 — 그라데이션·blur·blend 없음, 반투명은 창 뒤 먹 막 하나뿐. 칸은 그림자 없이 곧은 먹 사각으로 만든다. 먹 맛 = index.html 필터 #rough · #rough2(번짐)뿐.
+   잘라 낸 가장자리 금지(2026-11-14 사용자 「버튼 울퉁불퉁프레임이별로임」 · 「흐린테두리도쓰지마」): --sealclip · --sealclip2 · --cutclip은 none이다.
+   두 겹 칸(먹 ::before + 안쪽 한지 ::after)은 그대로 곧은 먹 테두리가 된다. 띠 밑단 --bandclip만 거친 모양이 남는다.
    메타 화면(미션 · 상점 · 도감) = 먹 틀 안에 화면 폭 색 붓 띠(미션 초록 · 상점 먹 · 도감 고동). 창(.m-card) = 먹 테두리 거친 사각 + 같은 색 붓 띠 머리(출근 남색 · 보상 초록 · 특가 주홍 · 시작 장비 고동).
    단추(.btn) = 붓 획(ink.ts 획 그림 sA~sC: 먹 · 주홍 s · 금 g · 옅은 먹 3). 둥근 모서리 · 그림자 없음.
    상점 = ui/shop.css · 미션·작전·출근 창·시작 장비 = ui/meta.css · 도트판 = ui/maskEditor.css. 판 위(HUD·조작 키)는 필터를 아껴 쓴다 — 매 프레임 바뀌는 칸엔 없다. */
@@ -68,10 +70,11 @@
   --sans: 'Gunbbu Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; /* 메타 화면의 읽는 글자 */
   --black: 'Black Han Sans', var(--sans);  /* 상품 이름 · 가격 · 큰 수 */
 
-  --sealclip: polygon(2% 4%, 28% 0%, 52% 3%, 76% 1%, 98% 5%, 100% 30%, 97% 55%, 100% 78%, 98% 98%, 74% 100%, 50% 97%, 26% 100%, 3% 97%, 0% 72%, 2% 48%, 0% 24%);
-  --sealclip2: polygon(0% 3%, 24% 1%, 50% 4%, 74% 0%, 97% 3%, 100% 26%, 98% 50%, 100% 74%, 97% 100%, 72% 98%, 48% 100%, 22% 97%, 2% 100%, 0% 76%, 3% 52%, 1% 28%);
+  /* 잘라 낸 가장자리 셋은 끈다(11-14, 머리말). 옛 모양은 커밋 9f2166a */
+  --sealclip: none;
+  --sealclip2: none;
+  --cutclip: none;
   /* 색 붓 띠 — 위는 곧고 아래 가장자리만 붓이 지나간 듯 거칠다(화면 머리 · 창 머리) */
-  --cutclip: polygon(0 4px, 24% 0, 52% 5px, 76% 1px, 100% 4px, calc(100% - 3px) 34%, 100% 68%, calc(100% - 2px) calc(100% - 4px), 74% 100%, 48% calc(100% - 4px), 22% calc(100% - 1px), 0 calc(100% - 5px), 3px 66%, 0 32%); /* 큰 칸 — 픽셀 고정이라 키가 커도 가장자리가 같게 거칠다 */
   --bandclip: polygon(0 0, 100% 0, 100% 90%, 95% 97%, 88% 91%, 80% 98%, 71% 92%, 63% 100%, 54% 93%, 46% 99%, 37% 92%, 29% 98%, 21% 91%, 13% 97%, 6% 92%, 0 96%);
   /* 글자 둘레 한지 띠(흐림 0) — 판 위 붓글씨가 건물 그림 위에서도 읽히게 */
   --halo: 2px 0 0 var(--paper), -2px 0 0 var(--paper), 0 2px 0 var(--paper), 0 -2px 0 var(--paper),
@@ -205,7 +208,7 @@ img { display: block; -webkit-user-drag: none; }
 }
 
 #stage.playing > #touch-layer,
-#stage.field > #touch-layer { visibility: visible; }
+#stage.keys > #touch-layer { visibility: visible; } /* 메뉴 키 = 홈뿐(overlay show). 결과는 제 단추 .rp-acts */
 #stage.playing > #hud-layer,
 #stage.paused > #hud-layer { visibility: visible; }
 
@@ -267,7 +270,7 @@ img { display: block; -webkit-user-drag: none; }
   height: 54px;
   flex: none;
   color: var(--ink);
-  filter: url(#rough2);
+  isolation: isolate; /* 테두리 칸은 거친 필터 없이 곧게(11-14) — 필터가 하던 쌓임 맥락만 남긴다(::before · ::after z -1) */
   display: grid;
   place-content: center;
   text-align: center;
@@ -774,37 +777,37 @@ img { display: block; -webkit-user-drag: none; }
 
 /* ── 일시정지 — 판 위에 떨어진 작은 컷 ───────────────── */
 .ov-pause { background: none; display: grid; place-items: center; }
+/* 11-14 배치 시안: 위에서 아래로 계속 부수기(주홍 폭) → 설정(곧은 먹 테) → 그만두기(밑줄 글, 두 번 눌러야) */
 .p-card {
   position: relative;
   width: 296px;
-  padding: 28px 24px 22px 28px;
+  padding: 28px 24px 16px 28px;
   background: var(--paper);
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 8px 10px;
+  gap: 10px;
   animation: dropin 0.42s cubic-bezier(0.3, 1.3, 0.5, 1) both;
 }
 .p-card > .frame,
 .m-card > .frame { left: 0; top: 0; width: 100%; height: 100%; }
 .p-title { font: 400 66px/1 var(--brush); rotate: -5deg; transform-origin: 0 100%; }
-.p-stats { grid-column: 1; display: flex; flex-direction: column; gap: 2px; font: 700 14px/1.2 var(--body); color: var(--ink2); }
+.p-stats { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px; font: 700 14px/1.2 var(--body); color: var(--ink2); }
 /* 숫자는 --black — 붓글씨 2가 Z로 읽혔다(11-11) */
 .p-stats b { font: 400 20px/1.1 var(--black); color: var(--ink); letter-spacing: 0.01em; white-space: nowrap; }
 .p-stats i { font: 400 15px/1 var(--black); font-style: normal; color: var(--ink); }
-.p-resume { grid-column: 2; grid-row: 1 / span 2; width: 118px; height: 118px; rotate: 4deg; }
-.p-resume b { font-size: 36px; line-height: 0.95; }
-.p-row { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
-.p-quit { flex: 1; max-width: 190px; rotate: -1.5deg; }
-.p-quit span { display: none; }
+.p-resume { height: 64px; }
+.p-resume b { font-size: 32px; line-height: 1; }
+.p-set { flex: none; }
+.p-quit { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 48px; color: var(--ink2); }
+.p-quit b { font: 700 15px/1 var(--body); text-decoration: underline; text-underline-offset: 4px; }
+.p-quit span { display: none; font: 700 13.5px/1 var(--body); }
+.p-quit.confirm { color: var(--ink); }
 .p-quit.confirm span { display: block; }
-.p-quit.confirm b { font-size: 26px; }
 
 /* ── 설정 — 켬·끔 스위치 대신 도장을 찍고 뗀다(찍힘 = 켬) ── */
 .set-body { display: flex; flex-direction: column; gap: 14px; padding: 6px 2px 4px; }
 .set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
 .set-tog { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 58px; font: 700 17px/1.2 var(--body); text-align: left; }
-.tog { position: relative; width: 50px; height: 50px; flex: none; display: grid; place-content: center; font: 400 25px/1 var(--brush); font-style: normal; color: var(--ink2); filter: url(#rough2); }
+.tog { position: relative; isolation: isolate; width: 50px; height: 50px; flex: none; display: grid; place-content: center; font: 400 25px/1 var(--brush); font-style: normal; color: var(--ink2); }
 .tog::before, .tog::after { content: ''; position: absolute; clip-path: var(--sealclip2); z-index: -1; }
 .tog::before { inset: 0; background: var(--ink3); }
 .tog::after { inset: 3px; background: var(--paper); }
@@ -815,7 +818,7 @@ img { display: block; -webkit-user-drag: none; }
 .set-level { display: flex; flex-direction: column; gap: 6px; }
 .set-level > span:first-child { font: 700 17px/1.2 var(--body); }
 .seg { display: flex; gap: 10px; }
-.seg button { position: relative; flex: 1; height: 50px; font: 400 25px/1 var(--brush); color: var(--ink2); filter: url(#rough2); }
+.seg button { position: relative; isolation: isolate; flex: 1; height: 50px; font: 400 25px/1 var(--brush); color: var(--ink2); }
 .seg button::before, .seg button::after { content: ''; position: absolute; clip-path: var(--sealclip2); z-index: -1; }
 .seg button::before { inset: 0; background: var(--ink3); }
 .seg button::after { inset: 3px; background: var(--paper); }
@@ -837,10 +840,12 @@ img { display: block; -webkit-user-drag: none; }
 .bt-rounds .stroke:nth-child(3) { width: 86%; rotate: -1deg; }
 
 /* ── 결과 넷 = 현장 화면 + 철거 보고서 한 장(「B 현장」 11-11 · overlay paintRp) ─────────
-   띠(다음 목표 · 모드 꼬리표) · 보고서(필드 기둥 x 14~346, 위 62 · 아래 끝 ≤ 480) · 왼쪽 꼬리표 하나(홈 상점 자리).
-   그 아래로 진짜 판(무너진 건물 · 깔린 뿌뿌)이 보이고, 조작 구역엔 진짜 키 넷만(이름은 touch.setFaces).
+   띠(모드 꼬리표) · 보고서(필드 기둥 x 14~346, 위 62 · 아래 끝 ≤ 480, 끝 줄 = 다음 목표 + 상점 · 미션 단추).
+   그 아래로 진짜 판(무너진 건물 · 깔린 뿌뿌)이 보이고, 조작 구역엔 결과 단추(.rp-acts)만 — 조작 키는 숨는다(11-14 배치 시안).
    숫자는 --black, 제목 · 판정 · 비고는 붓(25 이상), 이름표는 본문. 그림자 · 둥근 모서리 없음 */
-.rp-goal { display: flex; align-items: center; gap: 6px; min-width: 0; font: 700 15px/1 var(--body); white-space: nowrap; }
+.ov-rp.ov-field { bottom: 0; height: auto; }
+.rp-next { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-top: 6px; border-top: 2px solid var(--ink); }
+.rp-goal { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; font: 700 15px/1.2 var(--body); white-space: nowrap; }
 .rp-goal .sw { flex: none; width: 13px; height: 32px; rotate: 20deg; }
 .rp-goal .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rp-mode { margin-left: auto; flex: none; }
@@ -886,6 +891,21 @@ img { display: block; -webkit-user-drag: none; }
 .rp-bg span:last-child { font: 400 25px/1.1 var(--brush); }
 .rp-ln { font: 700 15px/1.4 var(--body); }
 .rp-ln.muted { color: var(--ink2); }
+
+/* 결과 단추 — 곧은 먹 테(.rk) · 주홍 폭 단추(.seal.rk-main). 닫힌 단추(게이트 shut)는 옅다 — 눌러도 버린다(scenes) */
+.rk { position: relative; flex: 1; min-width: 0; height: 52px; padding: 0 10px; border: 2.5px solid var(--ink); background: var(--card); font: 700 17px/1.1 var(--body); white-space: nowrap; }
+.rk.shut { border-color: var(--ink3); color: var(--ink2); }
+.rk:active:not(.shut) { scale: 0.96; }
+.rp-go { flex: none; height: 44px; font-size: 15px; }
+.rp-go::after { content: ''; position: absolute; inset: -3px; }
+.rp-acts { position: absolute; left: calc(var(--fr-x, 0px) + 14px); top: calc(var(--field-h, 610px) + 14px); width: 332px; display: flex; flex-direction: column; gap: 10px; }
+.rk-main { width: 100%; height: 72px; gap: 4px; padding-top: 2px; }
+.rk-main b { font: 400 32px/0.9 var(--brush); }
+.rk-main small { font-size: 13.5px; line-height: 1; }
+.ov-field .rk-main { color: var(--paper); }
+.ov-field .rk-main.shut { background: var(--ink3); color: var(--ink); }
+.rk-main.shut::after { border-color: var(--paper); opacity: 0.6; }
+.rk-row { display: flex; gap: 10px; }
 /* 광고 · 알림 쪽지는 땅선 위로 — 조작 구역의 키를 덮지 않게(결과 장면 = #stage.gameover · .ending) */
 #stage.gameover > .toast,
 #stage.ending > .toast { bottom: calc(100% - var(--field-h, 610px) + 14px); }

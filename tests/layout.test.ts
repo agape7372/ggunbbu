@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   DEFAULT_LAYOUT, KEY_ACTIONS, KEY_SIZE, ZONE, clampPos, findOverlap, isDefaultLayout, keysOverlap, mirrorX,
-  goSeat, resolveLayout, sanitizeLayout, toStored,
+  resolveLayout, sanitizeLayout, toStored,
 } from '../src/input/layout';
 import { loadSave } from '../src/storage';
 import { SAVE_KEY } from '../src/config';
@@ -135,23 +135,5 @@ describe('불러오기', () => {
     expect(loadSave().settings.buttonLayout).toEqual(good);
     store.set(SAVE_KEY, JSON.stringify({ v: 1, settings: { buttonLayout: { jump: 'x' } } }));
     expect(loadSave().settings.buttonLayout).toBeUndefined();
-  });
-});
-
-describe('작업 지시서 「착수」 자리(goSeat) — 공격 키 기본 자리 둘뿐', () => {
-  const left = mirrorX('attack', DEFAULT_LAYOUT.attack.x);
-  it('기본 배치 = 공격 키 자리 · 옆 띠는 오른쪽', () => {
-    expect(goSeat(null, false)).toEqual({ ...DEFAULT_LAYOUT.attack, sx: 1 });
-  });
-  it('왼손잡이 = 뒤집은 공격 키 자리 · 옆 띠는 왼쪽', () => {
-    expect(goSeat(null, true)).toEqual({ x: left, y: DEFAULT_LAYOUT.attack.y, sx: -1 });
-    expect(goSeat(null, true).x).toBe(resolveLayout(null, true).attack.x);
-  });
-  it('바꾼 배치는 쪽만 따른다 — 공격 키가 왼쪽 절반이면 왼쪽 자리', () => {
-    const moved = sanitizeLayout(resolveLayout(null, true)); // 오른손으로 뒤집은 배치를 저장
-    expect(moved).toBeDefined();
-    expect(goSeat(moved, false)).toEqual({ x: left, y: DEFAULT_LAYOUT.attack.y, sx: -1 });
-    expect(goSeat(moved, true)).toEqual({ ...DEFAULT_LAYOUT.attack, sx: 1 });
-    expect(goSeat({ attack: { x: 200, y: ZONE.y + 50 } }, false)).toEqual({ ...DEFAULT_LAYOUT.attack, sx: 1 });
   });
 });

@@ -39,8 +39,8 @@ import { HERO, OPERATIONS, WEAPON_COPY } from '../content/world';
 import { MASK_MAX, createMask, deleteMask, ownedMasks, updateMask, wearMask, wornMaskId } from '../meta/mask';
 import { closeMaskEditor, openMaskEditor } from './maskEditor';
 import { closeLayoutEditor, openLayoutEditor } from './layoutEditor';
-import { goSeat } from '../input/layout';
 import { mountHud, ensureHudLayer, type HudOp } from './hud';
+import type { TouchAction } from '../input/touch';
 import { createRunCaps, type RunCap, type RunCaps } from './runCaps';
 import { bookCount, bookGroups, type RecordView } from './bookView';
 import { fmt, reduceMotion as osReduceMotion } from './ink';
@@ -231,8 +231,13 @@ export function createApp(
     const onHome = scene === 'title' && overlay.getScreen() === 'title';
     if (onHome && homeFacts) { touch?.setFaces(homeFaces(homeJob, homeFacts)); return; }
     const rc = resultCtx();
-    touch?.setFaces(rc ? resultFaces(rc, resultGate?.shut ?? { jump: true, attack: true, special: true, guard: true }) : null);
+    // 결과는 조작 키를 숨기고 제 단추(overlay .rp-acts)를 쓴다 — 얼굴 · 닫힘은 같은 resultFaces
+    touch?.setFaces(null);
+    overlay.setResultKeys(rc ? resultFaces(rc, resultGate?.shut ?? { jump: true, attack: true, special: true, guard: true }) : null);
   }
+
+  /** 결과 단추를 눌렀다 — 다음 표본에서 그 키를 누른 것으로 게이트에 넣는다(연타 · 광고 일어나기 보호가 키와 같다) */
+  let domKey: TouchAction | null = null;
 
   /** 결과 카드가 떠 있으면 그 키 배정 재료. 카드가 뜨기 전(판이 무너지는 0.5초)은 null */
   function resultCtx(): ResultCtx | null {
@@ -791,7 +796,7 @@ export function createApp(
 
   // ── 작업 지시서 ─────────────────────────────────────────────
   function stageOpts() {
-    return { recs: save.stages, allOpen: debugOpen(), seat: goSeat(save.settings.buttonLayout, save.settings.leftHanded) };
+    return { recs: save.stages, allOpen: debugOpen() };
   }
 
   /** 홈을 거치지 않고 지시서 목록(또는 그 판의 지시서 한 장)으로 — 베는 칼이 보고서에서 바로 넘어가게 */
@@ -1375,6 +1380,7 @@ export function createApp(
     onGameOverMissions: afterLock(() => { playSfx('uiBlip'); goTitle(false); openMissions(); }),
     onExam: doExam,
     resultWho: () => `${HERO} · ${licenseTitle(save.license)}`,
+    onResultKey: (k) => { domKey = k; },
     missionBadge: () => {
       const key = kstDateKey(Date.now());
       return claimableCount(save.daily, save.achieves)
@@ -1504,6 +1510,8 @@ export function createApp(
 
   function update(): void {
     const f = input.sample();
+    const dk = domKey;
+    domKey = null;
     syncFaces(); // 창이 떠 있어도 키 얼굴은 맞춘다(창 막 아래로 비친다)
     duckBgm('menu', scene === 'pause' || overlay.getScreen() === 'settings');
     // 결과 장면의 공격 키가 시트 · 확인 창 뒤에서 「한 판 더」를 또 누르지 않게
@@ -1601,7 +1609,7 @@ export function createApp(
         resultGate ??= newGate(f.guard, now);
         if (overlayTicks > 0) overlayTicks -= 1;
         const rc = resultCtx();
-        const key = gateStep(resultGate, f, now, !rc || resultLocked(), rc ? reviveKey(rc) : null);
+        const key = gateStep(resultGate, dk ? { ...f, [dk]: true } : f, now, !rc || resultLocked(), rc ? reviveKey(rc) : null);
         const act = rc && key ? resultActs(rc)[key] : null;
         if (act) { resultDo(act); break; }
         if (scene === 'gameover' && gameoverDelay > 0) {

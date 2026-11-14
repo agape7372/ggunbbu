@@ -9,6 +9,7 @@ import { SCREENS, TAGLINE } from '../content';
 import { ITEM_COPY, regionOf } from '../content/world';
 import type { PlayerPose } from '../core/types';
 import { isDefaultLayout } from '../input/layout';
+import type { KeyFaces, TouchAction } from '../input/touch';
 import { FLASH_LABEL, SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
 import { nativeAppVersion } from '../platform/native';
@@ -158,8 +159,10 @@ export interface OverlayHandlers {
   onSettingsPatch(p: Partial<SaveSettings>): void;
   /** 설정 「버튼 배치 · 바꾸기」 — 배치 편집 화면은 씬이 연다 */
   onLayoutEdit(): void;
-  /** 결과 꼬리표(상점 · 미션) — 다음 목표를 사러. 결과 화면의 나머지 동작은 조작 키(scenes resultDo) */
+  /** 결과 보고서 다음 목표 줄의 상점 · 미션 단추 — 다음 목표를 사러 */
   onGameOverShop(): void;
+  /** 결과 단추(키 자리 이름 = 그 동작) — scenes가 키 누름처럼 결과 게이트에 넣는다 */
+  onResultKey(k: TouchAction): void;
   onGameOverMissions(): void;
   /** 철거 자격 응시 */
   onExam(): void;
@@ -224,6 +227,8 @@ export interface OverlayApi {
   /** 지시서 화면 안에서 한 칸 물러난다. 이미 목록이면 false */
   stagesBack(): boolean;
   showStageEnd(v: StageEndView): void;
+  /** 결과 화면 단추 — 얼굴은 resultFaces 그대로(닫힌 키 = 옅게). 같으면 다시 그리지 않는다 */
+  setResultKeys(f: KeyFaces | null): void;
   showMissions(v: MissionView): void;
   /** tab을 주면 그 칸으로 연다. 없으면 보던 칸 그대로 */
   showShop(inv: ShopInv, owned: ReadonlySet<string>, paths: ShopPaths, pack: PackView, tab?: ShopTab): void;
@@ -414,11 +419,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         ${frameSvg(7, 3, 4.5, 8)}
         <h2 class="p-title">잠깐</h2>
         <div class="p-stats" data-el="pause-stats"></div>
-        <button type="button" class="seal p-resume" data-act="resume" aria-label="계속 부수기"><b>계속<br>부수기</b></button>
-        <div class="p-row">
-          <button type="button" class="stroke s3 p-quit" data-act="quit" data-el="quit"><b>그만두기</b><span>한 번 더 누르세요</span></button>
-          <button type="button" class="inkseal" data-act="pause-settings">설정</button>
-        </div>
+        <button type="button" class="seal p-resume" data-act="resume"><b>계속 부수기</b></button>
+        <button type="button" class="rk p-set" data-act="pause-settings">설정</button>
+        <button type="button" class="p-quit" data-act="quit" data-el="quit"><b>그만두기</b><span>한 번 더 누르세요</span></button>
       </div>
     </div>
 
@@ -555,6 +558,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     const field = FIELD_SCREENS.has(name);
     root.classList.toggle('field', field);
     root.parentElement?.classList.toggle('field', field);
+    // 조작 키를 메뉴로 쓰는 건 홈뿐 — 결과는 제 단추(.rp-acts)를 쓴다(11-14 배치 시안)
+    root.parentElement?.classList.toggle('keys', name === 'title');
     root.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => {
       el.hidden = el.getAttribute('data-screen') !== name;
     });
@@ -998,6 +1003,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'meta-back': h.onMetaBack(); break;
       case 'go-shop': h.onGameOverShop(); break;
       case 'go-missions': h.onGameOverMissions(); break;
+      case 'rk': h.onResultKey(t.getAttribute('data-k') as TouchAction); break;
       case 'tab-missions': h.onOpenMissions(); break;
       case 'tab-shop': h.onOpenShop(); break;
       case 'tab-book': h.onOpenBook(); break;
@@ -1023,8 +1029,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     window.setTimeout(() => { if (tk === scoreToken && screen === on) countTo([el], 0, to, SCORE_ROLL_MS); else el.textContent = fmt(to); }, SCORE_ROLL_AT);
   }
 
-  /* ── 결과 넷 = 현장 화면 + 보고서 한 장(style.css .ov-rp). 띠(다음 목표 · 모드) · 왼쪽 꼬리표 하나 · 귀퉁이 먹 도장.
-     누를 것은 조작 키 넷(scenes resultDo · ui/resultLogic.ts). 화면 글은 원래 결과 화면의 말 · 값만 ── */
+  /* ── 결과 넷 = 현장 화면 + 보고서 한 장(style.css .ov-rp). 띠(모드) · 보고서(끝 줄 = 다음 목표 + 상점 · 미션 단추) · 귀퉁이 먹 도장.
+     누를 것은 조작 구역의 결과 단추(.rp-acts, setResultKeys — 동작은 scenes resultDo · ui/resultLogic.ts). 조작 키는 숨는다.
+     화면 글은 원래 결과 화면의 말 · 값만 ── */
   interface RpOpts {
     goal?: string;
     goalId?: string;
@@ -1033,19 +1040,44 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     stamp?: string;
     grade?: boolean;
     body: string;
-    /** 왼쪽 꼬리표 — 결과의 상점 · 미션 지름길 */
+    /** 다음 목표 줄 끝 단추 — 결과의 상점 · 미션 지름길 */
     tab?: { act: string; label: string };
   }
+  /** 마지막으로 그린 결과 단추 얼굴(JSON). 보고서를 새로 그리면 비운다 */
+  let rkFaces = '';
   function paintRp(name: OverlayScreen, o: RpOpts): HTMLElement {
     const el = screenEl(name) as HTMLElement;
     const goal = o.goal
       ? `<span class="rp-goal">${lb(SCREENS.gameover.nextTag)}${o.goalId ? swordSvg(o.goalId) : ''}<span class="t">${escapeHtml(o.goal)}</span></span>`
       : '';
+    const tab = o.tab ? `<button type="button" class="rk rp-go" data-act="${o.tab.act}">${o.tab.label}</button>` : '';
+    const next = goal || tab ? `<div class="rp-next">${goal}${tab}</div>` : '';
     const stamp = o.stamp ? `<span class="rp-stamp${o.grade ? ' grade' : ''}" role="img" aria-label="${escapeHtml(o.stamp)}">${escapeHtml(o.stamp)}</span>` : '';
-    el.innerHTML = `<div class="hf-band">${goal}<span class="tag rp-mode">${escapeHtml(o.mode)}</span></div>${BAND_LINE}`
-      + `<article class="rp" aria-label="${STAGE_MODE.report}"><header class="rp-h"><b>${STAGE_MODE.report}</b><span>${escapeHtml(h.resultWho())}</span></header>${o.body}</article>${stamp}`
-      + (o.tab ? `<button type="button" class="hf-tab tl t2" data-act="${o.tab.act}"><b>${o.tab.label}</b></button>` : '');
+    el.innerHTML = `<div class="hf-band"><span class="tag rp-mode">${escapeHtml(o.mode)}</span></div>${BAND_LINE}`
+      + `<article class="rp" aria-label="${STAGE_MODE.report}"><header class="rp-h"><b>${STAGE_MODE.report}</b><span>${escapeHtml(h.resultWho())}</span></header>${o.body}${next}</article>${stamp}`
+      + '<div class="rp-acts"></div>';
+    rkFaces = '';
     return el;
+  }
+  /** 결과 단추 — 공격 자리 = 주홍 폭 단추, 나머지(점프 · 필살 · 가드 자리)는 그 밑 한 줄. 동작 없는 자리는 안 그린다 */
+  function setResultKeys(f: KeyFaces | null): void {
+    const key = f ? JSON.stringify(f) : '';
+    if (key === rkFaces) return;
+    const box = RESULTS.has(screen) ? screenEl(screen)?.querySelector<HTMLElement>('.rp-acts') : null;
+    if (!box) return;
+    rkFaces = key;
+    const had = document.activeElement instanceof HTMLElement && box.contains(document.activeElement)
+      ? document.activeElement.getAttribute('data-k') : null;
+    const btn = (k: TouchAction): string => {
+      const c = f?.[k];
+      if (!c || c.tone === 'rest') return '';
+      const shut = c.tone === 'faint';
+      const sub = c.sub ? `<small>${escapeHtml(c.sub.replace('\n', ' · '))}</small>` : '';
+      return `<button type="button" class="${k === 'attack' ? 'seal rk-main' : 'rk'}${shut ? ' shut' : ''}" data-act="rk" data-k="${k}" aria-disabled="${shut}"><b>${escapeHtml(c.label)}</b>${sub}</button>`;
+    };
+    const row = (['jump', 'special', 'guard'] as const).map(btn).join('');
+    box.innerHTML = btn('attack') + (row ? `<div class="rk-row">${row}</div>` : '');
+    if (had) box.querySelector<HTMLElement>(`[data-k="${had}"]`)?.focus({ preventScroll: true });
   }
   const lb = (t: string): string => `<span class="lb">${t}</span>`;
   const verdict = (t: string): string => `<div class="rp-j">${lb('판정')}<b>${escapeHtml(t)}</b></div>`;
@@ -1131,6 +1163,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       enter('stages', () => stageUi.show(opts, detail));
     },
     stagesBack: () => screen === 'stages' && stageUi.back(),
+    setResultKeys,
     showStageEnd(v): void {
       enter('stageend', () => {
         const r = stageReport(v);
