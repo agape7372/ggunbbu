@@ -12,7 +12,7 @@ import { stageSeed, startStage, judgeStage, stageScript } from '../src/core/stag
 import { STAGES } from '../src/core/stages';
 import * as CFG from '../src/config';
 import { lmAct } from '../src/core/landmark';
-import { craneLog, craneWindows, expertBot, fmtTicks, humanBot, runStage, stageBot, userBot } from './stageBot';
+import { craneHuman, craneLog, craneTries, craneWindows, expertBot, fmtTicks, humanBot, runStage, stageBot, userBot } from './stageBot';
 
 function cause(s: GameState): string {
   const ev = s.events;
@@ -83,7 +83,9 @@ describe.skipIf(!process.env.CRANE)('크레인 창', () => {
           const lm = s.lm;
           if (lm?.id === 'crane' && s.stack && lm.air !== 0 && lm.wave !== wave) {
             wave = lm.wave;
-            console.log(`${['견습', '정규', '외주'][diff]} ${lmAct(s)}막 짐${wave}(${s.stack.floors.length}층): ${craneWindows(s)}`);
+            const line = `${['견습', '정규', '외주'][diff]} ${lmAct(s)}막 짐${wave}(칸${(wave - 1) % CFG.LANDMARK.CRANE.CARGO.length} ${s.stack.floors.map((f) => f.mat[0]).join('')} 띠${lm.k}): ${craneWindows(s)}`;
+            console.log(line);
+            if (process.env.OUT) appendFileSync(process.env.OUT, line + '\n');
           }
           return stageBot(s);
         },
@@ -152,6 +154,7 @@ function oldHasty(inner: (s: GameState) => InputFrame): (s: GameState) => InputF
 }
 
 // 사용자 대역(userBot) — 손 늦음 J · 착각 b · 계획 몫 q 격자. 칸마다 지연 × 베기 간격 × 회차를 돌려 깬 %를 센다. 기본값 = 보정값(J 5 · 간격 5~9 · 지연 6~16)
+//   크레인 판(4-B)은 craneHuman(같은 J · q · 시드, 틈 가운데 노림 + 쥔 채 버티기). 줄 끝 「짐 칸:실패/시도(첫 시도 틈 최소/중앙)」
 //   USER_BOT=1 DIFFS=0,1,2 npx vitest run --no-cache tests/stage-measure.test.ts -t 사용자
 //   좁히기 · 바꾸기: USER_J=4,5,6 USER_B=0,0.5 USER_Q=0.5,1 DELAYS=6,…,16 TAPS=5,…,9 SEEDS=0,1 ONLY=1-1 MAXT=36000 USER_SLAM=1 OUT=파일
 //   10-31판 재현: TWEAK=@tmp/st1114/old1031.json OLD_HASTY=1 MAXT=36000(게임엔 시간 제한이 없다)
@@ -174,12 +177,43 @@ describe.skipIf(!process.env.USER_BOT)('사용자 대역', () => {
           let ok = 0;
           let clearTicks = 0;
           let slow = 0;
+          let secret = 0; // 깬 판 중 비밀 도장(4-B = 짐이 땅을 한 번도 안 밟음)
           const fails = new Map<string, number>();
+          const tries = new Map<number, [number, number]>(); // 크레인 짐 칸(CARGO 번호) → [시도, 실패]
+          const widths = new Map<number, number[]>(); // 짐 칸 → 첫 시도 틈 넓이
+          const hurts = new Map<string, number>(); // 크레인: 목숨 · 안전모를 잃은 막 · 상태
           for (const delay of delays) for (const tap of taps) for (const seed of seeds) {
-            const bot = userBot(delay, tap, { J, b, q, seed, slamLate: !!process.env.USER_SLAM });
+            // 크레인은 짐마다 거는 틈을 아는 손(craneHuman) — 같은 J · q · 시드
+            const crane = d.boss === 'crane';
+            const bot0 = crane ? craneHuman(delay, tap, { J, q, seed }) : userBot(delay, tap, { J, b, q, seed, slamLate: !!process.env.USER_SLAM });
+            let hp = -1;
+            const bot = !crane ? bot0 : (s: GameState) => {
+              const now = s.lives * 2 + (s.hat ? 1 : 0);
+              if (hp >= 0 && now < hp && s.lm) {
+                const k = `${lmAct(s)}막 ${s.lm.st}${s.stack ? '' : ' 빈판'}`;
+                hurts.set(k, (hurts.get(k) ?? 0) + 1);
+              }
+              hp = now;
+              return bot0(s);
+            };
+            craneTries.length = 0;
             const r = runStage(d.id, diff, { policy: process.env.OLD_HASTY ? oldHasty(bot) : bot, maxTicks });
             const st = r.s.stage!;
-            if (r.result.cleared) { ok += 1; clearTicks += r.result.ticks; continue; }
+            // TRYLOG=1 → 진 판의 크레인 시도 줄(틱 · 막 · 짐 · 몇 번째 · 손 · 틈 · 누름 · 결과)
+            if (process.env.TRYLOG && !r.result.cleared && craneTries.length) {
+              const tl = `${d.id} ${['견습', '정규', '외주'][diff]} 지연${delay} 간격${tap} 회차${seed}: ` + craneTries.map((t) =>
+                `${t.tick}t ${t.act}막 짐${t.wave}#${t.attempt} ${t.how} ${t.lo}~${t.hi}→${t.press}${t.ok ? '○' : '×'}`).join(' / ');
+              if (process.env.OUT) appendFileSync(process.env.OUT.replace(/\.txt$/, '-tries.txt'), tl + '\n');
+            }
+            for (const t of craneTries) {
+              const c = (t.wave - 1) % CFG.LANDMARK.CRANE.CARGO.length;
+              const a = tries.get(c) ?? [0, 0];
+              a[0] += 1;
+              if (!t.ok) a[1] += 1;
+              tries.set(c, a);
+              if (t.attempt === 0) widths.set(c, [...(widths.get(c) ?? []), t.lo < 0 ? 0 : t.hi - t.lo + 1]);
+            }
+            if (r.result.cleared) { ok += 1; clearTicks += r.result.ticks; if (r.result.stamps.secret) secret += 1; continue; }
             if (r.s.over !== 'gameover') slow += 1;
             const at = `${st.phase === 'boss' ? '보스' : `${st.step}/${total}`}${r.s.over === 'gameover' ? '' : ' 시간'}`;
             fails.set(at, (fails.get(at) ?? 0) + 1);
@@ -189,7 +223,14 @@ describe.skipIf(!process.env.USER_BOT)('사용자 대역', () => {
           const line = `${d.id.padEnd(3)} ${['견습', '정규', '외주'][diff]} J${J} b${b} q${q} d${delays[0]}-${delays[delays.length - 1]}`
             + ` ${String(ok).padStart(2)}/${n} ${String(Math.round((ok * 100) / n)).padStart(3)}%`
             + (ok ? ` 평균 ${fmtTicks(Math.round(clearTicks / ok))} 시도 ${(n / ok).toFixed(1)}` : ' 시도 ∞')
-            + (slow ? ` 시간초과 ${slow}` : '') + (top ? ` | 실패 ${top}` : '');
+            + (slow ? ` 시간초과 ${slow}` : '') + (top ? ` | 실패 ${top}` : '')
+            + (hurts.size ? ' | 다친 곳 ' + [...hurts].sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k}×${v}`).join(' ') : '')
+            // 크레인: 짐 칸:실패/시도(첫 시도 틈 최소/중앙, 틱)
+            + (tries.size ? ` | 비밀 ${secret}/${n}` : '')
+            + (tries.size ? ' | 짐 ' + [...tries].sort((x, y) => x[0] - y[0]).map(([c, [a, f]]) => {
+              const w = [...(widths.get(c) ?? [])].sort((x, y) => x - y);
+              return `${c}:${f}/${a}` + (w.length ? `(틈${w[0]}/${w[w.length >> 1]})` : '');
+            }).join(' ') : '');
           console.log(line);
           if (process.env.OUT) appendFileSync(process.env.OUT, line + '\n');
         }
