@@ -1010,7 +1010,7 @@ describe('타워크레인 2판', () => {
       s.lm!.wave = 1; // 'mmm' — 세 번 베어도 안 부서진다
       waitStack(s);
       expect(s.lm!.air).toBe(0);
-      s.stack!.y = 225;
+      s.stack!.y = C.LOWER_TO + C.LOWER_V / 2; // 밑까지 30틱(11-14 전 값 225 = 150 + 150/2)
       s.player.pose = 'jump'; s.player.poseTick = 0;
       let cuts = 0;
       for (let i = 0; i < 80 && cuts < target; i++) {

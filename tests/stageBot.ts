@@ -7,6 +7,7 @@ import { makeState, advance } from '../src/core/sim';
 import { stageSeed, startStage, judgeStage, type StageResult } from '../src/core/stage';
 import { LANDMARK, STAGE, WAZA_GAUGE } from '../src/config';
 import { rand } from '../src/core/rng';
+import { lmAct } from '../src/core/landmark';
 
 const ATTACK: InputFrame = { ...EMPTY_INPUT, attack: true };
 const GUARD: InputFrame = { ...EMPTY_INPUT, guard: true };
@@ -101,18 +102,30 @@ function planCrane(s: GameState): Plan | null {
   return null;
 }
 
-/** 짐 하나에 땅 가드로 거는 창 — 층을 c개 덜고 g틱 뒤 막아 걸리는 g를 모은다(사람이 맞출 틈이 몇 틱인가) */
+/** 걸리는 틱 목록 → 이어진 구간 「a~b」 · 가장 긴 구간 넓이 */
+function runsOf(ok: number[]): { text: string; max: number } {
+  const r: [number, number][] = [];
+  for (const t of ok) {
+    const last = r[r.length - 1];
+    if (last && t === last[1] + 1) last[1] = t;
+    else r.push([t, t]);
+  }
+  return { text: r.map(([a, b]) => (a === b ? `${a}` : `${a}~${b}`)).join(','), max: Math.max(0, ...r.map(([a, b]) => b - a + 1)) };
+}
+
+/** 짐 하나에 거는 창 — 층을 c개 덜고 g틱 뒤 막아(땅) · j틱에 뛰고 바로 쥐어(점프) 걸리는 틱을 모은다.
+ *  칸 = 「가장 긴 이어진 틈 넓이(이어진 구간들)」. 사람이 맞출 틈은 이어진 구간이다(봇 손 = 6틱마다 베기) */
 export function craneWindows(s: GameState): string {
   const n = s.stack!.floors.length;
   const out: string[] = [];
   for (let cuts = 0; cuts < n; cuts++) {
     const ok: number[] = [];
     for (let g = 0; g <= 70; g++) if (tryCrane(s, cuts, g, -1)) ok.push(g);
-    if (ok.length) out.push(`${cuts}층 덜고 ${ok.length}틱(${ok[0]}~${ok[ok.length - 1]})`);
+    if (ok.length) { const r = runsOf(ok); out.push(`${cuts}층 덜고 땅 ${r.max}(${r.text})`); }
     // 점프하자마자 가드를 쥐고 있는 사람 — 뛰는 틱 j의 틈
     const jok: number[] = [];
     for (let j = 0; j <= 50; j++) if (tryCrane(s, cuts, j + 1, j)) jok.push(j);
-    if (jok.length) out.push(`${cuts}층 덜고 점프 ${jok.length}틱(${jok[0]}~${jok[jok.length - 1]})`);
+    if (jok.length) { const r = runsOf(jok); out.push(`${cuts}층 덜고 점프 ${r.max}(${r.text})`); }
   }
   return out.join(' · ') || '없음';
 }
@@ -302,6 +315,122 @@ export function userBot(delay: number, tap: number, o: { J: number; b?: number; 
     if (!f.attack) return f;
     if (s.tick - lastAttack < tap) return EMPTY_INPUT;
     lastAttack = s.tick;
+    return f;
+  };
+}
+
+// ── 사람 크레인(11-14, 정본 tmp/st1114/boss-human.md §1 · §2): 짐마다 거는 틈을 아는 사람 — 틈 가운데를 노리되 손이 늦는다 ──
+export interface CraneTry { tick: number; diff: number; act: number; wave: number; attempt: number; how: string; lo: number; hi: number; press: number; ok: boolean }
+/** 크레인 시도 기록 — 측정이 판마다 비운다 */
+export const craneTries: CraneTry[] = [];
+
+interface CraneOpt { cuts: number; jump: boolean }
+
+/** 사람 손: tap틱 간격으로 cuts층 벤다 → p틱부터 가드를 쥔다(jump면 p틱에 뛰고 다음 틱부터). since = 마지막 베기에서 지난 틱 */
+function craneRun(s0: GameState, o: CraneOpt, p: number, tap: number, since: number): { ok: boolean; late: boolean; inputs: InputFrame[] } {
+  const c = clone(s0);
+  const inputs: InputFrame[] = [];
+  const floors0 = c.stack!.floors.length;
+  let last = -since;
+  let up = false;
+  for (let t = 0; t < 240 && !c.over; t++) {
+    const cutDone = floors0 - (c.stack?.floors.length ?? 0) >= o.cuts;
+    let f: InputFrame = EMPTY_INPUT;
+    if (o.jump && t === p) f = JUMP;
+    else if (t >= p + (o.jump ? 1 : 0)) f = GUARD;
+    else if (!cutDone && c.player.pose !== 'attack' && t - last >= tap) { f = ATTACK; last = t; }
+    inputs.push(f);
+    advance(c, f);
+    c.events.length = 0;
+    if (c.lives < s0.lives || c.hat !== s0.hat) return { ok: false, late: true, inputs };
+    if (c.lm?.st === 'sit') return { ok: true, late: false, inputs };
+    if (!c.stack) return { ok: false, late: false, inputs };
+    if (c.stack.vy > 400) up = true; // 가드 바운스(베기 띄움 80은 아니다)
+    else if (up && c.stack.vy < 0) return { ok: false, late: false, inputs };
+  }
+  return { ok: false, late: false, inputs };
+}
+
+/** 가장 넓은 틈 고르기 — 땅 · 점프 × 덜 층 수. 넓이가 같으면 땅 · 덜 베기. 틈이 21틱보다 넓으면 늦은 끝 21틱만 본다(그보다 일찍 쥐고 기다리지 않는다) */
+export function cranePick(s: GameState, p0: number, tap: number, since: number): { o: CraneOpt; lo: number; hi: number } | null {
+  const n = s.stack!.floors.length;
+  let best: { o: CraneOpt; lo: number; hi: number } | null = null;
+  let bw = 0;
+  for (const jump of [false, true]) {
+    for (let cuts = 0; cuts < n; cuts++) {
+      const o = { cuts, jump };
+      let lo = -1;
+      const close = (hi: number) => {
+        const w = Math.min(hi - lo + 1, 21);
+        if (w > bw) { bw = w; best = { o, lo: Math.max(lo, hi - 20), hi }; }
+      };
+      for (let p = p0; p <= (jump ? 50 : 70); p++) {
+        const r = craneRun(s, o, p, tap, since);
+        if (r.ok) { if (lo < 0) lo = p; continue; }
+        if (lo >= 0) close(p - 1);
+        lo = -1;
+        if (r.late) break;
+      }
+      if (lo >= 0) close(jump ? 50 : 70);
+    }
+  }
+  return best;
+}
+
+/**
+ * 사용자 대역의 크레인 손 — 짐을 놓으면(끼릭) 가장 넓은 틈을 골라 그 가운데를 노린다. 못 걸면 다시 떨어질 때 delay틱 뒤부터 다시 노린다.
+ * 손 늦음 J는 userBot과 같은 뜻이다: 계획 = 가운데 − round(q·J)(평균 늦음만큼 일찍), 실제 누름 = 계획 + 0~J틱(균등, 같은 시드 방식).
+ * 그래서 「노린 틱 − 실제 틱」의 분포가 userBot의 「막기 계획 − 실제 가드」와 같다(J 5 → −3~+2틱, 폭 6).
+ * 첫 시도는 내려오는 짐을 내내 봤으니 지연 제약이 없다. 다시 노릴 땐 쥔 채 버티기(0틱 · 늦음 없음)도 손이다 — 그걸로 걸리거나 다시 맞출 틈이 없으면 쥐고 버틴다.
+ * 창에선 delay틱 뒤부터 tap틱마다 벤다. 크레인 밖(등장)은 userBot이다.
+ */
+export function craneHuman(delay: number, tap: number, o: { J: number; q?: number; seed?: number }): (s: GameState) => InputFrame {
+  const h = userBot(delay, tap, o);
+  const rng = { rngState: delay * 7919 + tap * 104729 + (o.seed ?? 0) * 15485863 };
+  const early = Math.round((o.q ?? 0.5) * o.J);
+  let prog: { start: number; inputs: InputFrame[] } | null = null;
+  let wave = -1;
+  let attempt = 0;
+  let lastAtk = -Infinity;
+  return (s) => {
+    const lm = s.lm;
+    if (lm?.id !== 'crane') return h(s);
+    const p = s.player;
+    if (p.pose === 'pinned') { prog = null; return GUARD; }
+    if (prog) {
+      const f = prog.inputs[s.tick - prog.start];
+      if (f) { if (f.attack) lastAtk = s.tick; return f; }
+      prog = null;
+    }
+    if (lm.st === 'sit') {
+      if (lm.t < delay || p.pose === 'attack' || s.tick - lastAtk < tap) return EMPTY_INPUT;
+      lastAtk = s.tick;
+      return ATTACK;
+    }
+    const st = s.stack;
+    if (!st || lm.air === 0 || st.vy >= 0 || lm.st !== 'play') return EMPTY_INPUT;
+    // 떨어지기 시작했다
+    if (lm.wave !== wave) { wave = lm.wave; attempt = 0; } else attempt += 1;
+    const p0 = attempt === 0 ? 0 : delay;
+    const since = Math.min(999, s.tick - lastAtk);
+    let pick = cranePick(s, p0, tap, since);
+    let hold = false;
+    if (attempt > 0 && (!pick || craneRun(s, { cuts: 0, jump: false }, 0, tap, since).ok)) {
+      hold = true;
+      pick = null;
+    }
+    const opt = pick?.o ?? { cuts: 0, jump: false };
+    const aim = pick ? Math.round((pick.lo + pick.hi) / 2) : p0;
+    const at = hold ? 0 : Math.max(p0, aim - early + Math.floor(rand(rng) * (o.J + 1)));
+    const r = craneRun(s, opt, at, tap, since);
+    craneTries.push({
+      tick: s.tick, diff: s.stage!.diff, act: lmAct(s), wave, attempt,
+      how: pick ? `${opt.jump ? '점프' : '땅'}${opt.cuts ? ` ${opt.cuts}층 덜고` : ''}` : hold ? '쥔 채' : '틈 없음',
+      lo: pick?.lo ?? -1, hi: pick?.hi ?? -1, press: at, ok: r.ok,
+    });
+    prog = { start: s.tick, inputs: r.inputs };
+    const f = r.inputs[0];
+    if (f.attack) lastAtk = s.tick;
     return f;
   };
 }
