@@ -752,6 +752,15 @@ describe('구층탑 2판', () => {
     expect(rocks(s)).toBe(LANDMARK.PAGODA.LIFT_TILES[1] * 2);
   });
 
+  it('천장: 띄워도 탑 밑면이 CEIL_Y 위로 안 뜬다. 띄우면 기와는 그대로', () => {
+    const s = pagoda();
+    s.stack!.y = LANDMARK.PAGODA.CEIL_Y - 5;
+    s.stack!.vy = 1190;
+    stepN(s, 10);
+    expect(s.stack!.y).toBeLessThanOrEqual(LANDMARK.PAGODA.CEIL_Y);
+    expect(rocks(s)).toBe(LANDMARK.PAGODA.LIFT_TILES[1]);
+  });
+
   it('이어 허물기: 둘째 층은 비가 없고, 셋째 층까지 이으면 떠 있던 기와가 부서진다. 간격이 벌어지면 처음부터', () => {
     const s = pagoda();
     const brk = () => { s.stack!.floors.shift(); return step(s); };

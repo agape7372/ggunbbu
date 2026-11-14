@@ -497,6 +497,8 @@ function stepPagoda(s: GameState, lm: LandmarkState, evStart: number): void {
     if (rising && !lm.flying) rainTiles(s, stk, P.LIFT_TILES[d]);
     lm.flying = rising;
   }
+  // 천장 — 띄워도 이 위로는 안 뜬다
+  if (stk.y > P.CEIL_Y) { stk.y = P.CEIL_Y; stk.vy = Math.min(stk.vy, 0); }
   // 풍경 기와 — 3막 정규에선 딸랑 뒤 6틱에 기와 둘이 따라온다
   if (lm.got > 0) {
     lm.got -= 1;
