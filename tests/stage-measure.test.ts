@@ -12,7 +12,7 @@ import { stageSeed, startStage, judgeStage, stageScript } from '../src/core/stag
 import { STAGES } from '../src/core/stages';
 import * as CFG from '../src/config';
 import { lmAct } from '../src/core/landmark';
-import { craneLog, craneWindows, expertBot, fmtTicks, humanBot, runStage, stageBot } from './stageBot';
+import { craneLog, craneWindows, expertBot, fmtTicks, humanBot, runStage, stageBot, userBot } from './stageBot';
 
 function cause(s: GameState): string {
   const ev = s.events;
@@ -125,6 +125,74 @@ describe.skipIf(!process.env.HUMAN)('사람 대역 55', () => {
           + (ok ? ` 평균 ${fmtTicks(Math.round(clearTicks / ok))} 사고 ${(lost / ok).toFixed(1)}` : '') + (top ? ` | 실패 ${top}` : '');
         console.log(line);
         if (process.env.OUT) appendFileSync(process.env.OUT, line + '\n');
+      }
+    }
+  });
+});
+
+/** 10-31판(1469489) 성급한 건물 흉내 — 그때는 급락이 건물당 한 번이 아니라 최하층이 HP1로 HASTY_TICKS 버틸 때마다 겹쳤다.
+ *  지금 코드가 첫 급락을 내고 나면 이 감시가 같은 셈을 이어 세어 둘째부터 곱한다(정책 앞에서 돌아 한 틱 늦을 수 있다) */
+function oldHasty(inner: (s: GameState) => InputFrame): (s: GameState) => InputFrame {
+  let emu: { stack: unknown; t: number; n: number } | null = null;
+  return (s) => {
+    const st = s.stage;
+    if (st?.hasty && s.stack && emu?.stack !== s.stack) emu = { stack: s.stack, t: 0, n: 0 };
+    if (emu && emu.stack !== s.stack) emu = null;
+    const bottom = s.stack?.floors[0];
+    if (emu && st && bottom) {
+      if (bottom.segs[0].hp !== 1) emu.t = 0;
+      else if (++emu.t === CFG.STAGE.HASTY_TICKS && ++emu.n >= 2) {
+        st.fallG *= CFG.STAGE.HASTY_FALL;
+        st.fallV *= CFG.STAGE.HASTY_FALL;
+        st.tally.hastyDrops += 1;
+      }
+    }
+    return inner(s);
+  };
+}
+
+// 사용자 대역(userBot) — 손 늦음 J · 착각 b · 계획 몫 q 격자. 칸마다 지연 × 베기 간격 × 회차를 돌려 깬 %를 센다. 기본값 = 보정값(J 5 · 간격 5~9 · 지연 6~16)
+//   USER_BOT=1 DIFFS=0,1,2 npx vitest run --no-cache tests/stage-measure.test.ts -t 사용자
+//   좁히기 · 바꾸기: USER_J=4,5,6 USER_B=0,0.5 USER_Q=0.5,1 DELAYS=6,…,16 TAPS=5,…,9 SEEDS=0,1 ONLY=1-1 MAXT=36000 USER_SLAM=1 OUT=파일
+//   10-31판 재현: TWEAK=@tmp/st1114/old1031.json OLD_HASTY=1 MAXT=36000(게임엔 시간 제한이 없다)
+//   한 줄 = 판 난이도 J b q 지연범위 깬수/판수 % 평균 시간 · 기대 시도 수(판수 ÷ 깬수) · 시간 초과 수 · 실패 걸음 상위 3
+describe.skipIf(!process.env.USER_BOT)('사용자 대역', () => {
+  it('사용자 대역 격자', { timeout: 3_600_000 }, () => {
+    tweak();
+    const list = (k: string, d: string) => (process.env[k] ?? d).split(',').map(Number);
+    const only = process.env.ONLY?.split(',');
+    const diffs = list('DIFFS', '1') as (0 | 1 | 2)[];
+    const delays = list('DELAYS', '6,7,8,9,10,11,12,13,14,15,16');
+    const taps = list('TAPS', '5,6,7,8,9');
+    const seeds = list('SEEDS', '0');
+    const maxTicks = Number(process.env.MAXT ?? 60 * 60 * 5);
+    for (const J of list('USER_J', '5')) for (const b of list('USER_B', '0')) for (const q of list('USER_Q', '0.5')) {
+      for (const d of STAGES) {
+        if (only && !only.includes(d.id)) continue;
+        for (const diff of diffs) {
+          const total = stageScript(d.id).length;
+          let ok = 0;
+          let clearTicks = 0;
+          let slow = 0;
+          const fails = new Map<string, number>();
+          for (const delay of delays) for (const tap of taps) for (const seed of seeds) {
+            const bot = userBot(delay, tap, { J, b, q, seed, slamLate: !!process.env.USER_SLAM });
+            const r = runStage(d.id, diff, { policy: process.env.OLD_HASTY ? oldHasty(bot) : bot, maxTicks });
+            const st = r.s.stage!;
+            if (r.result.cleared) { ok += 1; clearTicks += r.result.ticks; continue; }
+            if (r.s.over !== 'gameover') slow += 1;
+            const at = `${st.phase === 'boss' ? '보스' : `${st.step}/${total}`}${r.s.over === 'gameover' ? '' : ' 시간'}`;
+            fails.set(at, (fails.get(at) ?? 0) + 1);
+          }
+          const n = delays.length * taps.length * seeds.length;
+          const top = [...fails].sort((a, b2) => b2[1] - a[1]).slice(0, 3).map(([k, c]) => `${k}×${c}`).join(' ');
+          const line = `${d.id.padEnd(3)} ${['견습', '정규', '외주'][diff]} J${J} b${b} q${q} d${delays[0]}-${delays[delays.length - 1]}`
+            + ` ${String(ok).padStart(2)}/${n} ${String(Math.round((ok * 100) / n)).padStart(3)}%`
+            + (ok ? ` 평균 ${fmtTicks(Math.round(clearTicks / ok))} 시도 ${(n / ok).toFixed(1)}` : ' 시도 ∞')
+            + (slow ? ` 시간초과 ${slow}` : '') + (top ? ` | 실패 ${top}` : '');
+          console.log(line);
+          if (process.env.OUT) appendFileSync(process.env.OUT, line + '\n');
+        }
       }
     }
   });

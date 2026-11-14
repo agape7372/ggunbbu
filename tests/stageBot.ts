@@ -5,7 +5,8 @@ import type { GameState, InputFrame, StageDiff, WazaId, WeaponId } from '../src/
 import { EMPTY_INPUT } from '../src/core/types';
 import { makeState, advance } from '../src/core/sim';
 import { stageSeed, startStage, judgeStage, type StageResult } from '../src/core/stage';
-import { LANDMARK, WAZA_GAUGE } from '../src/config';
+import { LANDMARK, STAGE, WAZA_GAUGE } from '../src/config';
+import { rand } from '../src/core/rng';
 
 const ATTACK: InputFrame = { ...EMPTY_INPUT, attack: true };
 const GUARD: InputFrame = { ...EMPTY_INPUT, guard: true };
@@ -246,6 +247,58 @@ export function humanBot(delay: number, tap = 8, margin = delay): (s: GameState)
     if (st === 'telegraph' || st === 'descend' || st === 'charging') return GUARD;
     const f = stageBot(old, margin);
     if (f.guard) { guardFrom = s.tick; return f; }
+    if (!f.attack) return f;
+    if (s.tick - lastAttack < tap) return EMPTY_INPUT;
+    lastAttack = s.tick;
+    return f;
+  };
+}
+
+/**
+ * 사용자 대역(11-14 보정, 정본 tmp/st1114/calibrate.md) — 사람 대역에 손 늦음을 얹는다. 결정적이다(지연 · 간격 · 회차로 시드한 mulberry32).
+ * 보정값 = 지연 6~16 × 베기 간격 5~9 × J 5(10-31판 사용자 실측 넷: 1-1 · 1-2 · 1-B 깸, 2-1 못 깸에 맞춤).
+ * · 손 늦음 J: 막기로 마음먹을 때마다 손이 0~J틱 더 늦다(균등). 계획은 지연 + q·J(q 0.5 = 평균)로 세운다 — 늦은 쪽이 여유를 넘으면 깔린다.
+ *   종탑 내려찍기는 파가 모자라게 끝나면 반드시 오는 예고된 전환이라 집행기 예고처럼 늦지 않는다(slamLate = 늦게 받는 시험용).
+ * · 빠른 물체 착각 b(기본 0, 보정에서 기각): 막기 여유 × (1 − b + b·VREF/v), v = 낙하 끝속도 · VREF = 1-1 정규 끝속도.
+ * 나머지(옛 화면 · 내 몸 · 가드 쥐기 · 집행기 예고)는 humanBot과 같다.
+ */
+export function userBot(delay: number, tap: number, o: { J: number; b?: number; q?: number; seed?: number; slamLate?: boolean }): (s: GameState) => InputFrame {
+  const seen: GameState[] = [];
+  let lastAttack = -Infinity;
+  let guardFrom = -Infinity;
+  let pressAt = -1;
+  const rng = { rngState: delay * 7919 + tap * 104729 + (o.seed ?? 0) * 15485863 };
+  const plan = delay + Math.round((o.q ?? 0.5) * o.J);
+  const vref = STAGE.VTERM[0] * STAGE.DIFF[1].fall;
+  return (s) => {
+    seen.push(clone(s));
+    if (seen.length > delay + 1) seen.shift();
+    const p = s.player;
+    if (p.pose === 'pinned') { pressAt = -1; return GUARD; }
+    if (pressAt >= 0) {
+      if (s.tick < pressAt) return EMPTY_INPUT;
+      pressAt = -1;
+      guardFrom = s.tick;
+      return GUARD;
+    }
+    if (p.pose === 'attack' || p.pose === 'special' || p.pose === 'guardBreak') return EMPTY_INPUT;
+    let old = seen[0];
+    if (old.player.pose === 'attack') { old = clone(old); old.player.pose = 'idle'; old.player.poseTick = 0; }
+    const near = (old.stack && old.stack.vy <= 0 && old.stack.y < 120)
+      || old.entities.some((e) => e.kind === 'rock' && !e.remnant && e.y < 240);
+    if (s.tick - guardFrom < delay || (p.pose === 'guardG' && near)) return GUARD;
+    const st = old.boss?.st;
+    if (st === 'telegraph' || st === 'descend' || st === 'charging') return GUARD;
+    const v = old.stage?.fallV ?? 0;
+    const b = o.b ?? 0;
+    const k = b > 0 && v > vref ? 1 - b + (b * vref) / v : 1;
+    const f = stageBot(old, Math.round(plan * k));
+    if (f.guard) {
+      const late = old.lm?.st === 'slam' && !o.slamLate ? 0 : Math.floor(rand(rng) * (o.J + 1));
+      if (late > 0) { pressAt = s.tick + late; return EMPTY_INPUT; }
+      guardFrom = s.tick;
+      return f;
+    }
     if (!f.attack) return f;
     if (s.tick - lastAttack < tap) return EMPTY_INPUT;
     lastAttack = s.tick;
