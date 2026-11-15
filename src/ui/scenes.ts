@@ -229,6 +229,7 @@ export function createApp(
   /** 조작 키 얼굴 — 홈 · 결과(현장 화면)면 메뉴 얼굴, 아니면 플레이 얼굴. 키 얼굴은 여기 한 곳만 정한다 */
   function syncFaces(): void {
     const onHome = scene === 'title' && overlay.getScreen() === 'title';
+    document.getElementById('stage')?.classList.toggle('home', onHome); // 홈 = 조작 키 숨김(넘기기는 좌우 밀기 · 시작은 매단 일감)
     if (onHome && homeFacts) { touch?.setFaces(homeFaces(homeJob, homeFacts)); return; }
     const rc = resultCtx();
     // 결과는 조작 키를 숨기고 제 단추(overlay .rp-acts)를 쓴다 — 얼굴 · 닫힘은 같은 resultFaces
@@ -1409,7 +1410,7 @@ export function createApp(
     },
     onStageStart: (id, diff, fromBoss) => { playSfx('uiOk'); startStageRun(id, diff, fromBoss); },
     onOpenMissions: () => { playSfx('uiBlip'); openMissions(); },
-    onOpenShop: () => { playSfx('uiBlip'); openShop(coffeeReady(save.coffee, kstDateKey(Date.now())) ? 'pack' : 'gear'); },
+    onOpenShop: () => { playSfx('uiBlip'); openShop('gear'); }, // 상점은 늘 장비부터(커피는 꼬리표 점이 알린다)
     onOpenPack: () => { playSfx('uiBlip'); openShop('pack'); },
     onOpenBook: () => { playSfx('uiBlip'); openBook(); },
     onMetaBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },

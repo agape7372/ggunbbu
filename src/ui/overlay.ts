@@ -929,6 +929,31 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     if (d.open) d.scrollIntoView({ block: 'nearest' });
   }, true);
 
+  // 홈 좌우 밀기 = 일감 넘기기(조작 키는 홈에서 숨는다). 단추 위에서 시작해도 되고, 밀었으면 그 단추 눌림은 버린다
+  let swipeX = 0;
+  let swipeY = 0;
+  let swipeOn = false;
+  let swipedAt = -1e9;
+  window.addEventListener('pointerdown', (e) => {
+    // 시작 자리 = 홈 화면이나 그 밑 게임 캔버스뿐(안내 창 · 보상 축하 창 위에서 밀면 뒤 일감이 넘어가지 않게)
+    const t = e.target as Element;
+    swipeOn = e.isPrimary && screen === 'title' && (t.id === 'game' || !!t.closest?.('[data-screen="title"]'));
+    swipeX = e.clientX;
+    swipeY = e.clientY;
+  }, { passive: true });
+  window.addEventListener('pointercancel', () => { swipeOn = false; }, { passive: true });
+  window.addEventListener('pointerup', (e) => {
+    if (!swipeOn) return;
+    swipeOn = false;
+    const dx = e.clientX - swipeX;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(e.clientY - swipeY) * 1.5) return;
+    swipedAt = performance.now();
+    h.onJob(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  root.addEventListener('click', (e) => {
+    if (performance.now() - swipedAt < 400) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+
   root.addEventListener('click', (e) => {
     const t = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
     if (!t || (t as HTMLButtonElement).disabled) return;

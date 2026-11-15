@@ -656,6 +656,9 @@ img { display: block; -webkit-user-drag: none; }
    메뉴층은 누르기를 흘린다(#overlay-layer.field) — 누르는 DOM만 받는다. 조작 구역(610 아래)엔 DOM이 없다.
    주홍은 화면에 하나(공격 키 「착수 · 고르기」). 붓글씨는 이름 · 꼬리표만, 숫자는 --black */
 #overlay-layer.is-open.field { pointer-events: none; }
+/* 홈은 조작 키를 숨긴다 — 일감은 좌우로 밀어 넘기고, 매단 일감 · 쪽지를 눌러 들어간다. 단추 위에서 밀어도 끊기지 않게 */
+#stage.home #touch-layer { visibility: hidden; }
+.ov-field[data-screen="title"] button { touch-action: none; }
 .ov-field {
   left: calc(var(--ov-x, 0px) - var(--fr-x, 0px));
   right: calc(var(--ov-x, 0px) - var(--fr-x, 0px));
