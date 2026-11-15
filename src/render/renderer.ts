@@ -916,7 +916,7 @@ function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
     ctx.restore();
   }
   // 이름표 — 붓 숫자 밑 작은 활자(낙관 옆 관지처럼). 굵은 고딕 딱지는 붓글씨와 따로 놀았다(11-01)
-  const label = m.n >= SCORE.COMBO_CAP ? 'MAX COMBO' : 'COMBO';
+  const label = m.n >= SCORE.COMBO_CAP ? '최대 콤보' : '콤보';
   const ly = px * 0.5 + C.LABEL_PX * 0.5 + 2;
   ctx.font = LABEL_FONT;
   ctx.letterSpacing = '3px';
@@ -1099,7 +1099,7 @@ function drawHatBand(ctx: CanvasRenderingContext2D, s0: number, s1: number, n: n
   ctx.fillText(ITEM_COPY.hat.pop, 148, y - 7);
   ctx.font = LABEL_FONT;
   ctx.letterSpacing = '3px';
-  ctx.fillText(`COMBO ${n}`, 151, y + 17);
+  ctx.fillText(`${n} 콤보`, 151, y + 17);
   ctx.letterSpacing = '0px';
   ctx.restore();
 }

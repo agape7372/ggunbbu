@@ -67,7 +67,7 @@ export const SCREENS = {
   /** 이야기 판 진입 직전 도장 */
   stamps: {
     best: '신기록',
-    perfect: 'PERFECT',
+    perfect: '완벽',
     act2: '2막',
     zone: (n: number) => `${n}구역`,
   },
@@ -124,7 +124,7 @@ export const SCREENS = {
   /** 철거 자격 (C4) */
   license: {
     heading: '철거 자격',
-    lead: '건물을 부순 만큼 자격이 열린다.',
+    lead: '건물을 부수고 응시료를 내면 자격이 열린다.',
     exam: '응시',
     progress: (have: number, need: number) => `건물 ${have.toLocaleString('ko-KR')}/${need.toLocaleString('ko-KR')}채`,
     needBuildings: (n: number) => `건물 ${n.toLocaleString('ko-KR')}채 더`,
@@ -155,7 +155,7 @@ export const GAMEOVER_QUIPS: readonly string[] = [
   '견습은 산재 처리 대상이 아닙니다',
   '허가 없이 깔렸습니다',
   '무단 철거 신고가 들어왔습니다',
-  '파괴자 측 변호인이 이겼습니다',
+  '건물주 측 변호인이 이겼습니다',
   '남은 지구가 퇴근을 막았습니다',
 ];
 

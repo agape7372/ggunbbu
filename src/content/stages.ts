@@ -32,7 +32,7 @@ export const STAGE_MODE = {
   firstClear: '첫 철거',
   newBest: '새 기록',
   /** 자연층 — 종을 세 번 「깡」 치면 한 번 */
-  bellHint: '안 베인다. 다른 손을 쓰라.',
+  bellHint: '안 베인다. 다른 손을 써라.',
   windHint: '날숨엔 땅에서 막는다.',
   craneHint: '부서진 짐은 안 올라간다.',
   /** 2판 기믹 자막 — 막힌 흔적이 보일 때만(ui/stageLogic.ts) */
@@ -142,7 +142,7 @@ export const STAGE_TEXT: Readonly<Record<string, StageText>> = {
 const OUTROS: Readonly<Record<string, { cut: readonly string[]; special?: readonly string[]; secret: readonly string[]; extra?: readonly string[] }>> = {
   '1-B': { cut: ['종탑은 시간을 알렸다.', '이제 아무도 안 늦는다.'], special: ['종이 한 번에 울렸다.', '정각은 아니었다.'], secret: ['종은 끝까지 종이었다.'], extra: ['13시였다.'] },
   '2-B': { cut: ['바람이 멎었다.', '값은 내일 내린다.'], special: ['탑이 한 숨에 갔다.', '날숨이었다.'], secret: ['좌판은 끝내 땅을 안 봤다.'], extra: ['좌판은 상인 것이었다.'] },
-  '3-B': { cut: ['탑은 아홉 층이었다.', '지금은 터다.'], special: ['탑이 한 층이 됐다.', '심사는 다음 달이다.'], secret: ['기와는 한 장도 안 깨졌다.', '탑만 없다.'], extra: ['풍경이 아홉 번 울렸다.'] },
+  '3-B': { cut: ['탑은 아홉 층이었다.', '지금은 터다.'], special: ['탑이 한 층이 됐다.', '심사는 다음 달이다.'], secret: ['기와는 한 장도 땅을 못 밟았다.', '탑만 없다.'], extra: ['풍경이 아홉 번 울렸다.'] },
   '4-B': { cut: ['짐은 전부 돌려보냈다.', '수령인 불명.'], special: ['짐이 한 번에 올라갔다.', '영수증은 없다.'], secret: ['짐은 한 번도 땅을 안 밟았다.', '받은 사람도 없다.'] },
   // 본사 특기 사항이 곧 필살 마무리라 필살 줄을 따로 두지 않는다
   HQ: { cut: ['집행기가 멈췄다.', '지시는 「전부」였다.'], secret: ['마지막 한 수는 아껴 둔 것이었다.', '집행기는 끝까지 몰랐다.'] },
