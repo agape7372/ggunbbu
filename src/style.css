@@ -658,6 +658,10 @@ img { display: block; -webkit-user-drag: none; }
 #overlay-layer.is-open.field { pointer-events: none; }
 /* 홈은 조작 키를 숨긴다 — 일감은 좌우로 밀어 넘기고, 매단 일감 · 쪽지를 눌러 들어간다. 단추 위에서 밀어도 끊기지 않게 */
 #stage.home #touch-layer { visibility: hidden; }
+/* 키가 없으니 홈은 무대 높이를 다 쓴다 — 땅선 = 무대 맨 아래(scenes draw가 원경을 같은 만큼 내린다) */
+#stage.home::before,
+#stage.home::after { height: calc(100% - 50px); }
+.ov-field[data-screen="title"] { height: 100%; }
 .ov-field[data-screen="title"] button { touch-action: none; }
 .ov-field {
   left: calc(var(--ov-x, 0px) - var(--fr-x, 0px));
@@ -693,7 +697,7 @@ img { display: block; -webkit-user-drag: none; }
 .hf-trolley span { display: grid; place-items: center; width: 68px; height: 36px; padding-top: 3px; background: var(--ink); color: var(--paper); font: 400 26px/1 var(--brush); clip-path: var(--sealclip); }
 
 /* 매단 일감 — 판의 층을 줄여 그린 캔버스(ui/homeArt.ts). 살짝 흔들리고, 바꿀 땐 팔을 따라 빠졌다 들어온다 */
-.hf-hang { position: absolute; left: calc(50% - 90px); top: 150px; width: 180px; height: 242px; z-index: 1; transform-origin: 50% 0; animation: hang-sway 4s ease-in-out infinite; transition: translate 80ms ease-in; }
+.hf-hang { position: absolute; left: calc(50% - 123px); top: 150px; width: 246px; height: 340px; z-index: 1; transform-origin: 50% 0; animation: hang-sway 4s ease-in-out infinite; transition: translate 80ms ease-in; }
 .hf-hang canvas { display: block; width: 100%; height: 100%; }
 @keyframes hang-sway { 0%, 100% { rotate: -0.6deg; } 50% { rotate: 0.6deg; } }
 
@@ -705,7 +709,7 @@ img { display: block; -webkit-user-drag: none; }
 .hf-pr { right: max(4px, calc(var(--fr-x, 0px) / 2 - 36px)); align-items: flex-end; text-align: right; }
 
 /* 지시서 쪽지 — 밝은 판 + 먹 테두리, 거친 가장자리. 누르면 그 일감 확인(작업 지시서만 지도) */
-.hf-slip { position: absolute; left: calc(50% - 116px); top: 398px; width: 232px; z-index: 2; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 13px; text-align: left; background: var(--card); border: 3px solid var(--ink); clip-path: var(--cutclip); rotate: -1.5deg; }
+.hf-slip { position: absolute; left: calc(50% - 116px); top: 496px; width: 232px; z-index: 2; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 13px; text-align: left; background: var(--card); border: 3px solid var(--ink); clip-path: var(--cutclip); rotate: -1.5deg; }
 .hf-slip .s-top { display: flex; align-items: baseline; gap: 6px; font: 700 14px/1 var(--body); color: var(--ink2); }
 .hf-slip .s-nm { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .hf-slip .s-nm b { font: 400 40px/0.9 var(--brush); }
@@ -716,34 +720,34 @@ img { display: block; -webkit-user-drag: none; }
 .hf-slip .s-nm b.n { font-size: 24px; }
 .hf-slip .s-st { font: 700 15px/1.3 var(--body); }
 .hf-slip .s-st .ln { display: block; white-space: nowrap; }
-.hf-dots { position: absolute; left: 50%; top: 520px; translate: -50% 0; display: flex; gap: 6px; }
+.hf-dots { position: absolute; left: 50%; top: 622px; translate: -50% 0; display: flex; gap: 6px; }
 .hf-dots i { width: 10px; height: 10px; border: 2px solid var(--ink); }
 .hf-dots i.on { width: 24px; background: var(--ink); }
 
-/* 꼬리표 넷 — 틀 가장자리에 붙은 세로 붓글씨. 아래 끝은 땅선(610) 위 */
+/* 꼬리표 넷 — 틀 가장자리에 붙은 세로 붓글씨. 아래 끝은 땅선(780) 위 */
 .hf-tab { position: absolute; z-index: 3; width: var(--tw); height: 88px; display: grid; place-content: center; justify-items: center; gap: 3px; padding-top: 4px; background: var(--ink); }
 .hf-tab::before { content: ''; position: absolute; inset: 3px; background: var(--card); clip-path: inherit; z-index: -1; }
 .hf-tab.tl { left: 0; clip-path: polygon(0 0, 100% 8px, 100% calc(100% - 8px), 0 100%); }
 .hf-tab.tr { right: 0; clip-path: polygon(0 8px, 100% 0, 100% 100%, 0 calc(100% - 8px)); }
 .hf-tab.tl::before { left: 0; }
 .hf-tab.tr::before { right: 0; }
-.hf-tab.t1 { top: 420px; }
-.hf-tab.t2 { top: 516px; }
+.hf-tab.t1 { top: 590px; }
+.hf-tab.t2 { top: 686px; }
 .hf-tab > b:first-child { writing-mode: vertical-rl; font: 400 26px/1 var(--brush); }
 .hf-tab i { font: 400 15px/1 var(--black); font-style: normal; }
 .hf-tab i:empty { display: none; }
 /* 받을 것 점 = 먹(주홍은 착수 키 하나) — 글자와 안 겹치게 바깥 모서리 */
 .hf-tab .dot { position: absolute; top: 12px; right: 5px; width: 10px; height: 10px; background: var(--ink); clip-path: var(--sealclip2); }
 
-/* 뿌뿌 — 판과 같은 자리(가운데 · 발 610) · 같은 크기 */
-.ov-field .h-ppu { position: absolute; left: calc(50% - 33px); top: 534px; width: 66px; height: 76px; pointer-events: none; transform-origin: 50% 100%; }
+/* 뿌뿌 — 가운데 · 발은 홈 땅선(780) · 판과 같은 크기 */
+.ov-field .h-ppu { position: absolute; left: calc(50% - 33px); top: 704px; width: 66px; height: 76px; pointer-events: none; transform-origin: 50% 100%; }
 .h-ppu canvas { display: block; width: 100%; height: 100%; }
-.h-ppu-hit { position: absolute; left: calc(50% - 30px); top: 530px; width: 60px; height: 80px; z-index: 5; }
+.h-ppu-hit { position: absolute; left: calc(50% - 30px); top: 700px; width: 60px; height: 80px; z-index: 5; }
 .h-ppu.hop { animation: hop 0.36s cubic-bezier(0.2, 1.2, 0.4, 1); }
 .h-bub {
   position: absolute;
   left: calc(50% + 26px);
-  top: 520px;
+  top: 690px;
   z-index: 6;
   display: none;
   font: 400 30px/1 var(--brush);
@@ -760,6 +764,7 @@ img { display: block; -webkit-user-drag: none; }
 
 /* 현장 화면에선 알림이 땅선 바로 위(조작 키를 가리지 않게) · 설치 띠는 위로(installPrompt.ts) */
 #stage.field > .toast { bottom: calc(100% - var(--field-h, 610px) + 10px); }
+#stage.home > .toast { bottom: 10px; }
 
 /* ── 이야기 판 ─────────────────────────────────────────── */
 .ov-story { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 30px 70px; text-align: center; }

@@ -751,15 +751,23 @@ function syncFieldBg(drawn: boolean, b: BackdropInput, bg: string): void {
  * 홈(현장 화면) 캔버스 — 플레이가 카메라 0에서 보이는 그대로: 바탕 + 원경 + 땅선.
  * 땅 채움(#DDD8CC)은 필드 클립 밖이라 카메라 0에선 안 보인다. 바탕은 PALETTE.BG 고정.
  */
-export function drawFieldStill(ctx: CanvasRenderingContext2D, b: BackdropInput): void {
+export function drawFieldStill(ctx: CanvasRenderingContext2D, b: BackdropInput, down = 0): void {
   syncPageVar('--fr-bg', PALETTE.BG);
   ctx.fillStyle = PALETTE.BG;
   ctx.fillRect(0, 0, VIEW.W, VIEW.H);
   ctx.save();
+  // down = 홈이 조작 구역까지 쓸 때 땅선을 내리는 값. 위에 생긴 띠는 원경의 종이색으로 메운다
+  ctx.translate(0, down);
   clipField(ctx);
-  syncFieldBg(drawChapterBackdrop(ctx, b), b, PALETTE.BG);
+  const drawn = drawChapterBackdrop(ctx, b);
+  syncFieldBg(drawn, b, PALETTE.BG);
   fx.drawGroundLine(ctx);
   ctx.restore();
+  const paper = drawn && backdropPaper(backdropKey(b));
+  if (down && paper) {
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, VIEW.FIELD_TOP, VIEW.W, down);
+  }
 }
 
 function bgColor(s: GameState): string {

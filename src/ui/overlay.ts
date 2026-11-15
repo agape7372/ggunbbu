@@ -709,7 +709,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     const key = JSON.stringify([b(v.job), b(prev), b(next)]);
     if (!force && key === artKey) return;
     artKey = key;
-    paintHang(hang, b(v.job), 30);
+    paintHang(hang, b(v.job), 86); // 줄을 길게 — 건물이 이웃 일감 이름 아래에서 시작해 폭을 다 쓴다
     paintHang($('peek-prev-cv') as HTMLCanvasElement, b(prev), 20, true);
     paintHang($('peek-next-cv') as HTMLCanvasElement, b(next), 20, true);
   }
