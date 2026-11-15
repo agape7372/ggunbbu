@@ -13,27 +13,14 @@
 
 /* ── 머리: 고동 붓 띠 + 붓 제목 + 모은 수. 스크롤해도 위에 붙어 있다 ── */
 .bk-top {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
   width: min(430px, calc(100% - 40px));
   margin-inline: auto;
-  padding: 8px 16px 18px;
   background: var(--brown);
-  color: var(--paper);
-  clip-path: var(--bandclip);
 }
-
-.bk-title { font: var(--t-title); rotate: 0deg; }
-.bk-count { margin: 0; font: var(--t-small); font-weight: 700; white-space: nowrap; }
 .bk-count b { font: 400 22px/1 var(--black); font-variant-numeric: tabular-nums; }
 
 /* ── 보상 눈금 막대 — 옅은 먹 바탕 + 먹 획(높이 14), 도감 실적 문턱마다 세로 획 + 숫자 ── */
-.bk-goal { padding-top: 16px; padding-bottom: 4px; }
+.bk-goal { padding-top: 12px; padding-bottom: 0; }
 .bk-scale { position: relative; padding-bottom: 28px; }
 .bk-gbar { position: relative; display: block; height: 14px; background: var(--ink3); clip-path: var(--sealclip2); }
 .bk-gbar i { position: absolute; inset: 0 auto 0 0; background: var(--ink); }
@@ -54,7 +41,7 @@
 /* ── 묶음 머리: 이름 · 모은 수 · 다 모으면 「완」 도장 ── */
 .bk-grp,
 .bk-sub { display: flex; align-items: center; gap: 8px; }
-.bk-grp { margin: 14px 0 2px 2px; font: var(--t-sec); rotate: -2deg; transform-origin: 0 100%; }
+.bk-grp { margin: 24px 0 8px 2px; font: var(--t-sec); rotate: -2deg; transform-origin: 0 100%; }
 .bk-sub { margin: 8px 0 2px 2px; font: var(--t-small); font-weight: 700; color: var(--ink2); }
 .bk-grp small,
 .bk-sub small { font: 400 13.5px/1 var(--black); color: var(--ink2); font-variant-numeric: tabular-nums; }

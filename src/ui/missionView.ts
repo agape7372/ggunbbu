@@ -141,11 +141,11 @@ function draw(root: HTMLElement, v: MissionView, fresh: string | null, how: 'kee
   const tabs = TABS.map((t) => `<button type="button" role="tab" class="ms-tab${t.id === tab ? ' on' : ''}" data-ms-tab="${t.id}" aria-selected="${t.id === tab}"${flags[t.id] ? ' aria-label="' + t.name + ', 받을 것 있음"' : ''}>${t.name}${flags[t.id] ? '<i class="ms-dot" aria-hidden="true"></i>' : ''}</button>`).join('');
   const body = tab === 'today' ? todayHtml(v, fresh) : tab === 'site' ? siteHtml(v) : recordHtml(v);
   root.innerHTML = `
-    <header class="ms-band">
+    <header class="ms-band meta-band">
       <h2 class="meta-title">미션</h2>
-      <p class="ms-wallet">
-        <span class="cur" aria-label="먼지 ${fmt(v.dust)}">${glyph('dust')}<b>${fmt(v.dust)}</b></span>
-        <span class="cur" aria-label="궤도조각 ${fmt(v.orbit)}">${glyph('orb')}<b>${fmt(v.orbit)}</b></span>
+      <p class="ms-wallet meta-wallet">
+        <span class="cur" aria-label="먼지 ${fmt(v.dust)}">${glyph('dust')}먼지 <b>${fmt(v.dust)}</b></span>
+        <span class="cur" aria-label="궤도조각 ${fmt(v.orbit)}">${glyph('orb')}궤도조각 <b>${fmt(v.orbit)}</b></span>
       </p>
     </header>
     <nav class="ms-tabs" role="tablist" aria-label="미션 구분">${tabs}</nav>

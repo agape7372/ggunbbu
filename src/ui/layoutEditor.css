@@ -52,7 +52,7 @@
 .le-key.bad { outline: 3px dashed var(--ink); outline-offset: 6px; }
 
 /* ── 설정 화면의 한 줄: 「버튼 배치」 + 바꾸기 ── */
-.set-layout { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; }
-.set-layout-name { display: flex; flex-direction: column; gap: 2px; font: 700 17px/1.2 var(--body); }
-.set-layout-name small { font: 700 13.5px/1.2 var(--body); color: var(--ink2); }
-.set-layout .inkseal { width: auto; height: 52px; padding: 0 18px; font-size: 25px; }
+.set-layout { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
+.set-layout-name { display: flex; flex-direction: column; gap: 2px; font: var(--t-name); }
+.set-layout-name small { font: var(--t-small); color: var(--ink2); }
+.set-layout .inkseal { width: 64px; height: 48px; }

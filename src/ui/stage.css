@@ -87,10 +87,6 @@
 .mp-facts .n { font: 400 15px/1 var(--black); }
 .mp-diffs { gap: 5px; margin-top: 11px; }
 .mp-diffs.seg button { height: 48px; font: 700 15px/1 var(--body); }
-/* 난이도 세 상태 — 고름(먹 바탕) · 고를 수 있음(먹 테 + 먹 글) · 잠김(옅은 테 + 회색 글) */
-.mp-diffs.seg button:not(:disabled):not(.on) { color: var(--ink); }
-.mp-diffs.seg button:not(:disabled):not(.on)::before { background: var(--ink); }
-.mp-diffs.seg button:disabled { color: var(--ink2); }
 .mp-note { display: flex; flex-direction: column; font: 700 13.5px/1.2 var(--body); color: var(--ink2); white-space: nowrap; }
 .mp-prac { display: flex; align-items: center; gap: 8px; }
 .mp-prac button { position: relative; flex: none; height: 32px; padding: 0 9px; border: 2.5px solid var(--ink); background: var(--paper); font: 700 13.5px/1 var(--body); }

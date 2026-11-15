@@ -343,9 +343,9 @@ export function paintBook(
     return `<section class="bk-set">${top}<div class="bk-grid${cols}">${g.entries.map((e) => cellHtml(e, ctx)).join('')}</div></section>`;
   }).join('');
   root.innerHTML = `<div class="bk">
-    <header class="bk-top">
+    <header class="bk-top meta-band">
       <h2 class="meta-title bk-title">도감</h2>
-      <p class="bk-count">모은 것 <b>${have}</b>/${total}</p>
+      <p class="bk-count meta-side">모은 것 <b>${have}</b>/${total}</p>
     </header>
     ${record ? tabsHtml : ''}
     <div class="bk-pane" data-pane="col">${goalHtml(have, total)}${body}</div>

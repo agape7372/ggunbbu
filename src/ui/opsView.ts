@@ -53,14 +53,14 @@ export function paintOps(
         : '';
       body = `<span class="op-pic">${pic}</span><b class="op-name">${name}</b>`;
     }
-    return `<button type="button" class="op-cut" data-op="${escapeHtml(op.id)}" style="--i:${i}"${open ? '' : ' disabled'}>
+    return `<button type="button" class="op-cut${special ? ' sp' : ''}" data-op="${escapeHtml(op.id)}" style="--i:${i}"${open ? '' : ' disabled'}>
       ${frameSvg(...FRAMES[i % FRAMES.length])}${body}${why}
     </button>`;
   };
   const base = OPERATIONS.filter((o) => o.gimmick === 'none').map(cut).join('');
   const special = OPERATIONS.filter((o) => o.gimmick !== 'none').map(cut).join('');
   root.innerHTML = `
-    <h2 class="meta-title">구역 작전</h2>
+    <header class="meta-band"><h2 class="meta-title">구역 작전</h2></header>
     <p class="meta-lead">구역을 골라 바로 시작한다. 작전 판은 최고 기록에 안 들어간다.</p>
     <h3 class="op-h" style="--i:0">구역</h3>
     <div class="op-grid">${base}</div>

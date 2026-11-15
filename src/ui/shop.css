@@ -13,33 +13,9 @@
 
 /* ── 머리: 먹 붓 띠 + 붓 제목 + 지갑(띠 안). 스크롤해도 위에 붙어 있다 ── */
 .sh-top {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
   width: min(430px, calc(100% - 40px));
   margin-inline: auto;
-  padding: 8px 16px 17px;
-  background: var(--ink);
-  color: var(--paper);
-  clip-path: var(--bandclip);
 }
-
-.sh-title { font: var(--t-title); rotate: 0deg; }
-
-.sh-wallet {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  font: 700 14px/1.2 var(--sans);
-}
-
-.sh-wallet b { font: 400 18px/1 var(--black); }
-.sh-wallet .coin { width: 21px; height: 21px; }
 
 /* 지금 장착 — 먹 쪽지 줄 */
 .sh-worn { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 16px 0 8px; }
@@ -167,8 +143,8 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 32px 0 8px 2px;
-  font: 400 28px/1 var(--brush);
+  margin: 24px 0 8px 2px;
+  font: var(--t-sec);
   rotate: -2deg;
   transform-origin: 0 100%;
 }
@@ -328,7 +304,7 @@
 .sh-new .ic { width: 34px; height: 34px; }
 
 /* ── 탭 — 장비 · 꾸러미. 선택한 탭은 먹 면으로 채운다 ── */
-.sh-tabs { display: flex; gap: 12px; margin-top: 8px; }
+.sh-tabs { display: flex; gap: 8px; margin-top: 8px; }
 .sh-tabs .sh-tab {
   flex: 1 1 0;
   display: grid;

@@ -4,13 +4,14 @@
    칸 사이 12px · 구획 사이 28px. 논리 무대 높이는 늘 780 — vh·뷰포트 조건 없이 고정 px. */
 
 /* ── 글자 · 크기 공용 값 — 메타 화면(미션 · 매점 · 도감 · 창 · 보상)은 이 값만 쓴다 ─────
-   제목 붓 40 · 구획 붓 27 · 이름 16 · 본문 15 · 작은 글 13.5(이 밑 금지) · 숫자 = Black Han Sans.
+   제목 붓 40 · 구획 붓 28 · 이름 16 · 본문 15 · 작은 글 13.5(이 밑 금지) · 숫자 = Black Han Sans.
    행간: 붓 1~1.1 · 이름 1.3 · 본문 1.5. 작은 단추 글자는 붓이 아니라 Black Han Sans 17. 붓은 25 밑으로 안 쓴다.
    누름 칸 48 이상 · 단추 사이 8 이상 · 큰 단추 54.
+   11-15 통일: 구획 27 → 28(상점 · 도감 · 작전 · 설정 같은 값).
    11-02 크기 손질: 46 · 30 · 17 · 60에서 줄였다. 칸이 커서 한 화면에 두세 개만 보였다. */
 :root {
   --t-title: 400 40px/1 var(--brush);
-  --t-sec: 400 27px/1.1 var(--brush);
+  --t-sec: 400 28px/1.1 var(--brush);
   --t-name: 700 16px/1.3 var(--sans);
   --t-body: 500 15px/1.5 var(--sans);
   --t-small: 500 13.5px/1.4 var(--sans);
@@ -61,43 +62,25 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin: 18px 0 6px 2px;
-  font: 400 30px/1 var(--brush);
+  margin: 24px 0 8px 2px;
+  font: var(--t-sec);
   rotate: -2deg;
   transform-origin: 0 100%;
 }
 
-.op-h small { font: 700 13.5px/1 var(--body); color: var(--ink2); }
+.op-h small { font: var(--t-small); font-weight: 700; color: var(--ink2); }
 
 /* ── 미션 화면 — 세 탭(오늘 · 현장 · 실적). 먹 틀 안에 초록 붓 띠 머리(위에 붙음) + 탭 도장 줄 ── */
-.ov-meta[data-screen='missions'] { --ms-band: 74px; --ms-tabs: 58px; padding: 20px 0 18px; }
+.ov-meta[data-screen='missions'] { --ms-band: 72px; --ms-tabs: 68px; padding: 20px 0 18px; }
 .ov-meta[data-screen='missions'] > .ov-body { max-width: none; }
 .ov-meta[data-screen='missions'] > .ov-nav { padding-inline: 22px; }
 
 .ms-band {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
   width: min(430px, calc(100% - 40px));
   margin-inline: auto;
   height: var(--ms-band);
-  padding: 8px 16px 17px;
   background: var(--green);
-  color: var(--paper);
-  clip-path: var(--bandclip);
 }
-
-.ms-band .meta-title { font: var(--t-title); rotate: 0deg; }
-
-/* 지갑 — 초록 띠 위에 한지 쪽지 둘. 그림 선이 먹이라 한지 바탕이 있어야 읽힌다 */
-.ms-wallet { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-.ms-wallet .cur { gap: 5px; padding: 2px 9px 3px 7px; background: var(--paper); color: var(--ink); clip-path: var(--sealclip2); }
-.ms-wallet .coin { width: 18px; height: 18px; }
-.ms-wallet b { font: 400 16px/1 var(--black); font-variant-numeric: tabular-nums; }
 
 /* 탭 도장 줄 — 띠 바로 밑에 붙는다(스크롤해도 한 번에 바뀐다). 고른 탭은 먹 채움, 받을 것이 있으면 주홍 점.
    띠의 거친 밑단 8px 밑까지 깔아 띠 뒤로 지나가는 글이 비치지 않게 한다 */
@@ -110,7 +93,7 @@
   gap: 8px;
   height: var(--ms-tabs);
   margin-top: -8px;
-  padding: 6px max(20px, calc((100% - 430px) / 2)) 4px;
+  padding: 16px max(20px, calc((100% - 430px) / 2)) 4px;
   background: var(--paper);
 }
 
@@ -386,7 +369,7 @@ button.ms-rg:active { scale: 0.97; }
 .ms-sl-t .ms-num { margin-left: 2px; color: var(--ink); }
 
 /* ── 구역 작전 컷 2×2 ─────────────────────────────────── */
-.op-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; }
+.op-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 8px; }
 
 .op-cut {
   position: relative;
@@ -403,6 +386,8 @@ button.ms-rg:active { scale: 0.97; }
   background: var(--paper);
 }
 
+/* 특별작전 칸은 그림이 없다 — 빈 윗자리를 줄인다 */
+.op-cut.sp { height: 128px; }
 .op-cut:active:not(:disabled) { scale: 0.96; }
 .op-cut .frame { left: 6px; top: 6px; width: calc(100% - 12px); height: calc(100% - 12px); }
 .op-cut:disabled .frame path { stroke: var(--ink3); }
@@ -435,7 +420,7 @@ button.ms-rg:active { scale: 0.97; }
   text-shadow: var(--halo);
 }
 
-.op-cut small { position: relative; z-index: 7; font: 700 13.5px/1.3 var(--body); }
+.op-cut small { position: relative; z-index: 7; font: var(--t-small); font-weight: 700; }
 .op-why,
 .op-cut:disabled .op-name { color: var(--ink2); }
 .op-why { text-shadow: var(--halo); }

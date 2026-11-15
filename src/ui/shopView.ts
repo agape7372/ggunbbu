@@ -255,9 +255,9 @@ export function paintShop(
   const wasFocus = (document.activeElement as HTMLElement | null)?.dataset?.sel;
 
   root.innerHTML = `<div class="sh${sel ? ' sel' : ''}">
-    <header class="sh-top">
+    <header class="sh-top meta-band">
       <h2 class="meta-title sh-title">상점</h2>
-      <p class="sh-wallet">
+      <p class="sh-wallet meta-wallet">
         <span class="cur" aria-label="먼지 ${fmt(inv.dust)}">${glyph('dust')}먼지 <b data-w="dust">${fmt(from.dust)}</b></span>
         <span class="cur" aria-label="궤도조각 ${fmt(inv.orbit)}">${glyph('orb')}궤도조각 <b data-w="orbit">${fmt(from.orbit)}</b></span>
       </p>

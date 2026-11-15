@@ -428,28 +428,32 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     <div class="ov-screen ov-meta" data-screen="settings" hidden>
       ${frameSvg(8, 4.5, 6, 10)}
       <div class="ov-body">
-        <h2 class="meta-title">설정</h2>
+        <header class="meta-band"><h2 class="meta-title">설정</h2><p class="meta-side" data-el="ver">v${APP_VERSION}</p></header>
         <div class="set-body">
+          <h3 class="set-h">소리 · 진동</h3>
           <div class="set-grid">
-            ${tog('set-sound', '소리')}
+            ${tog('set-sound', '전체')}
             ${tog('set-bgm', '음악')}
             ${tog('set-sfx', '효과음')}
             ${tog('set-vib', '진동')}
-            ${tog('set-hand', '왼손 조작')}
           </div>
+          <h3 class="set-h">화면</h3>
           ${levelRow('set-shake', '화면 흔들림', SHAKE_LABEL)}
           ${levelRow('set-flash', '번쩍임', FLASH_LABEL)}
+          <h3 class="set-h">조작</h3>
+          ${tog('set-hand', '왼손 조작')}
           <div class="set-layout">
             <span class="set-layout-name">버튼 배치<small data-el="set-layout-state"></small></span>
             <button type="button" class="inkseal" data-act="set-layout" data-el="set-layout">바꾸기</button>
           </div>
+          <button type="button" class="set-link" data-act="howto">조작 안내</button>
+          <h3 class="set-h">정보</h3>
           <div class="set-links">
-            <button type="button" class="set-link" data-act="howto">조작 안내</button>
             <button type="button" class="set-link" data-act="privacy">개인정보 처리방침</button>
             <button type="button" class="set-link" data-act="credits">글꼴 저작권</button>
             <button type="button" class="set-link danger" data-act="reset" data-el="reset-row">기록 지우기</button>
           </div>
-          <p class="set-foot">GUNBBU <span data-el="ver">v${APP_VERSION}</span><span class="kbd-hint"><br>키보드: 점프 ↑ · 가드 ↓ · 공격 Z · 필살 X · 멈춤 Esc</span></p>
+          <p class="set-foot kbd-hint">키보드: 점프 ↑ · 가드 ↓ · 공격 Z · 필살 X · 멈춤 Esc</p>
         </div>
       </div>
       <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="set-back" data-el="set-back">홈</button><span class="nav-stamp">작업 수칙</span><span></span></nav>
@@ -458,7 +462,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     <div class="ov-screen ov-meta" data-screen="butter" hidden>
       ${frameSvg(9, 4, 5, 9)}
       <div class="ov-body">
-        <h2 class="meta-title">버터바 챌린지</h2>
+        <header class="meta-band"><h2 class="meta-title">버터바 챌린지</h2></header>
         <p class="meta-lead">판에서 만나 본 회차만 열린다.</p>
         <div class="bt-rounds" data-el="butter-rounds"></div>
       </div>
