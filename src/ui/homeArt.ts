@@ -15,7 +15,7 @@ const PAPER = '#F4F1E8';
  * cab = 캔버스 위 줄 · 고리 · 멜빵 높이(css px). 건물은 그 아래에 위를 맞춰 매단다.
  * faint = 이웃 일감 — 그린 위에 한지를 덮어 옅게(반투명 없이 불투명한 옅은 색이 된다)
  */
-export function paintHang(cv: HTMLCanvasElement, b: JobBuilding, cab: number, faint = false): void {
+export function paintHang(cv: HTMLCanvasElement, b: JobBuilding, cab: number, faint = false, drop = false): void {
   const r = cv.getBoundingClientRect();
   const cssW = cv.clientWidth || r.width;
   const cssH = cv.clientHeight || r.height;
@@ -35,23 +35,28 @@ export function paintHang(cv: HTMLCanvasElement, b: JobBuilding, cab: number, fa
   const k = Math.min((cssW - 4) / totalW, (cssH - cab - 2) / totalH);
   const bw = totalW * k;
   const cx = cssW / 2;
+  // drop = 건물 바닥을 캔버스 바닥에 맞춘다 — 낮은 건물은 줄이 길어진다(아래 쪽지와의 간격이 일감마다 같다)
+  if (drop) cab = cssH - 2 - totalH * k;
 
-  // 줄 · 고리 · 멜빵 — 먹 선
+  // 줄 · 고리 · 멜빵 — 먹 선. 멜빵 높이는 줄이 길어져도 28까지
+  const sl = Math.min(28, cab * 0.4);
+  const hookR = Math.min(4.5, Math.max(3, cab * 0.08));
+  const hookY = cab - sl - 2;
   ctx.strokeStyle = INK;
   ctx.lineCap = 'round';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.moveTo(cx, 0);
-  ctx.lineTo(cx, cab * 0.42);
+  ctx.lineTo(cx, hookY - hookR * 0.5);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(cx, cab * 0.5, Math.max(3, cab * 0.08), -Math.PI * 0.5, Math.PI * 0.9);
+  ctx.arc(cx, hookY, hookR, -Math.PI * 0.5, Math.PI * 0.9);
   ctx.stroke();
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(cx, cab * 0.6);
+  ctx.moveTo(cx, cab - sl);
   ctx.lineTo(cx - bw * 0.42, cab);
-  ctx.moveTo(cx, cab * 0.6);
+  ctx.moveTo(cx, cab - sl);
   ctx.lineTo(cx + bw * 0.42, cab);
   ctx.stroke();
 
