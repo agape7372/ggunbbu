@@ -489,6 +489,44 @@ export function drawWazaMid(ctx: CanvasRenderingContext2D, cam: number): void {
   if (split) drawSplit(ctx, VIEW.GROUND_Y);
   const sh = show;
   if (sh?.id === 'dalmuri') dalNight(ctx, sh, VIEW.FIELD_TOP - cam);
+  if (sh) tipTrail(ctx, sh);
+}
+
+/**
+ * 칼끝 자취 — 필살 여섯에 똑같이 얹는 층. 몸 연기(wazaBody)의 칼끝이 지난 TRAIL_F 프레임 동안 실제로 지나간 길에 먹 획을 남긴다
+ * (획은 움직임에서 나온다 — 연출의 획과 졸라맨의 칼이 이어진다). 칼이 멈추면 길이 줄어 꼬리부터 사라진다(알파 없음).
+ * 무음일섬은 뺀다(자로 그은 한 줄이 전부다). 용오름도 뺀다(제자리 돌기라 칼끝이 좌우로 접혀 지그재그가 된다 — 회오리 획이 그 일을 한다).
+ */
+const TRAIL_F = 4;
+const TRAIL_MIN = 26; // 칼끝이 이만큼(px)은 움직여야 긋는다 — 숨 · 떨림엔 안 나온다
+function tipTrail(ctx: CanvasRenderingContext2D, sh: Show): void {
+  if (sh.id === 'mukjul' || sh.id === 'baram' || sh.free || sh.f < 1) return;
+  const great = !!greatLook(sh.weapon);
+  const kit = kitOf(sh.weapon);
+  const all = sh.hits.map((h) => h.f);
+  const pts: number[] = [];
+  let len = 0;
+  for (let i = 0; i <= TRAIL_F * 4; i++) { // 반의 반 프레임마다 — 한 프레임에 넘어가는 베기도 호로 이어진다. 칼끝(지금)이 먼저
+    const f = sh.f - i / 4;
+    if (f < 0) break;
+    const v: WazaShowView = { id: sh.id, f, burst: sh.burst >= 0 && sh.burst <= f ? sh.burst : -1, hitF: all.filter((h) => h <= f), free: false };
+    const [, , tx, ty] = liveBlade(wazaBodyAt(v, kit), great);
+    const n = pts.length;
+    if (n) len += Math.hypot(tx + sh.x - pts[n - 2], ty + sh.foot - pts[n - 1]);
+    pts.push(sh.x + tx, sh.foot + ty);
+  }
+  if (len < TRAIL_MIN || pts.length < 4) return;
+  // 모서리 깎기 두 번 — 키 자세가 한 프레임에 넘어가 꺾인 길을 붓이 돈 호로 둥글린다(양 끝은 그대로)
+  let p = pts;
+  for (let k = 0; k < 2; k++) {
+    const q = [p[0], p[1]];
+    for (let i = 0; i + 3 < p.length; i += 2) {
+      q.push(p[i] * 0.75 + p[i + 2] * 0.25, p[i + 1] * 0.75 + p[i + 3] * 0.25, p[i] * 0.25 + p[i + 2] * 0.75, p[i + 1] * 0.25 + p[i + 3] * 0.75);
+    }
+    q.push(p[p.length - 2], p[p.length - 1]);
+    p = q;
+  }
+  cutPath(ctx, p, Math.min(8, 2 + len * 0.04), 0, 1, 0.55, sh.seed + 61, 3, sh.ink); // 속은 식어 가는 가는 줄(age 3)
 }
 
 // ── 그리기 — 월드 좌표(renderer가 카메라를 건 안쪽, 졸라맨 위) ──────────

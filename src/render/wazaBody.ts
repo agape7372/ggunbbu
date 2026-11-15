@@ -238,19 +238,61 @@ function baram(v: WazaShowView, st: Body): Body {
   return play([[spinEnd, R_SPIN], [spinEnd + 10, st]], f);
 }
 
+/** 키 자세 시간표 그대로의 몸 */
+function keyed(v: WazaShowView, st: Body): Body {
+  switch (v.id) {
+    case 'tenchi': return tenchi(v.f, st);
+    case 'ageba': return ageba(v.f, st);
+    case 'mukjul': return mukjul(v, st);
+    case 'dalmuri': return dalmuri(v, st);
+    case 'nakgwan': return nakgwan(v, st);
+    case 'baram': return baram(v, st);
+  }
+}
+
+// ── 후속 동작 — 필살 여섯에 똑같이 얹는 층. 키 자세는 그대로 두고(닿는 프레임은 한 프레임에 그대로 선다) 끝 마디만 따로 논다 ──
+// 칼 · 머리 · 빈손은 몸이 멈춘 다음 프레임에 지나쳐 갔다가 떨며 돌아온다. 버티는 동안엔 숨을 쉰다.
+// 상태를 두지 않는다 — 지난 TAIL 프레임을 그때의 박자로 다시 연기해 구한다(상점 칸 · 칼끝 별빛도 같은 값).
+const TAIL = 22;
+const SPRING = 0.34; // 되돌아오는 힘
+const DAMP = 0.62; // 떨림이 남는 비율
+const FLING = { sa: 0.2, head: 0.14, hand: 0.22 } as const; // 지난 프레임 움직임의 이만큼 지나친다
+const cap = (x: number, m: number): number => Math.max(-m, Math.min(m, x));
+
+function follow(v: WazaShowView, st: Body): Body {
+  const at = (f: number): Body => keyed({ ...v, f, hitF: v.hitF.filter((h) => h <= f), burst: v.burst >= 0 && v.burst <= f ? v.burst : -1 }, st);
+  const now = keyed(v, st);
+  // [칼 각, 머리 x, y, 빈손 x, y] — 머리 · 빈손은 골반에서 잰다(뛰어오르는 몸을 따라 통째로 밀리지 않게)
+  const tip = (b: Body): number[] => [b.sa, b.head[0] - b.hip[0], b.head[1] - b.hip[1], b.hB[0] - b.hip[0], b.hB[1] - b.hip[1]];
+  const G = [FLING.sa, FLING.head, FLING.head, FLING.hand, FLING.hand];
+  const M = [1.6, 7, 7, 9, 9];
+  const w = [0, 0, 0, 0, 0];
+  const vel = [0, 0, 0, 0, 0];
+  let a = tip(at(Math.max(0, v.f - TAIL)));
+  for (let f = Math.max(0, v.f - TAIL) + 1; f <= v.f; f++) {
+    const b = f === v.f ? tip(now) : tip(at(f));
+    for (let i = 0; i < 5; i++) {
+      vel[i] = vel[i] * DAMP - w[i] * SPRING;
+      w[i] += vel[i];
+      vel[i] += cap(b[i] - a[i], M[i]) * G[i]; // 이번 프레임 움직임은 다음 프레임에 밀려 나간다
+    }
+    a = b;
+  }
+  const grip = Math.hypot(now.hB[0] - now.hF[0], now.hB[1] - now.hF[1]) < 4.5; // 자루를 쥔 손은 칼을 떠나지 않는다
+  const breath = 0.9 * (1 - Math.cos((2 * Math.PI * v.f) / 80)) / 2;
+  return sink({
+    ...now,
+    sa: now.sa + w[0],
+    head: [now.head[0] + w[1], now.head[1] + w[2]],
+    hB: grip ? now.hB : [now.hB[0] + w[3], now.hB[1] + w[4]],
+  }, breath, 0.04 * breath);
+}
+
 /** 박자 v에서의 몸 — 판(wazaBody) · 상점 칸(drawWazaShot) · 연출의 칼끝 별빛이 같은 시간표를 읽는다. great = 대검(서기가 다르다) */
 export function wazaBodyAt(v: WazaShowView, k: Kit): Body {
   const long = k.long ?? 1;
   const st: Body = { ...k.stand, sl: k.stand.sl / long }; // 아래에서 다시 곱한다 — 서기는 제 길이로 돌아온다
-  let b: Body;
-  switch (v.id) {
-    case 'tenchi': b = tenchi(v.f, st); break;
-    case 'ageba': b = ageba(v.f, st); break;
-    case 'mukjul': b = mukjul(v, st); break;
-    case 'dalmuri': b = dalmuri(v, st); break;
-    case 'nakgwan': b = nakgwan(v, st); break;
-    case 'baram': b = baram(v, st); break;
-  }
+  let b = follow(v, st);
   // 무기 특성 — 무거우면 낮은 자세가 더 내려앉고(서 있을 땐 0), 길면 더 뻗고, 한 손 무기는 뒷손을 허리 뒤에 둔다
   const low = Math.min(1, Math.max(0, (b.head[1] + 48) / 16));
   if (k.heft) b = sink(b, k.heft * low);

@@ -1119,13 +1119,39 @@ function kneeOf(hip: Pt, foot: Pt): [number, number] {
   return [hip[0] + THIGH * Math.cos(a), hip[1] + THIGH * Math.sin(a)];
 }
 
-/** 팔 — 어깨 → 손, e만큼 팔을 굽힌다(앞으로 뻗은 팔이면 + = 아래) */
+const UPPER = 6.5; // 위팔 = 아래팔, 합이 자세 시간표의 팔 길이(wazaBody ARM 13)
+const SPINE = HIP_Y - HEAD_Y - HEAD_R; // 서기의 목 → 골반
+
+/**
+ * 팔 — 어깨 → 팔꿈치 → 손. 손이 팔 길이보다 가까우면 두 마디로 풀어 팔꿈치가 굽는다(앞으로 뻗은 팔이면 아래, 내린 팔이면 뒤 —
+ * 늘 한쪽으로만 굽는다). e = 더 굽히는 px(− = 반대쪽으로 굽힌다)
+ */
 function armOf(sh: Pt, hand: Pt, e: number): [number, number][] {
-  if (Math.abs(e) < 0.3) return [[sh[0], sh[1]], [hand[0], hand[1]]];
   const dx = hand[0] - sh[0];
   const dy = hand[1] - sh[1];
   const L = Math.hypot(dx, dy) || 1;
-  return [[sh[0], sh[1]], [(sh[0] + hand[0]) / 2 - (dy / L) * e, (sh[1] + hand[1]) / 2 + (dx / L) * e], [hand[0], hand[1]]];
+  const h = Math.sqrt(Math.max(0, UPPER * UPPER - (L * L) / 4));
+  const off = e + h * Math.max(-1, Math.min(1, 1 + e / 0.15)); // e가 0을 지날 때 팔꿈치가 튀지 않게 잇는다
+  if (Math.abs(off) < 0.3) return [[sh[0], sh[1]], [hand[0], hand[1]]];
+  return [[sh[0], sh[1]], [(sh[0] + hand[0]) / 2 - (dy / L) * off, (sh[1] + hand[1]) / 2 + (dx / L) * off], [hand[0], hand[1]]];
+}
+
+/**
+ * 등 — 목 → 어깨 → 골반. 웅크려 서기보다 짧아지면 어깨 아래 허리가 등 쪽으로 둥글게 말린다.
+ * 어깨는 제자리다(자세 시간표가 손을 그 어깨에서 팔 길이에 놓았다 — 옮기면 곧게 뻗은 팔이 굽는다)
+ */
+function spineOf(neck: Pt, hip: Pt, sh: Pt): [number, number][] {
+  const dx = neck[0] - hip[0];
+  const dy = neck[1] - hip[1];
+  const d = Math.hypot(dx, dy) || 1;
+  const h = Math.sqrt(Math.max(0, (SPINE * SPINE - d * d) / 4));
+  const cx = (sh[0] + hip[0]) / 2 + (dy / d) * h; // 조절점 — 등 쪽(곧게 서면 뒤)
+  const cy = (sh[1] + hip[1]) / 2 - (dx / d) * h;
+  const at = (t: number): [number, number] => [
+    (1 - t) * (1 - t) * sh[0] + 2 * t * (1 - t) * cx + t * t * hip[0],
+    (1 - t) * (1 - t) * sh[1] + 2 * t * (1 - t) * cy + t * t * hip[1],
+  ];
+  return [[neck[0], neck[1]], ...[0, 0.25, 0.5, 0.75, 1].map(at)];
 }
 
 function swordTip(b: Body, great: boolean): [number, number] {
@@ -1160,7 +1186,7 @@ function drawLiveBody(ctx: CanvasRenderingContext2D, b: Body, x: number, footY: 
   const lines = [
     armOf(sh, b.hB, b.eB),
     [b.hip, kneeOf(b.hip, b.fB), b.fB],
-    [neck, b.hip],
+    spineOf(neck, b.hip, sh),
     [b.hip, kneeOf(b.hip, b.fF), b.fF],
     armOf(sh, b.hF, b.eF),
   ].map((l) => l.map(X));
