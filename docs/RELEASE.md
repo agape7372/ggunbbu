@@ -205,8 +205,12 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 > 1. `VITE_OTA_BASE`는 `https://`로 시작해야 켜진다(평문 http는 꺼짐). 끝 슬래시는 코드가 떼어 쓰지만 쓰지 않는 편이 낫다.
 > 2. 매니페스트의 `url`은 **https이고 `VITE_OTA_BASE` 아래**여야 한다. 다른 호스트·상대 주소·`@`/역슬래시 표기 장난은 무시한다.
 >    `scripts/ota-release.mjs`가 만드는 `<base>/bundles/<버전>.zip` 형태는 그대로 통과한다.
-> 3. 아직 없는 것 — **출처 서명**. 체크섬이 같은 매니페스트에서 오므로 호스트를 소유한 사람이 곧 신뢰 근거다.
->    켜기 전에 Capgo 서명(공개키를 `shell/capacitor.config.ts`에 넣고 번들에 서명) 또는 허용 SHA 고정 중 하나를 넣을 것.
+> 3. ~~아직 없는 것 — 출처 서명~~ → **11-18 넣음 · 미합침(`fix/abuse-1118`)**. `ota-release`가 레포 밖 개인 키 `D:keysgunbbuota-sign.pem`(ECDSA P-256)으로
+>    `manifest.json`의 `version · url · checksum`에 서명(`sig`)하고, 앱(`src/platform/ota.ts` `signedOk`)은 박힌 공개 키(`otaKey`)로 맞을 때만 받는다.
+>    Capgo 공개 키만으로는 안 된다(sessionKey가 비면 평문 체크섬만 본다 · `CapgoUpdater.java:844-860`). 키가 없거나 앱 키와 짝이 안 맞으면 발행이 멈춘다.
+>    키를 잃으면 OTA가 멈추고 새 키 + 새 AAB로만 고친다 → `D:keysackup-keys.ps1`로 백업(폴더 전체를 훑으니 따로 적을 것 없음).
+> 4. **출시 빌드만 OTA로 낸다(11-18 · 미합침)**: `ota-release`는 `GUNBBU_RELEASE=1`이 없으면 굽지 않고(`--dry-run` 포함), 빌드 뒤 `dist/release-build.txt` 표식이 없어도 멈춘다.
+> 5. **환불 확인 함수(11-18 · 미합침)**: `ota/api/refund.ts`가 같은 Vercel 프로젝트로 나간다(`/api/refund`). 켜려면 Vercel 환경 변수 `PLAY_SA_JSON`(Play Console 「재무 데이터 보기」 권한 서비스 계정 JSON) + 앱 빌드 변수 `VITE_REFUND_URL=https://<우리 호스트>/api/refund` + 처리방침에 「환불 확인 때 결제 토큰을 보냄」 한 줄. 둘 중 하나라도 비면 앱은 묻지 않는다(1회 상품은 Play 보유 목록 대조로 따로 거둔다).
 
 `@capgo/capacitor-updater`(shell/ 의존성) + 정적 호스팅 `https://<우리 호스트>`
 (`manifest.json` + `bundles/*.zip` 두 파일뿐, 서버 로직 없음). 앱이 부팅 3초 뒤 매니페스트를 읽고
@@ -231,15 +235,16 @@ Capgo 클라우드 URL 3종 공백으로 차단) · `scripts/ota-release.mjs`(�
 **릴리스 절차**
 
 ```bash
-VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>   # 예: 1.0.1 — 빌드 → zip → sha256 → ota/ 산출물 (변수가 없으면 멈춘다)
-npm run ota:release -- <version> --dry-run   # 파일 쓰기 없이 빌드·zip·체크섬만 확인 (변수 없이 된다)
-VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version> --min-native=<x.y>   # 새 네이티브 플러그인을 전제한 번들이면
+# 공통: GUNBBU_RELEASE=1 + 실 광고 ID(VITE_ADMOB_REWARDED_ID) + VITE_SELLER_INFO (출시 검사 · 없으면 멈춘다)
+GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>   # 예: 1.0.1 — 빌드 → zip → sha256 → 서명 → ota/ 산출물 (변수 · 키가 없으면 멈춘다)
+GUNBBU_RELEASE=1 npm run ota:release -- <version> --dry-run   # 파일 쓰기 없이 빌드·zip·체크섬만 확인 (배포처 · 키 없이 된다)
+GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version> --min-native=<x.y>   # 새 네이티브 플러그인을 전제한 번들이면
 
 cd ota && npx vercel --prod --scope jirings-projects   # 실제 배포는 이 한 줄
 curl -s https://<우리 호스트>/manifest.json   # version 확인
 ```
 
-OTA를 켜는 날 `scripts/ota-release.mjs`가 릴리스 가드(`scripts/check-release.mjs`의 `checkRelease`)를 통과한 번들만 올리게 고칠 것(지금 1.0은 OTA 꺼짐).
+~~OTA를 켜는 날 `scripts/ota-release.mjs`가 릴리스 가드를 통과한 번들만 올리게 고칠 것~~ → 11-18 고침 · 미합침(`fix/abuse-1118`, 위 4).
 
 스크립트가 하는 일(levain 정본 + 건뿌 보강 3가지):
 
@@ -256,7 +261,7 @@ OTA를 켜는 날 `scripts/ota-release.mjs`가 릴리스 가드(`scripts/check-r
 `ota/manifest.json`(현재 배포 버전)과 `ota/history.json`(발행 이력)을 같이 갱신하고,
 `ota/bundles/`에는 최근 4개만 남기고 자동 정리한다.
 
-**롤백**: `ota/history.json`에서 되돌릴 버전의 항목(version/url/checksum)을 그대로
+**롤백**: `ota/history.json`에서 되돌릴 버전의 항목(version/url/checksum/sig — 서명까지)을 그대로
 `ota/manifest.json`에 덮어쓰고 다시 `cd ota && npx vercel --prod --scope jirings-projects`. 앱은 다음 확인 때 그 버전을 받는다.
 `bundles/*.zip`은 1년 immutable 캐시라 같은 파일명을 새로 쓰지 않는다 — 롤백은 기존 zip을 다시
 가리킬 뿐이다. 4개보다 오래된 버전은 zip이 정리돼 없을 수 있으니 history.json으로 먼저 확인.

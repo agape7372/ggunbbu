@@ -150,8 +150,8 @@ core/통합/테스트는 메인이 직접.
 - 원작 에셋(스프라이트·MIDI·명칭·내레이션 텍스트) 사용 금지.
 - 네이티브(Capacitor/AdMob/OTA)는 `src/platform/`에서만 만난다. 접근은 `window.Capacitor.Plugins`
   **런타임 조회만** — 정적/동적 bare import 금지(웹 번들 오염·WebView 무음 null). 플러그인 패키지는
-  `shell/`에만 있고 루트 런타임 의존성은 0을 유지한다. 결제는 `src/platform/iap.ts`만 만난다(구매 → 지급 · 저장 → 소비 · 승인 순서).
-- 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>`이 갱신한다(변수가 없으면 발행이 멈춘다. 기본 주소 없음).
+  `shell/`에만 있고 루트 런타임 의존성은 0을 유지한다. 결제는 `src/platform/iap.ts`만 만난다(구매 → 지급 · 저장 → 지급 표식(IndexedDB strict) → 소비 · 승인 순서. 저장이 안 써지면 소비하지 않는다. 결제 장부 `paid` · 환불 회수 `revokePaid`. 11-18 고침 · 미합침 `fix/abuse-1118`).
+- 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>`이 갱신한다(변수가 없으면 발행이 멈춘다. 기본 주소 없음). 매니페스트는 레포 밖 `D:keysgunbbuota-sign.pem`으로 서명하고 앱은 서명이 맞을 때만 받는다(`scripts/ota-sign.mjs` · `ota.ts` `otaKey`. 11-18 고침 · 미합침 `fix/abuse-1118`).
 - 에셋 예산 게이트: `npm run build`가 `scripts/check-budget.mjs`로 dist·이미지 상한과 중복을 검사한다.
 - 앱 아이콘 원본 = `assets/brand/src/gunbbu-icon.svg` 하나. 굽기 = `node scripts/gen-native-icons.mjs --playwright-module <playwright 폴더>`
   (웹 · 스토어 · 런처 · 적응형 전경 · 스플래시 33장, 안전 영역을 화소로 재서 넘치면 실패).
