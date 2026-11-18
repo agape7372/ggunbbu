@@ -681,6 +681,29 @@ describe('결제 장부 · 환불 회수', () => {
     expect(b.noAds).toBe(true);
   });
 
+  it('목록에서 잠깐 빠져 거둔 1회 상품은 같은 토큰이 다시 오면 다시 준다 — 첫 결제 선물은 한 번 · 장부는 다음 대조에도 맞는다', () => {
+    const b = ledgered();
+    grantSku(b, 'king_set', 'k1', '2026-11-18', 'GPA.1', T0);
+    const full = structuredClone(b);
+    revokeMissingOnce(b, new Set()); // 기기 계정 바꿈 · 목록 일시 누락
+    expect([b.noAds, b.firstGift, b.orbit]).toEqual([false, false, 0]);
+    expect(grantSku(b, 'king_set', 'k1', '2026-11-18', 'GPA.1', T0 + 1)).toBe(true); // 같은 계정으로 돌아옴
+    expect([b.noAds, b.firstGift, b.orbit, b.blanks]).toEqual([true, true, full.orbit, full.blanks]); // 선물 100이 한 번만
+    expect([...b.owned].sort()).toEqual([...full.owned].sort());
+    expect(grantSku(b, 'king_set', 'k1')).toBe(false); // 세 번째는 없다
+    expect(liveTokens(b)).toEqual(['k1']);
+    expect(revokeMissingOnce(b, new Set(['k1']))).toEqual([]);
+    expect(revokeMissingOnce(b, new Set())).toHaveLength(1); // 살아난 줄이 다음 대조에도 걸린다
+    expect(b.noAds).toBe(false);
+  });
+
+  it('반복 상품은 거둔 뒤에도 같은 토큰으로 다시 받지 못한다', () => {
+    const b = ledgered();
+    grantSku(b, 'orbit_l', 't1', '2026-11-18', undefined, T0);
+    revokePaid(b, 't1');
+    expect(grantSku(b, 'orbit_l', 't1')).toBe(false);
+  });
+
   it('월급 봉투 환불 — 남은 날 · 광고 없음 날짜를 30일 되돌린다', () => {
     const b = ledgered();
     grantSku(b, 'salary', 's1', '2026-11-18', undefined, T0);

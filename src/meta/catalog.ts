@@ -209,6 +209,8 @@ export interface PaidLine {
   items: Partial<Items>;
   owns: string[];
   stamps: number;
+  /** 이 결제로 첫 결제 선물이 나갔다 — 거두면 선물 표시도 되돌린다(다시 받을 때 한 번 더 나간다) */
+  gift?: boolean;
   gone?: boolean;
 }
 
@@ -250,7 +252,7 @@ const addDays = (key: string, n: number): string =>
 export function grantSku(b: Buyer, id: SkuId, token: string, dateKey = '', order?: string, now = Date.now()): boolean {
   const sku = skuById(id);
   if (!sku || b.iapTokens.includes(token) || (sku.once && b.bought.includes(id))) return false;
-  const was = { orbit: b.orbit, dust: b.dust, blanks: b.blanks, items: { ...b.items }, owned: new Set(b.owned), stamps: b.regular.stamps };
+  const was = { orbit: b.orbit, dust: b.dust, blanks: b.blanks, items: { ...b.items }, owned: new Set(b.owned), stamps: b.regular.stamps, gift: !b.firstGift };
   b.orbit += orbitOf(sku, b.bought);
   b.dust += dustOf(sku, b.bought);
   if (sku.items) addItems(b.items, sku.items);
@@ -276,7 +278,7 @@ export function grantSku(b: Buyer, id: SkuId, token: string, dateKey = '', order
     const line: PaidLine = {
       t: token, id, at: now, day: dateKey, ...(order ? { order } : {}),
       orbit: b.orbit - was.orbit, dust: b.dust - was.dust, blanks: b.blanks - was.blanks, items,
-      owns: b.owned.filter((x) => !was.owned.has(x)), stamps: b.regular.stamps - was.stamps,
+      owns: b.owned.filter((x) => !was.owned.has(x)), stamps: b.regular.stamps - was.stamps, ...(was.gift ? { gift: true } : {}),
     };
     b.paid = [...b.paid.filter((x) => now - x.at < PAID_KEEP_MS), line].slice(-PAID_MAX);
   }
@@ -291,8 +293,10 @@ export const liveTokens = (b: Pick<Buyer, 'paid'>): string[] => livePaid(b).map(
 
 /**
  * 환불된 결제를 거둔다. 궤도조각 · 먼지는 모자라면 음수로 남는다(다시 벌 때까지 그걸로 못 산다).
- * 칸 · 장비 · 도장은 0 밑으로 안 내린다. 그 결제로 생긴 꾸미기는 뺀다. 1회 상품은 산 기록을 지워 복원 · 재구매가 되게 한다.
- * 재화 묶음은 산 기록을 두어 첫 구매 두 배를 다시 못 받게 한다. 첫 결제 선물 표시도 그대로 둔다.
+ * 칸 · 장비 · 도장은 0 밑으로 안 내린다. 그 결제로 생긴 꾸미기는 뺀다.
+ * 1회 상품은 산 기록과 토큰을 지운다 — 목록에서 잠깐 빠졌던(계정 바꿈 등) 같은 토큰이 다시 오면 grantSku가 다시 준다.
+ * 반복 상품은 토큰을 남겨(서버가 환불이라 한 것) 같은 토큰으로 두 번 못 받게 하고, 산 기록도 두어 첫 구매 두 배를 다시 못 받게 한다.
+ * 이 결제로 첫 결제 선물이 나갔으면 선물도 거두고 표시를 되돌린다 → 다음 결제(또는 다시 받는 같은 결제)에 한 번 나간다.
  * ponytail: 받은 월급 봉투 · 특근 칸 몫은 장부에 없어 안 거둔다. 문제가 되면 장부에 더한다
  */
 export function revokePaid(b: Buyer, token: string): PaidLine | null {
@@ -305,7 +309,11 @@ export function revokePaid(b: Buyer, token: string): PaidLine | null {
   for (const k of KIT_IDS) b.items[k] = Math.max(0, b.items[k] - (e.items[k] ?? 0));
   if (e.owns.length) b.owned = b.owned.filter((x) => !e.owns.includes(x));
   b.regular.stamps = Math.max(0, b.regular.stamps - e.stamps);
-  if (sku.once) b.bought = b.bought.filter((x) => x !== e.id);
+  if (sku.once) {
+    b.bought = b.bought.filter((x) => x !== e.id);
+    b.iapTokens = b.iapTokens.filter((x) => x !== token);
+  }
+  if (e.gift) b.firstGift = false;
   if (sku.noAds) b.noAds = SKUS.some((s) => s.noAds && b.bought.includes(s.id));
   if (sku.salary) {
     b.salary = { ...b.salary, left: Math.max(0, b.salary.left - SALARY_DAYS) };

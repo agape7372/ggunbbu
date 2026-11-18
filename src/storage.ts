@@ -258,7 +258,7 @@ function validatePaid(v: unknown): PaidLine[] {
     out.push({
       t: o.t, id, at: n(o.at), day: typeof o.day === 'string' ? o.day : '', ...(typeof o.order === 'string' ? { order: o.order } : {}),
       orbit: n(o.orbit), dust: n(o.dust), blanks: n(o.blanks), items, owns: strList(o.owns), stamps: n(o.stamps),
-      ...(o.gone === true ? { gone: true } : {}),
+      ...(o.gift === true ? { gift: true } : {}), ...(o.gone === true ? { gone: true } : {}),
     });
   }
   return out.slice(-PAID_MAX);
