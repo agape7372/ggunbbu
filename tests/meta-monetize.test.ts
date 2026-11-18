@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { advance, applyStartKit, makeState } from '../src/core/sim';
 import { PLAYER, WAZA_GAUGE } from '../src/config';
 import { addItems, buyKit, clampPick, emptyItems, isBare, kitSheetUseful, pickCount, spendKit, validateItems } from '../src/meta/kit';
-import { dustOf, grantSku, orbitOf, SKUS, SKU_IDS, skuById, soldOut, TOKEN_KEEP, type Buyer } from '../src/meta/catalog';
+import { dustOf, grantSku, liveTokens, orbitOf, revokeMissingOnce, revokePaid, SKUS, SKU_IDS, skuById, soldOut, TOKEN_KEEP, type Buyer } from '../src/meta/catalog';
 import { armOffers, clockOf, emptyOffers, leftText, liveOffers, noteOfferBought, offerClock, offerToPop, validateOffers } from '../src/meta/offers';
 import {
   ACHIEVES, DAILY_POOL, DAILY_PICK, TRACK_BY_ID, applyMissionEvent, ensureDaily, initAchieveProgress, kstDateKey, mergeAchieves, nextRollover, pickDailyIds,
@@ -633,5 +633,77 @@ describe('저장', () => {
 
   it('kstDateKey 형식이 그대로라 문자열 비교가 날짜 순서다', () => {
     expect(kstDateKey(T0) < kstDateKey(T0 + 24 * HOUR)).toBe(true);
+  });
+});
+
+// 2026-11-18 어뷰징 점검 — 결제 장부와 환불 회수
+describe('결제 장부 · 환불 회수', () => {
+  const ledgered = (): Buyer => ({ ...buyer(), firstGift: false, paid: [] });
+
+  it('장부는 그 결제로 들어온 만큼(첫 구매 두 배 · 첫 결제 선물 포함)과 주문 번호를 적는다', () => {
+    const b = ledgered();
+    grantSku(b, 'orbit_l', 't1', '2026-11-18', 'GPA.1', T0);
+    expect(b.paid).toEqual([expect.objectContaining({ t: 't1', id: 'orbit_l', order: 'GPA.1', at: T0, orbit: b.orbit })]);
+    expect(b.paid![0]!.orbit).toBe(840 + 100);
+    expect(liveTokens(b)).toEqual(['t1']);
+  });
+
+  it('반복 상품 환불 — 써 버린 궤도조각은 음수로 남고, 첫 구매 두 배는 다시 안 열린다', () => {
+    const b = ledgered();
+    grantSku(b, 'orbit_l', 't1', '2026-11-18', undefined, T0);
+    b.orbit -= 900; // 이미 썼다
+    expect(revokePaid(b, 't1')).not.toBeNull();
+    expect(b.orbit).toBe(40 - 940);
+    expect(b.bought).toContain('orbit_l');
+    expect(revokePaid(b, 't1')).toBeNull(); // 두 번 안 거둔다
+    expect(liveTokens(b)).toEqual([]);
+  });
+
+  it('철거왕 세트 환불 — 꾸미기 · 광고 없음 · 마스크 칸을 거두고 다시 살 수 있게 된다', () => {
+    const b = ledgered();
+    b.owned = ['amber'];
+    grantSku(b, 'king_set', 'k1', '2026-11-18', undefined, T0);
+    expect(b.noAds).toBe(true);
+    revokeMissingOnce(b, new Set(['other']));
+    expect(b.noAds).toBe(false);
+    expect(b.blanks).toBe(0);
+    expect(b.owned).toEqual(['amber']); // 원래 가진 것은 남는다
+    expect(b.bought).not.toContain('king_set');
+    expect(soldOut(b, 'king_set')).toBe(false);
+  });
+
+  it('보유 목록에 있으면 · 시험 결제면 1회 상품을 거두지 않는다. 광고 없음은 다른 상품이 남아 있으면 켜 둔다', () => {
+    const b = ledgered();
+    grantSku(b, 'no_ads', 'n1', '2026-11-18', undefined, T0);
+    grantSku(b, 'king_set', 'test-1', '2026-11-18', undefined, T0);
+    expect(revokeMissingOnce(b, new Set(['n1']))).toEqual([]);
+    revokePaid(b, 'test-1');
+    expect(b.noAds).toBe(true);
+  });
+
+  it('월급 봉투 환불 — 남은 날 · 광고 없음 날짜를 30일 되돌린다', () => {
+    const b = ledgered();
+    grantSku(b, 'salary', 's1', '2026-11-18', undefined, T0);
+    revokePaid(b, 's1');
+    expect(b.salary.left).toBe(0);
+    expect(b.salary.adUntil).toBe('2026-11-18');
+  });
+
+  it('장부는 저장을 오가도 남고, 거둔 궤도조각의 음수도 남는다', () => {
+    const b = ledgered();
+    grantSku(b, 'orbit_s', 't1', '2026-11-18', 'GPA.9', T0);
+    const s = { ...DEFAULT_SAVE, ...b, orbit: -50 };
+    const mem = new Map<string, string>();
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); }, removeItem: (k: string) => { mem.delete(k); },
+    };
+    try {
+      expect(saveSave(s as never)).toBe(true);
+      const back = loadSave();
+      expect(back.orbit).toBe(-50);
+      expect(back.paid).toEqual(b.paid);
+    } finally {
+      delete (globalThis as { localStorage?: unknown }).localStorage;
+    }
   });
 });

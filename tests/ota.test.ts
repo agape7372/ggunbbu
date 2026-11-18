@@ -1,7 +1,8 @@
 // ★08-30 Wave 4: OTA 포트 가드 — 웹에서 조용해야 하고, 매니페스트는 형식이 어긋나면 무시한다.
 // 다운로드 경로 자체는 네이티브 플러그인 몫이라 여기서 테스트하지 않는다(계약만 가드).
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { compareVersions, parseManifest, initOta } from '../src/platform/ota';
+import { compareVersions, parseManifest, initOta, otaKey, signedOk } from '../src/platform/ota';
+import { signManifest } from '../scripts/ota-sign.mjs';
 
 describe('OTA 버전 비교', () => {
   it('자리별로 숫자 비교한다 (문자열 비교가 아니다)', () => {
@@ -89,5 +90,71 @@ describe('웹에서의 침묵', () => {
     (globalThis as Record<string, unknown>).fetch = f;
     expect(() => initOta()).not.toThrow();
     expect(f).not.toHaveBeenCalled(); // 플러그인 부재면 확인 자체를 예약하지 않는다
+  });
+});
+
+// 2026-11-18 어뷰징 점검: 배포처가 털려 manifest.json · zip을 같이 바꿔도 개인 키(레포 밖)가 없으면 앱이 안 받는다
+describe('매니페스트 서명', () => {
+  // 시험용 키 쌍(웹 crypto → PEM): 게시 쪽(scripts/ota-sign.mjs)으로 서명하고 앱 쪽(signedOk)이 확인 = 두 쪽 글 형식이 맞는지도 본다
+  const b64 = (b: ArrayBuffer): string => btoa(String.fromCharCode(...new Uint8Array(b)));
+  const pair = async (): Promise<{ pem: string; spki: string }> => {
+    const k = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const body = b64(await crypto.subtle.exportKey('pkcs8', k.privateKey)).match(/.{1,64}/g)!.join('\n');
+    return { pem: `-----BEGIN PRIVATE KEY-----\n${body}\n-----END PRIVATE KEY-----\n`, spki: b64(await crypto.subtle.exportKey('spki', k.publicKey)) };
+  };
+  const BASE = 'https://ota.example.com';
+  const plain = { version: '1.0.5', url: `${BASE}/bundles/1.0.5.zip`, checksum: 'abc' };
+  const shipped = otaKey.spki;
+  afterEach(() => {
+    otaKey.spki = shipped;
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    delete (globalThis as Record<string, unknown>).Capacitor;
+    delete (globalThis as Record<string, unknown>).window;
+  });
+
+  it('앱 키 짝으로 서명한 것만 맞다 — 서명 없음 · 다른 키 · 서명 뒤 바꿈은 틀림', async () => {
+    const mine = await pair();
+    const theirs = await pair();
+    otaKey.spki = mine.spki;
+    const signed = signManifest(plain, mine.pem);
+    expect(await signedOk(signed)).toBe(true);
+    expect(await signedOk(plain)).toBe(false);
+    expect(await signedOk(signManifest(plain, theirs.pem))).toBe(false);
+    expect(await signedOk({ ...signed, url: 'https://ota.example.com/bundles/evil.zip' })).toBe(false);
+    expect(await signedOk({ ...signed, checksum: 'def' })).toBe(false);
+    expect(parseManifest(signed, BASE)?.sig).toBe(signed.sig);
+  });
+
+  it('켠 앱은 서명 없는 매니페스트로 받지도 예약하지도 않고, 서명이 맞으면 받는다', async () => {
+    const mine = await pair();
+    vi.stubEnv('VITE_OTA_BASE', BASE);
+    vi.resetModules();
+    const fresh = await import('../src/platform/ota');
+    fresh.otaKey.spki = mine.spki;
+    const calls: string[] = [];
+    const up = {
+      current: async () => { calls.push('current'); return { bundle: { id: 'b', version: 'builtin' }, native: '1.0.0' }; },
+      list: async () => ({ bundles: [] }),
+      download: async (o: { version: string }) => { calls.push(`download:${o.version}`); return { id: 'n', version: o.version }; },
+      next: async () => { calls.push('next'); },
+      delete: async () => undefined,
+    };
+    (globalThis as Record<string, unknown>).window = globalThis;
+    (globalThis as Record<string, unknown>).Capacitor = { isNativePlatform: () => true, Plugins: { CapacitorUpdater: up } };
+    let body: unknown = plain;
+    const f = vi.fn(async () => ({ ok: true, json: async () => body }));
+    (globalThis as Record<string, unknown>).fetch = f;
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    fresh.initOta();
+    await vi.advanceTimersByTimeAsync(3000);
+    await vi.waitFor(() => expect(f).toHaveBeenCalledTimes(1));
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(calls).toEqual([]);
+    body = signManifest(plain, mine.pem);
+    fresh.initOta();
+    await vi.advanceTimersByTimeAsync(3000);
+    await vi.waitFor(() => expect(calls).toContain('next'));
+    expect(calls).toContain('download:1.0.5');
   });
 });

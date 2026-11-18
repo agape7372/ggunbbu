@@ -13,7 +13,7 @@
 // 웹은 `window.Capacitor.Plugins.CapacitorUpdater` 런타임 조회로만 접근한다(native.ts와 같은 패턴).
 import { isNative, nativePlugin } from './native';
 
-/** 정적 배포처 — 서버 로직 없음(manifest.json + bundles/*.zip 두 종류뿐). 비어 있으면 OTA를 끈다.
+/** 배포처 — manifest.json(서명) + bundles/*.zip 정적 파일과 환불 확인 함수(ota/api/refund.ts). 비어 있으면 OTA를 끈다.
  * ★2026-10-25 기본값을 비웠다. 옛 주소 gunbbu-ota.vercel.app은 한 번도 배포된 적 없는 **주인 없는 이름**이었고,
  * 체크섬도 같은 매니페스트에서 오므로 누가 그 이름을 먼저 차지하면 설치된 앱에 임의 번들을 밀어 넣을 수 있었다.
  * 우리가 소유한 호스트를 세운 뒤에만 빌드 변수 VITE_OTA_BASE로 켠다(docs/RELEASE.md OTA 절). */
@@ -23,10 +23,32 @@ const FETCH_TIMEOUT_MS = 6000;
 /** 부팅 경로를 막지 않게 확인을 뒤로 미루는 시간 */
 const CHECK_DELAY_MS = 3000;
 
+/**
+ * 매니페스트 서명(2026-11-18 어뷰징 점검): 배포처(Vercel) 계정이 털려 manifest.json · zip을 같이 바꿔도 이 공개 키의 짝(개인 키,
+ * 레포 밖 D:\keys\gunbbu\ota-sign.pem)이 없으면 서명을 못 만든다 → 받지 않는다. 체크섬은 같은 매니페스트에서 오므로 그것만으로는 못 막는다.
+ * 서명 = scripts/ota-sign.mjs(같은 글 형식). 시험은 spki를 갈아 끼운다. 냥수제비 src/net/ota.ts 이식
+ */
+export const otaKey = { spki: 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAElJ7TSLndVxRIxXg3AWMXO+3dtQy93vwPIhleGOXrjNoSHZTlDNuZIDqzM4trB/mXDFSy/XoIGQGRjrD+Dv+H0A==' };
+type Signable = { version: string; url: string; checksum: string; sig?: unknown };
+export const otaMessage = (m: Signable): string => `gunbbu-ota\n${m.version}\n${m.url}\n${m.checksum}`;
+const bytes = (b64: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+/** 서명이 맞나. 없음 · 틀림 · 웹 crypto 없음 = false(받지 않는다) */
+export async function signedOk(m: Signable): Promise<boolean> {
+  if (typeof m.sig !== 'string') return false;
+  try {
+    const key = await crypto.subtle.importKey('spki', bytes(otaKey.spki), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, bytes(m.sig), new TextEncoder().encode(otaMessage(m)));
+  } catch {
+    return false;
+  }
+}
+
 interface OtaManifest {
   version: string;
   url: string;
   checksum: string;
+  sig?: string;
   size?: number;
   releasedAt?: string;
   /** 이 번들이 요구하는 최소 네이티브 버전 — 낮은 셸이면 건너뛴다 */
@@ -83,6 +105,7 @@ export function parseManifest(json: unknown, base: string = OTA_BASE): OtaManife
     version: m.version,
     url: m.url,
     checksum: m.checksum,
+    sig: typeof m.sig === 'string' ? m.sig : undefined,
     size: typeof m.size === 'number' ? m.size : undefined,
     releasedAt: typeof m.releasedAt === 'string' ? m.releasedAt : undefined,
     minNative: typeof m.minNative === 'string' ? m.minNative : undefined,
@@ -119,7 +142,7 @@ async function checkAndStage(): Promise<void> {
   if (!up) return;
   try {
     const manifest = await fetchManifest();
-    if (!manifest) return;
+    if (!manifest || !(await signedOk(manifest))) return; // 서명 없음 · 틀림 = 남이 만든 판일 수 있다 → 받지도 예약하지도 않는다
 
     const cur = await up.current();
     const currentVersion = cur.bundle.version; // 내장 번들이면 "builtin"

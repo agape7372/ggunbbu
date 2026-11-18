@@ -189,7 +189,32 @@ export interface Buyer {
   season: Season;
   regular: Regular;
   firstGift: boolean;
+  /** 결제 장부. 없으면 적지 않는다 */
+  paid?: PaidLine[];
 }
+
+/**
+ * 결제 장부 한 줄 — 그 결제로 들어온 것(지급 전후 차이라 첫 구매 두 배 · 첫 결제 선물까지 담긴다).
+ * 환불이면 이만큼 거둔다(revokePaid). order = Play 주문 번호(GPA), 문의 때 맞춰 본다
+ */
+export interface PaidLine {
+  t: string;
+  id: SkuId;
+  at: number;
+  day: string;
+  order?: string;
+  orbit: number;
+  dust: number;
+  blanks: number;
+  items: Partial<Items>;
+  owns: string[];
+  stamps: number;
+  gone?: boolean;
+}
+
+/** 장부를 남기는 날수 · 줄 수. Play 환불은 보통 몇 주 안이다 */
+export const PAID_KEEP_MS = 120 * 864e5;
+export const PAID_MAX = 200;
 
 /** 더 살 수 없는 상품인가. masks · blanks를 넘기면 마스크 묶음은 가진 장 + 남은 칸이 상한일 때 품절이다. dateKey를 넘기면 오늘 사서 손해인 특근도 품절이다.
  *  owned를 넘기면 꾸미기가 든 1회 상품은 가진 것을 뺀 값이 가격 밑일 때 품절이다 */
@@ -222,9 +247,10 @@ const addDays = (key: string, n: number): string =>
  * 복구와 정상 흐름이 겹쳐도 두 번 주지 않는다. 토큰이 없는 재설치 저장은 다시 받는다.
  * dateKey = 오늘. 월급의 광고 없음은 칸을 안 받아도 달력으로 끝나고, 남은 날 뒤에 이어 붙는다.
  */
-export function grantSku(b: Buyer, id: SkuId, token: string, dateKey = ''): boolean {
+export function grantSku(b: Buyer, id: SkuId, token: string, dateKey = '', order?: string, now = Date.now()): boolean {
   const sku = skuById(id);
   if (!sku || b.iapTokens.includes(token) || (sku.once && b.bought.includes(id))) return false;
+  const was = { orbit: b.orbit, dust: b.dust, blanks: b.blanks, items: { ...b.items }, owned: new Set(b.owned), stamps: b.regular.stamps };
   b.orbit += orbitOf(sku, b.bought);
   b.dust += dustOf(sku, b.bought);
   if (sku.items) addItems(b.items, sku.items);
@@ -244,5 +270,55 @@ export function grantSku(b: Buyer, id: SkuId, token: string, dateKey = ''): bool
   b.regular.stamps += stampsOf(sku.krw);
   if (!b.bought.includes(id)) b.bought = [...b.bought, id];
   b.iapTokens = [...b.iapTokens, token].slice(-TOKEN_KEEP);
+  if (b.paid) {
+    const items: Partial<Items> = {};
+    for (const k of KIT_IDS) if (b.items[k] > was.items[k]) items[k] = b.items[k] - was.items[k];
+    const line: PaidLine = {
+      t: token, id, at: now, day: dateKey, ...(order ? { order } : {}),
+      orbit: b.orbit - was.orbit, dust: b.dust - was.dust, blanks: b.blanks - was.blanks, items,
+      owns: b.owned.filter((x) => !was.owned.has(x)), stamps: b.regular.stamps - was.stamps,
+    };
+    b.paid = [...b.paid.filter((x) => now - x.at < PAID_KEEP_MS), line].slice(-PAID_MAX);
+  }
   return true;
+}
+
+/** 아직 안 거둔 결제 줄. 시험 결제(test-)는 거둘 것이 없다 */
+const livePaid = (b: Pick<Buyer, 'paid'>): PaidLine[] => (b.paid ?? []).filter((x) => !x.gone && !x.t.startsWith('test-'));
+
+/** 아직 안 거둔 결제 토큰 — 환불 여부를 묻는다 */
+export const liveTokens = (b: Pick<Buyer, 'paid'>): string[] => livePaid(b).map((x) => x.t);
+
+/**
+ * 환불된 결제를 거둔다. 궤도조각 · 먼지는 모자라면 음수로 남는다(다시 벌 때까지 그걸로 못 산다).
+ * 칸 · 장비 · 도장은 0 밑으로 안 내린다. 그 결제로 생긴 꾸미기는 뺀다. 1회 상품은 산 기록을 지워 복원 · 재구매가 되게 한다.
+ * 재화 묶음은 산 기록을 두어 첫 구매 두 배를 다시 못 받게 한다. 첫 결제 선물 표시도 그대로 둔다.
+ * ponytail: 받은 월급 봉투 · 특근 칸 몫은 장부에 없어 안 거둔다. 문제가 되면 장부에 더한다
+ */
+export function revokePaid(b: Buyer, token: string): PaidLine | null {
+  const e = b.paid?.find((x) => x.t === token && !x.gone);
+  const sku = e && skuById(e.id);
+  if (!e || !sku) return null;
+  b.orbit -= e.orbit;
+  b.dust -= e.dust;
+  b.blanks = Math.max(0, b.blanks - e.blanks);
+  for (const k of KIT_IDS) b.items[k] = Math.max(0, b.items[k] - (e.items[k] ?? 0));
+  if (e.owns.length) b.owned = b.owned.filter((x) => !e.owns.includes(x));
+  b.regular.stamps = Math.max(0, b.regular.stamps - e.stamps);
+  if (sku.once) b.bought = b.bought.filter((x) => x !== e.id);
+  if (sku.noAds) b.noAds = SKUS.some((s) => s.noAds && b.bought.includes(s.id));
+  if (sku.salary) {
+    b.salary = { ...b.salary, left: Math.max(0, b.salary.left - SALARY_DAYS) };
+    if (b.salary.adUntil) b.salary.adUntil = addDays(b.salary.adUntil, -SALARY_DAYS);
+  }
+  if (sku.pass && e.day.slice(0, 7) === b.season.key) b.season.pass = false;
+  e.gone = true;
+  return e;
+}
+
+/** Play 보유 목록(조회 성공분)에 없는 1회 상품 결제 = 환불 · 취소. 거둔 줄을 돌려준다 */
+export function revokeMissingOnce(b: Buyer, held: ReadonlySet<string>): PaidLine[] {
+  const gone = livePaid(b).filter((x) => skuById(x.id)?.once && !held.has(x.t));
+  for (const x of gone) revokePaid(b, x.t);
+  return gone;
 }

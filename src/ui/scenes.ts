@@ -60,14 +60,14 @@ import {
   dustCost, spendDust, DUST_PER_BUILDING, DUST_PER_SPECIAL, DUST_PER_SUPPLY, MASK_DUST_COST,
   nextDustGoal, adOrbitLeft, noteAdOrbit, exchangeLeft, licenseTitle, takeExam,
 } from '../meta/economy';
-import { equip } from '../meta/loadout';
+import { enforceOwnedLoadout, equip } from '../meta/loadout';
 import {
   applyMissionEvent, ensureDaily, initAchieveProgress, ACHIEVES, DAILY_POOL, claim, defById, claimableCount, kstDateKey,
 } from '../meta/missions';
 import { betterGrade, isOpId, opGrade, opLimitTicks, opValue, type OpId } from '../meta/ops';
 import { buyKit, clampPick, isBare, kitDef, kitSheetUseful, pickCount, spendKit, type KitId, type KitPick } from '../meta/kit';
 import {
-  FIRST_GIFT, SALARY_DAYS, SKUS, dustOf, effPct, grantSku, orbitOf, skuById, soldOut, takeRegular, type SkuId,
+  FIRST_GIFT, SALARY_DAYS, SKUS, dustOf, effPct, grantSku, liveTokens, orbitOf, revokeMissingOnce, revokePaid, skuById, soldOut, takeRegular, type SkuId,
 } from '../meta/catalog';
 import { OFFER_RUNS, armOffers, leftText, liveOffers, noteOfferBought, offerClock, offerToPop, type LiveOffer } from '../meta/offers';
 import {
@@ -79,7 +79,7 @@ import {
 } from '../meta/season';
 import { createAdsPort, type AdKind } from '../platform/ads';
 import { minimizeApp, onBackButton, onLifecycle } from '../platform/native';
-import { createIapPort, type Paid } from '../platform/iap';
+import { createIapPort, voidedOf, type Ledger, type Paid } from '../platform/iap';
 import { DEV_TOOLS, isDevUnlocked } from '../platform/devUnlock';
 import {
   applyDebug as tickDebug,
@@ -970,20 +970,46 @@ export function createApp(
     overlay.showTitle(titleView());
     overlay.toast('기록을 지웠어요.');
     // 한 번만 사는 상품은 스토어에 남아 있다 — 지운 기록에 다시 얹는다(신입 특가와 꾸러미 이중 결제 방지)
-    void iap.restore(paid).then((n) => {
+    void iap.restore(paid, ledger).then((n) => {
       if (!n) return;
       overlay.toast(`산 상품 ${n}건을 다시 받았어요.`);
       if (overlay.getScreen() === 'title' && !overlay.modalOpen()) overlay.showTitle(titleView());
     });
   }
 
-  /** 지급 + 저장. 소비 · 승인은 이게 끝난 뒤에 iap가 한다. 처음 받은 구매면 true */
-  function paid(p: Paid): boolean {
+  /** 지급 + 저장. 처음 받은 구매면 onFresh. 저장이 안 써지면 false — iap가 소비 · 승인을 미루고 다음 복구가 다시 한다 */
+  function paid(p: Paid, onFresh?: () => void): boolean {
     rollMonth(kstDateKey(Date.now())); // 다음 달에 늦게 복구된 특근 수당은 그 달에 붙는다
-    const fresh = grantSku(save, p.id, p.token, kstDateKey(Date.now()));
-    if (fresh) noteOfferBought(save.offers, p.id, Date.now());
+    if (grantSku(save, p.id, p.token, kstDateKey(Date.now()), p.order)) {
+      noteOfferBought(save.offers, p.id, Date.now());
+      onFresh?.();
+    }
+    return saveSave(save);
+  }
+
+  /** 결제 장부 창구 — 지급 표식 맞대기 · Play 보유 목록에서 빠진 1회 상품 거두기 */
+  const ledger: Ledger = {
+    has: (t) => save.iapTokens.includes(t) || save.paid.some((x) => x.t === t),
+    held: (tokens) => clawed(revokeMissingOnce(save, tokens).length),
+  };
+
+  /** 환불된 결제를 거둔 뒤 — 빠진 꾸미기를 벗기고 저장 · 알림 */
+  function clawed(n: number): void {
+    if (!n) return;
+    save.loadout = enforceOwnedLoadout(save.loadout, save.owned);
+    applyCosmetics(save.loadout, save.maskArt);
     saveSave(save);
-    return fresh;
+    overlay.toast(`환불된 결제 ${n}건을 거뒀어요.`);
+    iapRedraw();
+  }
+
+  /** 반복 상품 환불 확인 — 서버 주소가 있을 때만(iap.voidedOf), 부팅 때와 여섯 시간마다 */
+  let refundAt = 0;
+  async function checkRefunds(): Promise<void> {
+    if (Date.now() - refundAt < 6 * 3600e3) return;
+    refundAt = Date.now();
+    const voided = await voidedOf(liveTokens(save));
+    clawed(voided.filter((t) => revokePaid(save, t)).length);
   }
 
   /** 결제 전 구성 · 가격 · 청약철회 안내를 한 번 보여 준다. 못 사는 상품은 결제 창까지 안 간다(지급 0 실과금 방지) */
@@ -1013,11 +1039,10 @@ export function createApp(
     const dust = dustOf(sku, save.bought);
     let got = 0;
     let fresh = false; // 이미 보유 오류로 남은 구매만 정리됐으면 이번 결제도 지급도 없다
-    const r = await iap.purchase(id, (p) => {
-      if (!paid(p)) return;
+    const r = await iap.purchase(id, (p) => paid(p, () => {
       got += 1;
       fresh ||= p.id === id;
-    });
+    }), ledger);
     if (r === 'cancel') return;
     if (r === 'pending') { overlay.toast('결제가 끝나면 받아요.'); return; }
     if (r === 'fail') {
@@ -1044,7 +1069,7 @@ export function createApp(
 
   async function restoreBuys(): Promise<void> {
     let got = 0;
-    const n = await iap.restore((p) => { if (paid(p)) got += 1; });
+    const n = await iap.restore((p) => paid(p, () => { got += 1; }), ledger);
     if (n === null) playSfx('uiDeny');
     overlay.toast(n === null ? '복원을 못 했어요. 잠시 뒤 다시 눌러 주세요.' : got > 0 ? `${got}건을 되찾았어요.` : '되찾을 구매가 없어요.');
     if (overlay.getScreen() === 'shop') openShop();
@@ -1440,7 +1465,8 @@ export function createApp(
   /** 끝나지 않은 구매 다시 받기. 앱이 지급 전에 죽었거나 대기 결제가 끝난 것 — 대기 결제는 사흘 안에 안 받으면 자동 환불된다 */
   async function pendingBuys(): Promise<number> {
     let got = 0;
-    await iap.restore((p) => { if (paid(p)) got += 1; });
+    await iap.restore((p) => paid(p, () => { got += 1; }), ledger);
+    void checkRefunds();
     return got;
   }
   const noteGot = (got: number): void => { if (got > 0) overlay.toast(`못 받은 결제 ${got}건을 받았어요.`); }; // 말없이 늘면 의심한다

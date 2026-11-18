@@ -117,6 +117,15 @@ describe('백업 사다리 (T7)', () => {
     expect(loadSave().bestArcade).toBe(9999);
   });
 
+  it('저장이 용량 초과로 안 써지면 false를 돌려준다 — 결제는 이걸 보고 소비를 미룬다', () => {
+    const ls = globalThis.localStorage as { setItem: (k: string, v: string) => void };
+    const setItem = ls.setItem;
+    expect(saveSave(structuredClone(DEFAULT_SAVE))).toBe(true);
+    ls.setItem = () => { throw new Error('QuotaExceededError'); };
+    expect(saveSave(structuredClone(DEFAULT_SAVE))).toBe(false);
+    ls.setItem = setItem;
+  });
+
   it('본 키가 JSON 배열이면 .bak으로 살린다', () => {
     saveSave({ ...structuredClone(DEFAULT_SAVE), dust: 777 });
     store.set(SAVE_KEY, '[]');

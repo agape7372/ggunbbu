@@ -4,8 +4,8 @@ import {
   DEFAULT_LOADOUT, DEFAULT_OWNED_IDS, enforceOwnedLoadout, sanitizeOwned, validateLoadout, type Loadout,
 } from './meta/loadout';
 import { initAchieveProgress, mergeAchieves, type DailyState, type MissionProgress } from './meta/missions';
-import { emptyItems, validateItems, type Items } from './meta/kit';
-import { SKU_IDS, validateRegular, type Regular } from './meta/catalog';
+import { KIT_IDS, emptyItems, validateItems, type Items } from './meta/kit';
+import { PAID_MAX, SKU_IDS, skuById, validateRegular, type PaidLine, type Regular } from './meta/catalog';
 import { emptyOffers, validateOffers, type Offers } from './meta/offers';
 import { emptySeason, validateSeason, type Season } from './meta/season';
 import { ROOKIE, validateAttend, validateSalary, validateWage, type Attend, type Salary, type Wage } from './meta/progress';
@@ -67,6 +67,7 @@ export interface SaveData {
   adDay: DayCount; // 상점 광고 궤도조각 하루 횟수 (무버전 추가 키)
   exchangeDay: DayCount; // 먼지 → 궤도조각 교환 하루 횟수 (무버전 추가 키)
   iapTokens: string[]; // 처리 끝낸 결제 토큰(최근 것만) — 중복 지급 방지 (무버전 추가 키)
+  paid: PaidLine[]; // 결제 장부 — 환불 회수 · 문의 대조(meta/catalog.ts) (무버전 추가 키)
   season: Season; // 이달의 현장 — meta/season.ts (무버전 추가 키)
   regular: Regular; // 단골 도장 (무버전 추가 키)
   firstGift: boolean; // 첫 결제 선물을 받았나 (무버전 추가 키)
@@ -131,6 +132,7 @@ export const DEFAULT_SAVE: SaveData = {
   adDay: { key: '', n: 0 },
   exchangeDay: { key: '', n: 0 },
   iapTokens: [],
+  paid: [],
   season: emptySeason(),
   regular: { stamps: 0, got: 0 },
   firstGift: false,
@@ -199,8 +201,8 @@ function normalize(raw: Record<string, unknown>): SaveData {
     butterTierReached: num(data.butterTierReached, DEFAULT_SAVE.butterTierReached, 3),
     butterBest: clampButterBest(data.butterBest),
     settings: validateSettings(data.settings),
-    dust: num(data.dust, 0),
-    orbit: num(data.orbit, 0),
+    dust: signed(data.dust),
+    orbit: signed(data.orbit),
     owned,
     loadout,
     daily: isDailyState(data.daily) ? data.daily : null,
@@ -227,11 +229,39 @@ function normalize(raw: Record<string, unknown>): SaveData {
     adDay: validateDayCount(data.adDay),
     exchangeDay: validateDayCount(data.exchangeDay),
     iapTokens: strList(data.iapTokens),
+    paid: validatePaid(data.paid),
     season: validateSeason(data.season),
     regular: validateRegular(data.regular),
     firstGift: data.firstGift === true,
     coffee: typeof data.coffee === 'string' ? data.coffee : '',
   };
+}
+
+/** 궤도조각 · 먼지 — 환불을 거두면 음수로 남을 수 있다 */
+function signed(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.max(-99_999_999, Math.floor(v)) : 0;
+}
+
+/** 장부 — 모양이 맞는 줄만 살린다 */
+function validatePaid(v: unknown): PaidLine[] {
+  if (!Array.isArray(v)) return [];
+  const n = (y: unknown): number => (typeof y === 'number' && Number.isFinite(y) ? Math.floor(y) : 0);
+  const out: PaidLine[] = [];
+  for (const x of v) {
+    if (typeof x !== 'object' || x === null) continue;
+    const o = x as Record<string, unknown>;
+    const id = typeof o.id === 'string' ? skuById(o.id)?.id : undefined;
+    if (typeof o.t !== 'string' || !o.t || !id) continue;
+    const it = typeof o.items === 'object' && o.items !== null ? (o.items as Record<string, unknown>) : {};
+    const items: PaidLine['items'] = {};
+    for (const k of KIT_IDS) if (n(it[k]) > 0) items[k] = n(it[k]);
+    out.push({
+      t: o.t, id, at: n(o.at), day: typeof o.day === 'string' ? o.day : '', ...(typeof o.order === 'string' ? { order: o.order } : {}),
+      orbit: n(o.orbit), dust: n(o.dust), blanks: n(o.blanks), items, owns: strList(o.owns), stamps: n(o.stamps),
+      ...(o.gone === true ? { gone: true } : {}),
+    });
+  }
+  return out.slice(-PAID_MAX);
 }
 
 function strList(v: unknown): string[] {
@@ -365,20 +395,23 @@ export function freezeSaves(): void {
 
 /**
  * 저장 데이터를 localStorage에 저장한다. 본 키가 써진 뒤에만 .bak을 같은 내용으로 갱신한다.
- * 실패 시(QuotaExceededError 포함) 조용히 무시한다. freezeSaves() 뒤엔 아무것도 쓰지 않는다.
+ * 실패 시(QuotaExceededError 포함) 조용히 false. freezeSaves() 뒤엔 아무것도 쓰지 않는다(false).
+ * 결제는 false를 보고 소비 · 승인을 미룬다(platform/iap.ts).
  */
-export function saveSave(d: SaveData): void {
+export function saveSave(d: SaveData): boolean {
   if (frozen || typeof localStorage === 'undefined') {
-    return;
+    return false;
   }
 
   try {
     const json = JSON.stringify(d);
     localStorage.setItem(SAVE_KEY, json);
     localStorage.setItem(BAK_KEY, json);
+    return true;
   } catch {
     // QuotaExceededError 포함 모든 예외를 무시한다.
     // 게임은 저장 실패에도 계속 동작한다.
+    return false;
   }
 }
 

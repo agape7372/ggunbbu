@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlink
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { collectFiles, makeZip } from './lib/zip.mjs';
+import { OTA_KEY, signManifest, verifyManifest } from './ota-sign.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP = 4; // ota/bundles/에 남길 최근 번들 수
@@ -54,6 +55,21 @@ const base = (process.env.VITE_OTA_BASE || '').replace(/\/+$/, '');
 if (!dryRun && !/^https:\/\/[^/]+/.test(base)) {
   console.error('발행 중단: VITE_OTA_BASE가 없거나 https 주소가 아닙니다. 우리가 소유한 호스트를 먼저 세우고 그 주소를 넣으세요(docs/RELEASE.md OTA 절).');
   console.error('예:   VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- 1.0.1');
+  process.exit(1);
+}
+
+// 출시 빌드만 OTA로 낸다(2026-11-18 어뷰징 점검). 이 변수 없이 구우면 시험 결제 · 시험 광고가 열린 번들이 설치된 앱에 간다 —
+// 출시 검사(scripts/check-release.mjs)는 GUNBBU_RELEASE=1일 때만 돈다. 아래 npm run build가 이 환경을 그대로 물려받는다
+if (process.env.GUNBBU_RELEASE !== '1') {
+  console.error('발행 중단: GUNBBU_RELEASE=1이 없습니다 — 출시 검사를 거친 빌드만 OTA로 낸다(--dry-run 포함).');
+  console.error('예:   GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> VITE_ADMOB_REWARDED_ID=... VITE_SELLER_INFO=... npm run ota:release -- 1.0.1');
+  process.exit(1);
+}
+
+// 매니페스트 서명 키(scripts/ota-sign.mjs): 없으면 판을 못 낸다 — 서명 없는 판은 앱(src/platform/ota.ts signedOk)이 안 받는다
+const otaPem = dryRun ? '' : existsSync(OTA_KEY) ? readFileSync(OTA_KEY, 'utf8') : null;
+if (otaPem === null) {
+  console.error(`발행 중단: OTA 서명 키가 없습니다: ${OTA_KEY} → 백업(D:/keys-backup)에서 되살리기. 잃었으면 새 키 + 앱 공개 키 교체 + 새 AAB`);
   process.exit(1);
 }
 
@@ -151,6 +167,10 @@ if (!files.some((f) => f.name === 'index.html')) {
   console.error('zip 루트에 index.html이 없습니다 — dist/ 구조를 확인하세요.');
   process.exit(1);
 }
+if (!files.some((f) => f.name === 'release-build.txt')) {
+  console.error('출시 검사 표시(dist/release-build.txt)가 없습니다 — 출시 빌드가 아니면 내지 않는다.');
+  process.exit(1);
+}
 
 const zipBuf = makeZip(files);
 const checksum = createHash('sha256').update(zipBuf).digest('hex');
@@ -164,14 +184,21 @@ if (dryRun) {
   process.exit(0);
 }
 
-const manifest = {
+const manifest = signManifest({
   version,
   url: `${base}/bundles/${version}.zip`,
   checksum,
   size,
   releasedAt: new Date().toISOString(),
   minNative,
-};
+}, otaPem);
+// 앱에 박힌 공개 키와 짝인지 쓰기 전에 맞대 본다 — 어긋난 판이 나가면 모든 앱이 OTA를 못 받고 새 AAB로만 고친다
+const appKey = /spki: '([^']+)'/.exec(readFileSync(path.join(root, 'src', 'platform', 'ota.ts'), 'utf8'))?.[1] ?? '';
+if (!verifyManifest(manifest, appKey)) {
+  if (prevVersionSrc !== null) writeFileSync(versionFile, prevVersionSrc);
+  console.error('발행 중단: 서명이 앱 공개 키(src/platform/ota.ts otaKey)와 짝이 안 맞습니다.');
+  process.exit(1);
+}
 
 const otaDir = path.join(root, 'ota');
 const bundlesDir = path.join(otaDir, 'bundles');
