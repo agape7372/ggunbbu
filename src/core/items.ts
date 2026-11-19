@@ -4,7 +4,8 @@
 
 import type { GameState, ItemId } from './types';
 import { addGauge } from './combat';
-import { GUARD_GAUGE, PLAYER, STACK, SUPPLY } from '../config';
+import { PLAYER, STACK, SUPPLY } from '../config';
+import { guardMax } from './perks';
 
 /** sim이 1막·토코톤의 stackDestroy마다 부른다 (모드 확인은 호출측). 3·8·13…번째에 상자. */
 export function onBuildingDown(s: GameState): void {
@@ -23,7 +24,7 @@ export function pickItem(s: GameState): ItemId {
 
 export function applyItem(s: GameState, item: ItemId): void {
   switch (item) {
-    case 'gloves': s.guardGauge = GUARD_GAUGE.MAX; return;
+    case 'gloves': s.guardGauge = guardMax(s); return;
     case 'coffee': addGauge(s, SUPPLY.COFFEE_GAUGE); return;
     case 'hat': s.hat = true; return;
     case 'dust': return; // 먼지는 저장 몫 — scenes가 supply 이벤트를 보고 지급한다

@@ -476,10 +476,13 @@ img { display: block; -webkit-user-drag: none; }
 /* 쉬는 점프 키 — 잠긴 키(f-faint)보다 훨씬 옅게: 꺼진 단추가 아니라 빈 자리로 읽힌다(필살 쉼의 점선과 비슷한 무게) */
 #btn-jump.f-rest { background-image: var(--pJ3); opacity: 0.36; pointer-events: none; }
 #btn-jump.f-rest::before { content: none; }
+/* 쉬는 가드 키(현장 조건 쪽지 동안) — 점프 쉼과 같은 무게 */
+#btn-guard.f-rest { opacity: 0.36; pointer-events: none; }
 /* 네 글자 넘는 이름표(touch.ts .long) — 키 안에 들게 줄이고, 띄어쓴 곳에서만 줄을 바꾼다 */
 #touch-layer.menu .tbtn.long > span { white-space: normal; word-break: keep-all; text-align: center; line-height: 1.02; }
 #btn-jump.long > span,
 #btn-guard.long > span { font-size: 26px; }
+#btn-jump.long > span { max-width: 74px; } /* 삼각 키 — 「두꺼운 장갑」은 두 줄로 */
 #btn-attack.long > span { max-width: 104px; font-size: 28px; }
 #btn-special.long > span { max-width: 70px; font-size: 21px; }
 
@@ -604,6 +607,15 @@ img { display: block; -webkit-user-drag: none; }
 .hud-pin { top: 452px; font-size: 44px; rotate: -4deg; }
 .hud-teach small,
 .hud-pin small { display: block; margin-top: 6px; font: 700 15px/1.4 var(--body); }
+
+/* 현장 조건 쪽지(11-19) — 구역 사이 판 위 한지 쪽지 둘(왼쪽 = 점프 · 오른쪽 = 공격). 곧은 먹 사각 · 붓 이름 + 읽는 글 고딕.
+   주홍 없음 — 둘 다 고를 수 있다(누를 것 하나가 아니다). 치르는 것은 옅은 먹 금 밑 연먹 */
+.hud-offer { position: absolute; left: calc(var(--fr-x, 0px) + 16px); right: calc(var(--fr-x, 0px) + 16px); top: 170px; display: flex; gap: 12px; }
+.hud-perk { flex: 1 1 0; min-width: 0; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px 8px; background: var(--paper); border: 3px solid var(--ink); color: var(--ink); text-align: center; pointer-events: auto; }
+.hud-perk b { font: 400 30px/1 var(--brush); white-space: nowrap; }
+.hud-perk span { font: 700 16px/1.25 var(--sans); white-space: nowrap; }
+.hud-perk .cost { padding-top: 6px; border-top: 2px solid var(--ink3); color: var(--ink2); }
+.hud-perk:active { scale: 0.96; }
 
 /* ── 메뉴 화면 공통 ─────────────────────────────────────── */
 .ov-screen {
@@ -810,6 +822,7 @@ img { display: block; -webkit-user-drag: none; }
 /* 숫자는 --black — 붓글씨 2가 Z로 읽혔다(11-11) */
 .p-stats b { font: 400 20px/1.1 var(--black); color: var(--ink); letter-spacing: 0.01em; white-space: nowrap; }
 .p-stats i { font: 400 15px/1 var(--black); font-style: normal; color: var(--ink); }
+.p-stats .p-perk { margin-top: 4px; color: var(--ink); } /* 고른 현장 조건 이름 한 줄 */
 .p-resume { height: 64px; }
 .p-resume b { font-size: 32px; line-height: 1; }
 .p-set { flex: none; }

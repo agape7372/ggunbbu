@@ -1,4 +1,4 @@
-// 판 원경 — 먹 농담 두 단(선 없는 면)과 살아 있는 것(해 · 새 · 연기 · 잎). 렌더 전용, 시뮬은 읽기만 한다.
+// 판 원경 — 먹 농담 두 단(선 없는 면)과 살아 있는 것(해 · 새 · 연기 · 이파리). 렌더 전용, 시뮬은 읽기만 한다.
 // 문법(docs/ART_DIRECTION.md · CLAUDE.md 불변 13): 밝은 바탕 · 먼지 톤 · 번짐과 그라데이션 없음. 면은 한 가지 색으로 평평하게,
 // 옅을수록 멀다. 가운데 레인은 건물이 가리니 그림은 화면 폭 전체에 깔고 양옆 여백에서 읽히게 둔다.
 // 두 단은 배경 캐시에 한 번 구워지고(assets.drawBackdropCached), 살아 있는 것만 매 프레임 그린다.
@@ -17,7 +17,7 @@ export function sceneTheme(key: string): SceneTheme | null {
   return THEMES.includes(t) ? t : null;
 }
 
-/** 그림 전용 난수 — 테마마다 같은 풍경이 나오게 고정 씨앗. 시뮬 난수(rngState)와 무관하다 */
+/** 그림 전용 난수 — 테마마다 같은 풍경이 나오게 고정 값. 시뮬 난수(rngState)와 무관하다 */
 function seeded(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -94,7 +94,7 @@ function asia(c: C, w: number, h: number, far: boolean): void {
     const top = h - bh;
     box(c, x, top, bw, h);
     if (r() < 0.4) box(c, x + 4, top - 8, bw - 8, top); // 옥상 턱
-    if (r() < (far ? 0.4 : 0.25)) { // 물탱크: 다리 · 통 · 고깔
+    if (r() < (far ? 0.4 : 0.25)) { // 물통: 다리 · 통 · 고깔
       const tx = x + 5 + r() * (bw - 18);
       box(c, tx + 1, top - 7, 1.6, top); box(c, tx + 8.4, top - 7, 1.6, top);
       box(c, tx, top - 19, 11, top - 7); gable(c, tx + 1, top - 19, 9, 6);
@@ -170,7 +170,7 @@ export function paintSceneTiers(c: C, key: string, w: number, h: number): void {
 }
 
 // ── 살아 있는 것 ──
-/** 해 자리 — 1막 진행도 p(0~1)를 따라 왼쪽에서 오른쪽으로 하루를 건넌다. [x, y] 화면 좌표 */
+/** 해 자리 — 1막 진행도 p(0~1)를 따라 왼쪽에서 오른쪽으로 하루를 지난다. [x, y] 화면 좌표 */
 export function sunAt(p: number): [number, number] {
   const t = Math.min(Math.max(p, 0), 1);
   return [52 + 256 * t, 290 - 170 * Math.sin(Math.PI * (0.12 + 0.76 * t))];
@@ -220,7 +220,7 @@ function drawSmoke(c: C, tick: number, x0: number, y0: number, phase: number, di
   }
 }
 
-/** 흩날리는 잎 — 짧은 먹 점 여섯이 비스듬히 내린다 */
+/** 흩날리는 이파리 — 짧은 먹 점 여섯이 비스듬히 내린다 */
 function drawLeaves(c: C, tick: number): void {
   c.strokeStyle = SCENE_WASH.bird;
   c.lineWidth = 1.2;

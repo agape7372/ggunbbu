@@ -2,8 +2,8 @@
 // 가드·필살 게이지는 조작 키 안에 그린다(touch.ts setGuardFill · setSpecialFill, 10-31 옆 게이지 걷음).
 // 매 프레임 부르지만 값이 바뀐 칸만 쓴다. 거친 붓 필터는 안 바뀌는 칸(밑줄·일시정지 인장·게이지 테)에만 걸려 있다(style.css).
 
-import type { GameState } from '../core/types';
-import { ACT2, CAPTION_MS, PLAYER } from '../config';
+import type { GameState, PerkId } from '../core/types';
+import { ACT2, CAPTION_MS, PERK, PLAYER } from '../config';
 import { CAPTIONS, hudModeLabel, SCREENS } from '../content';
 import { ICON } from './icons';
 import { fmt } from './ink';
@@ -21,6 +21,12 @@ export interface HudApi {
   teach(on: boolean): void;
 }
 
+/** 현장 조건 쪽지 하나 — 붓 이름 + 얻는 것(+ 치르는 것). 왼쪽 = 점프 키 · 오른쪽 = 공격 키(scenes syncFaces가 키 얼굴을 같은 이름으로) */
+function perkNote(id: PerkId, k: 'jump' | 'attack'): string {
+  const p = PERK[id];
+  return `<button type="button" class="hud-perk" data-k="${k}"><b>${p.name}</b><span>${p.gain}</span>${p.cost ? `<span class="cost">${p.cost}</span>` : ''}</button>`;
+}
+
 const pinHint = `${CAPTIONS.pinned}<small>탈출: 안전하게 · 공격: 아래층 베기, 실패하면 목숨 −1</small>`;
 
 /** 졸라맨 목숨 하나 — 잃으면 옅은 먹 위에 사선 한 획 */
@@ -35,7 +41,7 @@ function markHtml(label: string): string {
 
 export function mountHud(
   root: HTMLElement,
-  handlers: { onPause: () => void },
+  handlers: { onPause: () => void; onPerk: (k: 'jump' | 'attack') => void },
 ): HudApi {
   root.innerHTML = `
     <div class="hud">
@@ -68,6 +74,7 @@ export function mountHud(
       <div class="hud-note" data-el="note" role="status" hidden></div>
       <div class="hud-teach" data-el="teach" hidden>${SCREENS.teach.guard}<small>${SCREENS.teach.guardSub}</small></div>
       <div class="hud-pin" data-el="pin" hidden>${pinHint}</div>
+      <div class="hud-offer" data-el="offer" hidden></div>
     </div>
   `;
 
@@ -89,6 +96,7 @@ export function mountHud(
   const opEl = el('op');
   const noteEl = el('note');
   const teachEl = el('teach');
+  const offerEl = el('offer');
   let noteTimer = 0;
   let noteAlt = false;
   let teaching = false;
@@ -103,6 +111,17 @@ export function mountHud(
     handlers.onPause();
   });
 
+  // 쪽지를 누르면 그 쪽 키를 누른 것으로(scenes가 다음 표본에 넣는다 — 손 놓음 셈은 core가 같이 본다)
+  offerEl.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+  offerEl.addEventListener('click', (e) => {
+    const k = (e.target as HTMLElement).closest<HTMLElement>('[data-k]')?.dataset.k;
+    if (k !== 'jump' && k !== 'attack') return;
+    e.preventDefault();
+    e.stopPropagation();
+    handlers.onPerk(k);
+  });
+
+  let lastOffer = '';
   let lastScore = -1;
   let lastLives = -1;
   let lastHat: boolean | null = null;
@@ -230,6 +249,14 @@ export function mountHud(
       }
 
       pinEl.hidden = s.player.pose !== 'pinned' || teaching; // 가르치는 동안은 가르치는 줄 하나만
+
+      const o = s.perk?.offer ?? null;
+      const ok = o ? `${o.a}|${o.b}` : '';
+      if (ok !== lastOffer) {
+        lastOffer = ok;
+        offerEl.hidden = !o;
+        offerEl.innerHTML = o ? perkNote(o.a, 'jump') + perkNote(o.b, 'attack') : '';
+      }
     },
   };
 }

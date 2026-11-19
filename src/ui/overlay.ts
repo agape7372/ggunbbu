@@ -105,6 +105,8 @@ export interface GameOverView {
   best: boolean;
   /** 띠 오른쪽 모드 이름(아케이드 · 야근 · 작전 이름 …) */
   mode: string;
+  /** 고른 현장 조건 이름 한 줄 — 없으면 '' */
+  perks: string;
 }
 
 /** 특별작전 결과 카드 — 한도에 닿았거나 도장을 딴 채 끝난 판 */
@@ -143,6 +145,8 @@ export interface StoryOpts {
 export interface PauseView {
   score: number;
   combo: number;
+  /** 고른 현장 조건 이름 한 줄 — 없으면 '' */
+  perks: string;
 }
 
 export interface OverlayHandlers {
@@ -1138,7 +1142,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     showPause(v: PauseView): void {
       disarmQuit();
       enter('pause', () => {
-        $('pause-stats').innerHTML = `<span>점수</span><b>${fmt(v.score)}</b><span>콤보 <i>${fmt(v.combo)}</i></span>`;
+        $('pause-stats').innerHTML = `<span>점수</span><b>${fmt(v.score)}</b><span>콤보 <i>${fmt(v.combo)}</i></span>`
+          + (v.perks ? `<span class="p-perk">${escapeHtml(v.perks)}</span>` : '');
       });
     },
     showSettings(s: SaveSettings, fromPause: boolean): void {
@@ -1162,7 +1167,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           body: verdict(g.title) + scoreRow('go-score', v.best)
             + `<dl class="rp-tb">${cell(g.buildings, `${fmt(v.buildings)}<small>채</small>`)}${cell('최고 콤보', fmt(v.combo))}`
             + `${cell(g.dust, `+${fmt(v.dustGained)}`)}${cell(g.zone, escapeHtml(v.zone), 't')}</dl>`
-            + `<p class="rp-bg">${lb('비고')}<span>${escapeHtml(v.line)}</span></p>`,
+            + `<p class="rp-bg">${lb('비고')}<span>${escapeHtml(v.line)}</span></p>`
+            + (v.perks ? `<p class="rp-ln">${lb('조건')}${escapeHtml(v.perks)}</p>` : ''),
         });
       });
       rollScore($('go-score'), v.score, 'gameover');

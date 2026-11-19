@@ -58,6 +58,21 @@ export interface FallingStack {
   resting: boolean;
   /** 스폰 시 총 층수 (완파 보너스 계산용) */
   totalFloors: number;
+  /** 아케이드 변종(config ARCADE_VARY) — 없으면 보통 건물 */
+  vary?: StackVary;
+}
+
+/** 아케이드 변종 건물 — 지시서 대본 「!」 · 「~」 · 「>」와 같은 동작. 건물과 함께 사라진다 */
+export interface StackVary {
+  /** 빠른 낙하(한 단계 빠르게 + 빠른 초속) */
+  fast: boolean;
+  /** 성급한 건물 · 최하층이 HP1로 남은 틱(stage.ts hastyDue) */
+  hasty: boolean;
+  hastyT: number;
+  /** 이 건물을 부수면 다음 건물이 붙어 온다(STAGE.JOINED_GAP) */
+  joined: boolean;
+  /** 낙하 배율 — 성급 급락이 곱한다 */
+  fall: number;
 }
 
 export interface Bolt {
@@ -302,7 +317,8 @@ export type JuiceKind =
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
   | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape'
-  | 'wazaSwing' | 'wazaHit' | 'wazaBurst';
+  | 'wazaSwing' | 'wazaHit' | 'wazaBurst'
+  | 'perkOffer' | 'perkPick';
 
 export interface JuiceEvent {
   kind: JuiceKind;
@@ -403,6 +419,19 @@ export interface GameState {
   wazaRun: WazaRun | null;
   /** 필살 대미지가 들어간 마지막 틱 — 보스를 필살로 끝냈나(작업 지시서 특기 사항)를 이 틱으로 가린다 */
   wazaHitTick: number;
+  /** 현장 조건(core/perks.ts) — 아케이드 판만 있다. null = 이 판엔 없다(토코톤 · 특별작전 · 지시서 · 버터바) */
+  perk: PerkRun | null;
+}
+
+/** 현장 조건 — config PERK의 키 */
+export type PerkId = 'reach' | 'glove' | 'coffee' | 'hat' | 'overtime' | 'rush' | 'bare';
+
+export interface PerkRun {
+  /** 고른 조건(판 끝까지) · 내민 적 있는 조건(같은 판에 두 번 안 나온다) */
+  picked: PerkId[];
+  seen: PerkId[];
+  /** 지금 내민 쪽지 — 있는 동안 시뮬이 선다. a = 왼쪽(안전 · 점프) · b = 오른쪽(욕심 · 공격) · t = 뜬 뒤 틱 · calm = 손을 놓은 틱 */
+  offer: { a: PerkId; b: PerkId; t: number; calm: number } | null;
 }
 
 export interface WazaRun {

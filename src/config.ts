@@ -11,7 +11,7 @@
 // (행동 불변식 주장 위주). 근거는 CLAUDE.md 불변 규칙 2 — 여기 숫자는 그 사본이다.
 // 체크포인트 산술(30/40/148/168/180/228/230)은 tests/checkpoints.test.ts가 가드한다.
 
-import type { ItemId, WeaponId } from './core/types';
+import type { ItemId, PerkId, WeaponId } from './core/types';
 
 export const TICK = 1 / 60;
 export const TPS = 60;
@@ -255,6 +255,62 @@ export const ACT1 = {
   // 챕터 경계 (p) → 챕터 index = 경계 통과 수
   CHAPTER_BOUNDS: [0.25, 0.5, 0.75] as const,
   CHAPTER_THEMES: ['europe', 'asia', 'eastasia', 'modern'] as const,
+} as const;
+
+// ── 아케이드 변종 건물(11-19 「판 안 재미」) [튜닝] ─────────────────
+// 지시서 대본의 「!」 빠른 낙하 · 「~」 성급한 건물 · 「>」 붙어 오기를 아케이드 1막 · 토코톤 스폰에 섞는다.
+// 동작 · 예고는 지시서와 같다(STAGE.FAST_* · HASTY_* · JOINED_GAP). 특별작전 · 2막 · 버터바 · 지시서엔 없다.
+// 추첨은 층 재질 추첨 뒤에 세 번(빠름 · 성급 · 붙어 옴). 판 시작 뒤 CALM채를 부술 때까지는 뽑지 않는다.
+// 구역(0~3)마다 얼굴이 다르다: 1구역 거의 없음 · 2구역 빠름 + 붙어 옴 · 3구역 성급 · 4구역 셋 다.
+export const ARCADE_VARY = {
+  CALM: 5,
+  /** 구역마다 [들머리, 끝] 확률 — 구역 안에서 p를 따라 선형으로 오른다. tests/arcade-vary.test.ts가 구역 얼굴을 지킨다 */
+  RATE: [
+    { fast: [0, 0.04], hasty: [0, 0], joined: [0, 0.04] },
+    { fast: [0.1, 0.2], hasty: [0, 0], joined: [0.1, 0.2] },
+    { fast: [0, 0], hasty: [0.15, 0.25], joined: [0, 0] },
+    { fast: [0.1, 0.18], hasty: [0.1, 0.18], joined: [0.1, 0.18] },
+  ],
+} as const;
+
+// ── 현장 조건(11-19) [튜닝] ─────────────────────────────────────
+// 아케이드 구역 사이(버터바에서 돌아온 직후)에 쪽지 둘 중 하나를 골라 판 끝까지 단다. 한 판에 MAX번.
+// 왼쪽 = 안전, 오른쪽 = 욕심(얻는 것과 치르는 것이 함께). 점수 배수 · 목숨은 넣지 않는다(SUPPLY 주석과 같은 이유).
+// 무기 표(WEAPON)는 그대로 — 이 값은 아케이드 판 상태(s.perk)에만 얹는다. 지시서 판엔 perk가 없다(불변 14).
+export interface PerkSpec {
+  side: 'safe' | 'greed';
+  name: string;
+  gain: string;
+  cost?: string;
+  /** 사거리 · 띄우기 · 가드 최대 · 건물 층수에 더한다 */
+  reach?: number;
+  lift?: number;
+  guardMax?: number;
+  floors?: number;
+  /** 필살 게이지 획득 · 가드 회복 · 그 판 먼지에 곱한다 */
+  waza?: number;
+  guardRegen?: number;
+  dust?: number;
+  /** 고르면 안전모를 바로 쓴다(쓰고 있으면 후보에서 빠진다) */
+  hat?: boolean;
+}
+export const PERK: Readonly<Record<PerkId, PerkSpec>> = {
+  reach: { side: 'safe', name: '긴 자루', gain: '사거리 +10', reach: 10 },
+  glove: { side: 'safe', name: '두꺼운 장갑', gain: '가드 회복 ×1.4', guardRegen: 1.4 },
+  coffee: { side: 'safe', name: '진한 커피', gain: '필살 게이지 ×1.3', waza: 1.3 },
+  hat: { side: 'safe', name: '새 안전모', gain: '안전모 +1', hat: true },
+  overtime: { side: 'greed', name: '야근', gain: '먼지 ×1.5', cost: '건물 +1층', dust: 1.5, floors: 1 },
+  rush: { side: 'greed', name: '속전속결', gain: '필살 게이지 ×1.6', cost: '가드 최대 -25', waza: 1.6, guardMax: -25 },
+  bare: { side: 'greed', name: '맨손', gain: '띄우기 +12', cost: '사거리 -14', lift: 12, reach: -14 },
+};
+export const PERK_RUN = {
+  MAX: 3,
+  /** 이만큼(10초) 안 고르면 왼쪽으로 정한다 */
+  AUTO: 600,
+  /** 손을 이만큼 놓았다가 새로 눌러야 고른다 — 버터바 연타가 쪽지를 고르지 않게(결과 키 KEY_QUIET_MS 250과 같은 뜻) */
+  CALM: 15,
+  /** 띄우기 상한 — WEAPON 주석의 lift < ACT1_G[0]·8/120 ≈ 102(tests/weapons.test.ts) */
+  LIFT_MAX: 101,
 } as const;
 
 // ── 게이지 경제 [획득식만 정본 제약] ────────────────────────────

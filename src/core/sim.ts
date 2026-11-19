@@ -7,12 +7,13 @@ import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carr
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, registerHit, wonAlready } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN } from '../config';
+import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, STAGE, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN } from '../config';
 import type { WazaRunId } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { absorbWithHat, onBuildingDown } from './items';
 import { specialHitBoss } from './boss';
-import { stepStage, tallyGuard } from './stage';
+import { hastyDue, stepStage, tallyGuard } from './stage';
+import { guardMax, guardRegenMul, openOffer, stepOffer } from './perks';
 import { specialHitLandmark } from './landmark';
 
 export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): GameState {
@@ -55,11 +56,14 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     lm: null,
     wazaRun: null,
     wazaHitTick: -1,
+    perk: null,
   };
 }
 
 export function advance(s: GameState, input: InputFrame): void {
   if (s.over) return;
+  // 현장 조건 쪽지가 떠 있으면 판이 선다 — 틱도 안 센다(시간 · 버터바 · 토코톤 셈이 그대로)
+  if (s.perk?.offer) { stepOffer(s, input); return; }
   s.tick += 1;
 
   // 히트스톱 중에도 입력 버퍼는 수집 (연타 리듬 보존)
@@ -125,8 +129,9 @@ export function advance(s: GameState, input: InputFrame): void {
 
   // ── 방어 게이지 회복 (가드를 놓고 있을 때만) ──
   if (s.guardRegenCd > 0) s.guardRegenCd -= 1;
-  else if (s.guardGauge < GUARD_GAUGE.MAX) {
-    s.guardGauge = Math.min(GUARD_GAUGE.MAX, s.guardGauge + GUARD_GAUGE.REGEN_PER_S * TICK);
+  else {
+    const max = guardMax(s); // 현장 조건 「속전속결」이 낮춘다 · 「두꺼운 장갑」이 회복을 곱한다
+    if (s.guardGauge < max) s.guardGauge = Math.min(max, s.guardGauge + GUARD_GAUGE.REGEN_PER_S * TICK * guardRegenMul(s));
   }
 
   // ── 시간차 필살 (연참 · 검풍 · 터짐) ──
@@ -625,7 +630,16 @@ function stepAct1(s: GameState): void {
     return;
   }
 
+  stepVary(s);
   trySpawn(s);
+}
+
+/** 아케이드 변종 「성급한 건물」 — 지시서와 같은 셈(stage.ts hastyDue) · 같은 급락 예고음 */
+function stepVary(s: GameState): void {
+  const v = s.stack?.vary;
+  if (!v || !hastyDue(v, s.stack!.floors[0])) return;
+  v.fall *= STAGE.HASTY_FALL;
+  s.events.push({ kind: 'boltCue', lane: 0 });
 }
 
 function trySpawn(s: GameState): void {
@@ -650,6 +664,7 @@ function stepTokoton(s: GameState): void {
     enterBonusTokoton(s);
     return;
   }
+  stepVary(s);
   trySpawn(s);
 }
 
@@ -706,5 +721,7 @@ function stepBonus(s: GameState): void {
     s.bonus = null;
     s.stack = null;
     s.stackSpawnCd = STACK.RESPAWN_TICKS;
+    // 아케이드 구역 사이 — 현장 조건 쪽지(perk가 있는 판만 · 다음 틱부터 판이 선다)
+    if (b.returnMode === 'act1') openOffer(s);
   }
 }

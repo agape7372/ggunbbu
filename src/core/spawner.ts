@@ -1,9 +1,11 @@
 // 1막/토코톤 건물 생성 — 진행도 p 기반 층수·재질 분포, 챕터 테마.
 
-import type { Floor, GameState, Material, Theme } from './types';
+import type { Floor, GameState, Material, StackVary, Theme } from './types';
 import { makeFloor, makeStack } from './building';
 import { rand } from './rng';
-import { ACT1, GIMMICK } from '../config';
+import { spawnTopY } from './camera';
+import { extraFloors } from './perks';
+import { ACT1, ARCADE_VARY, GIMMICK, STAGE } from '../config';
 
 /** p 구간 선형 보간으로 재질 분포 [weak, mid, hard] */
 export function matDist(p: number): [number, number, number] {
@@ -37,7 +39,7 @@ const MATS: readonly Material[] = ['weak', 'mid', 'hard'];
 /** 1막 일반 건물 스폰 (세그별 독립 재질 추첨 — 레인 선택이 최적화 요소가 되도록) */
 export function spawnAct1Building(s: GameState): void {
   const pc = Math.min(s.p, 1);
-  const floorCount = ACT1.FLOORS_MIN + Math.floor(ACT1.FLOORS_ADD * pc);
+  const floorCount = ACT1.FLOORS_MIN + Math.floor(ACT1.FLOORS_ADD * pc) + extraFloors(s); // 현장 조건 「야근」 +1층
   const dist = matDist(pc);
   const theme = chapterTheme(s.chapter);
   const floors: Floor[] = [];
@@ -58,8 +60,29 @@ export function spawnAct1Building(s: GameState): void {
       floors[i].segs[0] = { hp: 1, maxHp: 1 };
     }
   }
-  const fall = s.gimmick === 'orbit' ? GIMMICK.ORBIT_SPAWN_VY : GIMMICK.DEFAULT_SPAWN_VY;
-  s.stack = makeStack({ variant: 'building', theme, floors, vy: fall });
+  // 아케이드(기믹 없음)만: 변종 추첨은 층 재질 추첨 뒤(앞 난수 순서 그대로) · 생김 높이는 지시서처럼 화면 맨 위 바로 위.
+  // 특별작전은 생김 높이 · 초속 그대로(STACK.SPAWN_Y · 궤도 직하 초속)
+  const arcade = s.gimmick === 'none';
+  const vary = arcade && s.drops >= ARCADE_VARY.CALM ? rollVary(s, pc) : undefined;
+  // 성급한 건물은 「최하층을 HP1로 남겨 두면」 급락한다 — 맨 아래가 약재면 생기자마자 세기 시작하니 중재로 올린다(대본 「~」 건물도 맨 아래가 중 · 강이다)
+  if (vary?.hasty && floors[0].mat === 'weak') floors[0] = makeFloor('mid');
+  const fall = s.gimmick === 'orbit' ? GIMMICK.ORBIT_SPAWN_VY : vary?.fast ? STAGE.FAST_SPAWN_VY : GIMMICK.DEFAULT_SPAWN_VY;
+  s.stack = makeStack({ variant: 'building', theme, floors, vy: fall, y: arcade ? spawnTopY(s) : undefined });
+  if (vary) s.stack.vary = vary;
+}
+
+/** 변종 추첨 — 난수 셋(빠름 · 성급 · 붙어 옴)을 늘 같은 수만큼 뽑는다. 확률은 구역 표 [들머리, 끝]을 구역 안 p로 잇는다 */
+export function rollVary(s: GameState, pc: number): StackVary | undefined {
+  const ch = chapterOf(pc);
+  const lo = ch === 0 ? 0 : ACT1.CHAPTER_BOUNDS[ch - 1];
+  const hi = ch < ACT1.CHAPTER_BOUNDS.length ? ACT1.CHAPTER_BOUNDS[ch] : 1;
+  const k = Math.min(1, Math.max(0, (pc - lo) / (hi - lo)));
+  const r = ARCADE_VARY.RATE[ch];
+  const at = (x: readonly [number, number]) => x[0] + (x[1] - x[0]) * k;
+  const fast = rand(s) < at(r.fast);
+  const hasty = rand(s) < at(r.hasty);
+  const joined = rand(s) < at(r.joined);
+  return fast || hasty || joined ? { fast, hasty, hastyT: 0, joined, fall: 1 } : undefined;
 }
 
 function pickMat(s: GameState, dist: [number, number, number]): Material {
