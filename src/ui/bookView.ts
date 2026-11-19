@@ -167,7 +167,7 @@ const tierTag = (t: Tier): string => `<span class="bk-tier t-${t}">${TIER_COPY[t
 /** 칼 이름은 앞말만(대검은 소머리가 「대검」) */
 const shortName = (e: BookEntry): string => e.name.replace(/ 대검$/, '');
 
-/** 얻는 길 — 상점 장비 · 꾸러미 · 이달의 현장. 실적(도감 칸 · 신입 졸업)과 보급품은 바로가기가 없다 */
+/** 얻는 길 — 상점 장비 · 꾸러미 · 이달의 현장. 실적(도감 칸 · 신입 수료)과 보급품은 바로가기가 없다 */
 function routeOf(e: BookEntry): BookGo | undefined {
   const how = LOOK_EARNED[e.id]?.how;
   if (e.slot === 'item') return undefined;
