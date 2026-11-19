@@ -167,6 +167,7 @@ export function mountHud(
       teaching = label !== null;
       teachEl.hidden = !teaching;
       teachEl.innerHTML = html;
+      teachEl.classList.toggle('step', teaching && !sub); // 교육판 걸음 이름표 = 먹 판(건물 위에서도 읽힌다)
       if (teaching) pinEl.hidden = true;
     },
     sync(s: GameState, op?: HudOp | null): void {

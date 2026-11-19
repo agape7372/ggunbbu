@@ -1216,7 +1216,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
             + `<dl class="rp-tb">${cell(g.buildings, `${fmt(v.buildings)}<small>채</small>`)}${cell('최고 콤보', fmt(v.combo))}`
             + `${cell(g.dust, `<span data-el="go-dust">+${fmt(v.dustGained)}</span>`)}${cell(g.zone, escapeHtml(v.zone), 't')}</dl>`
             + `<p class="rp-bg">${lb('비고')}<span>${escapeHtml(v.line)}</span></p>`
-            + (v.perks ? `<p class="rp-ln">${lb('조건')}${escapeHtml(v.perks)}</p>` : ''),
+            + (v.perks ? `<p class="rp-ln rp-perk">${lb('조건')}<span>${escapeHtml(v.perks)}</span></p>` : ''),
         });
       });
       rollScore({ el: $('go-score'), to: v.score, on: 'gameover', prevBest: v.prevBest, mark: v.best ? $('go-score-best') : null, dust: $('go-dust'), dustTo: v.dustGained });

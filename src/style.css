@@ -613,6 +613,8 @@ img { display: block; -webkit-user-drag: none; }
 .hud-cap { top: 250px; font-size: 32px; rotate: 3deg; }
 .hud-teach { top: 430px; font-size: 32px; rotate: -3deg; }
 .hud-pin { top: 452px; font-size: 44px; rotate: -4deg; }
+/* 교육판 걸음 이름표 — 하늘 자리의 곧은 먹 판. 건물이 지나가도 가려지지 않는다 */
+.hud-teach.step { top: 150px; left: 50%; right: auto; translate: -50% 0; padding: 8px 18px 5px; background: var(--ink); color: var(--paper); text-shadow: none; white-space: nowrap; rotate: none; }
 .hud-teach small,
 .hud-pin small { display: block; margin-top: 6px; font: 700 15px/1.4 var(--body); }
 
@@ -942,6 +944,10 @@ img { display: block; -webkit-user-drag: none; }
 .rp-bg span:last-child { font: 400 25px/1.1 var(--brush); }
 .rp-ln { font: 700 15px/1.4 var(--body); }
 .rp-ln.muted { color: var(--ink2); }
+/* 현장 조건 한 줄(이름표 옆에 값) — 줄이 하나 늘어난 만큼만 종이가 길어진다 */
+.rp-perk { display: flex; align-items: baseline; gap: 10px; }
+.rp-perk span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp:has(.rp-perk) { max-height: 444px; }
 
 /* 결과 단추 — 곧은 먹 테(.rk) · 주홍 폭 단추(.seal.rk-main). 닫힌 단추(게이트 shut)는 옅다 — 눌러도 버린다(scenes) */
 .rk { position: relative; flex: 1; min-width: 0; height: 52px; padding: 0 10px; border: 2.5px solid var(--ink); background: var(--card); font: 700 17px/1.1 var(--body); white-space: nowrap; }
