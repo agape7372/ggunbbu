@@ -16,6 +16,7 @@ import { damageStack } from './building';
 import { DEBRIS, GIMMICK, GUARD_GAUGE, HAT, MAT_LIFT, STAGE, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
 import { VIEW } from '../config';
 import { rand } from './rng';
+import { liftOf, reachOf, wazaMul } from './perks';
 
 export function addScore(s: GameState, n: number): void {
   s.score = Math.min(s.score + n, SCORE.CAP);
@@ -46,7 +47,7 @@ export function gaugePerHit(combo: number): number {
 
 /** 이번 타격이 채우는 필살 게이지 — 콤보 계단 × 무기 배율 */
 export function hitGauge(s: GameState): number {
-  return gaugePerHit(s.combo) * WEAPON[s.weapon].gauge;
+  return gaugePerHit(s.combo) * WEAPON[s.weapon].gauge * wazaMul(s);
 }
 
 export function addGauge(s: GameState, n: number): void {
@@ -74,15 +75,14 @@ export function attackRange(footY: number, reach: number = PLAYER.ATTACK_REACH):
 export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   const stack = s.stack;
   if (!stack) return false;
-  const weapon = WEAPON[s.weapon];
-  const [lo, hi] = attackRange(footY, weapon.reach);
+  const [lo, hi] = attackRange(footY, reachOf(s));
   const mat = stack.floors.length > 0 ? stack.floors[0].mat : 'weak';
   const yHit = stack.y;
   const res = damageStack(stack, lane, lo, hi, 1);
   if (res === 'miss') return false;
 
   // 종은 세게 밀린다(저글링) · 바람탑 들숨은 두 배 — 아케이드 재질은 배율 1
-  stack.vy = Math.max(stack.vy, weapon.lift * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
+  stack.vy = Math.max(stack.vy, liftOf(s) * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
   stack.resting = false;
 
   if (res === 'collapse') {
@@ -135,9 +135,10 @@ export function destroyStack(s: GameState): void {
     addScore(s, SCORE.DESTROY_BONUS);
   }
   s.stack = null;
-  s.stackSpawnCd = s.gimmick === 'night'
-    ? Math.max(12, Math.floor(STACK.RESPAWN_TICKS * GIMMICK.NIGHT_RESPAWN_MUL))
-    : STACK.RESPAWN_TICKS;
+  s.stackSpawnCd = stack.vary?.joined ? STAGE.JOINED_GAP // 아케이드 변종 「붙어 오기」(대본 「>」)
+    : s.gimmick === 'night'
+      ? Math.max(12, Math.floor(STACK.RESPAWN_TICKS * GIMMICK.NIGHT_RESPAWN_MUL))
+      : STACK.RESPAWN_TICKS;
 }
 
 /**

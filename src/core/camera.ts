@@ -1,5 +1,5 @@
 import type { GameState } from './types';
-import { CAMERA, PLAYER, VIEW } from '../config';
+import { CAMERA, PLAYER, STAGE, VIEW } from '../config';
 
 /**
  * 세로 추종 카메라 — **데드존 + 상한**.
@@ -26,4 +26,9 @@ import { CAMERA, PLAYER, VIEW } from '../config';
 export function cameraFollowY(s: GameState): number {
   const want = s.player.y + PLAYER.H + CAMERA.HEADROOM - (VIEW.FIELD_H - CAMERA.DEADZONE);
   return Math.max(0, Math.min(CAMERA.MAX, want));
+}
+
+/** 건물이 생기는 높이 = 화면 맨 위(카메라 목표) + STAGE.SPAWN_ABOVE. 지시서(stage.ts)와 아케이드 1막 · 토코톤(spawner.ts)이 같이 쓴다 */
+export function spawnTopY(s: GameState): number {
+  return VIEW.GROUND_Y - VIEW.FIELD_TOP + cameraFollowY(s) + STAGE.SPAWN_ABOVE;
 }

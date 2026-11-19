@@ -4,14 +4,14 @@
 // 난수는 대본에 없다. 시드는 판 id에서 나오고, 연출 잔해 · 집행기 패턴 고르기만 쓴다.
 // 도장 판정용 집계(tally)는 이 틱의 이벤트와 개체 수 차이로만 센다 — 기존 규칙 코드는 모른다.
 
-import type { GameState, InputFrame, StageDiff, StageTally, WazaId, WeaponId } from './types';
+import type { Floor, GameState, InputFrame, StageDiff, StageTally, WazaId, WeaponId } from './types';
 import { ACT1, ACT2, LANDMARK, MAT_HP, STAGE, VIEW } from '../config';
 import { parseScript, scriptStats, type ScriptItem, type ScriptStep } from './script';
 import { DEBRIS_RANDS } from './combat';
 import { rngSkip } from './rng';
 import { STAGES, type SecretId, type StageDef } from './stages';
 import { makeFloor, makeStack } from './building';
-import { cameraFollowY } from './camera';
+import { spawnTopY } from './camera';
 import { spawnBolt, stepEntities } from './act2';
 import { initBoss, stepBoss } from './boss';
 import { initLandmark, stepLandmark } from './landmark';
@@ -167,19 +167,23 @@ function stepScript(s: GameState): void {
 /** 성급한 건물: 최하층을 HP1로 남겨 두면 세다가 급락한다(정석 「HP1 남기고 점프 가드」를 한 번 깬다). 급락은 건물당 한 번 — 층마다 겹치면 ×9가 된다 */
 function stepHasty(s: GameState): void {
   const st = s.stage!;
-  if (!st.hasty) return;
-  const bottom = s.stack?.floors[0];
-  if (!bottom) { st.hasty = false; st.hastyT = 0; return; }
-  if (bottom.segs[0].hp !== 1) { st.hastyT = 0; return; }
-  st.hastyT += 1;
-  if (st.hastyT === STAGE.HASTY_TICKS) {
-    st.hasty = false;
-    st.hastyT = 0;
-    st.fallG *= STAGE.HASTY_FALL;
-    st.fallV *= STAGE.HASTY_FALL;
-    st.tally.hastyDrops += 1;
-    s.events.push({ kind: 'boltCue', lane: 0 }); // 급락 예고음 — 2막 낙하 예고와 같은 소리
-  }
+  if (!hastyDue(st, s.stack?.floors[0])) return;
+  st.fallG *= STAGE.HASTY_FALL;
+  st.fallV *= STAGE.HASTY_FALL;
+  st.tally.hastyDrops += 1;
+  s.events.push({ kind: 'boltCue', lane: 0 }); // 급락 예고음 — 2막 낙하 예고와 같은 소리
+}
+
+/** 성급한 건물 셈 한 틱 — 급락할 틱이면 true(셈은 끝난다). 지시서(StageRun)와 아케이드 변종(StackVary)이 같이 쓴다 */
+export function hastyDue(h: { hasty: boolean; hastyT: number }, bottom: Floor | undefined): boolean {
+  if (!h.hasty) return false;
+  if (!bottom) { h.hasty = false; h.hastyT = 0; return false; }
+  if (bottom.segs[0].hp !== 1) { h.hastyT = 0; return false; }
+  h.hastyT += 1;
+  if (h.hastyT < STAGE.HASTY_TICKS) return false;
+  h.hasty = false;
+  h.hastyT = 0;
+  return true;
 }
 
 function emit(s: GameState, it: ScriptItem, withBuild: boolean): void {
@@ -194,7 +198,7 @@ function emit(s: GameState, it: ScriptItem, withBuild: boolean): void {
     st.hastyT = 0;
     s.stack = makeStack({
       variant: 'building', theme: def.theme, floors: it.floors.map(makeFloor),
-      y: VIEW.GROUND_Y - VIEW.FIELD_TOP + cameraFollowY(s) + STAGE.SPAWN_ABOVE,
+      y: spawnTopY(s),
       vy: it.fast ? STAGE.FAST_SPAWN_VY : STAGE.SPAWN_VY,
     });
   } else if (it.k === 'bolt') {

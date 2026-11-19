@@ -8,7 +8,8 @@ import { makeState, advance, applyStartKit, enterBonus, grantMercyLife } from '.
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
 import { judgeStage, stageScript, stageSeed, startStage } from '../core/stage';
 import { STAGES } from '../core/stages';
-import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, TEACH, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, PERK, TEACH, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
+import { dustMul } from '../core/perks';
 import { drawGame, drawFieldStill, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { butterTier, homeFaces, jobAction, stepJob, type HomeFacts, type JobId } from './homeLogic';
 import { gateStep, reviveKey, newGate, resultActs, resultFaces, type ResultAct, type ResultCtx, type ResultGate } from './resultLogic';
@@ -134,6 +135,7 @@ export function createApp(
   // 이번 판 결과 카드용 계수 — 부활·체크포인트 이어하기는 같은 판이라 계속 쌓는다
   let runBuildings = 0;
   let runDust = 0;
+  let dustCarry = 0; // 현장 조건 「야근」 먼지 배율의 소수 몫 — 다음 지급에 이어 붙인다
   let butterRoundNo = 0; // 버터바 챌린지 회차(0 = 챌린지 아님). 종료 시점엔 s.bonus가 이미 null이라 따로 든다
   let gameoverDelay = 0; // 결과 카드가 뜨기까지 남은 틱 — 그동안 캔버스만 그린다
   let pendingOver: GameOverView | null = null;
@@ -232,8 +234,15 @@ export function createApp(
     document.getElementById('stage')?.classList.toggle('home', onHome); // 홈 = 조작 키 숨김(넘기기는 좌우 밀기 · 시작은 매단 일감)
     if (onHome && homeFacts) { touch?.setFaces(homeFaces(homeJob, homeFacts)); return; }
     const rc = resultCtx();
+    // 현장 조건 쪽지 — 점프 = 왼쪽 · 공격 = 오른쪽 쪽지 이름, 가드 · 필살은 쉰다(둘 다 고를 수 있어 주홍 없음)
+    const off = scene === 'play' ? state?.perk?.offer : null;
     // 결과는 조작 키를 숨기고 제 단추(overlay .rp-acts)를 쓴다 — 얼굴 · 닫힘은 같은 resultFaces
-    touch?.setFaces(null);
+    touch?.setFaces(off ? {
+      jump: { label: PERK[off.a].name, tone: 'ink' },
+      guard: { label: '', tone: 'rest' },
+      attack: { label: PERK[off.b].name, tone: 'ink' },
+      special: { label: '', tone: 'rest' },
+    } : null);
     overlay.setResultKeys(rc ? resultFaces(rc, resultGate?.shut ?? { jump: true, attack: true, special: true, guard: true }) : null);
   }
 
@@ -384,6 +393,7 @@ export function createApp(
     revivesUsed = 0;
     runBuildings = 0;
     runDust = 0;
+    dustCarry = 0;
     runHatBreaks = 0;
     butterRoundNo = 0;
     opRun = null;
@@ -493,6 +503,7 @@ export function createApp(
     const lifetimeFirst = save.stats.runs === 0; // applyRunMeta 가 판 수를 올리기 전에 본다
     sessionArcadeRuns += 1;
     applyRunMeta(state);
+    state.perk = { picked: [], seen: [], offer: null }; // 현장 조건은 아케이드 판만
     butterChallenge = false;
     armCaps('arcade');
     if (save.buddhaMode && import.meta.env.DEV) {
@@ -1290,7 +1301,12 @@ export function createApp(
     if (scene !== 'play' || !state) return;
     scene = 'pause';
     setChrome('paused');
-    overlay.showPause({ score: state.score, combo: state.combo });
+    overlay.showPause({ score: state.score, combo: state.combo, perks: perkNames(state) });
+  }
+
+  /** 고른 현장 조건 이름 한 줄(멈춤 창 · 결과 보고서) — 없으면 '' */
+  function perkNames(s: GameState): string {
+    return (s.perk?.picked ?? []).map((id) => PERK[id].name).join(' · ');
   }
 
   function resumePause(): void {
@@ -1363,7 +1379,7 @@ export function createApp(
 
   function backFromSettings(): void {
     if (settingsFrom === 'pause' && state) {
-      overlay.showPause({ score: state.score, combo: state.combo });
+      overlay.showPause({ score: state.score, combo: state.combo, perks: perkNames(state) });
     } else {
       overlay.showTitle(titleView());
     }
@@ -1385,7 +1401,10 @@ export function createApp(
     }
   }
 
-  const hud = mountHud(ensureHudLayer(), { onPause: () => { playSfx('uiBlip'); enterPause(); } });
+  const hud = mountHud(ensureHudLayer(), {
+    onPause: () => { playSfx('uiBlip'); enterPause(); },
+    onPerk: (k) => { domKey = k; },
+  });
   overlay = mountOverlay(ensureOverlayLayer(), {
     onBoot: enterTitleFromBoot,
     onJob: (dir) => { if (!overlay.modalOpen()) moveJob(dir); },
@@ -1606,7 +1625,8 @@ export function createApp(
         if (debug && !run) tickDebug(s, f);
         const wasMode = s.mode;
         const wasPhase = s.act2Phase;
-        advance(s, f);
+        // 현장 조건 쪽지를 손가락으로 눌렀다 — 그 쪽 키를 누른 것으로 넣는다(결정적 입력 · 손 놓음 셈 그대로)
+        advance(s, dk && s.perk?.offer ? { ...f, [dk]: true } : f);
         if (debug && !run) settleDebug(s);
         noteMissions(s);
         if (run) stageTick(s, run);
@@ -1681,7 +1701,10 @@ export function createApp(
   }
 
   function earnDust(n: number): void {
-    const got = runKit.dust2x ? n * 2 : n;
+    // 현장 조건 「야근」은 그 판에 번 먼지에만 곱한다(소수 몫은 dustCarry로 이어 붙여 반올림 이득이 없다)
+    dustCarry += (runKit.dust2x ? n * 2 : n) * (state ? dustMul(state) : 1);
+    const got = Math.floor(dustCarry);
+    dustCarry -= got;
     grant(save, got, 0);
     runDust += got;
     dustDirty = true;
@@ -1804,6 +1827,7 @@ export function createApp(
       line,
       best,
       mode: runLabel,
+      perks: perkNames(s),
     };
   }
 

@@ -64,12 +64,13 @@ export function windLight(s: GameState): boolean {
 }
 
 /**
- * 지금 건물의 가로 떨림 변위(px). 급한 집 · 가벼운 좌판 · 띄운 구층탑이 이 하나를 같이 쓴다(렌더러가 이것만 부른다).
+ * 지금 건물의 가로 떨림 변위(px). 급한 집(지시서 · 아케이드 변종) · 가벼운 좌판 · 띄운 구층탑이 이 하나를 같이 쓴다(렌더러가 이것만 부른다).
  * 위상은 s.tick(구층탑은 그린 프레임)이라 같은 판은 같은 떨림
  */
 export function hastyShakeX(s: GameState): number {
   const f = s.stack?.floors[0];
-  const hasty = s.stage?.hasty && f ? hastyAmp(s.stage.hastyT, f.segs[0].hp) * Math.sin(s.tick * 2.1) : 0;
+  const h = s.stage ?? s.stack?.vary; // 지시서 「~」 · 아케이드 변종 성급한 건물 — 같은 셈, 같은 떨림
+  const hasty = h?.hasty && f ? hastyAmp(h.hastyT, f.segs[0].hp) * Math.sin(s.tick * 2.1) : 0;
   const flutter = windLight(s) ? WIND_FLUTTER_PX * Math.sin(s.tick * 0.9) : 0;
   const lift = liftT > 0 ? LIFT_SHAKE_PX * (liftT / LIFT_SHAKE_FRAMES) * Math.sin(liftT * 2.2) : 0;
   return hasty + flutter + lift;

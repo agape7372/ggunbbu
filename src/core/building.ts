@@ -5,7 +5,7 @@
 // docs/ORIGINAL_BENCHMARK_2026-08-30.md §5-B.
 
 import type { FallingStack, Floor, GameState, Lane, Material, Theme } from './types';
-import { MAT_HP, STACK, VIEW } from '../config';
+import { MAT_HP, STACK, STAGE, VIEW } from '../config';
 
 // M11 단일 레인 전환 후 "층 공유 HP 풀" 특례는 세그먼트 1개로 자동 성립 —
 // sharedHp 파라미터는 무효 사문이라 08-30 제거했다 (audit ③-8).
@@ -49,17 +49,20 @@ export function stackPhysics(s: GameState): { g: number; vterm: number } {
     if (s.act2Phase === 'cathedral') return { g: STACK.CATHEDRAL_G, vterm: STACK.CATHEDRAL_VTERM };
     if (s.act2Phase === 'tower') return { g: STACK.TOWER_G, vterm: STACK.TOWER_VTERM };
   }
-  // act1 / tokoton: p로 보간 (tokoton은 p∈[1,2] 구간 연장)
-  const p = s.p;
+  // act1 / tokoton: p로 보간 (tokoton은 p∈[1,2] 구간 연장).
+  // 아케이드 변종(stack.vary): 빠른 낙하 = 한 단계(STAGE.FAST_SPEED_ADD) 앞의 p · 성급 급락 = fall 배율(지시서 stage.ts와 같은 셈)
+  const v = s.stack?.vary;
+  const p = v?.fast ? s.p + STAGE.FAST_SPEED_ADD : s.p;
+  const m = v ? v.fall : 1;
   if (p <= 1) {
     const g = STACK.ACT1_G[0] + (STACK.ACT1_G[1] - STACK.ACT1_G[0]) * p;
     const vterm = STACK.ACT1_VTERM[0] + (STACK.ACT1_VTERM[1] - STACK.ACT1_VTERM[0]) * Math.pow(p, 0.7);
-    return { g, vterm };
+    return { g: g * m, vterm: vterm * m };
   }
   const q = Math.min(p - 1, 1);
   const g = STACK.ACT1_G[1] + (STACK.TOKOTON_G_MAX - STACK.ACT1_G[1]) * q;
   const vterm = STACK.ACT1_VTERM[1] + (STACK.TOKOTON_VTERM_MAX - STACK.ACT1_VTERM[1]) * q;
-  return { g, vterm };
+  return { g: g * m, vterm: vterm * m };
 }
 
 /** 스택 1틱 물리. 접지 여부 반환(이번 틱에 지면 도달) */

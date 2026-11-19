@@ -5,7 +5,8 @@ import type { Bolt, GameState, Lane } from './types';
 import { makeFloor, makeStack } from './building';
 import { registerHit, hurtPlayer, addScore, addGauge, addCombo, hitGauge } from './combat';
 import { guardActive, makePlayer } from './player';
-import { ACT2, GUARD_GAUGE, LANDMARK, PLAYER, SCORE, STACK, TICK, VIEW, WEAPON } from '../config';
+import { ACT2, LANDMARK, PLAYER, SCORE, STACK, TICK, VIEW } from '../config';
+import { guardMax, liftOf } from './perks';
 import { initBoss, stepBoss, tryHitBoss } from './boss';
 import { tryHitLandmark } from './landmark';
 
@@ -247,7 +248,7 @@ export function tryHitAct2Targets(s: GameState): boolean {
     const e = s.entities[i];
     if (e.kind === 'rock' && e.lane === p.lane && e.y >= lo && e.y <= hi) {
       e.hp -= 1;
-      e.vy = Math.max(e.vy, WEAPON[s.weapon].lift);
+      e.vy = Math.max(e.vy, liftOf(s));
       const remnant = !!e.remnant;
       if (e.hp <= 0) s.entities.splice(i, 1);
       if (remnant) addCombo(s); // [정본] 격파 잔해 = 콤보만, 점수 없음
@@ -289,7 +290,7 @@ export function continueFromCheckpoint(s: GameState): void {
   s.over = null;
   s.lives = PLAYER.LIVES;
   s.wazaGauge = 0;
-  s.guardGauge = GUARD_GAUGE.MAX;
+  s.guardGauge = guardMax(s);
   s.hitstop = 0;
   s.debris = [];
   s.events = [];

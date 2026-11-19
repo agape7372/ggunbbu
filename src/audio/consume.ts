@@ -200,6 +200,10 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
     }
     case 'chapterUnlock':
       return ['stamp'];
+    case 'perkOffer': // 현장 조건 쪽지가 뜬다 · 골랐다
+      return ['uiOk'];
+    case 'perkPick':
+      return ['stamp'];
     default:
       return null;
   }
