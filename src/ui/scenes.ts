@@ -7,7 +7,7 @@ import type { GameState, GimmickId, StageDiff } from '../core/types';
 import { makeState, advance, applyStartKit, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
 import { judgeStage, stageScript, stageSeed, startStage } from '../core/stage';
-import { LESSONS, startTraining as setupTraining, trainingKeys, trainingLesson } from '../core/training';
+import { LESSONS, startTraining as setupTraining, trainingGuide, trainingKeys } from '../core/training';
 import { STAGES } from '../core/stages';
 import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, PERK, TEACH, TRAINING, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { dustMul } from '../core/perks';
@@ -436,7 +436,8 @@ export function createApp(
     teachPulse = 0;
     teachDue = false;
     hud.teach(null);
-    touch?.setGuardHint(false);
+    hud.guide(null);
+    touch?.setHint(null);
   }
 
   function startTeach(): void {
@@ -445,7 +446,7 @@ export function createApp(
     teachFreeze = TEACH.GUARD_FREEZE_TICKS;
     teachPulse = TEACH.GUARD_PULSE_TICKS;
     hud.teach(SCREENS.teach.guard, SCREENS.teach.guardSub);
-    touch?.setGuardHint(true);
+    touch?.setHint(['guard']);
   }
 
   function bgm(track: BgmTrack | null): void {
@@ -522,8 +523,8 @@ export function createApp(
     const t = state?.training;
     save.howtoSeen = true;
     if (done || (t && t.lesson > LESSONS.findIndex((l) => l.id === 'guard'))) save.guardTaught = true; // 가드를 배웠으면 첫 목숨 손실 때 다시 안 세운다
-    hud.teach(null);
-    touch?.setGuardHint(false);
+    hud.guide(null);
+    touch?.setHint(null);
     if (!done) { saveSave(save); goTitle(); return; }
     const reward = { dust: TRAINING.REWARD_DUST };
     giveReward(save, reward);
@@ -534,11 +535,18 @@ export function createApp(
     void showReward({ tier: 'l', title: SCREENS.training.done, seal: SCREENS.training.seal, reward }).then(homeNudge);
   }
 
-  /** 교육판 한 틱 — 걸음 이름표 하나 · 가드 멈춤이면 가드 키가 뛴다 */
+  /** 튜토리얼 한 틱 — 안내판(제목 · 설명 · 할 일 · 통과) · 판이 기다리는 키가 뛴다 */
   function trainingTick(s: GameState): void {
-    const id = trainingLesson(s);
-    hud.teach(id ? SCREENS.training.lesson[id] : null);
-    touch?.setGuardHint((s.training?.hold ?? 0) !== 0);
+    const g = trainingGuide(s);
+    if (!g) { hud.guide(null); touch?.setHint(null); return; }
+    const l: { title: string; lines: string; tasks: readonly string[]; wait?: string; wait2?: string } = SCREENS.training.lesson[g.lesson];
+    const last = l.tasks[l.tasks.length - 1];
+    const wait = g.rep > 0 && l.wait2 ? l.wait2 : l.wait;
+    // 서 있으면 그 박자의 할 일 · 통과 쉼이면 마지막 할 일 · 아니면 기다림 글(없으면 다음 할 일)
+    const task = g.waiting ? l.tasks[g.beat] : g.ok ? last ?? wait : wait ?? l.tasks[g.beat] ?? last;
+    hud.guide({ title: l.title, lines: l.lines, task: task ?? '', ok: g.ok });
+    // 맥동 = 판이 기다리는 키, 아니면 이 걸음의 진한 키(실전 연습 · 통과 쉼은 없음)
+    touch?.setHint(g.waiting && g.need ? [g.need] : g.lesson === 'solo' || g.ok ? null : trainingKeys(s));
   }
 
   function startArcade(): void {
@@ -1669,7 +1677,7 @@ export function createApp(
         }
         if (teachPulse > 0) {
           teachPulse -= 1;
-          if (f.guard || teachPulse === 0) { teachPulse = 0; touch?.setGuardHint(false); } // 눌러 봤으면 충분
+          if (f.guard || teachPulse === 0) { teachPulse = 0; touch?.setHint(null); } // 눌러 봤으면 충분
         }
         const run = stageRun;
         if (debug && !run && !inTraining) tickDebug(s, f);

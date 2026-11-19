@@ -140,13 +140,31 @@ export const SCREENS = {
     guardSub: '건물이 닿는 순간에 누른다',
   },
 
-  /** 수습 교육판(첫 실행) — 걸음마다 이름표 하나. 문장 · 설명 줄 없음 */
+  /**
+   * 튜토리얼(첫 실행, core/training.ts) — 판 위 안내판: 제목 · 설명(두 줄 안) · 할 일 한 줄.
+   * tasks = 박자마다 할 일(판이 서 있을 때). 서기 전엔 wait가 있으면 그것(가드 둘째 = wait2)
+   */
   training: {
-    name: '수습',
-    lesson: { slash: '베기', combo: '이어 베기', guard: '가드', jumpSlash: '뛰어 베기', escape: '빠져나오기', special: '필살' },
-    done: '수습 끝',
+    name: '튜토리얼',
+    done: '튜토리얼 끝',
     seal: '수습',
-    setting: '수습 교육',
+    setting: '튜토리얼',
+    ok: '통과',
+    lesson: {
+      slash: { title: '베기', lines: '공격을 누르면 닿은 층 하나를 벤다.', tasks: ['공격을 눌러 다 부순다'] },
+      combo: { title: '콤보', lines: '벨 때마다 콤보가 1씩 오른다.\n콤보가 높을수록 점수가 크다.', tasks: ['다섯 층을 모두 벤다'] },
+      jumpSlash: { title: '뛰어 베기', lines: '높이 뜬 건물은 땅에서 안 닿는다.\n뛰어오르면 닿는다.', tasks: ['점프를 누른다', '지금 공격을 누른다'] },
+      guard: {
+        title: '가드',
+        lines: '떨어지는 건물은 가드로 튕겨 올린다.',
+        wait: '닿기 직전에 가드를 누르고 있는다',
+        wait2: '한 번 더. 닿기 직전에 누르고 있는다',
+        tasks: ['지금 가드를 누르고 있는다'],
+      },
+      escape: { title: '깔렸을 때', lines: '깔리면 가드 키가 「탈출」로 바뀐다.\n실전에서는 목숨도 하나 준다.', tasks: ['탈출을 누른다'] },
+      special: { title: '필살', lines: '벨수록 마름모 게이지가 찬다.\n다 차면 필살을 쓸 수 있다.', tasks: ['필살을 누른다'] },
+      solo: { title: '실전 연습', lines: '이번엔 건물이 멈추지 않는다.\n땅에 닿기 전에 부순다.', wait: '건물 한 채를 부순다', tasks: [] },
+    },
   },
 } as const;
 

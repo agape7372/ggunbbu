@@ -75,7 +75,7 @@ export function advance(s: GameState, input: InputFrame): void {
     s.hitstop -= 1;
     return;
   }
-  // 수습 교육판 가드 걸음 — 건물이 가드 존에서 멈춰 있다(가드를 누르면 이 틱부터 다시 돈다)
+  // 튜토리얼 박자 — 판이 서 있다(그 키를 누르면 이 틱부터 다시 돈다 · 다른 버퍼는 비운다)
   if (holdTraining(s, input)) return;
   // 시작 장비 「필살 충전」 — 게이지가 비면(쓴 뒤 · 2막 진입 리셋 뒤) 하나 써서 다시 채운다
   if (s.wazaBank > 0 && s.wazaGauge < WAZA_GAUGE.COST) {

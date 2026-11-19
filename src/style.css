@@ -431,8 +431,9 @@ img { display: block; -webkit-user-drag: none; }
 }
 #btn-guard.active::after { -webkit-mask-image: var(--pG2); mask-image: var(--pG2); }
 #btn-guard.pinned::after { content: none; }
-/* 가드 가르치기 — 키가 숨 쉬듯 커졌다 줄어든다 */
-#btn-guard.teach { animation: teach 0.8s ease-in-out infinite; }
+/* 누를 키 — 숨 쉬듯 커졌다 줄어든다(가드 가르치기 · 튜토리얼에서 판이 기다리는 키, touch.ts setHint).
+   네 키 모두. #touch-layer를 앞에 둬 필살 키의 #btn-special.ready 숨(breathe2)보다 앞선다 */
+#touch-layer .tbtn.teach { animation: teach 0.8s ease-in-out infinite; }
 /* 수습 교육판 — 이 걸음에 안 쓰는 키는 옅은 먹(메뉴 얼굴 f-faint와 같은 바탕, touch.ts setFocus). 눌리기는 한다 */
 #btn-attack.dim { background-image: var(--pA3); color: var(--ink); }
 #btn-jump.dim { background-image: var(--pJ3); color: var(--ink); }
@@ -613,10 +614,18 @@ img { display: block; -webkit-user-drag: none; }
 .hud-cap { top: 250px; font-size: 32px; rotate: 3deg; }
 .hud-teach { top: 430px; font-size: 32px; rotate: -3deg; }
 .hud-pin { top: 452px; font-size: 44px; rotate: -4deg; }
-/* 교육판 걸음 이름표 — 하늘 자리의 곧은 먹 판. 건물이 지나가도 가려지지 않는다 */
-.hud-teach.step { top: 232px; left: 50%; right: auto; translate: -50% 0; padding: 8px 18px 5px; background: var(--ink); color: var(--paper); text-shadow: none; white-space: nowrap; rotate: none; }
 .hud-teach small,
 .hud-pin small { display: block; margin-top: 6px; font: 700 15px/1.4 var(--body); }
+
+/* 튜토리얼 안내판(11-20) — 위 띠 밑 한지 판 + 곧은 먹 테 3px(.hud-perk와 같은 문법). 주홍 없음(누를 것은 키가 맥동으로 말한다).
+   제목 붓 · 설명 두 줄 안 · 할 일 한 줄(먹 금 위 · 먹 세모). 밑단은 화면 y 200 안(약 5층 꼭대기 212) */
+.hud-guide { position: absolute; left: calc(var(--fr-x, 0px) + 16px); right: calc(var(--fr-x, 0px) + 16px); top: 58px; padding: 6px 14px 8px; background: var(--paper); border: 3px solid var(--ink); color: var(--ink); text-align: left; }
+.hud-guide .g-t { display: block; font: 400 38px/0.9 var(--brush); }
+.hud-guide .g-l { margin: 4px 0 0; font: 700 16px/1.35 var(--sans); white-space: pre-line; word-break: keep-all; }
+.hud-guide .g-k { position: relative; margin: 8px 0 0; padding: 7px 0 0 18px; border-top: 2px solid var(--ink); font: 700 17px/1.2 var(--sans); word-break: keep-all; }
+.hud-guide .g-k::before { content: ''; position: absolute; left: 1px; top: 11px; border-style: solid; border-width: 6px 0 6px 10px; border-color: transparent transparent transparent var(--ink); }
+.hud-guide .g-ok { position: absolute; top: 9px; right: 12px; padding: 4px 10px 2px; background: var(--ink); color: var(--paper); font: 400 24px/1 var(--brush); font-style: normal; animation: g-ok 120ms ease-out both; }
+@keyframes g-ok { from { scale: 1.25; } to { scale: 1; } }
 
 /* 현장 조건 쪽지(11-19) — 구역 사이 판 위 한지 쪽지 둘(왼쪽 = 점프 · 오른쪽 = 공격). 곧은 먹 사각 · 붓 이름 + 읽는 글 고딕.
    주홍 없음 — 둘 다 고를 수 있다(누를 것 하나가 아니다). 치르는 것은 옅은 먹 금 밑 연먹 */

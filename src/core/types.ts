@@ -194,7 +194,7 @@ export interface BossState {
 
 export type Mode = 'act1' | 'act2' | 'tokoton' | 'bonus' | 'stage' | 'training';
 
-/** 수습 교육판 진행 — 걸음(lesson) 안에서 정한 수만큼 해내면 다음 걸음(core/training.ts) */
+/** 튜토리얼 진행 — 걸음(lesson) 안에서 정한 수만큼 해내면 다음 걸음(core/training.ts) */
 export interface TrainingRun {
   /** 지금 걸음(LESSONS 자리). 다 하면 LESSONS.length */
   lesson: number;
@@ -204,10 +204,14 @@ export interface TrainingRun {
   spawned: boolean;
   /** 다음 건물까지 쉼(틱) */
   wait: number;
-  /** 판 멈춤 — 0 = 안 멈춤 · 양수 = 남은 틱 · -1 = 가드를 누를 때까지 */
+  /** 판 멈춤 — 0 = 안 멈춤 · 양수 = 남은 틱 · -1 = need 키를 누를 때까지 */
   hold: number;
-  /** 이번 건물에서 멈춘 적이 있나(건물 하나에 한 번) */
-  held: boolean;
+  /** 이번 건물에서 다음에 설 박자(걸음의 beats 자리). 박자는 건물 하나에 한 번씩 */
+  beat: number;
+  /** 판이 기다리는 키(서 있을 때만) */
+  need: 'jump' | 'guard' | 'attack' | 'special' | null;
+  /** 한 번 해냈다 — 다음 건물까지 쉬는 동안 「통과」. 걸음은 쉼이 끝나야 넘어간다 */
+  ok: boolean;
   /** 해낸 건물을 위로 날려 보내는 중 — 화면 위로 나가면 걷는다 */
   launch: boolean;
 }

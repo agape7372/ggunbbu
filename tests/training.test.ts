@@ -1,11 +1,11 @@
-// 수습 교육판(core/training.ts) — 걸음 순서 · 목숨 불변 · 결정성 · 가드 멈춤 · 깔리면 다시.
+// 튜토리얼(core/training.ts) — 걸음 순서 · 목숨 불변 · 결정성 · 박자(그 키로만 풀림 · 버퍼 비움) · 가드 · 깔렸을 때 · 실전 연습.
 import { describe, expect, it } from 'vitest';
 import { advance, makeState } from '../src/core/sim';
-import { LESSONS, startTraining, trainingKeys, trainingLesson, type LessonId } from '../src/core/training';
+import { LESSONS, startTraining, trainingGuide, trainingKeys, trainingLesson, type LessonId } from '../src/core/training';
 import { STAGES } from '../src/core/stages';
 import type { GameState, InputFrame } from '../src/core/types';
 import { EMPTY_INPUT } from '../src/core/types';
-import { PLAYER } from '../src/config';
+import { PLAYER, TRAINING } from '../src/config';
 
 const fresh = (): GameState => {
   const s = makeState({ seed: 7, mode: 'training' });
@@ -13,20 +13,35 @@ const fresh = (): GameState => {
   return s;
 };
 
-/** 키가 진하게 보이는 대로만 누르는 신입 손 */
+/** 안내판 · 키 얼굴대로만 누르는 신입 손 — 판이 서면 그 키, 아니면 걸음의 키 */
 function rookie(s: GameState): InputFrame {
-  const id = trainingLesson(s);
+  const g = trainingGuide(s);
+  if (!g) return EMPTY_INPUT;
+  if (g.waiting && g.need) return { ...EMPTY_INPUT, [g.need]: true };
   const odd = s.tick % 2 === 0;
   const st = s.stack;
-  const p = s.player;
-  switch (id) {
-    case 'slash': case 'combo': return { ...EMPTY_INPUT, attack: odd };
+  switch (g.lesson) {
+    case 'slash': case 'combo': case 'solo': return { ...EMPTY_INPUT, attack: odd };
     case 'special': return { ...EMPTY_INPUT, special: odd };
-    case 'guard': return { ...EMPTY_INPUT, guard: (s.training!.hold !== 0) || (!!st && st.vy < 0 && st.y < 70) };
-    case 'jumpSlash': return p.y <= 0 ? { ...EMPTY_INPUT, jump: !!st && st.vy === 0 && odd } : { ...EMPTY_INPUT, attack: odd };
-    case 'escape': return { ...EMPTY_INPUT, guard: p.pose === 'pinned' && odd };
-    default: return EMPTY_INPUT;
+    case 'guard': return { ...EMPTY_INPUT, guard: !!st && st.vy < 0 && st.y < 70 };
+    default: return EMPTY_INPUT; // 뛰어 베기 · 깔렸을 때는 판이 설 때만 누른다(공중 「닿음」 박자가 안 서면 못 끝낸다)
   }
+}
+
+/** 걸음 id(그 걸음의 rep번째 건물)까지 신입 손으로 */
+function reach(s: GameState, id: LessonId, rep = 0): void {
+  for (let i = 0; i < 60 * 60 && !(trainingLesson(s) === id && s.training!.rep === rep && !s.training!.ok); i++) {
+    advance(s, rookie(s));
+    s.events.length = 0;
+  }
+  expect(trainingLesson(s)).toBe(id);
+}
+
+/** n틱 같은 손 — 이벤트 이름을 모은다 */
+function idle(s: GameState, n: number, input: InputFrame = EMPTY_INPUT): string[] {
+  const ev: string[] = [];
+  for (let i = 0; i < n; i++) { advance(s, input); ev.push(...s.events.map((e) => e.kind)); s.events.length = 0; }
+  return ev;
 }
 
 function play(bot: (s: GameState) => InputFrame, max = 60 * 90): { s: GameState; seen: LessonId[]; minLives: number } {
@@ -43,9 +58,10 @@ function play(bot: (s: GameState) => InputFrame, max = 60 * 90): { s: GameState;
   return { s, seen, minLives };
 }
 
-describe('수습 교육판', () => {
-  it('키 얼굴대로 누르면 여섯 걸음을 차례로 지나 끝난다 — 목숨은 그대로', () => {
+describe('튜토리얼', () => {
+  it('키 얼굴대로 누르면 일곱 걸음을 차례로 지나 끝난다 — 목숨은 그대로', () => {
     const { s, seen, minLives } = play(rookie);
+    expect(LESSONS.length).toBe(7);
     expect(s.over).toBe('cleared');
     expect(seen).toEqual(LESSONS.map((l) => l.id));
     expect(minLives).toBe(PLAYER.LIVES);
@@ -63,35 +79,55 @@ describe('수습 교육판', () => {
     expect(STAGES.some((d) => (d.id as string) === 'training')).toBe(false);
   });
 
-  it('가드 걸음: 가드 존에서 판이 멈추고, 안 누르면 계속 기다린다 · 누르면 튕겨 오른다', () => {
+  it('선 판은 그 키로만 풀린다 — 베기에서 점프를 눌러 둬도 공격으로 풀면 뛰지 않고 벤다', () => {
     const s = fresh();
-    // 가드 걸음까지 신입 손으로
-    for (let i = 0; i < 60 * 60 && trainingLesson(s) !== 'guard'; i++) { advance(s, rookie(s)); s.events.length = 0; }
-    expect(trainingLesson(s)).toBe('guard');
+    idle(s, TRAINING.GAP + 2);
+    expect(trainingGuide(s)).toMatchObject({ lesson: 'slash', waiting: true, need: 'attack' });
+    const y = s.stack!.y;
+    idle(s, 20, { ...EMPTY_INPUT, jump: true }); // 다른 키 — 안 풀린다
+    idle(s, 20, { ...EMPTY_INPUT, guard: true, special: true });
+    expect(trainingGuide(s)!.waiting).toBe(true);
+    expect(s.stack!.y).toBe(y);
+    expect(s.player.y).toBe(0);
+    const ev = idle(s, 1, { ...EMPTY_INPUT, attack: true });
+    expect(trainingGuide(s)!.waiting).toBe(false);
+    expect(s.player.pose).toBe('attack');
+    ev.push(...idle(s, 20));
+    expect(ev).not.toContain('jump');
+    expect(ev).toContain('floorCollapse'); // 약층은 한 칼에 무너진다
+    expect(s.combo).toBe(1);
+    expect(s.player.y).toBe(0);
+  });
+
+  it('가드 걸음: 가드 존에서 판이 서고, 안 누르면 계속 기다린다 · 누르면 튕겨 오른다', () => {
+    const s = fresh();
+    reach(s, 'guard');
     expect(trainingKeys(s)).toEqual(['guard']);
-    for (let i = 0; i < 60 * 10 && s.training!.hold === 0; i++) { advance(s, EMPTY_INPUT); s.events.length = 0; }
+    for (let i = 0; i < 60 * 10 && s.training!.hold === 0; i++) idle(s, 1);
+    expect(trainingGuide(s)).toMatchObject({ waiting: true, need: 'guard' });
     expect(s.training!.hold).toBe(-1);
     const y = s.stack!.y;
-    for (let i = 0; i < 300; i++) advance(s, EMPTY_INPUT);
-    expect(s.stack!.y).toBe(y); // 멈춰 있다
-    expect(s.training!.hold).toBe(-1);
-    const ev: string[] = [];
-    for (let i = 0; i < 20; i++) { advance(s, { ...EMPTY_INPUT, guard: true }); ev.push(...s.events.map((e) => e.kind)); s.events.length = 0; }
+    idle(s, 300);
+    expect(s.stack!.y).toBe(y); // 서 있다
+    const ev = idle(s, 20, { ...EMPTY_INPUT, guard: true });
     expect(ev).toContain('guardBounce');
     expect(s.training!.rep).toBe(1);
+    expect(trainingGuide(s)!.ok).toBe(true);
     expect(s.stack!.vy).toBeGreaterThan(0);
   });
 
-  it('둘째 가드는 짧게 멈추고, 놓쳐서 깔려도 목숨은 그대로 · 같은 걸음을 다시 낸다', () => {
+  it('둘째 가드는 짧게 서고, 놓쳐서 깔려도 목숨은 그대로 · 같은 걸음을 다시 낸다', () => {
     const s = fresh();
-    for (let i = 0; i < 60 * 60 && !(trainingLesson(s) === 'guard' && s.training!.rep === 1); i++) { advance(s, rookie(s)); s.events.length = 0; }
-    expect(s.training!.rep).toBe(1);
+    reach(s, 'guard', 1);
+    let held = 0;
     let crushed = false;
     for (let i = 0; i < 60 * 20 && !crushed; i++) {
       advance(s, EMPTY_INPUT);
+      if (s.training!.hold !== 0) held += 1;
       crushed = s.events.some((e) => e.kind === 'hurt');
       s.events.length = 0;
     }
+    expect(held).toBe(TRAINING.GUARD_HOLD2);
     expect(crushed).toBe(true);
     expect(s.lives).toBe(PLAYER.LIVES);
     expect(trainingLesson(s)).toBe('guard');
@@ -100,23 +136,37 @@ describe('수습 교육판', () => {
     expect(s.player.pose).toBe('idle');
   });
 
-  it('빠져나오기: 깔린 동안만 가운데 키가 진하다 · 오래 깔려도 목숨은 그대로', () => {
+  it('깔렸을 때: 건물이 바로 깔고 판이 선다 · 가드(탈출)로만 풀린다 · 목숨은 그대로', () => {
     const s = fresh();
-    for (let i = 0; i < 60 * 60 && trainingLesson(s) !== 'escape'; i++) { advance(s, rookie(s)); s.events.length = 0; }
+    reach(s, 'escape');
     expect(trainingKeys(s)).toEqual([]);
-    for (let i = 0; i < 60 * 8; i++) { advance(s, EMPTY_INPUT); s.events.length = 0; }
+    const ev = idle(s, TRAINING.GAP + 3);
+    expect(ev).not.toContain('guardBounce'); // 떨어지며 튕길 틈이 없다
     expect(s.player.pose).toBe('pinned');
+    expect(trainingGuide(s)).toMatchObject({ waiting: true, need: 'guard' });
     expect(trainingKeys(s)).toEqual(['guard']);
+    idle(s, 200, { ...EMPTY_INPUT, attack: true });
+    expect(s.player.pose).toBe('pinned');
     expect(s.lives).toBe(PLAYER.LIVES);
+    expect(idle(s, 1, { ...EMPTY_INPUT, guard: true })).toContain('pinEscape');
+    expect(s.training!.rep).toBe(1);
     expect(s.over).toBeNull();
   });
 
-  it('낮게 멈춘 건물은 안 깔린다 — 손을 놓아도 베기 걸음이 그대로 남는다', () => {
+  it('실전 연습은 판을 세우지 않는다 — 깔려도 목숨 그대로 같은 걸음', () => {
     const s = fresh();
-    for (let i = 0; i < 60 * 20; i++) { advance(s, EMPTY_INPUT); s.events.length = 0; }
-    expect(trainingLesson(s)).toBe('slash');
-    expect(s.stack!.resting).toBe(false);
-    expect(s.player.pose).toBe('idle');
+    reach(s, 'solo');
+    let stood = false;
+    let crushed = false;
+    for (let i = 0; i < 60 * 20 && !crushed; i++) {
+      advance(s, EMPTY_INPUT);
+      if (s.training!.hold !== 0) stood = true;
+      crushed = s.events.some((e) => e.kind === 'hurt');
+      s.events.length = 0;
+    }
+    expect(stood).toBe(false);
+    expect(crushed).toBe(true);
+    expect(trainingLesson(s)).toBe('solo');
     expect(s.lives).toBe(PLAYER.LIVES);
   });
 });

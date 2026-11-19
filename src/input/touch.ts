@@ -22,8 +22,8 @@ export interface TouchInput {
   clearPressed(): void;
   /** 깔림 상태 → 가드 버튼이 '탈출' 버튼으로 바뀐다 */
   setPinned(pinned: boolean): void;
-  /** 가드 가르치기 — 가드 키가 맥동한다(첫 목숨 손실 때 한 번) */
-  setGuardHint(on: boolean): void;
+  /** 누를 키 맥동 — 첫 목숨 손실 때 가드 · 튜토리얼에서 판이 기다리는 키. null = 끈다 */
+  setHint(keys: readonly TouchAction[] | null): void;
   /**
    * 플레이 얼굴의 진한 키(수습 교육판 걸음) — 여기 든 키만 그대로, 나머지는 옅은 먹(f-faint 바탕). 옅어도 눌린다.
    * null = 모두 그대로. 메뉴 얼굴이 떠 있는 동안은 값만 받아 둔다
@@ -112,7 +112,8 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   let guardFill = -1;
   let layout: ButtonLayout | null = null;
   let leftHanded = false;
-  let guardHint = false;
+  let hint: readonly TouchAction[] | null = null;
+  let hintKey = '';
   let focus: readonly TouchAction[] | null = null;
   let focusKey = '';
   let faces: KeyFaces | null = null;
@@ -170,16 +171,20 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
         btn.setAttribute('aria-label', label);
       }
     }
-    for (const btn of buttonsByAction.guard) {
-      btn.classList.toggle('pinned', pinned);
-      btn.classList.toggle('teach', guardHint);
-    }
+    for (const btn of buttonsByAction.guard) btn.classList.toggle('pinned', pinned);
+    paintHint();
     for (const btn of buttonsByAction.special) btn.classList.toggle('ready', specialReady);
     paintSpecialFill();
     paintFocus();
   };
 
-  /** 수습 교육판 — 이 걸음에 안 쓰는 키는 옅게 */
+  const paintHint = (): void => {
+    for (const action of ACTIONS) {
+      for (const btn of buttonsByAction[action]) btn.classList.toggle('teach', !!hint && hint.includes(action));
+    }
+  };
+
+  /** 튜토리얼 — 이 걸음에 안 쓰는 키는 옅게 */
   const paintFocus = (): void => {
     for (const action of ACTIONS) {
       for (const btn of buttonsByAction[action]) btn.classList.toggle('dim', !!focus && !focus.includes(action));
@@ -364,10 +369,12 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
       if (!faces) paintFocus();
     },
 
-    setGuardHint(on: boolean) {
-      guardHint = on;
-      if (faces) return;
-      for (const btn of buttonsByAction.guard) btn.classList.toggle('teach', on);
+    setHint(keys: readonly TouchAction[] | null) {
+      const key = keys ? keys.join() : '';
+      if (key === hintKey) return;
+      hintKey = key;
+      hint = keys && keys.length ? keys : null;
+      if (!faces) paintHint();
     },
 
     setSpecialReady(next: boolean) {
