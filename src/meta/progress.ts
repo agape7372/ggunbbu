@@ -197,10 +197,10 @@ export interface RookieStep {
 
 export const ROOKIE: readonly RookieStep[] = [
   { title: '첫 판 끝내기', desc: '어디까지 가든 첫 출근이다.', done: (f) => f.runs >= 1, reward: { dust: 300, items: { life: 3, waza: 3, dust2x: 2 } } },
-  { title: '무기 한 자루', desc: '상점에서 새 연장을 산다.', done: (f) => f.weapons >= 2, reward: { orbit: 30 } },
+  { title: '무기 한 자루', desc: '상점에서 새 무기를 산다.', done: (f) => f.weapons >= 2, reward: { orbit: 30 } },
   { title: '필살 한 번', desc: '게이지가 차면 누른다.', done: (f) => f.specials >= 1, reward: { dust: 100 } },
   { title: '시작 장비 써 보기', desc: '판 시작 때 하나 골라 들고 간다.', done: (f) => f.kitRuns >= 1, reward: { orbit: 30 } },
-  { title: '2구역 닿기', desc: '아케이드에서 다음 구역까지.', done: (f) => f.chapters >= 1, reward: { dust: 200, items: { waza: 1 } } },
+  { title: '2구역 닿기', desc: '다음 구역에 닿는다.', done: (f) => f.chapters >= 1, reward: { dust: 200, items: { waza: 1 } } },
   { title: '지시서 한 장', desc: '작업 지시서 하나를 끝낸다.', done: (f) => f.stageClears >= 1, reward: { orbit: 40, items: { life: 1 } } },
   { title: '3급 따기', desc: '철거 자격에 응시한다.', done: (f) => f.license >= 1, reward: { orbit: 60, owns: ['sprout'] } },
 ];

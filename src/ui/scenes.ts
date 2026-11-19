@@ -1949,7 +1949,8 @@ export function createApp(
       if (scene === 'play' || scene === 'pause') hud.sync(state, opHud(state));
     } else if (!state) {
       // 홈 = 판이 카메라 0에서 보이는 그대로(하늘 · 원경 · 땅선). 메뉴 화면이 덮어도 같은 그림이라 돌아올 때 늦지 않는다
-      drawFieldStill(ctx, { mode: 'act1', chapter: homeChapter, act2Phase: null });
+      // 홈은 조작 키가 없다 — 땅선을 화면 맨 아래로 내려 조작 구역까지 쓴다(style.css 홈 배치와 짝)
+      drawFieldStill(ctx, { mode: 'act1', chapter: homeChapter, act2Phase: null }, VIEW.H - VIEW.FIELD_H);
     }
   }
 

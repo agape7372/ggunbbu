@@ -21,7 +21,7 @@ export interface HudApi {
   teach(on: boolean): void;
 }
 
-const pinHint = `${CAPTIONS.pinned}<small>탈출: 빠져나오기 · 공격: 아래층 베기</small>`;
+const pinHint = `${CAPTIONS.pinned}<small>탈출: 안전하게 · 공격: 아래층 베기, 실패하면 목숨 −1</small>`;
 
 /** 졸라맨 목숨 하나 — 잃으면 옅은 먹 위에 사선 한 획 */
 const life = (on: boolean): string =>

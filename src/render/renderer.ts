@@ -758,15 +758,23 @@ function syncFieldBg(drawn: boolean, b: BackdropInput, bg: string): void {
  * 홈(현장 화면) 캔버스 — 플레이가 카메라 0에서 보이는 그대로: 바탕 + 원경 + 땅선.
  * 땅 채움(#DDD8CC)은 필드 클립 밖이라 카메라 0에선 안 보인다. 바탕은 PALETTE.BG 고정.
  */
-export function drawFieldStill(ctx: CanvasRenderingContext2D, b: BackdropInput): void {
+export function drawFieldStill(ctx: CanvasRenderingContext2D, b: BackdropInput, down = 0): void {
   syncPageVar('--fr-bg', PALETTE.BG);
   ctx.fillStyle = PALETTE.BG;
   ctx.fillRect(0, 0, VIEW.W, VIEW.H);
   ctx.save();
+  // down = 홈이 조작 구역까지 쓸 때 땅선을 내리는 값. 위에 생긴 띠는 원경의 종이색으로 메운다
+  ctx.translate(0, down);
   clipField(ctx);
-  syncFieldBg(drawChapterBackdrop(ctx, b), b, PALETTE.BG);
+  const drawn = drawChapterBackdrop(ctx, b);
+  syncFieldBg(drawn, b, PALETTE.BG);
   fx.drawGroundLine(ctx);
   ctx.restore();
+  const paper = drawn && backdropPaper(backdropKey(b));
+  if (down && paper) {
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, VIEW.FIELD_TOP, VIEW.W, down);
+  }
 }
 
 function bgColor(s: GameState): string {
@@ -915,7 +923,7 @@ function drawComboMark(ctx: CanvasRenderingContext2D, cam: number): void {
     ctx.restore();
   }
   // 이름표 — 붓 숫자 밑 작은 활자(낙관 옆 관지처럼). 굵은 고딕 딱지는 붓글씨와 따로 놀았다(11-01)
-  const label = m.n >= SCORE.COMBO_CAP ? 'MAX COMBO' : 'COMBO';
+  const label = m.n >= SCORE.COMBO_CAP ? '최대 콤보' : '콤보';
   const ly = px * 0.5 + C.LABEL_PX * 0.5 + 2;
   ctx.font = LABEL_FONT;
   ctx.letterSpacing = '3px';
@@ -1098,7 +1106,7 @@ function drawHatBand(ctx: CanvasRenderingContext2D, s0: number, s1: number, n: n
   ctx.fillText(ITEM_COPY.hat.pop, 148, y - 7);
   ctx.font = LABEL_FONT;
   ctx.letterSpacing = '3px';
-  ctx.fillText(`COMBO ${n}`, 151, y + 17);
+  ctx.fillText(`${n} 콤보`, 151, y + 17);
   ctx.letterSpacing = '0px';
   ctx.restore();
 }

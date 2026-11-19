@@ -99,7 +99,7 @@ function renderBanner(mode: 'prompt' | 'ios', deferred: BeforeInstallPromptEvent
     <div class="ip-card">
       <div class="ip-copy">
         <p class="ip-title">홈 화면에 추가</p>
-        <p class="ip-sub">${mode === 'ios' ? '공유 → 홈 화면에 추가. 설치하면 바로 열려요.' : '앱처럼 전체 화면으로 열려요.'}</p>
+        <p class="ip-sub">${mode === 'ios' ? '공유 → 홈 화면에 추가. 추가하면 바로 열려요.' : '앱처럼 전체 화면으로 열려요.'}</p>
       </div>
       <button type="button" class="ip-x" aria-label="닫기">×</button>
       <button type="button" class="ip-go">${mode === 'ios' ? '방법 보기' : '설치'}</button>

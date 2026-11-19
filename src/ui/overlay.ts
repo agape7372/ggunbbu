@@ -361,7 +361,7 @@ const NAV_TO = { missions: toMissions, shop: toShop, book: toBook } as const;
 const HOWTO_ROWS: readonly { key: string; name: string; desc: string }[] = [
   { key: 'k-atk', name: '공격', desc: '닿은 층을 벤다. 이어 베면 콤보.' },
   { key: 'k-jmp', name: '점프', desc: '한 번 누르면 한 번 뛴다.' },
-  { key: 'k-grd', name: '가드', desc: '떨어지는 건물을 튕겨 올린다. 막대만큼.' },
+  { key: 'k-grd', name: '가드', desc: '떨어지는 건물을 튕겨 올린다. 막대가 남은 만큼.' },
   { key: 'k-sp', name: '필살', desc: '마름모에 먹이 다 차면 쓴다.' },
 ];
 
@@ -374,7 +374,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       ${frameSvg(9, 3.5, 5.5, 10)}
       <img class="boot-mark" src="./icons/icon-192.png" alt="" draggable="false" />
       <p class="boot-tag">${TAGLINE}</p>
-      <p class="boot-hint">누르면 시작</p>
+      <p class="boot-hint">눌러서 들어가기</p>
     </div>
 
     <div class="ov-screen ov-field" data-screen="title" hidden>
@@ -709,7 +709,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     const key = JSON.stringify([b(v.job), b(prev), b(next)]);
     if (!force && key === artKey) return;
     artKey = key;
-    paintHang(hang, b(v.job), 30);
+    paintHang(hang, b(v.job), 30, false, true); // 건물 바닥을 한 높이에 — 남는 자리는 줄이 받는다
     paintHang($('peek-prev-cv') as HTMLCanvasElement, b(prev), 20, true);
     paintHang($('peek-next-cv') as HTMLCanvasElement, b(next), 20, true);
   }
@@ -883,8 +883,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     openModal({
       meta: '작업 안내',
       title: '이렇게 부순다',
-      html: `<p class="muted">하늘에서 건물이 떨어진다. 바닥에 닿기 전에 벤다. 깔리면 가드 키가 탈출이 된다. 한 번 누르면 빠져나온다.</p><div class="howto">${rows}</div>`
-        + `<p><b>보급 상자</b> <span class="muted">건물 ${SUPPLY.FIRST}채째부터 ${SUPPLY.EVERY}채마다 하나.</span></p><ul class="supply">${supply}</ul>`
+      html: `<p class="muted">하늘에서 건물이 떨어진다. 바닥에 닿기 전에 벤다. 깔리면 가드 키가 「탈출」로 바뀐다. 한 번 누르면 빠져나온다.</p><div class="howto">${rows}</div>`
+        + `<p><b>보급 상자</b> <span class="muted">${SUPPLY.FIRST}번째 건물부터 ${SUPPLY.EVERY}채마다 하나.</span></p><ul class="supply">${supply}</ul>`
         + `<p><b>${escapeHtml(ITEM_COPY.hat.name)}</b> <span class="muted">콤보 ${HAT.COMBO_AT.join(' · ')}에서 하나씩. ${escapeHtml(ITEM_COPY.hat.desc)}</span></p>`,
       actions: [{ label: first ? '시작' : '닫기', act: 'modal-close', kind: first ? 'cta' : 'btn' }],
       closable: !first,

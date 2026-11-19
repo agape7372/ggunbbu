@@ -8,7 +8,7 @@ import type { FxSlot, Tier } from '../meta/tier';
 /** 주인공. 얼굴 없는 졸라맨. 자격증은 없다. */
 export const HERO = '나';
 
-/** 2막 보스. 하늘에서 건물을 집어 던지는 무인 철거 집게보. */
+/** 2막 보스. 하늘에서 건물을 집어 던지는 무인 철거 집게봇. */
 export const BOSS_NAME = '집행기';
 
 export const TAGLINE = '하늘이 던진다. 베면 된다';
@@ -167,9 +167,9 @@ export interface WeaponCopy {
 export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   sword: { name: '철거칼', desc: '고르게 쓴다. 기본.' },
   hammer: { name: '오함마', desc: '칠 때마다 건물을 더 띄운다. 짧다.' },
-  crowbar: { name: '빠루', desc: '멀리 닿는다. 필살이 느리다.' },
+  crowbar: { name: '빠루', desc: '아주 멀리 닿는다. 필살이 느리다.' },
   grinder: { name: '그라인더', desc: '필살이 빨리 찬다. 덜 띄운다.' },
-  iron: { name: '무쇠 대검', desc: '길게 닿는다. 필살이 조금 느리다.' },
+  iron: { name: '무쇠 대검', desc: '멀리 닿는다. 필살이 조금 느리다.' },
   saw: { name: '톱날 대검', desc: '조금 멀리 닿는다. 필살이 빨리 찬다. 덜 띄운다.' },
   hazard: { name: '공사중 대검', desc: '멀리 닿고 높이 띄운다. 필살이 느리다.' },
   beam: { name: '철골 대검', desc: '가장 높이 띄운다. 짧다.' },
