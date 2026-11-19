@@ -6,10 +6,12 @@
 import type { SaveData, SaveSettings } from '../storage';
 import { HAT, SUPPLY, TICK } from '../config';
 import { SCREENS, TAGLINE } from '../content';
+import { playSfx } from '../audio/audio';
 import { ITEM_COPY, regionOf } from '../content/world';
 import type { PlayerPose } from '../core/types';
 import { isDefaultLayout } from '../input/layout';
 import type { KeyFaces, TouchAction } from '../input/touch';
+import { ROLL, rollAt } from './resultLogic';
 import { FLASH_LABEL, SHAKE_LABEL } from './settings';
 import { isDevUnlocked } from '../platform/devUnlock';
 import { nativeAppVersion } from '../platform/native';
@@ -37,7 +39,7 @@ import { dailyDone } from '../meta/missions';
 import { APP_VERSION } from '../version';
 import type { Loadout } from '../meta/types';
 import { brushNum, escapeHtml, infoHtml } from './html';
-import { countTo, fmt, frameSvg, glyph, installInkVars, reduceMotion, replay, swordSvg } from './ink';
+import { fmt, frameSvg, glyph, installInkVars, reduceMotion, replay, swordSvg } from './ink';
 import { CUT, cutFrom, type CutDir } from './cut';
 import { paintHero } from './heroArt';
 
@@ -103,6 +105,8 @@ export interface GameOverView {
   line: string;
   /** 이번 판이 그 모드 최고 기록을 넘었나 */
   best: boolean;
+  /** 판 전 최고 기록 — 굴러 오르는 점수가 이 값을 넘는 순간 인장이 찍힌다 */
+  prevBest: number;
   /** 띠 오른쪽 모드 이름(아케이드 · 야근 · 작전 이름 …) */
   mode: string;
   /** 고른 현장 조건 이름 한 줄 — 없으면 '' */
@@ -133,6 +137,8 @@ export interface EndingView {
   fullCombo: boolean;
   /** 이번 판이 최고 기록을 넘었나 */
   best: boolean;
+  /** 판 전 최고 기록(인장 찍는 순간) */
+  prevBest: number;
   mode: string;
 }
 
@@ -207,6 +213,8 @@ export interface OverlayHandlers {
   /** start = 첫 실행 안내의 「시작」을 눌렀다(뒤로 · Esc로 닫으면 false) */
   onHowtoDone(start: boolean): void;
   onResetData(): void;
+  /** 설정 「수습 교육」 — 교육판을 다시 한다 */
+  onTraining(): void;
 }
 
 /** 창 머리 색 — navy 출근 · green 보상 · seal 특가 · brown 시작 장비 · gold 구매 확인 · ink 나머지 */
@@ -252,6 +260,8 @@ export interface OverlayApi {
   }, ok: () => void): void;
   /** 조작 안내 창. first = 첫 실행(닫으면 onHowtoDone) */
   showHowto(first: boolean): void;
+  /** 결과 숫자 굴림을 끝 값으로(누름) */
+  skipRoll(): void;
   /** 확인 창이 떠 있나 — 뒤로가기가 창부터 닫는다 */
   modalOpen(): boolean;
   closeModal(): void;
@@ -263,8 +273,7 @@ const TOAST_MS = 2400;
 const QUIT_CONFIRM_MS = 3000;
 const SHAKE_MS = 900;
 /** 결과 점수는 보고서가 내려앉고 도장이 찍힌 뒤 굴러 올라간다(style.css .ov-rp 안무 0.3초) */
-const SCORE_ROLL_AT = 320;
-const SCORE_ROLL_MS = 750;
+const SCORE_ROLL_AT = 320; // 쌓이는 박자는 resultLogic ROLL
 
 /** 홈 뿌뿌 — 가만히 · 두 번째 누름(벤다) · 네 번째부터(뻗는다, 더는 안 받아 준다) */
 const HERO_IDLE: PlayerPose = 'idle';
@@ -451,6 +460,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
             <button type="button" class="inkseal" data-act="set-layout" data-el="set-layout">바꾸기</button>
           </div>
           <button type="button" class="set-link" data-act="howto">조작 안내</button>
+          <button type="button" class="set-link" data-act="training" data-el="training-row">${SCREENS.training.setting}</button>
           <h3 class="set-h">정보</h3>
           <div class="set-links">
             <button type="button" class="set-link" data-act="privacy">개인정보 처리방침</button>
@@ -994,6 +1004,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'set-flash': if (settings) h.onSettingsPatch({ flashLevel: levelOf(t) }); break;
       case 'set-layout': h.onLayoutEdit(); break;
       case 'howto': showHowto(false); break;
+      case 'training': h.onTraining(); break;
       case 'privacy': openDoc('개인정보 처리방침', './privacy.html'); break;
       case 'credits': showCredits(); break;
       case 'doc-ofl-dokdo': openDoc('동해독도', './fonts/OFL-EastSeaDokdo.txt'); break;
@@ -1053,13 +1064,49 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     if (e.target === e.currentTarget && !howtoFirst) closeModal();
   });
 
-  /** 결과 점수 — 안무가 있으면 0에서 굴러 올라간다. 화면을 떠나면 멈춘다 */
-  function rollScore(el: HTMLElement, to: number, on: OverlayScreen): void {
+  /** 굴리는 중인 결과 숫자를 끝 값으로 — 누름 · 화면 떠남. 게이트(키 잠금)는 건드리지 않는다 */
+  let rollEnd: (() => void) | null = null;
+
+  /**
+   * 결과 숫자가 쌓인다 — 점수가 0에서 틱 소리와 올라가고(SCORE_ROLL_MS), 최고 기록을 넘는 그 순간 「신기록」 인장이 찍힌다.
+   * 이어 번 먼지가 +0에서 쌓인다. 동작 줄이기면 처음부터 끝 값(인장도 그 자리에 그대로).
+   */
+  function rollScore(o: { el: HTMLElement; to: number; on: OverlayScreen; prevBest: number; mark?: HTMLElement | null; dust?: HTMLElement | null; dustTo?: number }): void {
+    rollEnd?.();
     const tk = ++scoreToken;
-    el.textContent = fmt(to);
-    if (reduceMotion() || to <= 0) return;
-    el.textContent = '0';
-    window.setTimeout(() => { if (tk === scoreToken && screen === on) countTo([el], 0, to, SCORE_ROLL_MS); else el.textContent = fmt(to); }, SCORE_ROLL_AT);
+    const dustTo = o.dustTo ?? 0;
+    const finish = (): void => {
+      if (rollEnd === finish) rollEnd = null;
+      o.el.textContent = fmt(o.to);
+      if (o.dust) o.dust.textContent = `+${fmt(dustTo)}`;
+      if (o.mark) o.mark.hidden = false;
+    };
+    if (reduceMotion() || (o.to <= 0 && dustTo <= 0)) { finish(); return; }
+    rollEnd = finish;
+    o.el.textContent = '0';
+    if (o.dust) o.dust.textContent = '+0';
+    if (o.mark) o.mark.hidden = true;
+    const t0 = performance.now() + SCORE_ROLL_AT;
+    let tickAt = 0;
+    let coined = false;
+    const frame = (now: number): void => {
+      if (rollEnd !== finish) return; // 건너뛰었다 · 새 결과가 떴다
+      if (tk !== scoreToken || screen !== o.on) { finish(); return; }
+      const e = now - t0;
+      if (e >= 0) {
+        const r = rollAt(e, o.to, o.prevBest, dustTo);
+        o.el.textContent = fmt(r.score);
+        if (r.score < o.to && now - tickAt >= ROLL.TICK_MS) { tickAt = now; playSfx('uiBlip', { pitchSemitones: Math.round((7 * r.score) / o.to) }); }
+        if (o.mark?.hidden && r.mark) { o.mark.hidden = false; playSfx('stamp'); } // 넘는 그 순간 한 번
+        if (o.dust && dustTo > 0 && r.score >= o.to && e >= ROLL.SCORE_MS + ROLL.DUST_GAP) {
+          if (!coined) { coined = true; playSfx('coin'); }
+          o.dust.textContent = `+${fmt(r.dust)}`;
+        }
+        if (r.done) { finish(); return; }
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
   }
 
   /* ── 결과 넷 = 현장 화면 + 보고서 한 장(style.css .ov-rp). 띠(모드) · 보고서(끝 줄 = 다음 목표 + 상점 · 미션 단추) · 귀퉁이 먹 도장.
@@ -1115,7 +1162,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
   const lb = (t: string): string => `<span class="lb">${t}</span>`;
   const verdict = (t: string): string => `<div class="rp-j">${lb('판정')}<b>${escapeHtml(t)}</b></div>`;
   const scoreRow = (el: string, best: boolean): string =>
-    `<div class="rp-sc">${lb('점수')}<b class="n" data-el="${el}"></b>${best ? `<i class="rp-best">${SCREENS.stamps.best}</i>` : ''}</div>`;
+    `<div class="rp-sc">${lb('점수')}<b class="n" data-el="${el}"></b>${best ? `<i class="rp-best" data-el="${el}-best">${SCREENS.stamps.best}</i>` : ''}</div>`;
   const cell = (dt: string, dd: string, cls = 'n'): string => `<div><dt>${dt}</dt><dd class="${cls}">${dd}</dd></div>`;
 
   const api: OverlayApi = {
@@ -1152,6 +1199,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         $('set-back').textContent = fromPause ? '뒤로' : '홈';
         // 판 도중엔 기록 지우기를 숨긴다 — 진행 중인 판과 저장이 엇갈리는 길을 막는다
         $('reset-row').hidden = fromPause;
+        $('training-row').hidden = fromPause; // 수습 교육도 홈에서만 — 판 도중에 새 판을 열지 않는다
       });
     },
     showButterPick(tier: number): void { enter('butter', () => paintButter(tier)); },
@@ -1166,12 +1214,12 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           tab: v.goalMissions ? { act: 'go-missions', label: SCREENS.tabs.missions } : { act: 'go-shop', label: SCREENS.tabs.shop },
           body: verdict(g.title) + scoreRow('go-score', v.best)
             + `<dl class="rp-tb">${cell(g.buildings, `${fmt(v.buildings)}<small>채</small>`)}${cell('최고 콤보', fmt(v.combo))}`
-            + `${cell(g.dust, `+${fmt(v.dustGained)}`)}${cell(g.zone, escapeHtml(v.zone), 't')}</dl>`
+            + `${cell(g.dust, `<span data-el="go-dust">+${fmt(v.dustGained)}</span>`)}${cell(g.zone, escapeHtml(v.zone), 't')}</dl>`
             + `<p class="rp-bg">${lb('비고')}<span>${escapeHtml(v.line)}</span></p>`
             + (v.perks ? `<p class="rp-ln">${lb('조건')}${escapeHtml(v.perks)}</p>` : ''),
         });
       });
-      rollScore($('go-score'), v.score, 'gameover');
+      rollScore({ el: $('go-score'), to: v.score, on: 'gameover', prevBest: v.prevBest, mark: v.best ? $('go-score-best') : null, dust: $('go-dust'), dustTo: v.dustGained });
     },
     showOpsEnd(v: OpsEndView): void {
       enter('opsend', () => {
@@ -1199,6 +1247,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     },
     stagesBack: () => screen === 'stages' && stageUi.back(),
     setResultKeys,
+    skipRoll: () => { rollEnd?.(); },
     showStageEnd(v): void {
       enter('stageend', () => {
         const r = stageReport(v);
@@ -1266,7 +1315,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
             + `<p class="rp-bg">${lb('비고')}<span>${r.petals}</span></p>`,
         });
       });
-      rollScore($('end-score'), v.score, 'ending');
+      rollScore({ el: $('end-score'), to: v.score, on: 'ending', prevBest: v.prevBest, mark: v.best ? $('end-score-best') : null });
     },
     showHowto,
     modalOpen: () => !$('modal').hidden,

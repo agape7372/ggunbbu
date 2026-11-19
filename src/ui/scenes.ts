@@ -7,8 +7,9 @@ import type { GameState, GimmickId, StageDiff } from '../core/types';
 import { makeState, advance, applyStartKit, enterBonus, grantMercyLife } from '../core/sim';
 import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
 import { judgeStage, stageScript, stageSeed, startStage } from '../core/stage';
+import { LESSONS, startTraining as setupTraining, trainingKeys, trainingLesson } from '../core/training';
 import { STAGES } from '../core/stages';
-import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, PERK, TEACH, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, PERK, TEACH, TRAINING, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { dustMul } from '../core/perks';
 import { drawGame, drawFieldStill, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { butterTier, homeFaces, jobAction, stepJob, type HomeFacts, type JobId } from './homeLogic';
@@ -155,6 +156,7 @@ export function createApp(
   let scoreBase = 0; // 작전이 시작 진행으로 주입한 점수 — 카드·만담은 이 판에 번 점수만 본다
   let runCaps: RunCaps = createRunCaps({ prevBest: 0, countsRecord: false });
   // 가드 가르치기: 평생 첫 목숨 손실 때 판을 잠깐 세우고 가드 키를 맥동시킨다 (C1)
+  let inTraining = false; // 수습 교육판 한 판(첫 실행 · 설정 「수습 교육」). 기록 · 재화 · 판 수 · 미션에 안 닿는다
   let teachFreeze = 0;
   let teachPulse = 0;
   let teachDue = false; // 깔린 채 목숨을 잃었다 — 가르침은 깔림이 풀린 첫 틱(가운데 키가 다시 「가드」 얼굴)에
@@ -230,6 +232,7 @@ export function createApp(
 
   /** 조작 키 얼굴 — 홈 · 결과(현장 화면)면 메뉴 얼굴, 아니면 플레이 얼굴. 키 얼굴은 여기 한 곳만 정한다 */
   function syncFaces(): void {
+    touch?.setFocus(inTraining && state ? trainingKeys(state) : null); // 교육판: 이 걸음 키만 진하게
     const onHome = scene === 'title' && overlay.getScreen() === 'title';
     document.getElementById('stage')?.classList.toggle('home', onHome); // 홈 = 조작 키 숨김(넘기기는 좌우 밀기 · 시작은 매단 일감)
     if (onHome && homeFacts) { touch?.setFaces(homeFaces(homeJob, homeFacts)); return; }
@@ -432,7 +435,7 @@ export function createApp(
     teachFreeze = 0;
     teachPulse = 0;
     teachDue = false;
-    hud.teach(false);
+    hud.teach(null);
     touch?.setGuardHint(false);
   }
 
@@ -441,7 +444,7 @@ export function createApp(
     saveSave(save);
     teachFreeze = TEACH.GUARD_FREEZE_TICKS;
     teachPulse = TEACH.GUARD_PULSE_TICKS;
-    hud.teach(true);
+    hud.teach(SCREENS.teach.guard, SCREENS.teach.guardSub);
     touch?.setGuardHint(true);
   }
 
@@ -478,6 +481,7 @@ export function createApp(
     stageEnd = null;
     stageRun = null;
     opRun = null;
+    inTraining = false;
     endTeach();
     state = null;
     scene = 'title';
@@ -491,6 +495,50 @@ export function createApp(
     }
     syncFaces();
     bgm('title');
+  }
+
+  /** 수습 교육판 — 글 창 대신 손으로(core/training.ts). 맨몸 · 기록 없음 · 판 수에 안 센다(신입 과제 「첫 판 끝내기」는 첫 진짜 판이 채운다) */
+  function startTrainingRun(): void {
+    runExempt = true;
+    stageRun = null;
+    stageEnd = null;
+    opRun = null;
+    butterChallenge = false;
+    scoreBase = 0;
+    endTeach();
+    state = makeState({ seed: debugSeed(0x7a1e), mode: 'training' });
+    state.waza = save.loadout.waza;
+    state.weapon = save.loadout.weapon;
+    setupTraining(state);
+    inTraining = true;
+    runLabel = SCREENS.training.name;
+    goPlay();
+  }
+
+  /** 교육판을 나간다 — 끝냈으면 인장 + 작은 보상 뒤 홈. 그만둬도 다시 강요하지 않는다(howtoSeen) */
+  function finishTraining(done: boolean): void {
+    if (!inTraining) return;
+    inTraining = false;
+    const t = state?.training;
+    save.howtoSeen = true;
+    if (done || (t && t.lesson > LESSONS.findIndex((l) => l.id === 'guard'))) save.guardTaught = true; // 가드를 배웠으면 첫 목숨 손실 때 다시 안 세운다
+    hud.teach(null);
+    touch?.setGuardHint(false);
+    if (!done) { saveSave(save); goTitle(); return; }
+    const reward = { dust: TRAINING.REWARD_DUST };
+    giveReward(save, reward);
+    saveSave(save);
+    // 보상 창은 메뉴층에 뜬다 — 홈을 먼저 깔고 그 위에 찍는다. 출근부 등은 닫은 뒤에
+    goTitle(false);
+    overlay.showTitle(titleView());
+    void showReward({ tier: 'l', title: SCREENS.training.done, seal: SCREENS.training.seal, reward }).then(homeNudge);
+  }
+
+  /** 교육판 한 틱 — 걸음 이름표 하나 · 가드 멈춤이면 가드 키가 뛴다 */
+  function trainingTick(s: GameState): void {
+    const id = trainingLesson(s);
+    hud.teach(id ? SCREENS.training.lesson[id] : null);
+    touch?.setGuardHint((s.training?.hold ?? 0) !== 0);
   }
 
   function startArcade(): void {
@@ -1373,7 +1421,7 @@ export function createApp(
     setChrome('title');
     overlay.showTitle(titleView());
     bgm('title');
-    if (!save.howtoSeen) overlay.showHowto(true); // 첫 실행 — 조작 네 개부터 보여 준다
+    if (!save.howtoSeen) startTrainingRun(); // 첫 실행 — 읽기 전에 손부터(수습 교육판). 글 창 「작업 안내」는 설정에 그대로
     else homeNudge();
   }
 
@@ -1415,6 +1463,7 @@ export function createApp(
     onPauseResume: () => { playSfx('uiBlip'); resumePause(); },
     onPauseQuit: () => {
       playSfx('uiBack');
+      if (inTraining) { finishTraining(false); return; }
       persist();
       if (stageRun) toStageList(); else goTitle();
     },
@@ -1475,6 +1524,7 @@ export function createApp(
     // 「시작」 = 홈 「착수」와 같은 판. 출근부 · 신입 과제는 그 판이 끝나 홈에 설 때(goTitle → homeNudge) 뜬다
     onHowtoDone: (start) => { save.howtoSeen = true; saveSave(save); if (start) confirmTitle(); else homeNudge(); },
     onResetData: resetData,
+    onTraining: () => { playSfx('uiOk'); startTrainingRun(); },
   });
 
   if (DEV_TOOLS && (debug || isDevUnlocked())) mountDebugMenu(() => state, debug); // 전해금 뒤 부팅은 접어서
@@ -1614,7 +1664,7 @@ export function createApp(
         if (teachFreeze > 0) {
           // 평생 첫 목숨 손실 — 판을 잠깐 세워 가드를 가르친다. 캔버스는 그 장면 그대로 (C1)
           teachFreeze -= 1;
-          if (teachFreeze === 0) hud.teach(false);
+          if (teachFreeze === 0) hud.teach(null);
           break;
         }
         if (teachPulse > 0) {
@@ -1622,13 +1672,14 @@ export function createApp(
           if (f.guard || teachPulse === 0) { teachPulse = 0; touch?.setGuardHint(false); } // 눌러 봤으면 충분
         }
         const run = stageRun;
-        if (debug && !run) tickDebug(s, f);
+        if (debug && !run && !inTraining) tickDebug(s, f);
         const wasMode = s.mode;
         const wasPhase = s.act2Phase;
         // 현장 조건 쪽지를 손가락으로 눌렀다 — 그 쪽 키를 누른 것으로 넣는다(결정적 입력 · 손 놓음 셈 그대로)
         advance(s, dk && s.perk?.offer ? { ...f, [dk]: true } : f);
         if (debug && !run) settleDebug(s);
-        noteMissions(s);
+        if (inTraining) trainingTick(s);
+        else noteMissions(s); // 교육판은 재화 · 평생 기록 · 미션에 안 센다
         if (run) stageTick(s, run);
         consumeAudio(s);
         consumeEvents(s);
@@ -1655,6 +1706,7 @@ export function createApp(
         const now = performance.now();
         resultGate ??= newGate(f.guard, now);
         if (overlayTicks > 0) overlayTicks -= 1;
+        if (!resultLocked() && (f.attack || f.jump || f.special || (f.guard && !prevTitleGuard) || dk)) overlay.skipRoll(); // 잠금이 풀린 뒤 누름 = 숫자 쌓이는 연출만 건너뛴다(죽는 순간 연타는 안 넘긴다) — 키 잠금 · 판정은 그대로
         const rc = resultCtx();
         const key = gateStep(resultGate, dk ? { ...f, [dk]: true } : f, now, !rc || resultLocked(), rc ? reviveKey(rc) : null);
         const act = rc && key ? resultActs(rc)[key] : null;
@@ -1772,6 +1824,7 @@ export function createApp(
 
   /** 판 도중 띠 가운데 둘째 줄(지시서는 첫 줄 판 이름까지) — 작전이 아니면 null */
   function opHud(s: GameState): HudOp | null {
+    if (inTraining && s.training) return { head: SCREENS.training.name, line: `${Math.min(s.training.lesson + 1, LESSONS.length)}/${LESSONS.length}` };
     if (stageRun && s.stage) return stageHudLine({ id: stageRun.id, ticks: s.stage.clearTick || s.tick });
     if (!opRun) return null;
     const remain = Math.max(0, Math.ceil((opLimitTicks(opRun.id) - s.tick) / 60));
@@ -1826,6 +1879,7 @@ export function createApp(
       goalMissions: !!news,
       line,
       best,
+      prevBest,
       mode: runLabel,
       perks: perkNames(s),
     };
@@ -1874,6 +1928,7 @@ export function createApp(
 
   function handleTransitions(s: GameState, wasMode: GameState['mode'], wasPhase: GameState['act2Phase']): void {
     const wipe = { wipeTicks: UI_FLOW.WIPE_TICKS };
+    if (s.mode === 'training') { if (s.over) finishTraining(true); return; } // 교육판은 엔딩 · 게임오버를 안 탄다
     if (endStageIfDue(s)) return; // 지시서 판은 아케이드 엔딩 · 게임오버 카드 · 부활을 절대 안 탄다
     if (endOpIfDue(s)) return;
     // 버터바를 지나 새 구역으로 돌아왔다 — 구역 이름을 한 번 자막으로 (C11)
@@ -1924,7 +1979,8 @@ export function createApp(
       return;
     }
     if (s.over === 'cleared') {
-      const best = !runExempt && s.score > 0 && s.score > save.bestArcade;
+      const prevBest = save.bestArcade;
+      const best = !runExempt && s.score > 0 && s.score > prevBest;
       save.act2Cleared = true;
       deathStreak = 0; // 클리어하면 연속 사망은 끝
       noteKind('moonClear');
@@ -1941,6 +1997,7 @@ export function createApp(
           mode: runLabel,
           fullCombo: s.fullCombo,
           best,
+          prevBest,
         });
         overlayTicks = UI_FLOW.GAMEOVER_LOCK;
       }, { wipeTicks: UI_FLOW.WIPE_BOSS_TICKS });

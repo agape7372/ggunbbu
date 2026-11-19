@@ -1964,3 +1964,14 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 
 - 대역 봇 구역 3 분당 목숨 1.60 → 3.60(성급 건물). 20% 상한 안이라 확률은 내리지 않았다.
 - 검증: tsc 0 · `npm test` 1067 통과 / 11 건너뜀(새 `arcade-vary.test.ts` 24) · 캡처 `tmp/gamey/cap/`(390×844 · 416×657 — 쪽지 · 키 얼굴 · 멈춤 창 · 결과 · 성급 떨림). 실기기 안 봄.
+
+## 2026-11-19 — 첫 판 흐름 (`feat/gamey-first`)
+
+- 수습 교육판(`src/core/training.ts`, `Mode` `'training'`): 처음 켠 사람(`howtoSeen` false)은 글 창 대신 바로 손으로 배운다. 여섯 걸음 = 베기 · 이어 베기 · 가드 · 뛰어 베기 · 빠져나오기 · 필살, 걸음마다 동사 하나. 스크립트 엔진(`parseScript`)을 쓰되 `STAGES`엔 없다. 무작위 0 · 목숨 안 줄어듦(깔리면 그 걸음 다시) · 기록 · 도장 · 판 수 없음.
+  - 낮은 층은 머리 위에 떠 있고(`hoverStack`), 가드 걸음은 가드 구역에서 멈춰 가드 키가 뛴다(`holdTraining`, 누르면 풀림 · 둘째는 짧게). 성공한 건물은 위로 날려 다시 깔리지 않게 한다.
+  - 쓸 키만 먹, 나머지는 옅게(`touch.setFocus` ← `syncFaces` 한 곳). HUD 가르침 줄엔 걸음 이름표 하나(`SCREENS.training`).
+  - 끝: 홈을 깔고 「수습 끝」 인장 + 먼지 30(`TRAINING.REWARD_DUST`) → `howtoSeen` · `guardTaught` true. 일시정지 「그만두기」도 `howtoSeen` true. 설정 「수습 교육」 줄로 다시 하기(「조작 안내」 글 창은 그대로).
+  - 신입 과제 「첫 판 끝내기」는 교육판으로 안 채운다 — 판 수에 안 세서 첫 진짜 판이 채운다(보상 창이 연달아 두 번 뜨지 않게).
+  - 옛 저장(플레이 흔적 있음)은 이관 때 `howtoSeen` true → 교육판을 안 본다.
+- 결과 보고서 쌓이기(`resultLogic` `rollAt` · `ROLL`, `overlay` `rollScore`): 점수가 0에서 틱 소리와 오르고(0.6초), 판 전 최고를 넘는 그 순간 「신기록」 인장이 찍힌다. 이어 먼지가 +0에서 쌓인다. 잠금이 풀린 뒤 누르면 끝 값으로 건너뛴다. 동작 줄이기면 처음부터 끝 값. 키 게이트(`ResultGate` · `GAMEOVER_LOCK` · `KEY_QUIET_MS`)는 손대지 않았다.
+- 검증: tsc 0 · `npm test` 1052 통과 / 9 건너뜀 · 글꼴 서브셋 다시 굽기(교육 · 둬). 캡처 `tmp/gamey/cap/`(git 밖) — 여섯 걸음 · 수습 끝 · 결과 굴림 중간 · 끝, 390×844 · 416×657. 실기기 · 소리는 안 봤다.

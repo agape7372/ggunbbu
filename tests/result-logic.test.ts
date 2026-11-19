@@ -221,3 +221,30 @@ describe('일어나기 키는 늦게 열린다', () => {
     expect(gateStep(g, tap('attack'), t, false, 'attack')).toBeNull();
   });
 });
+
+describe('결과 숫자가 쌓인다(rollAt)', () => {
+  it('0에서 시작해 점수 → 먼지 순서로 끝 값에 닿는다 · 건너뛰면 바로 끝 값', async () => {
+    const { ROLL, rollAt } = await import('../src/ui/resultLogic');
+    expect(rollAt(0, 12345, 0, 30)).toEqual({ score: 0, dust: 0, mark: false, done: false });
+    const mid = rollAt(ROLL.SCORE_MS / 2, 12345, 0, 30);
+    expect(mid.score).toBeGreaterThan(0);
+    expect(mid.score).toBeLessThan(12345);
+    expect(mid.dust).toBe(0); // 먼지는 점수가 다 오른 뒤
+    const scoreEnd = rollAt(ROLL.SCORE_MS, 12345, 0, 30);
+    expect([scoreEnd.score, scoreEnd.dust, scoreEnd.done]).toEqual([12345, 0, false]);
+    expect(rollAt(ROLL.SCORE_MS + ROLL.DUST_GAP + ROLL.DUST_MS, 12345, 0, 30)).toEqual({ score: 12345, dust: 30, mark: true, done: true });
+    expect(rollAt(Infinity, 12345, 0, 30)).toEqual({ score: 12345, dust: 30, mark: true, done: true });
+    // 먼지가 없으면 점수가 다 오르면 끝
+    expect(rollAt(ROLL.SCORE_MS, 500, 0, 0).done).toBe(true);
+  });
+
+  it('인장은 판 전 최고를 넘는 그 순간부터 — 못 넘으면 끝까지 안 찍힌다', async () => {
+    const { ROLL, rollAt } = await import('../src/ui/resultLogic');
+    let first = -1;
+    for (let e = 0; e <= ROLL.SCORE_MS; e += 10) if (first < 0 && rollAt(e, 1000, 800, 0).mark) first = e;
+    expect(first).toBeGreaterThan(0);
+    expect(rollAt(first, 1000, 800, 0).score).toBeGreaterThan(800);
+    expect(rollAt(first - 10, 1000, 800, 0).score).toBeLessThanOrEqual(800);
+    expect(rollAt(Infinity, 700, 800, 0).mark).toBe(false);
+  });
+});

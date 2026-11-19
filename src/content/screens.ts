@@ -139,6 +139,15 @@ export const SCREENS = {
     guard: '가드로 건물을 튕겨 올려라',
     guardSub: '건물이 닿는 순간에 누른다',
   },
+
+  /** 수습 교육판(첫 실행) — 걸음마다 이름표 하나. 문장 · 설명 줄 없음 */
+  training: {
+    name: '수습',
+    lesson: { slash: '베기', combo: '이어 베기', guard: '가드', jumpSlash: '뛰어 베기', escape: '빠져나오기', special: '필살' },
+    done: '수습 끝',
+    seal: '수습',
+    setting: '수습 교육',
+  },
 } as const;
 
 /** 게임오버 만담. 톤 = 건조한 전단지. 점수·틱으로 고르면 된다. */

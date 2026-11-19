@@ -303,6 +303,8 @@ function migrate(data: Record<string, unknown>): Record<string, unknown> {
   const veteran = num(data.bestArcade, 0) > 0 || num(data.dust, 0) > 0 || data.act2Cleared === true;
   if (veteran && data.guardTaught === undefined) data.guardTaught = true;
   if (veteran && data.stats === undefined) data.stats = { buildings: 0, runs: 1 };
+  // 해 본 사람은 수습 교육판(첫 실행, howtoSeen false면 뜬다)을 안 본다 — 설정 「수습 교육」으로만
+  if (veteran && data.howtoSeen !== true) data.howtoSeen = true;
   return data;
 }
 

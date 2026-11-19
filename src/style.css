@@ -433,6 +433,14 @@ img { display: block; -webkit-user-drag: none; }
 #btn-guard.pinned::after { content: none; }
 /* 가드 가르치기 — 키가 숨 쉬듯 커졌다 줄어든다 */
 #btn-guard.teach { animation: teach 0.8s ease-in-out infinite; }
+/* 수습 교육판 — 이 걸음에 안 쓰는 키는 옅은 먹(메뉴 얼굴 f-faint와 같은 바탕, touch.ts setFocus). 눌리기는 한다 */
+#btn-attack.dim { background-image: var(--pA3); color: var(--ink); }
+#btn-jump.dim { background-image: var(--pJ3); color: var(--ink); }
+#btn-guard.dim { background-image: var(--pG3); color: var(--ink); }
+#btn-guard.dim::after { content: none; }
+#btn-special.dim .sp-shape { stroke: var(--ink3); }
+#btn-special.dim .sp-fill,
+#btn-special.dim .sp-lbl { fill: var(--ink3); }
 
 /* 필살 = 마름모 — 게이지만큼 먹이 아래에서 차오른다(touch.ts setSpecialFill). 차면 테두리가 굵어지고 글씨가 뒤집힌다 */
 #btn-special { left: 118px; top: 0; width: 88px; height: 88px; filter: none; }
@@ -919,6 +927,8 @@ img { display: block; -webkit-user-drag: none; }
 .rp-sc .lb { width: 100%; }
 .rp-sc .n { margin-top: 3px; font: 400 44px/1 var(--black); letter-spacing: 0.01em; white-space: nowrap; }
 .rp-best { padding: 5px 8px 4px; background: var(--ink); color: var(--paper); clip-path: var(--sealclip2); font: 700 13.5px/1 var(--body); font-style: normal; rotate: 5deg; }
+/* 굴러 오르는 점수가 최고 기록을 넘는 순간 찍힌다(overlay rollScore가 hidden을 푼다) */
+.rp-best:not([hidden]) { animation: stamp 0.32s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
 .rp-tb { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border-top: 2px solid var(--ink); }
 .rp-tb div { min-width: 0; padding: 6px 0 6px 8px; border-bottom: 2px solid var(--ink); }
 .rp-tb div:nth-child(odd) { padding-left: 0; border-right: 2px solid var(--ink); }

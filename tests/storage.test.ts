@@ -74,7 +74,8 @@ describe('butterBest 항목별 구제 (08-30 검증 후속)', () => {
 
 describe('howtoSeen 무버전 키', () => {
   it('없거나 이상한 값이면 false, true는 보존', () => {
-    store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
+    // 플레이 흔적이 없는 저장 — 흔적이 있으면(bestArcade 등) 해 본 사람이라 true(아래 「옛 세이브」)
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, unlockedChapters: 0 }));
     expect(loadSave().howtoSeen).toBe(false);
     store.set(SAVE_KEY, JSON.stringify({ v: 1, howtoSeen: 'yes' }));
     expect(loadSave().howtoSeen).toBe(false);
@@ -217,6 +218,9 @@ describe('진행 키 (B3: guardTaught · stats · license · opsGrade) — 무�
     store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9 }));
     expect(loadSave().guardTaught).toBe(true);
     expect(loadSave().stats).toMatchObject({ buildings: 0, runs: 1 });
+    expect(loadSave().howtoSeen).toBe(true); // 수습 교육판을 다시 안 띄운다
+    store.set(SAVE_KEY, JSON.stringify({ v: 1, bestArcade: 9, howtoSeen: false }));
+    expect(loadSave().howtoSeen).toBe(true);
     store.set(SAVE_KEY, JSON.stringify({ v: 1, dust: 40 }));
     expect(loadSave().guardTaught).toBe(true);
     // 안내만 닫고 한 판도 안 한 사람은 신입 그대로

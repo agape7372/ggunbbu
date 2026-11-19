@@ -129,3 +129,19 @@ export function gateStep(
   }
   return hit;
 }
+
+/** 결과 숫자 쌓기 박자(ms) — 점수가 오르는 시간 · 틱 소리 간격 · 먼지가 쌓이기 전 쉼 · 쌓이는 시간 */
+export const ROLL = { SCORE_MS: 600, TICK_MS: 80, DUST_GAP: 120, DUST_MS: 400 } as const;
+
+export interface RollFrame { score: number; dust: number; mark: boolean; done: boolean }
+
+/**
+ * 결과 숫자 쌓기 — 시작 뒤 e ms의 모습(순수). 점수는 0 → to(끝으로 갈수록 느리게), 그다음 먼지가 +0 → +dustTo.
+ * mark = 점수가 판 전 최고 기록을 넘었다(인장 찍는 순간). 건너뛰기 = rollAt(Infinity, …)
+ */
+export function rollAt(e: number, to: number, prevBest: number, dustTo: number): RollFrame {
+  const p = Math.min(1, Math.max(0, e / ROLL.SCORE_MS));
+  const score = Math.round(to * (1 - (1 - p) ** 3));
+  const q = dustTo > 0 ? Math.min(1, Math.max(0, (e - ROLL.SCORE_MS - ROLL.DUST_GAP) / ROLL.DUST_MS)) : 1;
+  return { score, dust: Math.round(dustTo * q), mark: score > prevBest, done: p >= 1 && q >= 1 };
+}
