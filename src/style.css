@@ -614,7 +614,7 @@ img { display: block; -webkit-user-drag: none; }
 .hud-teach { top: 430px; font-size: 32px; rotate: -3deg; }
 .hud-pin { top: 452px; font-size: 44px; rotate: -4deg; }
 /* 교육판 걸음 이름표 — 하늘 자리의 곧은 먹 판. 건물이 지나가도 가려지지 않는다 */
-.hud-teach.step { top: 150px; left: 50%; right: auto; translate: -50% 0; padding: 8px 18px 5px; background: var(--ink); color: var(--paper); text-shadow: none; white-space: nowrap; rotate: none; }
+.hud-teach.step { top: 232px; left: 50%; right: auto; translate: -50% 0; padding: 8px 18px 5px; background: var(--ink); color: var(--paper); text-shadow: none; white-space: nowrap; rotate: none; }
 .hud-teach small,
 .hud-pin small { display: block; margin-top: 6px; font: 700 15px/1.4 var(--body); }
 
