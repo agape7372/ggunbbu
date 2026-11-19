@@ -718,7 +718,7 @@ export function createApp(
       r = ROOKIE[save.rookie].reward;
       save.rookie += 1;
       if (first) show = { tier: 'l', title: '첫 판 수고했어요', sub: '다음 판을 시작할 때 골라서 들고 가요.', seal: '입사' };
-      else if (save.rookie >= ROOKIE.length) show = { tier: 'l', title: `칭호 「${ROOKIE_TITLE}」`, seal: '졸업' };
+      else if (save.rookie >= ROOKIE.length) show = { tier: 'l', title: `칭호 「${ROOKIE_TITLE}」`, seal: '수료' };
       else show = { tier: 'm', title };
     }
     if (!r) { playSfx('uiDeny'); return; }
@@ -1058,7 +1058,7 @@ export function createApp(
     save.loadout = enforceOwnedLoadout(save.loadout, save.owned);
     applyCosmetics(save.loadout, save.maskArt);
     saveSave(save);
-    overlay.toast(`환불된 결제 ${n}건을 거뒀어요.`);
+    overlay.toast(`환불된 결제 ${n}건의 상품을 회수했어요.`);
     iapRedraw();
   }
 
@@ -1112,7 +1112,7 @@ export function createApp(
     if (overlay.getScreen() === 'shop') openShop();
     else if (overlay.getScreen() === 'missions') openMissions();
     if (!fresh) {
-      overlay.toast(got > 0 ? `못 받은 결제 ${got}건을 받았어요.` : '지난 결제가 걸려 있었어요. 다시 눌러 주세요.');
+      overlay.toast(got > 0 ? `못 받은 상품 ${got}건을 받았어요.` : '지난 결제가 처리 중이었어요. 다시 눌러 주세요.');
       return;
     }
     const owns = (sku.owns?.length ?? 0) > 3 ? [] : [...(sku.owns ?? [])]; // 철거왕 세트의 긴 목록은 칸 하나로 못 보인다
@@ -1538,7 +1538,7 @@ export function createApp(
     void checkRefunds();
     return got;
   }
-  const noteGot = (got: number): void => { if (got > 0) overlay.toast(`못 받은 결제 ${got}건을 받았어요.`); }; // 말없이 늘면 의심한다
+  const noteGot = (got: number): void => { if (got > 0) overlay.toast(`못 받은 상품 ${got}건을 받았어요.`); }; // 말없이 늘면 의심한다
 
   /** 결제가 열렸거나 못 받은 결제를 받았다 — 열린 상점 · 홈(특가)을 다시 그린다 */
   function iapRedraw(): void {

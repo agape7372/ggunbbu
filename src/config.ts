@@ -300,8 +300,8 @@ export const PERK: Readonly<Record<PerkId, PerkSpec>> = {
   coffee: { side: 'safe', name: '진한 커피', gain: '필살 게이지 ×1.3', waza: 1.3 },
   hat: { side: 'safe', name: '새 안전모', gain: '안전모 +1', hat: true },
   overtime: { side: 'greed', name: '야근', gain: '먼지 ×1.5', cost: '건물 +1층', dust: 1.5, floors: 1 },
-  rush: { side: 'greed', name: '속전속결', gain: '필살 게이지 ×1.6', cost: '가드 최대 -25', waza: 1.6, guardMax: -25 },
-  bare: { side: 'greed', name: '맨손', gain: '띄우기 +12', cost: '사거리 -14', lift: 12, reach: -14 },
+  rush: { side: 'greed', name: '속전속결', gain: '필살 게이지 ×1.6', cost: '가드 최대 −25', waza: 1.6, guardMax: -25 },
+  bare: { side: 'greed', name: '짧은 자루', gain: '띄우기 +12', cost: '사거리 −14', lift: 12, reach: -14 },
 };
 export const PERK_RUN = {
   MAX: 3,

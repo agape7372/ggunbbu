@@ -362,7 +362,7 @@ function metaScreen(name: string, frame: string, stamp: string, own?: keyof type
   return `<div class="ov-screen ov-meta" data-screen="${name}" hidden>
       ${frame}
       <div class="ov-body" data-el="body-${name}"></div>
-      <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="meta-back">홈</button>${rest}</nav>
+      <nav class="ov-nav" aria-label="이동"><button type="button" class="inkseal" data-act="meta-back">홈</button>${rest}</nav>
     </div>`;
 }
 
@@ -374,8 +374,8 @@ const NAV_TO = { missions: toMissions, shop: toShop, book: toBook } as const;
 const HOWTO_ROWS: readonly { key: string; name: string; desc: string }[] = [
   { key: 'k-atk', name: '공격', desc: '닿은 층을 벤다. 이어 베면 콤보.' },
   { key: 'k-jmp', name: '점프', desc: '한 번 누르면 한 번 뛴다.' },
-  { key: 'k-grd', name: '가드', desc: '떨어지는 건물을 튕겨 올린다. 막대가 남은 만큼.' },
-  { key: 'k-sp', name: '필살', desc: '마름모에 먹이 다 차면 쓴다.' },
+  { key: 'k-grd', name: '가드', desc: '떨어지는 건물을 튕겨 올린다. 게이지가 남은 만큼.' },
+  { key: 'k-sp', name: '필살', desc: '마름모 게이지가 다 차면 쓴다.' },
 ];
 
 export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi {
@@ -434,7 +434,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         <div class="p-stats" data-el="pause-stats"></div>
         <button type="button" class="seal p-resume" data-act="resume"><b>계속 부수기</b></button>
         <button type="button" class="rk p-set" data-act="pause-settings">설정</button>
-        <button type="button" class="p-quit" data-act="quit" data-el="quit"><b>그만두기</b><span>한 번 더 누르세요</span></button>
+        <button type="button" class="p-quit" data-act="quit" data-el="quit"><b>그만두기</b><span>한 번 더</span></button>
       </div>
     </div>
 
@@ -445,7 +445,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         <div class="set-body">
           <h3 class="set-h">소리 · 진동</h3>
           <div class="set-grid">
-            ${tog('set-sound', '전체')}
+            ${tog('set-sound', '소리 전체')}
             ${tog('set-bgm', '음악')}
             ${tog('set-sfx', '효과음')}
             ${tog('set-vib', '진동')}
@@ -470,7 +470,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
           <p class="set-foot kbd-hint">키보드: 점프 ↑ · 가드 ↓ · 공격 Z · 필살 X · 멈춤 Esc</p>
         </div>
       </div>
-      <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="set-back" data-el="set-back">홈</button><span class="nav-stamp">작업 수칙</span><span></span></nav>
+      <nav class="ov-nav" aria-label="이동"><button type="button" class="inkseal" data-act="set-back" data-el="set-back">홈</button><span class="nav-stamp">설정</span><span></span></nav>
     </div>
 
     <div class="ov-screen ov-meta" data-screen="butter" hidden>
@@ -480,23 +480,23 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         <p class="meta-lead">판에서 만나 본 회차만 열린다.</p>
         <div class="bt-rounds" data-el="butter-rounds"></div>
       </div>
-      <nav class="ov-nav" aria-label="가는 길"><button type="button" class="inkseal" data-act="butter-back">홈</button><span class="nav-stamp">버터 반죽</span><span></span></nav>
+      <nav class="ov-nav" aria-label="이동"><button type="button" class="inkseal" data-act="butter-back">홈</button><span class="nav-stamp">버터바</span><span></span></nav>
     </div>
 
     <div class="ov-screen ov-field ov-rp" data-screen="gameover" hidden></div>
     <div class="ov-screen ov-field ov-rp" data-screen="opsend" hidden></div>
     <div class="ov-screen ov-field ov-rp" data-screen="ending" hidden></div>
 
-    ${metaScreen('ops', frameSvg(8, 4, 5.5, 10), '현장 배정')}
+    ${metaScreen('ops', frameSvg(8, 4, 5.5, 10), '구역 작전')}
 
     <div class="ov-screen ov-map" data-screen="stages" hidden>
       <div class="mp"><div class="mp-in" data-el="body-stages"></div>${BAND_LINE}</div>
     </div>
 
     <div class="ov-screen ov-field ov-rp" data-screen="stageend" hidden></div>
-    ${metaScreen('missions', frameSvg(9, 4.5, 5, 9), '출근 도장', 'missions')}
-    ${metaScreen('shop', frameSvg(8, 4.5, 6, 10), '현장 매점', 'shop')}
-    ${metaScreen('book', frameSvg(9, 4, 5.5, 10), '모은 만큼', 'book')}
+    ${metaScreen('missions', frameSvg(9, 4.5, 5, 9), '미션', 'missions')}
+    ${metaScreen('shop', frameSvg(8, 4.5, 6, 10), '상점', 'shop')}
+    ${metaScreen('book', frameSvg(9, 4, 5.5, 10), '도감', 'book')}
 
     <div class="ov-modal" data-el="modal" hidden>
       <div class="m-card" role="dialog" aria-modal="true" aria-labelledby="modal-title-text" tabindex="-1" data-el="modal-card">
@@ -895,7 +895,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     const supply = SUPPLY.ROTATION.map((id) =>
       `<li><b>${escapeHtml(ITEM_COPY[id].name)}</b>${escapeHtml(ITEM_COPY[id].desc)}</li>`).join('');
     openModal({
-      meta: '작업 안내',
+      meta: '조작 안내',
       title: '이렇게 부순다',
       html: `<p class="muted">하늘에서 건물이 떨어진다. 바닥에 닿기 전에 벤다. 깔리면 가드 키가 「탈출」로 바뀐다. 한 번 누르면 빠져나온다.</p><div class="howto">${rows}</div>`
         + `<p><b>보급 상자</b> <span class="muted">${SUPPLY.FIRST}번째 건물부터 ${SUPPLY.EVERY}채마다 하나.</span></p><ul class="supply">${supply}</ul>`

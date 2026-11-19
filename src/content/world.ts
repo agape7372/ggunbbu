@@ -144,7 +144,7 @@ export const WAZA_COPY: Record<WazaCopyId, WazaCopy> = {
   dalmuri: {
     id: 'dalmuri',
     name: '월하난무',
-    desc: '달 아래 다섯 칼, 마지막에 달째 가른다. 보스에 가장 세다.',
+    desc: '달 아래 다섯 칼. 마지막에 달까지 가른다. 보스에 가장 세다.',
   },
   nakgwan: {
     id: 'nakgwan',
@@ -166,13 +166,13 @@ export interface WeaponCopy {
 
 export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   sword: { name: '철거칼', desc: '고르게 쓴다. 기본.' },
-  hammer: { name: '오함마', desc: '칠 때마다 건물을 더 띄운다. 짧다.' },
+  hammer: { name: '오함마', desc: '칠 때마다 건물을 더 띄운다. 짧게 닿는다.' },
   crowbar: { name: '빠루', desc: '아주 멀리 닿는다. 필살이 느리다.' },
   grinder: { name: '그라인더', desc: '필살이 빨리 찬다. 덜 띄운다.' },
   iron: { name: '무쇠 대검', desc: '멀리 닿는다. 필살이 조금 느리다.' },
   saw: { name: '톱날 대검', desc: '조금 멀리 닿는다. 필살이 빨리 찬다. 덜 띄운다.' },
   hazard: { name: '공사중 대검', desc: '멀리 닿고 높이 띄운다. 필살이 느리다.' },
-  beam: { name: '철골 대검', desc: '가장 높이 띄운다. 짧다.' },
+  beam: { name: '철골 대검', desc: '가장 높이 띄운다. 짧게 닿는다.' },
   flame: { name: '화염 대검', desc: '멀리 닿고 필살이 빨리 찬다. 덜 띄운다.' },
   frost: { name: '서리 대검', desc: '아주 멀리 닿는다. 덜 띄운다.' },
   onyx: { name: '흑철 대검', desc: '가장 멀리 닿고 높이 띄운다. 필살이 아주 느리다.' },
@@ -194,7 +194,7 @@ export interface ItemCopy {
 
 export const ITEM_COPY: Record<ItemId, ItemCopy> = {
   hat: { name: '안전모', desc: '한 번 깔려도 버틴다.', pop: '안전모!' },
-  coffee: { name: '믹스커피', desc: '필살 반 칸.', pop: '필살 +50' },
+  coffee: { name: '믹스커피', desc: '필살 절반.', pop: '필살 +50' },
   gloves: { name: '장갑', desc: '가드를 채운다.', pop: '가드 가득' },
   dust: { name: '먼지 자루', desc: '먼지 10.', pop: '먼지 +10' },
 };

@@ -138,7 +138,7 @@ export function paintMissions(
 function draw(root: HTMLElement, v: MissionView, fresh: string | null, how: 'keep' | 'enter' | 'tab'): void {
   const prevTop = root.scrollTop;
   const flags = readyTabs(v);
-  const tabs = TABS.map((t) => `<button type="button" role="tab" class="ms-tab${t.id === tab ? ' on' : ''}" data-ms-tab="${t.id}" aria-selected="${t.id === tab}"${flags[t.id] ? ' aria-label="' + t.name + ', 받을 것 있음"' : ''}>${t.name}${flags[t.id] ? '<i class="ms-dot" aria-hidden="true"></i>' : ''}</button>`).join('');
+  const tabs = TABS.map((t) => `<button type="button" role="tab" class="ms-tab${t.id === tab ? ' on' : ''}" data-ms-tab="${t.id}" aria-selected="${t.id === tab}"${flags[t.id] ? ' aria-label="' + t.name + ', 받을 수 있음"' : ''}>${t.name}${flags[t.id] ? '<i class="ms-dot" aria-hidden="true"></i>' : ''}</button>`).join('');
   const body = tab === 'today' ? todayHtml(v, fresh) : tab === 'site' ? siteHtml(v) : recordHtml(v);
   root.innerHTML = `
     <header class="ms-band meta-band">
@@ -351,9 +351,9 @@ function siteHtml(v: MissionView): string {
     ${!s.pass && s.price ? effHtml(s.eff) : ''}
   </section>
   <section class="ms-score">
-    <p class="ms-sc-t"><b>${open}</b>칸째${s.late ? '<span class="ms-x2">점수 두 배</span>' : ''}${s.pass ? '<span class="ms-pass">특근 중</span>' : ''}</p>
+    <p class="ms-sc-t"><b>${open}</b>칸째${s.late ? '<span class="ms-x2">점수 2배</span>' : ''}${s.pass ? '<span class="ms-pass">특근 중</span>' : ''}</p>
     ${bar(span ? Math.round((have / span) * 100) : 100, ' lg')}
-    <p class="ms-sub">${span ? `다음 칸까지 <b class="ms-num">${fmt(span - have)}</b>점` : '끝 칸까지 열렸어요'}</p>
+    <p class="ms-sub">${span ? `다음 칸까지 <b class="ms-num">${fmt(span - have)}</b>점` : '끝 칸까지 열림'}</p>
   </section>`;
 
   // 이 테마 특근 전용 꾸미기를 그림 칸으로 — 산 사람에겐 필요 없다
@@ -394,7 +394,7 @@ function siteHtml(v: MissionView): string {
 
 /** 부문 → 인장 글자 한 자 */
 const SEAL_CHAR: Readonly<Record<string, string>> = {
-  '2막': '막', 가드: '방', 근속: '근', 깔림: '깔', 도감: '감', 맨손: '맨', 명물: '명', 무기: '연',
+  '2막': '막', 가드: '방', 근속: '근', 깔림: '깔', 도감: '감', 맨손: '맨', 명물: '명', 무기: '무',
   버터: '버', 부활: '부', 자격: '격', 지시서: '지', 철거: '철', 콤보: '콤', 필살: '필',
 };
 

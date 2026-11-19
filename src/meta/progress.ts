@@ -125,7 +125,7 @@ export const DEMO_SITES: readonly { name: string; theme: string }[] = [
   { name: '소망 문방구', theme: 'asia' },
   { name: '장미 미용실', theme: 'eastasia' },
   { name: '현대 볼링장', theme: 'modern' },
-  { name: '새마을 금고', theme: 'europe' },
+  { name: '대동 금고', theme: 'europe' },
   { name: '만복 중국집', theme: 'eastasia' },
   { name: '한양 독서실', theme: 'asia' },
 ];
@@ -201,11 +201,11 @@ export const ROOKIE: readonly RookieStep[] = [
   { title: '필살 한 번', desc: '게이지가 차면 누른다.', done: (f) => f.specials >= 1, reward: { dust: 100 } },
   { title: '시작 장비 써 보기', desc: '판 시작 때 하나 골라 들고 간다.', done: (f) => f.kitRuns >= 1, reward: { orbit: 30 } },
   { title: '2구역 닿기', desc: '다음 구역에 닿는다.', done: (f) => f.chapters >= 1, reward: { dust: 200, items: { waza: 1 } } },
-  { title: '지시서 한 장', desc: '작업 지시서 하나를 끝낸다.', done: (f) => f.stageClears >= 1, reward: { orbit: 40, items: { life: 1 } } },
+  { title: '지시서 한 장', desc: '작업 지시서 한 장을 끝낸다.', done: (f) => f.stageClears >= 1, reward: { orbit: 40, items: { life: 1 } } },
   { title: '3급 따기', desc: '철거 자격에 응시한다.', done: (f) => f.license >= 1, reward: { orbit: 60, owns: ['sprout'] } },
 ];
 
-export const ROOKIE_TITLE = '신입 졸업';
+export const ROOKIE_TITLE = '신입 수료';
 
 /** 지금 단계가 끝나 받을 수 있나 */
 export function rookieReady(step: number, f: Facts): boolean {
@@ -269,8 +269,8 @@ export function achieveLines(list: readonly MissionProgress[]): AchieveLine[] {
 /** 뒤로 갈수록 높다. 대표 칭호 = 가진 것 중 맨 뒤 */
 export const TITLES: readonly { id: string; name: string }[] = [
   { id: 'ach_b500', name: '철거 반장' },
-  { id: 'ach_w12', name: '연장 부자' },
-  { id: 'ach_r200', name: '개근' },
+  { id: 'ach_w12', name: '무기 부자' },
+  { id: 'ach_r200', name: '고참' },
   { id: 'ach_bo20', name: '명물 사냥꾼' },
   { id: 'ach_bk30', name: '수집가' },
   { id: 'ach_st13', name: '지시서 완수' },
@@ -282,7 +282,7 @@ export const TITLES: readonly { id: string; name: string }[] = [
   { id: 'ach_b10000', name: '만 채 철거' },
 ];
 
-/** 가진 칭호(낮은 것부터). 신입 졸업이 맨 앞 */
+/** 가진 칭호(낮은 것부터). 신입 수료가 맨 앞 */
 export function titlesOf(list: readonly MissionProgress[], rookie: number): string[] {
   const claimed = new Set(list.filter((p) => p.claimed).map((p) => p.id));
   const out = rookie >= ROOKIE.length ? [ROOKIE_TITLE] : [];

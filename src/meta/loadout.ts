@@ -23,7 +23,7 @@ export const LOOK_EARNED: Readonly<Record<string, { name: string; how: string }>
   ember: { name: '불씨', how: '도감 20칸' },
   rivet: { name: '리벳', how: '철거왕 세트' },
   gilt: { name: '금박', how: '철거왕 세트' },
-  sprout: { name: '새싹', how: '신입 졸업' },
+  sprout: { name: '새싹', how: '신입 수료' },
   inju: { name: '인주', how: '첫 결제 선물' },
   apron: { name: '단골 앞치마', how: '단골 도장 10칸' },
   s_night: { name: '밤샘', how: '야간 철거 특근 15칸' },

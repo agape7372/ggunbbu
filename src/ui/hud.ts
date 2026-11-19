@@ -27,7 +27,7 @@ function perkNote(id: PerkId, k: 'jump' | 'attack'): string {
   return `<button type="button" class="hud-perk" data-k="${k}"><b>${p.name}</b><span>${p.gain}</span>${p.cost ? `<span class="cost">${p.cost}</span>` : ''}</button>`;
 }
 
-const pinHint = `${CAPTIONS.pinned}<small>탈출: 안전하게 · 공격: 아래층 베기, 실패하면 목숨 −1</small>`;
+const pinHint = `${CAPTIONS.pinned}<small>탈출: 안전하게 · 공격: 아래층 베기(실패하면 목숨 −1)</small>`;
 
 /** 졸라맨 목숨 하나 — 잃으면 옅은 먹 위에 사선 한 획 */
 const life = (on: boolean): string =>
@@ -61,7 +61,7 @@ export function mountHud(
           <b class="hud-score" data-el="score">0</b>
           <b class="hud-bank" data-el="bank" hidden></b>
         </div>
-        <button type="button" class="inkseal hud-pause" aria-label="일시정지"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M4 2 L11 2 L10 24 L3 24 Z"/><path d="M15 2 L22 2 L23 24 L16 24 Z"/></svg></button>
+        <button type="button" class="inkseal hud-pause" aria-label="멈춤"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M4 2 L11 2 L10 24 L3 24 Z"/><path d="M15 2 L22 2 L23 24 L16 24 Z"/></svg></button>
       </div>
       <svg class="hud-line" viewBox="0 0 360 12" preserveAspectRatio="none" aria-hidden="true"><path d="M0 1 Q150 -1 296 3.5 L306 6 L294 8.5 Q150 11 0 11 Z"/></svg>
       <div class="hud-boss" data-el="boss" role="img" hidden>

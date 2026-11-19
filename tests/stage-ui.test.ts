@@ -24,15 +24,15 @@ describe('반려 사유', () => {
   const def = stageDef('1-1');
   it('못 찍은 첫 자리 하나: 접수 > 이상 없음 > 기한 내 > 전임자 확인', () => {
     expect(pickReason(result({ cleared: false, stamps: { ...ALL, done: false } }), 0)).toBe('사유: 미완료.');
-    expect(pickReason(result({ stamps: { ...ALL, safe: false, inTime: false } }), 2)).toBe('사유: 목숨 2.');
-    expect(pickReason(result({ stamps: { ...ALL, safe: false } }), 0)).toBe('사유: 안전모.');
+    expect(pickReason(result({ stamps: { ...ALL, safe: false, inTime: false } }), 2)).toBe('사유: 목숨 2 잃음.');
+    expect(pickReason(result({ stamps: { ...ALL, safe: false } }), 0)).toBe('사유: 안전모 파손.');
     expect(pickReason(result({ ticks: def.par + 90, stamps: { ...ALL, inTime: false, master: false } }), 0)).toBe('사유: 1.5초 늦음.');
   });
 
   it('전임자 확인은 차이를 「미처리 N건」으로 말한다 — 전임자 걸음 기록보다 늦은 걸음 수', () => {
     const splits = [300, 700, def.master - 10, def.master + 50, def.master + 90];
     const line = pickReason(result({ ticks: def.master + 108, splits, stamps: { ...ALL, master: false } }), 0);
-    expect(line).toBe('사유: 1.8초. 미처리 2건.');
+    expect(line).toBe('사유: 1.8초 늦음. 미처리 2건.');
   });
 
   it('특기 사항만 비면 사유가 없다(수수께끼가 그 자리 밑에 늘 보인다)', () => {

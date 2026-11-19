@@ -70,9 +70,9 @@ const LOOKS = [
 
 /** 꾸미기엔 기존 설명이 없다 — 쓰임 한 줄만 여기서 */
 const LOOK_USE: Readonly<Record<'body' | 'blade' | 'letters', string>> = {
-  body: '졸라맨 몸 색을 바꾼다.',
+  body: '졸라맨 선 색을 바꾼다.',
   blade: '칼빛 색을 바꾼다.',
-  letters: '콤보 숫자 색을 바꾼다.',
+  letters: '콤보 50 전 숫자 색을 바꾼다.',
 };
 
 const KIND: Readonly<Record<BookSlot, string>> = {
@@ -127,7 +127,7 @@ export function bookCount(groups: readonly BookGroup[]): { have: number; total: 
   return { have: all.filter((e) => e.has).length, total: all.length };
 }
 
-const noText = (n: number): string => `No.${String(n).padStart(2, '0')}`;
+const noText = (n: number): string => `${String(n).padStart(2, '0')}번`;
 
 /* ── 그림 ── */
 
@@ -173,7 +173,7 @@ function routeOf(e: BookEntry): BookGo | undefined {
   if (e.slot === 'item') return undefined;
   if (!how) return 'gear';
   if (how.includes('특근')) return 'season';
-  return /^(도감|신입 졸업)/.test(how) ? undefined : 'pack';
+  return /^(도감|신입 수료)/.test(how) ? undefined : 'pack';
 }
 
 const TIER_EDGE: Readonly<Record<Tier, string>> = { common: 'dim', fine: 'ink', rare: 'navy', legend: 'gold' };
@@ -429,7 +429,7 @@ export function bookPopup(key: string): BookPage | null {
     : '<p class="bk-lock">가지면 열린다.</p>';
   const html = `<div class="bk-pop ${e.has ? 'is-have' : 'is-no'}${e.user ? ' is-user' : ''}">
       <div class="bk-pop-art k-${e.slot}"><span class="bk-pno">${noText(e.no)}</span>${artHtml(e.slot === 'mask' ? e : { ...e, has: true }, last.ctx, true)}</div>
-      <p class="bk-kind">${kind}${e.tier ? tierTag(e.tier) : ''}<span class="bk-state">${e.has ? '가짐' : '아직 없음'}</span></p>
+      <p class="bk-kind">${kind}${e.tier ? tierTag(e.tier) : ''}<span class="bk-state">${e.has ? '보유' : '아직 없음'}</span></p>
     </div>
     ${text}
     ${how ? `<p class="bk-how2">${escapeHtml(how)}</p>` : ''}`;

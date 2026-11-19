@@ -141,7 +141,7 @@ function showIosGuide(): void {
         <li><span class="ip-num">2</span><span>「홈 화면에 추가」를 찾아 눌러요</span></li>
         <li><span class="ip-num">3</span><span>오른쪽 위 「추가」를 누르면 끝나요</span></li>
       </ol>
-      <p class="ip-note">설치하면 홈에서 바로 열려요. 알림은 보내지 않아요.</p>
+      <p class="ip-note">설치하면 홈 화면에서 바로 열려요. 알림은 보내지 않아요.</p>
       <button type="button">닫기</button>
     </div>
   `;

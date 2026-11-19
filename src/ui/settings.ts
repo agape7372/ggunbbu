@@ -5,7 +5,7 @@ import { SAVE_KEY } from '../config';
 import type { ButtonLayout } from '../input/layout';
 import { saveSave, type SaveData, type SaveSettings } from '../storage';
 
-export const SHAKE_LABEL = ['없음', '약하게', '기본'] as const;
+export const SHAKE_LABEL = ['없음', '약함', '기본'] as const;
 export const FLASH_LABEL = SHAKE_LABEL;
 
 export interface SettingsSinks {
