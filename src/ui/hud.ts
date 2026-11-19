@@ -17,8 +17,8 @@ export interface HudApi {
   sync(s: GameState, op?: HudOp | null): void;
   /** 판 도중 자막(콤보 이정표·기록 돌파·구역 도달) — CAPTION_MS 뒤 사라진다. 새 자막은 앞 것을 갈아치운다 */
   note(text: string): void;
-  /** 가드 가르치기 한 줄 켜고 끄기 (평생 첫 목숨 손실 때) */
-  teach(on: boolean): void;
+  /** 가르치는 줄 — 평생 첫 목숨 손실 때 가드(이름 + 작은 한 줄) · 수습 교육판 걸음 이름표. null = 끈다 */
+  teach(label: string | null, sub?: string): void;
 }
 
 const pinHint = `${CAPTIONS.pinned}<small>탈출: 빠져나오기 · 공격: 아래층 베기</small>`;
@@ -66,7 +66,7 @@ export function mountHud(
       <div class="hud-bonus" data-el="bonus" hidden></div>
       <div class="hud-cap" data-el="cap" hidden></div>
       <div class="hud-note" data-el="note" role="status" hidden></div>
-      <div class="hud-teach" data-el="teach" hidden>${SCREENS.teach.guard}<small>${SCREENS.teach.guardSub}</small></div>
+      <div class="hud-teach" data-el="teach" hidden></div>
       <div class="hud-pin" data-el="pin" hidden>${pinHint}</div>
     </div>
   `;
@@ -92,6 +92,7 @@ export function mountHud(
   let noteTimer = 0;
   let noteAlt = false;
   let teaching = false;
+  let teachHtml = '';
 
   capEl.textContent = CAPTIONS.combo999;
 
@@ -140,10 +141,14 @@ export function mountHud(
       noteEl.classList.toggle('in-b', !noteAlt);
       noteTimer = window.setTimeout(() => { noteEl.hidden = true; }, CAPTION_MS);
     },
-    teach(on: boolean): void {
-      teaching = on;
-      teachEl.hidden = !on;
-      if (on) pinEl.hidden = true;
+    teach(label: string | null, sub?: string): void {
+      const html = label === null ? '' : `${label}${sub ? `<small>${sub}</small>` : ''}`;
+      if (html === teachHtml) return;
+      teachHtml = html;
+      teaching = label !== null;
+      teachEl.hidden = !teaching;
+      teachEl.innerHTML = html;
+      if (teaching) pinEl.hidden = true;
     },
     sync(s: GameState, op?: HudOp | null): void {
       if (s.score !== lastScore) {

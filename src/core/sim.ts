@@ -14,6 +14,7 @@ import { absorbWithHat, onBuildingDown } from './items';
 import { specialHitBoss } from './boss';
 import { stepStage, tallyGuard } from './stage';
 import { specialHitLandmark } from './landmark';
+import { holdTraining, hoverStack, stepTraining } from './training';
 
 export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): GameState {
   return {
@@ -53,6 +54,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     tokotonCycle: 0,
     stage: null,
     lm: null,
+    training: null,
     wazaRun: null,
     wazaHitTick: -1,
   };
@@ -69,6 +71,8 @@ export function advance(s: GameState, input: InputFrame): void {
     s.hitstop -= 1;
     return;
   }
+  // 수습 교육판 가드 걸음 — 건물이 가드 존에서 멈춰 있다(가드를 누르면 이 틱부터 다시 돈다)
+  if (holdTraining(s, input)) return;
   // 시작 장비 「필살 충전」 — 게이지가 비면(쓴 뒤 · 2막 진입 리셋 뒤) 하나 써서 다시 채운다
   if (s.wazaBank > 0 && s.wazaGauge < WAZA_GAUGE.COST) {
     s.wazaBank -= 1;
@@ -140,6 +144,7 @@ export function advance(s: GameState, input: InputFrame): void {
     prevStackY = stack.y;
     const { g, vterm } = stackPhysics(s);
     const grounded = stepStack(stack, g, vterm, TICK);
+    if (s.training) hoverStack(s, stack); // 교육판 멈춤 높이 — 밑면 붙어 내려가기 앞
     // 접지 전에 가드 스윕 판정 기회를 준다 (공중가드가 접지 직전 프레임을 잡도록)
     if (grounded && !tryGuardBounce(s, guardActive(s.player), s.player.y, prevStackY)) {
       onStackGrounded(s);
@@ -172,6 +177,7 @@ export function advance(s: GameState, input: InputFrame): void {
   else if (s.mode === 'bonus') stepBonus(s);
   else if (s.mode === 'act2') stepAct2(s);
   else if (s.mode === 'stage') stepStage(s, evStart);
+  else if (s.mode === 'training') stepTraining(s, evStart);
 
   // ── 보급 상자 (완파 수) ── 완파 경로가 여럿(타격·필살·깔림 Z)이라 이벤트로 모아 센다
   if (countsDrops) {
@@ -504,6 +510,7 @@ function stepPinnedByRocks(s: GameState, input: InputFrame): void {
 }
 
 function loseLife(s: GameState): void {
+  if (s.mode === 'training') return; // 수습 교육판은 목숨이 안 준다 — 깔림 · 피격 연출(hurt)은 호출부가 그대로 낸다
   s.lives -= 1;
   s.events.push({ kind: 'lifeLost', n: s.lives });
   if (s.lives <= 0) {

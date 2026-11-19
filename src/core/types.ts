@@ -177,7 +177,25 @@ export interface BossState {
   hittable: boolean;
 }
 
-export type Mode = 'act1' | 'act2' | 'tokoton' | 'bonus' | 'stage';
+export type Mode = 'act1' | 'act2' | 'tokoton' | 'bonus' | 'stage' | 'training';
+
+/** 수습 교육판 진행 — 걸음(lesson) 안에서 정한 수만큼 해내면 다음 걸음(core/training.ts) */
+export interface TrainingRun {
+  /** 지금 걸음(LESSONS 자리). 다 하면 LESSONS.length */
+  lesson: number;
+  /** 이 걸음에서 해낸 수 */
+  rep: number;
+  /** 이번 건물을 냈나 */
+  spawned: boolean;
+  /** 다음 건물까지 쉼(틱) */
+  wait: number;
+  /** 판 멈춤 — 0 = 안 멈춤 · 양수 = 남은 틱 · -1 = 가드를 누를 때까지 */
+  hold: number;
+  /** 이번 건물에서 멈춘 적이 있나(건물 하나에 한 번) */
+  held: boolean;
+  /** 해낸 건물을 위로 날려 보내는 중 — 화면 위로 나가면 걷는다 */
+  launch: boolean;
+}
 
 /** 작업 지시서 난이도 — 0 견습 · 1 정규 · 2 외주 */
 export type StageDiff = 0 | 1 | 2;
@@ -399,6 +417,8 @@ export interface GameState {
   stage: StageRun | null;
   /** 명물 보스 (작업 지시서 보스전일 때만) */
   lm: LandmarkState | null;
+  /** 수습 교육판 진행 (mode 'training'일 때만) */
+  training: TrainingRun | null;
   /** 시간차 필살이 도는 중(config WAZA_RUN) — t = 발동 히트스톱 뒤 지난 틱, stack = 벤 건물(같은 건물일 때만 멈추고 터뜨린다) */
   wazaRun: WazaRun | null;
   /** 필살 대미지가 들어간 마지막 틱 — 보스를 필살로 끝냈나(작업 지시서 특기 사항)를 이 틱으로 가린다 */

@@ -24,6 +24,11 @@ export interface TouchInput {
   setPinned(pinned: boolean): void;
   /** 가드 가르치기 — 가드 키가 맥동한다(첫 목숨 손실 때 한 번) */
   setGuardHint(on: boolean): void;
+  /**
+   * 플레이 얼굴의 진한 키(수습 교육판 걸음) — 여기 든 키만 그대로, 나머지는 옅은 먹(f-faint 바탕). 옅어도 눌린다.
+   * null = 모두 그대로. 메뉴 얼굴이 떠 있는 동안은 값만 받아 둔다
+   */
+  setFocus(keys: readonly TouchAction[] | null): void;
   /** 필살 게이지 충전 완료 → 마름모 테두리가 굵어지고 글씨가 뒤집힌다 */
   setSpecialReady(ready: boolean): void;
   /** 필살 게이지(0~100) — 마름모 안 먹 높이. 정수가 바뀔 때만 쓴다 */
@@ -108,6 +113,8 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
   let layout: ButtonLayout | null = null;
   let leftHanded = false;
   let guardHint = false;
+  let focus: readonly TouchAction[] | null = null;
+  let focusKey = '';
   let faces: KeyFaces | null = null;
   let facesKey = '';
   /** 키보드 · 보조기기 「누름」(click detail 0)으로 든 가드 — 한 표본만 쥐고 놓는다 */
@@ -169,6 +176,14 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
     }
     for (const btn of buttonsByAction.special) btn.classList.toggle('ready', specialReady);
     paintSpecialFill();
+    paintFocus();
+  };
+
+  /** 수습 교육판 — 이 걸음에 안 쓰는 키는 옅게 */
+  const paintFocus = (): void => {
+    for (const action of ACTIONS) {
+      for (const btn of buttonsByAction[action]) btn.classList.toggle('dim', !!focus && !focus.includes(action));
+    }
   };
 
   const paintFaces = (f: KeyFaces): void => {
@@ -177,7 +192,7 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
       const face = f[action];
       const rest = face.tone === 'rest';
       for (const btn of buttonsByAction[action]) {
-        btn.classList.remove('f-ink', 'f-seal', 'f-faint', 'f-rest', 'ready', 'teach', 'pinned');
+        btn.classList.remove('f-ink', 'f-seal', 'f-faint', 'f-rest', 'ready', 'teach', 'pinned', 'dim');
         btn.classList.add(`f-${face.tone}`);
         btn.classList.toggle('long', face.label.length > 3); // 「일어나기 · 한 판 더 · 다음 지시서」 — 글씨를 줄인다(style.css)
         const sub = face.sub ? `<i>${face.sub}</i>` : '';
@@ -339,6 +354,14 @@ export function initTouchLayer(container: HTMLElement): TouchInput {
         btn.setAttribute('aria-label', label);
         btn.classList.toggle('pinned', pinned);
       }
+    },
+
+    setFocus(keys: readonly TouchAction[] | null) {
+      const key = keys ? keys.join() || '-' : '';
+      if (key === focusKey) return;
+      focusKey = key;
+      focus = keys;
+      if (!faces) paintFocus();
     },
 
     setGuardHint(on: boolean) {
