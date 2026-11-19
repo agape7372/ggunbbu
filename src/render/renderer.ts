@@ -18,6 +18,7 @@ import {
 import { maskColors, wornMask } from '../meta/mask';
 import { setFxMask } from './weaponFx';
 import { backdropKey, drawChapterBackdrop, type BackdropInput } from './background';
+import { drawSceneLive } from './scenery';
 import { backdropPaper } from './assets';
 import { cameraFollowY } from '../core/camera';
 import { spawnCueCd } from '../core/landmark';
@@ -515,6 +516,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.save();
   ctx.translate(0, cam * CAMERA.BG_PARALLAX);
   syncFieldBg(drawChapterBackdrop(ctx, s), s, bg);
+  drawSceneLive(ctx, { key: backdropKey(s), tick: s.tick, p: s.p, night: s.gimmick === 'night' });
   ctx.restore();
   ctx.translate(0, cam);
   ctx.fillStyle = '#DDD8CC';

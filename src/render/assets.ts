@@ -7,6 +7,7 @@ import manifestJson from '../assets/manifest.json';
 import { drawHalo, haloFor } from './halo';
 import { JUICE_SYS, PALETTE } from '../config';
 import { fillSmallPaperPockets } from './skylineWindows';
+import { paintSceneTiers } from './scenery';
 
 export interface AssetEntry {
   src: string;
@@ -271,6 +272,7 @@ export function drawBackdropCached(
     if (!drawBackdrop(c, key, 0, 0, dw, dh)) return false;
     measurePaper(c, key, cv.height);
     if (night) inkSkylineWindows(c, cv.width, cv.height);
+    paintSceneTiers(c, key, dw, dh); // 먹 농담 원경 두 단(scenery.ts) — 창 칠하기 뒤에 얹는다(종이 색 판정이 안 흔들리게)
     bgCache = { key, image, dw, dh, night, cv };
   }
   ctx.drawImage(bgCache.cv, dx, dy, dw, dh);
