@@ -3,7 +3,7 @@
 // 옅을수록 멀다. 가운데 레인은 건물이 가리니 그림은 화면 폭 전체에 깔고 양옆 여백에서 읽히게 둔다.
 // 두 단은 배경 캐시에 한 번 구워지고(assets.drawBackdropCached), 살아 있는 것만 매 프레임 그린다.
 
-import { VIEW } from '../config';
+import { PALETTE, VIEW } from '../config';
 
 type C = CanvasRenderingContext2D;
 export type SceneTheme = 'europe' | 'asia' | 'eastasia' | 'modern';
@@ -31,7 +31,8 @@ function seeded(seed: number): () => number {
 
 // ── 면 조각(모두 시계 방향 — 겹쳐도 구멍이 나지 않는다) ──
 function box(c: C, x: number, top: number, w: number, base: number): void {
-  c.moveTo(x, top); c.lineTo(x + w, top); c.lineTo(x + w, base); c.lineTo(x, base); c.closePath();
+  // 옆 조각과 반 픽셀 겹친다 — 딱 맞닿으면 가장자리 다듬기가 이음선을 남긴다
+  c.moveTo(x - 0.5, top); c.lineTo(x + w + 0.5, top); c.lineTo(x + w + 0.5, base); c.lineTo(x - 0.5, base); c.closePath();
 }
 function gable(c: C, x: number, top: number, w: number, rise: number): void {
   c.moveTo(x - 2, top); c.lineTo(x + w / 2, top - rise); c.lineTo(x + w + 2, top); c.closePath();
@@ -264,3 +265,34 @@ export function drawSceneLive(c: C, s: SceneLive): void {
   drawFlock(c, s.tick);
   c.restore();
 }
+
+// ── 부순 흔적 ──
+/** 잔해 한 덩이를 쌓는 데 드는 층 수 · 한쪽에 쌓이는 덩이 수(레인 밖 여백 45px 안에 든다) */
+export const HEAP = { FLOORS_PER_BLOCK: 10, PER_SIDE: 6, FILL: '#CFC9BC' } as const;
+/** 한쪽 더미의 자리 [여백 안쪽 x, 땅에서 높이, 크기] — 아래 셋 · 가운데 둘 · 위 하나 */
+const HEAP_SEAT = [[3, 0, 15], [27, 0, 14], [15, 0, 16], [9, 13, 14], [23, 12, 13], [16, 24, 13]] as const;
+
+/** 이 판에서 부순 층 수만큼 양옆 여백에 잔해가 쌓인다 — 판이 얼마나 갔는지가 땅에 남는다. 월드 좌표(카메라 변환 안) */
+export function drawRubbleHeaps(c: C, razedFloors: number, groundY: number): void {
+  const blocks = Math.min(HEAP.PER_SIDE * 2, Math.floor(razedFloors / HEAP.FLOORS_PER_BLOCK));
+  if (blocks <= 0) return;
+  c.save();
+  c.fillStyle = HEAP.FILL;
+  c.strokeStyle = PALETTE.INK;
+  c.lineWidth = 1.4;
+  c.lineJoin = 'round';
+  for (let i = 0; i < blocks; i++) {
+    const right = i % 2 === 1;
+    const [sx, up, size] = HEAP_SEAT[i >> 1];
+    const cx = right ? VIEW.W - sx - size / 2 : sx + size / 2;
+    const tilt = (((i * 37) % 9) - 4) * 0.05;
+    c.save();
+    c.translate(cx, groundY - up - size / 2);
+    c.rotate(tilt);
+    c.fillRect(-size / 2, -size / 2, size, size);
+    c.strokeRect(-size / 2, -size / 2, size, size);
+    c.restore();
+  }
+  c.restore();
+}
+

@@ -18,7 +18,7 @@ import {
 import { maskColors, wornMask } from '../meta/mask';
 import { setFxMask } from './weaponFx';
 import { backdropKey, drawChapterBackdrop, type BackdropInput } from './background';
-import { drawSceneLive } from './scenery';
+import { drawRubbleHeaps, drawSceneLive } from './scenery';
 import { backdropPaper } from './assets';
 import { cameraFollowY } from '../core/camera';
 import { spawnCueCd } from '../core/landmark';
@@ -46,6 +46,8 @@ let trauma = 0;
  * 목표값을 그대로 쓰면 데드존 진입 순간 화면이 툭 튄다. drawGame이 매 프레임 한 번 전진시킨다.
  */
 let smoothCam = 0;
+/** 이 판에서 부순 층 수 — 양옆 잔해 더미(scenery.drawRubbleHeaps)가 읽는다 */
+let razed = 0;
 let shakeT = 0;
 /** 방향 킥 — 화면이 위로 툭 튀었다 용수철로 돌아오는 변위(px)·속도. 흔들림 떨림과 따로 논다(첫 프레임이 곧 최대). */
 let kickY = 0;
@@ -136,6 +138,7 @@ function resetRunState(): void {
   jumpT = 0;
   hitFlashT = 0;
   dropT = 0;
+  razed = 0;
   lastStack = null;
   bossMark = '';
   prelude = null;
@@ -254,6 +257,7 @@ function reactImpact(s: GameState, e: JuiceEvent): void {
   switch (e.kind) {
     case 'stackDestroy': {
       const n = e.n ?? 0;
+      razed += n;
       fx.startImpact(VIEW.LANE_X[0], headY, n >= JUICE_SYS.IMPACT_FLOORS);
       // 버터바(보너스)는 겹 수로 점수가 따로 붙는다 — 일반 건물만 층수·완파 점수 자막.
       // 모드로는 못 가린다: 마지막 버터바를 부순 틱에 core가 같은 틱 안에서 본편으로 돌아간다
@@ -522,6 +526,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.fillStyle = '#DDD8CC';
   ctx.fillRect(-16, VIEW.GROUND_Y, VIEW.W + 32, VIEW.H - VIEW.GROUND_Y);
   fx.drawGroundLine(ctx);
+  if (s.mode !== 'bonus') drawRubbleHeaps(ctx, razed, VIEW.GROUND_Y);
   watchOrbitDrop(s);
   if (s.stack && !lastStack && !s.over) dropT = JUICE_SYS.DROP_STREAK_TICKS;
   drawOrbitBeam(ctx, s, cam);
