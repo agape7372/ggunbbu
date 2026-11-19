@@ -209,7 +209,7 @@ export interface TrainingRun {
   /** 이번 건물에서 다음에 설 박자(걸음의 beats 자리). 박자는 건물 하나에 한 번씩 */
   beat: number;
   /** 판이 기다리는 키(서 있을 때만) */
-  need: 'jump' | 'guard' | 'attack' | 'special' | null;
+  need: 'jump' | 'guard' | 'attack' | 'special' | 'any' | null;
   /** 한 번 해냈다 — 다음 건물까지 쉬는 동안 「통과」. 걸음은 쉼이 끝나야 넘어간다 */
   ok: boolean;
   /** 해낸 건물을 위로 날려 보내는 중 — 화면 위로 나가면 걷는다 */

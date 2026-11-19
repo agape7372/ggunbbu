@@ -7,7 +7,7 @@ import { ACT2, CAPTION_MS, PERK, PLAYER } from '../config';
 import { CAPTIONS, hudModeLabel, SCREENS } from '../content';
 import { ICON } from './icons';
 import { fmt } from './ink';
-import { escapeHtml } from './html';
+import { mountGuide, type GuideView } from './hudGuide';
 import { arcadeBar, stageBar, type HudBar } from './stageLogic';
 
 /** 띠 가운데 둘째 줄 — head가 있으면 구역 이름 대신 첫 줄에 선다(지시서: 「1-1 회랑 3번지」 + 시계) */
@@ -20,11 +20,11 @@ export interface HudApi {
   note(text: string): void;
   /** 가르치는 줄 — 평생 첫 목숨 손실 때 가드(이름 + 작은 한 줄). null = 끈다 */
   teach(label: string | null, sub?: string): void;
-  /** 튜토리얼 안내판 — 제목 · 설명 · 할 일 한 줄 · 해냈으면 「통과」 도장. null = 끈다 */
+  /** 튜토리얼 담당자 무전 — 말풍선 · 누를 키 꼬리표 · 「지금!」(hudGuide.ts). null = 끈다 */
   guide(v: GuideView | null): void;
 }
 
-export interface GuideView { title: string; lines: string; task: string; ok: boolean }
+export type { GuideView };
 
 /** 현장 조건 쪽지 하나 — 붓 이름 + 얻는 것(+ 치르는 것). 왼쪽 = 점프 키 · 오른쪽 = 공격 키(scenes syncFaces가 키 얼굴을 같은 이름으로) */
 function perkNote(id: PerkId, k: 'jump' | 'attack'): string {
@@ -78,7 +78,6 @@ export function mountHud(
       <div class="hud-cap" data-el="cap" hidden></div>
       <div class="hud-note" data-el="note" role="status" hidden></div>
       <div class="hud-teach" data-el="teach" hidden></div>
-      <div class="hud-guide" data-el="guide" role="status" hidden></div>
       <div class="hud-pin" data-el="pin" hidden>${pinHint}</div>
       <div class="hud-offer" data-el="offer" hidden></div>
     </div>
@@ -102,14 +101,13 @@ export function mountHud(
   const opEl = el('op');
   const noteEl = el('note');
   const teachEl = el('teach');
-  const guideEl = el('guide');
   const offerEl = el('offer');
   let noteTimer = 0;
   let noteAlt = false;
   let teaching = false;
   let teachHtml = '';
   let guiding = false;
-  let guideHtml = '';
+  const radio = mountGuide(root, hudEl);
 
   capEl.textContent = CAPTIONS.combo999;
 
@@ -179,14 +177,10 @@ export function mountHud(
       if (teaching) pinEl.hidden = true;
     },
     guide(v: GuideView | null): void {
-      const html = v === null ? '' : `<b class="g-t">${escapeHtml(v.title)}</b><p class="g-l">${escapeHtml(v.lines)}</p>`
-        + `<p class="g-k">${escapeHtml(v.task)}</p>${v.ok ? `<i class="g-ok">${SCREENS.training.ok}</i>` : ''}`;
-      if (html === guideHtml) return;
-      guideHtml = html;
+      radio.set(v);
+      if (guiding === (v !== null)) return;
       guiding = v !== null;
-      guideEl.hidden = !guiding;
-      guideEl.innerHTML = html;
-      teachEl.hidden = !teaching || guiding; // 안내판이 떠 있으면 판 위 글은 안내판 하나만
+      teachEl.hidden = !teaching || guiding; // 말풍선이 떠 있으면 판 위 글은 말풍선 하나만
       if (guiding) pinEl.hidden = true;
     },
     sync(s: GameState, op?: HudOp | null): void {

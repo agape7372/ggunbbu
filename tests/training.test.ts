@@ -17,7 +17,7 @@ const fresh = (): GameState => {
 function rookie(s: GameState): InputFrame {
   const g = trainingGuide(s);
   if (!g) return EMPTY_INPUT;
-  if (g.waiting && g.need) return { ...EMPTY_INPUT, [g.need]: true };
+  if (g.waiting && g.need) return { ...EMPTY_INPUT, [g.need === 'any' ? 'jump' : g.need]: true };
   const odd = s.tick % 2 === 0;
   const st = s.stack;
   switch (g.lesson) {
@@ -59,9 +59,9 @@ function play(bot: (s: GameState) => InputFrame, max = 60 * 90): { s: GameState;
 }
 
 describe('튜토리얼', () => {
-  it('키 얼굴대로 누르면 일곱 걸음을 차례로 지나 끝난다 — 목숨은 그대로', () => {
+  it('키 얼굴대로 누르면 여덟 걸음을 차례로 지나 끝난다 — 목숨은 그대로', () => {
     const { s, seen, minLives } = play(rookie);
-    expect(LESSONS.length).toBe(7);
+    expect(LESSONS.length).toBe(8);
     expect(s.over).toBe('cleared');
     expect(seen).toEqual(LESSONS.map((l) => l.id));
     expect(minLives).toBe(PLAYER.LIVES);
@@ -75,13 +75,51 @@ describe('튜토리얼', () => {
     expect([a.tick, a.score, a.peakCombo]).toEqual([b.tick, b.score, b.peakCombo]);
   });
 
+  it('타이밍 박자(가드 존)에서만 「지금!」', () => {
+    const s = fresh();
+    reach(s, 'guard');
+    expect(trainingGuide(s)!.now).toBe(false);
+    for (let i = 0; i < 60 * 10 && s.training!.hold === 0; i++) idle(s, 1);
+    expect(trainingGuide(s)!.now).toBe(true);
+  });
+
   it('지시서 목록(STAGES)에 안 든다', () => {
     expect(STAGES.some((d) => (d.id as string) === 'training')).toBe(false);
   });
 
+  it('인사: 건물 없이 판이 서고, 아무 키 하나로 바로 베기 걸음(눌린 키는 안 쓴다)', () => {
+    for (const k of ['jump', 'attack', 'guard', 'special'] as const) {
+      const s = fresh();
+      idle(s, 30);
+      expect(trainingGuide(s)).toMatchObject({ lesson: 'hello', waiting: true, need: 'any', ok: false });
+      expect(s.stack).toBeNull();
+      const ev = idle(s, 1, { ...EMPTY_INPUT, [k]: true });
+      expect(trainingLesson(s)).toBe('slash');
+      expect(ev).not.toContain('jump'); // 점프로 넘겨도 뛰지 않는다
+      expect(trainingGuide(s)!.ok).toBe(false); // 통과 · 쉼 없이
+      idle(s, 2);
+      expect(trainingGuide(s)).toMatchObject({ lesson: 'slash', waiting: true, need: 'attack' });
+    }
+  });
+
+  it('해낸 뒤 쉼은 OK_TICKS — 그동안 「통과」(반응 대사 읽을 시간)', () => {
+    const s = fresh();
+    reach(s, 'slash');
+    let rest = -1; // 판이 빈 틱에 잡힌 쉼
+    for (let i = 0; i < 60 * 20 && trainingLesson(s) === 'slash'; i++) {
+      advance(s, rookie(s));
+      if (rest < 0 && s.training!.ok && !s.stack) rest = s.training!.wait;
+      s.events.length = 0;
+    }
+    expect(rest + 1).toBe(TRAINING.OK_TICKS); // 판이 빈 틱이 쉼 첫 틱 · 히트스톱 틱은 쉼을 안 깎는다
+    expect(trainingLesson(s)).toBe('combo');
+  });
+
   it('선 판은 그 키로만 풀린다 — 베기에서 점프를 눌러 둬도 공격으로 풀면 뛰지 않고 벤다', () => {
     const s = fresh();
-    idle(s, TRAINING.GAP + 2);
+    idle(s, 2);
+    idle(s, 1, { ...EMPTY_INPUT, attack: true }); // 인사
+    idle(s, 2);
     expect(trainingGuide(s)).toMatchObject({ lesson: 'slash', waiting: true, need: 'attack' });
     const y = s.stack!.y;
     idle(s, 20, { ...EMPTY_INPUT, jump: true }); // 다른 키 — 안 풀린다

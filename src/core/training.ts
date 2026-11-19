@@ -1,10 +1,11 @@
-// 튜토리얼 — 첫 실행에 판 위 안내판(제목 · 설명 · 할 일)과 「그 키를 누를 때까지 판이 선다」로 가르친다.
+// 튜토리얼 — 첫 실행에 담당자 무전(말풍선: 대사 · 행동 유도 · 해내면 반응 대사)과 「그 키를 누를 때까지 판이 선다」로 가르친다.
 // 걸음마다 박자(beat) 몇 개. 박자가 서면 판이 멈추고 need 키로만 풀린다. 글은 content/screens.ts SCREENS.training.
 // 작업 지시서가 아니다 — STAGES에 안 들고 지도 · 기록 · 기한 · 도장이 없다. 건물 층은 지시서 대본 글자(core/script.ts)로 적는다.
 // 목숨이 줄지 않는다(sim.ts loseLife). 깔리면 그 건물을 걷고 같은 걸음을 다시 낸다 — 깔렸을 때 걸음만 깔리는 게 일이다.
 // 난수를 안 쓴다. 같은 입력이면 같은 판이다.
 //
 // | 걸음      | 건물                          | 박자                     |
+// | 인사      | 없음                          | 시작 → 아무 키           |
 // | 베기      | 약 3층 · 높이 58에 바로       | 자리 → 공격              |
 // | 콤보      | 약 5층 · 높이 58에 바로       | 자리 → 공격              |
 // | 뛰어 베기 | 약 2층 · 높이 190에 바로      | 자리 → 점프, 닿음 → 공격 |
@@ -22,17 +23,17 @@ import { reachOf } from './perks';
 
 /** 조작 키 이름 — input/touch.ts TouchAction과 같은 글자(core는 입력 층을 import하지 않는다) */
 export type Verb = 'jump' | 'guard' | 'attack' | 'special';
-export type LessonId = 'slash' | 'combo' | 'jumpSlash' | 'guard' | 'escape' | 'special' | 'solo';
+export type LessonId = 'hello' | 'slash' | 'combo' | 'jumpSlash' | 'guard' | 'escape' | 'special' | 'solo';
 
 /** 판이 서는 순간 — ready 건물이 자리 잡음 · guardZone 가드 존 · reach 공중에서 칼이 닿음 · pinned 깔림 */
-export interface Beat { key: Verb; when: 'ready' | 'guardZone' | 'reach' | 'pinned' }
+export interface Beat { key: Verb | 'any'; when: 'start' | 'ready' | 'guardZone' | 'reach' | 'pinned' }
 
 interface Lesson {
   id: LessonId;
   /** 진하게 보일 키 */
   keys: readonly Verb[];
-  /** 해낸 것 하나 = 완파 · 가드 튕김 · 깔림 탈출 */
-  goal: 'destroy' | 'guard' | 'escape';
+  /** 해낸 것 하나 = 완파 · 가드 튕김 · 깔림 탈출 · (인사) 아무 키 */
+  goal: 'destroy' | 'guard' | 'escape' | 'start';
   reps: number;
   floors: readonly Material[];
   /** 나오는 높이. 0 = 땅에 놓인 채(바로 깔린다) */
@@ -53,6 +54,7 @@ const ALL: readonly Verb[] = ['jump', 'guard', 'attack', 'special'];
 const { HOVER_LOW: LOW, HOVER_HIGH: HIGH } = TRAINING;
 
 export const LESSONS: readonly Lesson[] = [
+  { id: 'hello', keys: ALL, goal: 'start', reps: 1, floors: [], spawnY: 0, beats: [{ key: 'any', when: 'start' }] },
   { id: 'slash', keys: ['attack'], goal: 'destroy', reps: 1, floors: floorsOf('www'), spawnY: LOW, hover: LOW, beats: [{ key: 'attack', when: 'ready' }] },
   { id: 'combo', keys: ['attack'], goal: 'destroy', reps: 1, floors: floorsOf('wwwww'), spawnY: LOW, hover: LOW, beats: [{ key: 'attack', when: 'ready' }] },
   { id: 'jumpSlash', keys: ['jump', 'attack'], goal: 'destroy', reps: 1, floors: floorsOf('ww'), spawnY: HIGH, hover: HIGH,
@@ -67,7 +69,7 @@ export const LESSONS: readonly Lesson[] = [
 export function startTraining(s: GameState): void {
   s.mode = 'training';
   s.stackSpawnCd = 0;
-  s.training = { lesson: 0, rep: 0, spawned: false, wait: TRAINING.GAP, hold: 0, beat: 0, need: null, ok: false, launch: false };
+  s.training = { lesson: 0, rep: 0, spawned: false, wait: 0, hold: 0, beat: 0, need: null, ok: false, launch: false };
 }
 
 /** 지금 걸음 — 다 했으면 null */
@@ -82,6 +84,7 @@ export function trainingKeys(s: GameState): readonly Verb[] {
   const l = t ? LESSONS[t.lesson] : undefined;
   if (!t || !l || t.launch) return [];
   if (l.goal === 'escape' && s.player.pose !== 'pinned') return [];
+  if (t.hold !== 0 && t.need && t.need !== 'any') return [t.need]; // 판이 기다리는 키 하나만
   return l.keys;
 }
 
@@ -91,7 +94,9 @@ export interface TrainingGuide {
   beat: number;
   /** 판이 need 키를 기다리며 서 있나 */
   waiting: boolean;
-  need: Verb | null;
+  need: Verb | 'any' | null;
+  /** 타이밍 박자(가드 존 · 공중에서 닿음)로 서 있나 — 화면이 「지금!」을 찍는다 */
+  now: boolean;
   /** 걸음을 막 해내고 쉼 중인가 */
   ok: boolean;
   rep: number;
@@ -102,7 +107,9 @@ export function trainingGuide(s: GameState): TrainingGuide | null {
   const t = s.training;
   const l = t ? LESSONS[t.lesson] : undefined;
   if (!t || !l) return null;
-  return { lesson: l.id, beat: t.beat, waiting: t.hold !== 0 && t.need !== null, need: t.need, ok: t.ok, rep: t.rep };
+  const waiting = t.hold !== 0 && t.need !== null;
+  const when = waiting ? l.beats[t.beat]?.when : undefined;
+  return { lesson: l.id, beat: t.beat, waiting, need: t.need, now: when === 'guardZone' || when === 'reach', ok: t.ok, rep: t.rep };
 }
 
 /**
@@ -113,10 +120,11 @@ export function holdTraining(s: GameState, input: InputFrame): boolean {
   const t = s.training;
   if (!t || t.hold === 0) return false;
   const need = t.need;
-  if (need && input[need]) t.hold = 0;
+  const pressed = need === 'any' ? input.jump || input.attack || input.guard || input.special : !!need && input[need];
+  if (pressed) t.hold = 0;
   else if (t.hold > 0) t.hold -= 1;
   if (t.hold !== 0) return true;
-  // 풀렸다(눌렀거나 둘째 가드의 짧은 멈춤이 끝났다)
+  // 풀렸다(눌렀거나 둘째 가드의 짧은 멈춤이 끝났다). 인사(any)는 누른 키를 쓰지 않는다 — 버퍼를 다 비운다
   const p = s.player;
   if (need !== 'jump') p.bufJump = 0;
   if (need !== 'attack') p.bufAttack = 0;
@@ -140,6 +148,18 @@ export function stepTraining(s: GameState, evStart: number): void {
   const l = t ? LESSONS[t.lesson] : undefined;
   if (!t || !l) return;
   const p = s.player;
+
+  // 인사 — 건물 없이 판을 세우고 아무 키나 누르면 바로 다음 걸음(통과 · 쉼 없음)
+  if (l.goal === 'start') {
+    if (t.beat === 0) {
+      if (t.hold === 0) { t.hold = -1; t.need = 'any'; }
+      return;
+    }
+    t.lesson += 1;
+    t.beat = 0;
+    t.wait = 0;
+    return;
+  }
 
   if (!t.launch && s.stack) {
     for (let i = evStart; i < s.events.length; i++) {
@@ -179,7 +199,7 @@ export function stepTraining(s: GameState, evStart: number): void {
     if (l.goal === 'destroy') { t.rep += 1; t.ok = true; }
     t.spawned = false;
     t.launch = false;
-    t.wait = TRAINING.GAP;
+    t.wait = t.ok ? TRAINING.OK_TICKS : TRAINING.GAP; // 해냈으면 반응 대사를 읽을 만큼 쉰다
   }
 
   if (!t.spawned && !s.stack) {
@@ -214,6 +234,7 @@ export function stepTraining(s: GameState, evStart: number): void {
 function beatDue(s: GameState, b: Beat, st: FallingStack): boolean {
   const p = s.player;
   switch (b.when) {
+    case 'start': return false;
     case 'ready': return p.y <= 0;
     case 'guardZone': return st.vy < 0 && st.y <= STACK.GUARD_ZONE_GROUND && p.y <= 0 && !guardActive(p);
     case 'reach': return p.y > 0 && st.y <= p.y + reachOf(s);

@@ -160,6 +160,7 @@ export function createApp(
   let teachFreeze = 0;
   let teachPulse = 0;
   let teachDue = false; // 깔린 채 목숨을 잃었다 — 가르침은 깔림이 풀린 첫 틱(가운데 키가 다시 「가드」 얼굴)에
+  let trainingSay = ''; // 튜토리얼 담당자가 마지막으로 한 대사 — 바뀌면 무전 소리
   let storyLock = 0; // 이야기 판에 들어선 직후 연타로 넘어가지 않게 잠그는 틱
   // 「한 판 더」는 방금 그 모드로 — 구역 작전·야근에서 죽었는데 아케이드로 튕기지 않게
   let lastRun: () => void = () => startArcade();
@@ -437,6 +438,7 @@ export function createApp(
     teachDue = false;
     hud.teach(null);
     hud.guide(null);
+    trainingSay = '';
     touch?.setHint(null);
   }
 
@@ -524,6 +526,7 @@ export function createApp(
     save.howtoSeen = true;
     if (done || (t && t.lesson > LESSONS.findIndex((l) => l.id === 'guard'))) save.guardTaught = true; // 가드를 배웠으면 첫 목숨 손실 때 다시 안 세운다
     hud.guide(null);
+    trainingSay = '';
     touch?.setHint(null);
     if (!done) { saveSave(save); goTitle(); return; }
     const reward = { dust: TRAINING.REWARD_DUST };
@@ -535,18 +538,26 @@ export function createApp(
     void showReward({ tier: 'l', title: SCREENS.training.done, seal: SCREENS.training.seal, reward }).then(homeNudge);
   }
 
-  /** 튜토리얼 한 틱 — 안내판(제목 · 설명 · 할 일 · 통과) · 판이 기다리는 키가 뛴다 */
+  /** 튜토리얼 한 틱 — 담당자 무전(대사 · 행동 유도 · 반응 대사) · 누를 키 꼬리표 · 「지금!」 · 판이 기다리는 키가 뛴다 */
   function trainingTick(s: GameState): void {
     const g = trainingGuide(s);
-    if (!g) { hud.guide(null); touch?.setHint(null); return; }
-    const l: { title: string; lines: string; tasks: readonly string[]; wait?: string; wait2?: string } = SCREENS.training.lesson[g.lesson];
-    const last = l.tasks[l.tasks.length - 1];
-    const wait = g.rep > 0 && l.wait2 ? l.wait2 : l.wait;
-    // 서 있으면 그 박자의 할 일 · 통과 쉼이면 마지막 할 일 · 아니면 기다림 글(없으면 다음 할 일)
-    const task = g.waiting ? l.tasks[g.beat] : g.ok ? last ?? wait : wait ?? l.tasks[g.beat] ?? last;
-    hud.guide({ title: l.title, lines: l.lines, task: task ?? '', ok: g.ok });
-    // 맥동 = 판이 기다리는 키, 아니면 이 걸음의 진한 키(실전 연습 · 통과 쉼은 없음)
-    touch?.setHint(g.waiting && g.need ? [g.need] : g.lesson === 'solo' || g.ok ? null : trainingKeys(s));
+    if (!g) { hud.guide(null); touch?.setHint(null); trainingSay = ''; return; }
+    const T = SCREENS.training;
+    const l: { say: string; asks: readonly string[]; then?: string; wait?: string; done?: string; say2?: string; wait2?: string; done1?: string } = T.lesson[g.lesson];
+    const again = g.rep > 0; // 가드 둘째
+    let say = again && l.say2 ? l.say2 : l.say;
+    let ask: string;
+    if (g.ok) { say = (g.rep === 1 && l.done1) || l.done || say; ask = ''; } // 해낸 뒤 쉼 — 반응 대사만
+    else if (g.waiting) ask = l.asks[g.beat] ?? l.asks[l.asks.length - 1] ?? '';
+    else if (g.beat >= l.asks.length && l.then) ask = l.then; // 박자는 다 풀었고 할 일이 남았다
+    else ask = (again && l.wait2) || l.wait || l.asks[g.beat] || l.asks[l.asks.length - 1] || '';
+    const key = g.waiting && g.need && g.need !== 'any' ? g.need : null;
+    const point = key ? { key, label: key === 'guard' && g.lesson === 'guard' ? T.pointHold : T.point } : null;
+    hud.guide({ lesson: g.lesson, say, ask, ok: g.ok, point, now: g.now });
+    if (say !== trainingSay) { playSfx(g.ok ? 'stamp' : 'uiBlip'); trainingSay = say; } // 새 대사 = 무전 소리 · 해냄 = 도장
+    // 맥동 = 판이 기다리는 키(인사는 네 키 모두), 아니면 이 걸음의 진한 키(실전 연습 · 통과 쉼은 없음)
+    const all: readonly TouchAction[] = ['jump', 'guard', 'attack', 'special'];
+    touch?.setHint(g.waiting && g.need ? (g.need === 'any' ? all : [g.need]) : g.lesson === 'solo' || g.ok ? null : trainingKeys(s));
   }
 
   function startArcade(): void {
