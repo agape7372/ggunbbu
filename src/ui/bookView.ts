@@ -12,7 +12,7 @@ import { LORE } from '../content/lore';
 import type { ItemId } from '../core/types';
 import { COSMETIC_ORBIT_COST, MASK_DUST_COST, ORBIT_COSTS, WAZA_ORBIT_COST, WEAPON_DUST_COST } from '../meta/economy';
 import type { Loadout, WeaponId } from '../meta/types';
-import { BLADE_IDS, BODY_IDS, DEFAULT_OWNED_IDS, GREATSWORD_IDS, LETTERS_IDS, LOOK_EARNED, WAZA_IDS, isOwned } from '../meta/loadout';
+import { BLADE_IDS, BODY_IDS, DEFAULT_OWNED_IDS, GREATSWORD_IDS, LETTERS_IDS, LOOK_EARNED, WAZA_IDS, WEAPON_IDS, isOwned } from '../meta/loadout';
 import { SAMPLE_MASK, wornMask } from '../meta/mask';
 import { ACHIEVES } from '../meta/missions';
 import { FX_SLOTS, WEAPON_TIER, filledSlots, type Tier } from '../meta/tier';
@@ -58,7 +58,7 @@ export interface BookMask {
 }
 
 const GREAT = new Set<string>(GREATSWORD_IDS);
-const TOOLS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder'];
+const TOOLS: readonly WeaponId[] = WEAPON_IDS.filter((w) => !GREAT.has(w));
 const ITEMS: readonly ItemId[] = ['hat', ...SUPPLY.ROTATION];
 
 const LOOKS = [
@@ -153,7 +153,7 @@ function artUrl(e: BookEntry, c: Ctx): string {
 
 /** 그림 한 장 — 가졌으면 그대로, 못 가졌으면 알파를 마스크로 쓴 옅은 먹 실루엣 */
 function artHtml(e: BookEntry, c: Ctx, big = false): string {
-  if (e.slot === 'weapon') return swordSvg(e.id, big ? 'bk-sw big' : 'bk-sw');
+  if (e.slot === 'weapon') return swordSvg(e.id, big ? 'bk-sw big' : 'bk-sw', false, !big);
   if (e.slot === 'item') return ITEM_ICON[e.id as ItemId];
   const url = artUrl(e, c);
   if (!url) return '';
@@ -339,7 +339,7 @@ export function paintBook(
       top = headHtml('h3', 'bk-grp', g.title, g.entries);
     }
     head = g.head ?? g.title;
-    const cols = g.id === 'tools' || g.id === 'greats' || g.id === 'item' ? ' c4' : '';
+    const cols = g.id === 'greats' || g.id === 'item' ? ' c4' : ''; // 무기(연장 아홉)는 3열 3줄 — 4열이면 마지막 줄에 한 칸만 남는다
     return `<section class="bk-set">${top}<div class="bk-grid${cols}">${g.entries.map((e) => cellHtml(e, ctx)).join('')}</div></section>`;
   }).join('');
   root.innerHTML = `<div class="bk">

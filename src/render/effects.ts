@@ -351,6 +351,9 @@ function ensoAt(x: number, y: number, r0: number, grow: number, life: number, w:
   p.h = flat;
 }
 
+/** 제 튐을 weaponFx가 그리는 연장 — 공통 먹 튐(spat)을 겹치지 않는다 */
+const OWN_SPLASH: ReadonlySet<WeaponId> = new Set<WeaponId>(['hammer', 'grinder', 'shovel', 'pickaxe']);
+
 /** 타격 — 맞은 밑면에 위로 튄 작은 먹(포인트 색 속) · 방울 몇. own = 무기가 맞은 자리를 제 그림으로 누른다(오함마 발묵) */
 function inkHit(x: number, y: number, k: number, core: string, own: boolean): void {
   if (!own) spat(x + signed() * 5, y + 2, 3.5 + 1.2 * k, -Math.PI / 2 + signed() * 0.45, 0.2, core, 4); // 연타라 작고 짧게
@@ -782,9 +785,9 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     // 층 조각은 renderer(shatterFloor)가 그 층 그림째 부순다 — 여기선 맞은 자리 먹만
     if (s.gimmick === 'glass') glassBurst(x, y, e.kind === 'floorCollapse' ? JUICE_SYS.GLASS_CHIPS : JUICE_SYS.GLASS_CHIPS_HIT);
     const k = tierK(e.combo ?? s.combo);
-    // 오함마는 맞은 자리를 제 발묵으로 누르고, 그라인더는 젖은 먹 대신 불티 · 쇳가루로 갈린다(weaponFx) — 먹 튐을 겹치지 않는다
+    // 오함마는 맞은 자리를 제 발묵으로 누르고, 그라인더는 불티 · 쇳가루로 갈리고, 삽은 흙 덩이 · 곡괭이는 돌 조각이 튄다(weaponFx) — 먹 튐을 겹치지 않는다
     if (e.kind === 'floorCollapse') inkCollapse(x, y, k, e.mat);
-    else inkHit(x, y, k, pointInk(s.weapon), s.weapon === 'hammer' || s.weapon === 'grinder');
+    else inkHit(x, y, k, pointInk(s.weapon), OWN_SPLASH.has(s.weapon));
     return;
   }
   if (e.kind === 'gaugeFull') {

@@ -238,7 +238,7 @@ export const ACHIEVES: readonly MissionDef[] = [
   { id: 'ach_bk46', kind: 'achieve', title: '도감 46칸', desc: '마흔여섯 칸을 채웠다.', goal: 46, rewardDust: 0, rewardOrbit: 300, line: '도감', stat: 'book' },
   { id: 'ach_w3', kind: 'achieve', title: '무기 셋', desc: '무기 세 자루를 갖는다.', goal: 3, rewardDust: 50, rewardOrbit: 15, line: '무기', stat: 'weapons' },
   { id: 'ach_w6', kind: 'achieve', title: '무기 여섯', desc: '무기 여섯 자루를 갖는다.', goal: 6, rewardDust: 120, rewardOrbit: 30, line: '무기', stat: 'weapons' },
-  { id: 'ach_w12', kind: 'achieve', title: '무기 전부', desc: '열두 자루를 다 갖는다.', goal: 12, rewardDust: 300, rewardOrbit: 80, line: '무기', stat: 'weapons' },
+  { id: 'ach_w12', kind: 'achieve', title: '무기 열둘', desc: '무기 열두 자루를 갖는다.', goal: 12, rewardDust: 300, rewardOrbit: 80, line: '무기', stat: 'weapons' },
   { id: 'ach_r10', kind: 'achieve', title: '10판 출근', desc: '평생 누적.', goal: 10, rewardDust: 30, rewardOrbit: 12, line: '근속', stat: 'runs' },
   { id: 'ach_r50', kind: 'achieve', title: '50판 출근', desc: '평생 누적.', goal: 50, rewardDust: 80, rewardOrbit: 25, rewardItems: { dust2x: 2 }, line: '근속', stat: 'runs' },
   { id: 'ach_r200', kind: 'achieve', title: '200판 출근', desc: '평생 누적.', goal: 200, rewardDust: 200, rewardOrbit: 60, line: '근속', stat: 'runs' },

@@ -15,9 +15,10 @@ const COMBO_DROP_COVER: ReadonlySet<JuiceKind> = new Set([
 
 /** 1200부터 대검은 제 소리 — 타격에, 층 깨기·완파엔 붕괴음 위에 얹는다 */
 export const GREAT_OWN: Partial<Record<WeaponId, SfxName>> = { flame: 'hitFlame', frost: 'hitFrost', onyx: 'hitOnyx', gold: 'hitGold' };
-/** 무기별 타격음 — 연장 셋, 값싼 대검 넷(연장 소리를 빌린다), 비싼 대검 넷. 없으면(철거칼) 재질·변형 */
+/** 무기별 타격음 — 연장 여덟(새 다섯은 있는 소리를 빌린다: 삽 퍽 · 곡괭이 깨짐 · 착암기 지익 · 맨홀 쿵 · 파이프 깡), 값싼 대검 넷(연장 소리를 빌린다), 비싼 대검 넷. 없으면(철거칼) 재질·변형 */
 const WEAPON_HIT: Partial<Record<WeaponId, SfxName>> = {
   hammer: 'hitHammer', crowbar: 'hitBar', grinder: 'hitGrind',
+  shovel: 'hitLow', pickaxe: 'hitStrong', jackhammer: 'hitGrind', manhole: 'hitHammer', pipe: 'hitBar',
   iron: 'hitStrong', saw: 'hitGrind', hazard: 'hitBar', beam: 'hitHammer', ...GREAT_OWN,
 };
 

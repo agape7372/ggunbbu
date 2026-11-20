@@ -36,12 +36,27 @@ export const SWORDS: Readonly<Record<string, string>> = {
   crowbar: '<path d="M44 292 L44 86 Q44 42 70 32 Q96 24 108 48 L112 66 L98 70 L94 56 Q86 44 74 48 Q60 54 60 86 L60 292 Z"/><path class="p" d="M100 44 L118 58 L108 72 Z"/><path d="M36 288 L70 288 L74 300 L34 300 Z"/>',
   /** 그라인더 = 톱니 없는 매끈한 원판 + 가운데 축 + 반달 덮개 + 아래 손잡이 + 옆 손잡이 */
   grinder: '<circle cx="60" cy="72" r="44"/><circle class="p" cx="60" cy="72" r="11"/>' + GUARD_ARC + '<path d="M52 114 L68 114 L70 294 L50 294 Z"/><path d="M66 150 L110 140 L112 154 L68 164 Z"/>',
+  /** 삽 = 위 끝 스페이드 삽날(가운데 마른 골) + 목 + 살짝 휜 긴 자루 + 아래 끝 D자 손잡이 */
+  shovel: '<path d="M60 2 Q84 20 92 54 Q96 82 92 112 Q60 122 28 112 Q24 82 28 54 Q36 20 60 2 Z"/><path class="p" d="M58.6 30 L61.4 30 L62 100 L58.4 100 Z"/><path d="M48 110 L72 110 Q68 126 66 142 L54 142 Q52 126 48 110 Z"/><path d="M55 138 L65 138 Q67 200 64.5 264 L55.5 264 Q53 200 55 138 Z"/><path d="M36 300 Q34 276 50 260 L70 260 Q86 276 84 300 Z"/><path class="p" d="M45 291 Q45 279 54 270 L66 270 Q75 279 75 291 Z"/>',
+  /** 곡괭이 = 자루 위 끝에 가로로 휜 양날(왼쪽 뾰족 · 오른쪽 넓게 벌어진 납작 날) + 쐐기 박은 눈 + 나뭇결 한 줄 */
+  pickaxe: '<path d="M0 72 Q14 40 50 22 L72 22 Q96 26 112 20 L120 18 Q117 42 120 66 L110 58 Q94 48 70 48 L50 48 Q22 52 0 72 Z"/><path d="M47 10 Q60 6 73 10 L72 58 Q60 62 48 58 Z"/><path class="p" d="M57 17 L63 17 L62.5 32 L57.5 32 Z"/><path d="M54 56 L66 56 Q69 180 66 296 L54 296 Q51 180 54 56 Z"/><path class="p" d="M59 120 L61 120 L61.2 232 L59.2 232 Z"/>',
+  /** 착암기 = 위로 가는 긴 정 + 물림쇠 두 단 + 정 쪽이 좁은 통 몸통(마른 띠 둘 · 이름판) + 아래 넓은 T 손잡이 + 손잡이 아래로 늘어진 호스 */
+  jackhammer: '<path d="M60 2 L68 28 L67 106 L53 106 L52 28 Z"/><path class="p" d="M59 34 L61.4 34 L61.4 98 L59 98 Z"/><path d="M44 102 L76 102 L79 114 L41 114 Z"/><path d="M48 113 L72 113 L72 124 L48 124 Z"/><path d="M42 122 L78 122 L85 138 L86 214 L34 214 L35 138 Z"/><path class="p" d="M40 142 L80 142 L80 146 L40 146 Z"/><path class="p" d="M40 152 L80 152 L80 156 L40 156 Z"/><path class="p" d="M50 176 L70 176 L70 196 L50 196 Z"/><path d="M36 212 L84 212 L92 226 L28 226 Z"/><path d="M8 224 L112 224 L112 236 L8 236 Z"/><path d="M2 219 L28 219 L28 241 L2 241 Q-3 230 2 219 Z"/><path d="M118 219 L92 219 L92 241 L118 241 Q123 230 118 219 Z"/><path d="M84 190 C102 190 108 206 107 232 L104 292 L95 291 L98 232 C99 212 96 202 84 201 Z"/>',
+  /** 맨홀 뚜껑 = 방패만 한 두꺼운 쇠 원판(굵은 테 · 안쪽 동심 테 · 지렛대 구멍 둘 · 미끄럼 방지 돌기) + 가장자리에 짧은 쇠고리 한 마디 */
+  manhole: '<circle cx="60" cy="228" r="56"/><path class="p" d="M11 228 a49 49 0 1 1 98 0 a49 49 0 1 1 -98 0 Z M17 228 a43 43 0 1 0 86 0 a43 43 0 1 0 -86 0 Z"/><path class="p" d="M36 228 a24 24 0 1 1 48 0 a24 24 0 1 1 -48 0 Z M41 228 a19 19 0 1 0 38 0 a19 19 0 1 0 -38 0 Z"/><path class="p" d="M24 221 L30 221 L30 235 L24 235 Z"/><path class="p" d="M90 221 L96 221 L96 235 L90 235 Z"/><path class="p" d="M38 196 L46 196 L46 200 L38 200 Z"/><path class="p" d="M50 196 L58 196 L58 200 L50 200 Z"/><path class="p" d="M62 196 L70 196 L70 200 L62 200 Z"/><path class="p" d="M74 196 L82 196 L82 200 L74 200 Z"/><path class="p" d="M32 206 L40 206 L40 210 L32 210 Z"/><path class="p" d="M80 206 L88 206 L88 210 L80 210 Z"/><path class="p" d="M32 246 L40 246 L40 250 L32 250 Z"/><path class="p" d="M80 246 L88 246 L88 250 L80 250 Z"/><path class="p" d="M38 256 L46 256 L46 260 L38 260 Z"/><path class="p" d="M50 256 L58 256 L58 260 L50 260 Z"/><path class="p" d="M62 256 L70 256 L70 260 L62 260 Z"/><path class="p" d="M74 256 L82 256 L82 260 L74 260 Z"/><path class="p" d="M57 222 L63 222 L63 234 L57 234 Z"/><path d="M50 280 L70 280 Q76 280 76 287 L76 293 Q76 300 70 300 L50 300 Q44 300 44 293 L44 287 Q44 280 50 280 Z"/><path class="p" d="M53 286 L67 286 L67 294 L53 294 Z"/>',
+  /** 비계 파이프 = 길고 곧은 관(마른 결 둘) + 위 끝 열린 단면(빈 타원) + 가운데 조임쇠(이음 줄 · 볼트) */
+  pipe: '<path d="M49 12 L71 12 L71 298 L49 298 Z"/><path d="M47 12 a13 6 0 1 0 26 0 a13 6 0 1 0 -26 0 Z"/><path class="p" d="M52 12 a8 3 0 1 0 16 0 a8 3 0 1 0 -16 0 Z"/><path class="p" d="M54.5 30 L57 30 L57 136 L54.5 136 Z"/><path class="p" d="M54.5 184 L57 184 L57 286 L54.5 286 Z"/><path d="M38 142 L82 142 Q86 158 82 176 L38 176 Q34 158 38 142 Z"/><path class="p" d="M42 157 L78 157 L78 161 L42 161 Z"/><path d="M82 150 L98 148 L98 152 L106 151 L106 167 L98 166 L98 170 L82 168 Z"/>',
   /** 마스크 = 도트 얼굴 가면 + 양쪽 끈. 칸 아래쪽 절반에 둔다 */
   mask: '<g transform="translate(0 130)"><path d="M22 50 Q60 28 98 50 L100 122 Q60 152 20 122 Z"/><path class="p" d="M30 58 Q60 42 90 58 L92 116 Q60 140 28 116 Z"/><rect x="40" y="70" width="12" height="12"/><rect x="68" y="70" width="12" height="12"/><rect x="44" y="100" width="8" height="8"/><rect x="52" y="106" width="8" height="8"/><rect x="60" y="106" width="8" height="8"/><rect x="68" y="100" width="8" height="8"/><path d="M22 90 L2 72 L7 66 L26 82 Z"/><path d="M98 90 L118 72 L113 66 L94 82 Z"/></g>',
 };
 
 /** 판 속에서 쥐는 법 — 칸 위 손 자리(handY)와 칼끝 자리(tipY)(둘 다 x = 60 위), k = 손 → 칼끝 길이가 포즈가 주는 길이(L)의 몇 배인지.
  *  대검·철거칼은 손잡이 위(코등이 아래), 오함마는 자루 밑동, 빠루는 막대의 뒤쪽 조금 위(앞 갈고리까지 1.14L), 그라인더는 손잡이 밑동 → 원판 중심(0.58L) */
+/** 세로 칸에 안 맞는 납작한 품목의 보임 변환(120×300 칸 좌표). cell = 상점 · 도감 작은 칸(작아 보여 키운다), big = 상세 큰 그림(옆 능력치 숫자 · 칩을 가려 줄이고 오른쪽으로 민다) */
+export const SWORD_SHOW: Readonly<Record<string, { cell: string; big: string }>> = {
+  manhole: { cell: 'translate(60 300) scale(1.4) translate(-60 -300)', big: 'translate(94 300) scale(0.8) translate(-60 -300)' },
+};
+
 export interface SwordHold { handY: number; tipY: number; k: number }
 const GREAT_HOLD: SwordHold = { handY: 228, tipY: 6, k: 1 };
 export const SWORD_HOLD: Readonly<Record<string, SwordHold>> = {
@@ -51,6 +66,11 @@ export const SWORD_HOLD: Readonly<Record<string, SwordHold>> = {
   hammer: { handY: 290, tipY: 67, k: 1 },
   crowbar: { handY: 262, tipY: 32, k: 1.14 },
   grinder: { handY: 290, tipY: 72, k: 0.58 },
+  shovel: { handY: 262, tipY: 4, k: 1 },
+  pickaxe: { handY: 280, tipY: 34, k: 1 },
+  jackhammer: { handY: 230, tipY: 2, k: 1 },
+  manhole: { handY: 290, tipY: 172, k: 1 },
+  pipe: { handY: 284, tipY: 4, k: 1.15 },
 };
 
 /** 풀어낸 조각 하나 — d는 SVG path 문자열(원 · 사각형도 path로 바꿔 담는다), cls는 색 뜻 */

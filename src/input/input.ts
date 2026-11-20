@@ -32,6 +32,7 @@ export function mergeFrame(
     attack: kb.attack || touch.attack,
     special: kb.special || touch.special,
     guard: kb.guard || touch.guard,
+    attackHeld: kb.attackHeld || touch.attackHeld,
   };
 }
 
@@ -59,6 +60,7 @@ export function spaceToFocused(onButton: boolean, onKey: boolean, menu: boolean,
 export function createInput(touch: TouchInput | null): InputSource {
   const edges = new Set<'jump' | 'attack' | 'special'>();
   const heldGuardKeys = new Set<string>();
+  const heldAttackKeys = new Set<string>();
   let firstCb: (() => void) | null = null;
   let firstFired = false;
   let lastSpecialAt = Number.NEGATIVE_INFINITY;
@@ -89,11 +91,13 @@ export function createInput(touch: TouchInput | null): InputSource {
     if (e.repeat) return;
     if (act) edges.add(act);
     if (isGuard) heldGuardKeys.add(e.code);
+    if (act === 'attack') heldAttackKeys.add(e.code);
   });
   window.addEventListener('keyup', (e) => {
     heldGuardKeys.delete(e.code);
+    heldAttackKeys.delete(e.code);
   });
-  const clearHeld = (): void => { heldGuardKeys.clear(); };
+  const clearHeld = (): void => { heldGuardKeys.clear(); heldAttackKeys.clear(); };
   window.addEventListener('blur', clearHeld);
   window.addEventListener('pagehide', clearHeld);
   document.addEventListener('visibilitychange', () => {
@@ -112,6 +116,7 @@ export function createInput(touch: TouchInput | null): InputSource {
         attack: edges.has('attack'),
         special: edges.has('special'),
         guard: heldGuardKeys.size > 0,
+        attackHeld: heldAttackKeys.size > 0,
       };
       const fromTouch: InputFrame | null = t
         ? {
@@ -119,6 +124,7 @@ export function createInput(touch: TouchInput | null): InputSource {
           attack: t.pressed.attack,
           special: t.pressed.special,
           guard: t.held.guard,
+          attackHeld: t.held.attack,
         }
         : null;
       const merged = mergeFrame(kb, fromTouch);

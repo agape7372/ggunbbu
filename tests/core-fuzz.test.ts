@@ -11,7 +11,7 @@ import { stageBot } from './stageBot';
 import { ACT1, GIMMICK, SCORE, WAZA_GAUGE, GUARD_GAUGE } from '../src/config';
 
 const WAZAS: WazaId[] = ['tenchi', 'ageba', 'mukjul', 'dalmuri', 'nakgwan', 'baram'];
-const WEAPONS: WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', 'iron', 'saw', 'hazard', 'beam', 'flame', 'frost', 'onyx', 'gold'];
+const WEAPONS: WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', 'shovel', 'pipe', 'pickaxe', 'manhole', 'jackhammer', 'iron', 'saw', 'hazard', 'beam', 'flame', 'frost', 'onyx', 'gold'];
 
 function mk(seed: number): () => number {
   let a = seed >>> 0;
@@ -27,6 +27,9 @@ interface Scn { name: string; make: (seed: number) => GameState; ticks: number; 
 
 const scn: Scn[] = [
   { name: 'act1', make: (k) => makeState({ seed: k }), ticks: 4000, bot: 0.6, seed: 1 },
+  // 무기는 seed % WEAPONS — 연장 다섯 중 앞 씨앗에 안 걸리는 맨홀(7) · 착암기(8)를 1막으로 한 판씩
+  { name: 'act1-manhole', make: (k) => makeState({ seed: k }), ticks: 3000, bot: 0.6, seed: 7 },
+  { name: 'act1-jackhammer', make: (k) => makeState({ seed: k }), ticks: 3000, bot: 0.4, seed: 8 },
   { name: 'op-orbit', ticks: 3000, bot: 0.6, seed: 2, make: (k) => {
     const s = makeState({ seed: k }); s.gimmick = 'orbit'; s.chapter = 3; s.p = GIMMICK.START_P.orbit; s.score = Math.floor(ACT1.UNLOCK_SCORE * s.p); return s;
   } },
@@ -66,7 +69,7 @@ function run(sc: Scn): { s: GameState; viol: string[] } {
       try { f = stageBot(s); } catch (e) { v(`stageBot 예외 ${(e as Error).message}`); }
     } else {
       if (r() < 0.08) guardHold = !guardHold;
-      f = { attack: r() < 0.35, jump: r() < 0.06, guard: guardHold, special: r() < 0.03 };
+      f = { attack: r() < 0.35, jump: r() < 0.06, guard: guardHold, special: r() < 0.03, attackHeld: r() < 0.5 };
     }
     try { advance(s, f); } catch (e) { v(`advance 예외 ${(e as Error).message}`); break; }
     for (const e of s.events) if (e.kind === 'bossDefeat') defeatedAt = s.tick;

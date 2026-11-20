@@ -8,7 +8,7 @@
 import type { FallingStack, Floor, GameState, LandmarkId, LandmarkSt, LandmarkState, Material } from './types';
 import { LANDMARK, PLAYER, SCORE, SPECIAL, STAGE, VIEW, WEAPON, GUARD_GAUGE } from '../config';
 import { makeFloor, makeStack } from './building';
-import { addScore, attackRange, breakCombo, hurtPlayer, registerHit } from './combat';
+import { addScore, attackRange, groundGuardCombo, hurtPlayer, registerHit } from './combat';
 import { guardActive } from './player';
 
 const L = LANDMARK;
@@ -181,7 +181,7 @@ export function tryHitLandmark(s: GameState): boolean {
   const mat = b.floors[0].mat;
   if (damageBody(s, lm, 1)) {
     s.events.push({ kind: 'floorCollapse', y: b.y, mat, combo: s.combo + 1 });
-    registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS });
+    registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, collapse: true });
   } else {
     s.events.push({ kind: 'hit', y: b.y, mat, combo: s.combo + 1 });
     registerHit(s);
@@ -312,7 +312,7 @@ function stepSlam(s: GameState, lm: LandmarkState): void {
       lm.air = 2; // 막았다 — 땅에 닿은 몸이 반격 창에 머문다
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_GROUND);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
-      breakCombo(s);
+      groundGuardCombo(s);
       s.events.push({ kind: 'guardBounce', y: 0 });
     } else if (p.y < L.BELL.SLAM_HIT_H) {
       hurtPlayer(s);

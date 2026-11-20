@@ -4,12 +4,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { makeState } from '../src/core/sim';
 import type { GameState, JuiceEvent, JuiceKind, WazaId, WeaponId } from '../src/core/types';
-import { WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
+import { GREATSWORD_IDS, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx, type Bit } from '../src/render/bladeFx';
 import { liveBits, setFxMask } from '../src/render/weaponFx';
 import { drawWazaShot } from '../src/render/wazaShow';
 
-const TOOL_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder'];
+/** 연장 아홉(철거칼 · 오함마 · 빠루 · 그라인더 + 11-20 다섯) — 대검이 아닌 무기 */
+const TOOL_IDS: readonly WeaponId[] = WEAPON_IDS.filter((w) => !(GREATSWORD_IDS as readonly string[]).includes(w));
 const STRIKES = ['hit', 'floorCollapse', 'stackDestroy', 'slash'] as const;
 const MOMENTS = ['special', 'gaugeFull', 'comboBreak', 'pinEscape'] as const;
 /** 한 이벤트가 새로 뿌리는 조각 상한 — 평타 10 · 층 깨기 24 · 완파·필살 48 */
@@ -61,7 +62,7 @@ beforeEach(() => {
 });
 
 describe('연장·필살 이펙트', () => {
-  it('무기 12종 × 타격·층 깨기·완파·헛스윙 — 던지지 않고, 3타째·높은 콤보·마스크까지 얹어도 상한 안, 2초 뒤엔 0', () => {
+  it('무기 17종 × 타격·층 깨기·완파·헛스윙 — 던지지 않고, 3타째·높은 콤보·마스크까지 얹어도 상한 안, 2초 뒤엔 0', () => {
     setFxMask(['#E5302E', '#FFD200']);
     for (const w of WEAPON_IDS) {
       // 대검의 높은 콤보는 기존 RECIPES가 일부러 키운다(비쌀수록 화려) — 연장만 콤보 210까지 본다
@@ -104,7 +105,7 @@ describe('연장·필살 이펙트', () => {
     }
   });
 
-  it('연장 넷은 서로 다른 조각으로 터진다', () => {
+  it('연장 아홉은 서로 다른 조각으로 터진다', () => {
     const sigs = TOOL_IDS.map((w) => {
       resetBladeFx();
       const s = state(w);

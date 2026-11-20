@@ -169,7 +169,10 @@ export const STACK = {
 // ── 무기 [튜닝] ──────────────────────────────────────────────────
 // 대미지는 전부 1, 공격 프레임(1/3/2)도 전부 같다 — 체크포인트가 층 HP 합(=타격 수)이고,
 // 프레임을 무기마다 바꾸면 3f 입력 버퍼 안에서 탭이 버려진다(10-25 반론 실측: 8탭/s에 오함마 50% 유실).
-// 그래서 무기는 세 칸만 바꾼다: 사거리(건물 판정창 위끝) · 띄우기(타격 밀어올림) · 필살 게이지 배율.
+// 그래서 무기는 세 칸을 바꾼다: 사거리(건물 판정창 위끝) · 띄우기(타격 밀어올림) · 필살 게이지 배율.
+// 11-20 무기 다섯(삽 · 비계 파이프 · 곡괭이 · 맨홀 뚜껑 · 착암기)은 세 칸에 고유 규칙 하나를 더한다(아래 선택 칸).
+// 고유 규칙도 대미지 · 프레임 · 띄우기 상한 · 층 HP를 건드리지 않는다(2막 30/138타는 그대로 · tests/weapons.test.ts).
+// core는 무기 id로 가르지 않고 이 칸만 읽는다. 칸 값은 봇 비교(tests/weapon-measure.test.ts · DEVLOG 11-20)로 맞췄다.
 //   ⚠ 띄우기 상한: 연타 1주기(7f) 동안 건물이 **1막 어디서든 가라앉아야** 한다 — 안 그러면
 //   "연타만으로는 못 버틴다"(STACK.HIT_LIFT_V 주석)가 깨진다. 조건 lift < ACT1_G[0]·8/120 ≈ 102.
 //   tests/weapons.test.ts가 지킨다.
@@ -180,12 +183,28 @@ export interface WeaponSpec {
   lift: number;
   gauge: number;
   shake: number;
+  /** 땅 가드로 튕겨도 콤보가 0이 되지 않고 이 몫(0~1)이 남는다. 다 남기면 콤보가 999까지 안 끊겨 점수(기본 × 콤보)가 흑철의 1.7배였다(봇 실측) */
+  keepCombo?: number;
+  /** 층이 무너질 때마다 필살 게이지 +이 값(무기 배율 안 곱함 · 상한 100) */
+  collapseGauge?: number;
+  /** 공격 키를 누르고 있으면 이 틱마다 벤다(탭은 그대로) */
+  holdRepeat?: number;
+  /** 가드 튕김 속도(땅 · 공중) 배율 */
+  guardLift?: number;
+  /** 발이 땅에서 떨어져 있으면 사거리 +이 값 */
+  airReach?: number;
 }
 export const WEAPON: Record<WeaponId, WeaponSpec> = {
   sword: { reach: PLAYER.ATTACK_REACH, lift: STACK.HIT_LIFT_V, gauge: 1, shake: 1 },
   hammer: { reach: 60, lift: 95, gauge: 1, shake: 1.6 },     // 띄우기 ↑ / 사거리 ↓
   crowbar: { reach: 88, lift: STACK.HIT_LIFT_V, gauge: 0.8, shake: 1 }, // 사거리 ↑ / 필살 ↓
   grinder: { reach: PLAYER.ATTACK_REACH, lift: 65, gauge: 1.4, shake: 0.8 }, // 필살 ↑ / 띄우기 ↓
+  // 연장 다섯(11-20). 세 칸 + 고유 규칙 하나
+  shovel: { reach: 66, lift: 82, gauge: 0.8, shake: 1.1, keepCombo: 0.5 },
+  pickaxe: { reach: 72, lift: 78, gauge: 0.8, shake: 1.2, collapseGauge: 2 },
+  jackhammer: { reach: 64, lift: 76, gauge: 0.95, shake: 1.5, holdRepeat: 8 },
+  manhole: { reach: 58, lift: 94, gauge: 1.1, shake: 1.4, guardLift: 1.2 },
+  pipe: { reach: 62, lift: 80, gauge: 1, shake: 1, airReach: 26 },
   // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 고르는 맛은 칼날 모양과 손맛
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
   saw: { reach: 72, lift: 70, gauge: 1.25, shake: 0.9 },                 // 필살 ↑ / 띄우기 ↓
@@ -792,6 +811,7 @@ export const PALETTE = {
  */
 export const WEAPON_INK = {
   sword: '#E3A21A', hammer: '#8C877D', crowbar: '#2F5C9A', grinder: '#E8701E',
+  shovel: '#C08A4E', pickaxe: '#646AA0', jackhammer: '#1F9E8A', manhole: '#7E6B3B', pipe: '#9AA7B0',
   iron: '#5D7183', saw: '#9A4F2C', hazard: '#E9B21A', beam: '#C0532E',
   flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
 } as const;

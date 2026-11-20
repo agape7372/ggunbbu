@@ -127,7 +127,7 @@ export function holdTraining(s: GameState, input: InputFrame): boolean {
   // 풀렸다(눌렀거나 둘째 가드의 짧은 멈춤이 끝났다). 인사(any)는 누른 키를 쓰지 않는다 — 버퍼를 다 비운다
   const p = s.player;
   if (need !== 'jump') p.bufJump = 0;
-  if (need !== 'attack') p.bufAttack = 0;
+  if (need !== 'attack') { p.bufAttack = 0; p.holdTick = 0; } // 쥐고 있던 공격(착암기)도 새로 눌러야 다시 돈다
   if (need !== 'special') p.bufSpecial = 0;
   if (need !== 'guard') p.bufGuard = 0;
   t.need = null;

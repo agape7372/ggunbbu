@@ -132,6 +132,11 @@ describe('이벤트 → 소리 배선', () => {
     expect(map({ kind: 'stackDestroy', n: 4 }, state({ weapon: 'onyx' }))).toEqual(['destroy', 'gorogoro', 'hitOnyx']);
     expect(map({ kind: 'stackDestroy', n: 4 }, state({ weapon: 'iron' }))).toEqual(['destroy', 'gorogoro']);
   });
+  it('11-20 연장 다섯은 새 합성 없이 있는 타격음을 빌린다', () => {
+    const hit: JuiceEvent = { kind: 'hit', lane: 0, mat: 'soft' as never, combo: 1 };
+    const got = (['shovel', 'pickaxe', 'jackhammer', 'manhole', 'pipe'] as const).map((weapon) => map(hit, state({ weapon }))![0]);
+    expect(got).toEqual(['hitLow', 'hitStrong', 'hitGrind', 'hitHammer', 'hitBar']);
+  });
 });
 
 describe('스케줄러 — 밀리면 건너뛴다 (snd-08)', () => {

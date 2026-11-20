@@ -160,6 +160,8 @@ export interface PlayerState {
   attackHit: boolean;
   /** attack 종료 후 복귀할 상태가 공중인가 */
   attackFromAir: boolean;
+  /** 착암기(WeaponSpec.holdRepeat) 누름 셈. 0 = 닫힘(공격 엣지가 1로 연다), 쥐고 있는 동안 틱마다 +1. 놓거나 깔리면 0 */
+  holdTick: number;
 }
 
 export type Act2Phase = 'cathedral' | 'tower' | 'bolt' | 'rock' | 'moon';
@@ -323,7 +325,10 @@ export type WazaId = 'tenchi' | 'ageba' | 'mukjul' | 'dalmuri' | 'nakgwan' | 'ba
  * 장착 무기. 대미지는 전부 1이다 — 2막 체크포인트가 층 HP 합(=타격 수)이라 대미지를 바꾸면
  * 산술이 깨진다. 무기는 사거리·띄우기·필살 게이지 배율만 바꾼다(config WEAPON).
  */
-export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder' | GreatswordId;
+export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder' | ToolId | GreatswordId;
+
+/** 연장 다섯(11-20). 세 칸에 고유 규칙 하나씩(config WeaponSpec 선택 칸). 대미지 · 프레임은 같다 */
+export type ToolId = 'shovel' | 'pickaxe' | 'jackhammer' | 'manhole' | 'pipe';
 
 /** 대검 — 칼날 모양·색(render/sprites)과 세 칸(config WEAPON)만 다르다. 쥐는 자세는 하나 */
 export type GreatswordId = 'iron' | 'saw' | 'hazard' | 'beam' | 'flame' | 'frost' | 'onyx' | 'gold';
@@ -472,6 +477,8 @@ export interface InputFrame {
   guard: boolean;   // 홀드 (레벨)
   attack: boolean;  // 엣지
   special: boolean; // 엣지
+  /** 공격 키를 누르고 있나(레벨). 착암기(WeaponSpec.holdRepeat)만 읽는다. 없으면 안 누름 */
+  attackHeld?: boolean;
 }
 
 export const EMPTY_INPUT: InputFrame = {

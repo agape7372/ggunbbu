@@ -2,7 +2,7 @@
 // 그림은 전부 손으로 찍은 점(시안 f1-ink 그대로). 색 뜻: 먹 = 그림·판정 · 주홍 = 지금 누를 것 하나 · 참격 노랑 = 베는 순간만.
 // 섞기 0 — 그라데이션·blur·반투명 없음. 거친 가장자리는 index.html의 SVG 필터 #rough · #rough2.
 
-import { SWORDS } from '../render/swordShapes';
+import { SWORDS, SWORD_SHOW } from '../render/swordShapes';
 import { goods } from './goodsArt';
 const PAPER = '#F4F1E8';
 const INK = '#1A1A20';
@@ -77,9 +77,13 @@ export function frameSvg(left = 9, top = 3.5, right = 5.5, bottom = 10): string 
 /* ── 칼 열셋 + 마스크 — 그림 자료(SWORDS)는 render/swordShapes.ts. 판 속 졸라맨이 든 칼도 같은 자료를 그린다(sprites.ts) */
 
 /** 칼 그림 한 장. cls 예: 'it-pic' · 's-big'. delays = 획마다 --d(80ms 차례) — 큰 칼을 획 순서대로 그릴 때 */
-export function swordSvg(id: string, cls = '', delays = false): string {
-  const body = SWORDS[id] ?? SWORDS.sword;
-  return `<svg class="sw ${cls}" viewBox="0 0 120 300" aria-hidden="true">${delays ? withDelays(body) : body}</svg>`;
+export function swordSvg(id: string, cls = '', delays = false, cell = false): string {
+  const raw = SWORDS[id] ?? SWORDS.sword;
+  const body = delays ? withDelays(raw) : raw;
+  const show = SWORD_SHOW[id]; // 세로 칸에 안 맞는 납작한 물건만: 작은 칸에선 키우고 큰 그림에선 줄인다
+  const k = show ? (cell ? show.cell : show.big) : '';
+  if (!k) return `<svg class="sw ${cls}" viewBox="0 0 120 300" aria-hidden="true">${body}</svg>`;
+  return `<svg class="sw ${cls}" viewBox="0 0 120 300" overflow="visible" aria-hidden="true"><g transform="${k}">${body}</g></svg>`;
 }
 
 /** 획마다 style="--d:Ns" 를 단다(0.08초 간격) */

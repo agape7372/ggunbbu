@@ -4,7 +4,7 @@
 //   +1: 건물 세그 타격 / 번개탄 파괴 / 화산탄 타격 / 토끼탄 상쇄 / 보스·드론·대포 타격
 //       / 명물 몸 타격(landmark.ts tryHitLandmark) / 시간차 필살의 연참·검풍 한 타(sim.ts wazaHit).
 //       (바닥 화산탄 파밍은 SCORE.GROUND_ROCK_COMBO, 기본 off)
-//   →0: ① 지면 가드 바운스 · 종탑 내려찍기를 지면 가드로 막음(landmark.ts stepSlam)
+//   →0: ① 지면 가드 바운스 · 종탑 내려찍기를 지면 가드로 막음(landmark.ts stepSlam). 무기 keepCombo(삽)면 유지
 //       ② 구조물 접지(깔림) · 버터바 뭉개짐 ③ 플레이어 피격 전부
 //       ④ 집행기 보스 개시(2막 달 · 작업 지시서 HQ) — 카운터만 0, fullCombo 유지, comboBreak 이벤트 없음
 //       ⑤ 2막 이어하기 — 콤보를 체크포인트(40/148/168)로 재설정, fullCombo 소멸
@@ -41,6 +41,14 @@ export function breakCombo(s: GameState): void {
   if (s.mode === 'act2') s.fullCombo = false;
 }
 
+/** 땅 가드가 막았다(튕김 · 종탑 내려찍기). 무기 keepCombo가 있으면 끊지 않고 그 몫만 남긴다(1 밑으론 안 간다) */
+export function groundGuardCombo(s: GameState): void {
+  const keep = WEAPON[s.weapon].keepCombo;
+  if (!keep || s.combo === 0) { breakCombo(s); return; }
+  if (s.combo > s.peakCombo) s.peakCombo = s.combo;
+  s.combo = Math.max(1, Math.floor(s.combo * keep));
+}
+
 export function gaugePerHit(combo: number): number {
   return Math.min(WAZA_GAUGE.PER_HIT_MAX, WAZA_GAUGE.PER_HIT_BASE + Math.floor(combo / WAZA_GAUGE.PER_HIT_DIV));
 }
@@ -56,11 +64,11 @@ export function addGauge(s: GameState, n: number): void {
   if (before < WAZA_GAUGE.MAX && s.wazaGauge >= WAZA_GAUGE.MAX) s.events.push({ kind: 'gaugeFull' });
 }
 
-/** 유효 타격 공통 처리: 콤보 +1 → 점수 → 게이지 */
-export function registerHit(s: GameState, opts?: { scoreBonus?: number; noGauge?: boolean }): void {
+/** 유효 타격 공통 처리: 콤보 +1 → 점수 → 게이지. collapse = 이 타격에 층이 무너졌다(무기 collapseGauge를 그대로 더한다) */
+export function registerHit(s: GameState, opts?: { scoreBonus?: number; noGauge?: boolean; collapse?: boolean }): void {
   addCombo(s);
   addScore(s, SCORE.BASE_HIT * Math.min(s.combo, SCORE.COMBO_CAP) + (opts?.scoreBonus ?? 0));
-  if (!opts?.noGauge) addGauge(s, hitGauge(s));
+  if (!opts?.noGauge) addGauge(s, hitGauge(s) + (opts?.collapse ? WEAPON[s.weapon].collapseGauge ?? 0 : 0));
 }
 
 /** 공격 히트박스 수직 범위 (물리 좌표). reach = 무기 사거리(건물 판정에만 넘긴다) */
@@ -91,7 +99,7 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
       kind: isButter ? 'butterCollapse' : 'floorCollapse',
       lane, y: yHit, mat, combo: s.combo + 1,
     });
-    registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS });
+    registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, collapse: true });
     spawnFloorDebris(s, yHit);
     if (stack.floors.length === 0) {
       destroyStack(s);
@@ -155,11 +163,11 @@ export function tryGuardBounce(
   const prev = prevStackY ?? stack.y;
   if (guardActive === 'ground') {
     if (stack.y <= STACK.GUARD_ZONE_GROUND) {
-      stack.vy = STACK.GUARD_GROUND_V * (s.gimmick === 'ice' ? GIMMICK.ICE_BOUNCE_GROUND : 1);
+      stack.vy = STACK.GUARD_GROUND_V * (s.gimmick === 'ice' ? GIMMICK.ICE_BOUNCE_GROUND : 1) * (WEAPON[s.weapon].guardLift ?? 1);
       stack.resting = false;
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_GROUND);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
-      breakCombo(s); // [정본] 지면 가드 = 콤보 단절
+      groundGuardCombo(s); // [정본] 지면 가드 = 콤보 단절(삽 keepCombo는 몫만큼 남는다)
       s.events.push({ kind: 'guardBounce', y: stack.y });
       return true;
     }
@@ -167,7 +175,7 @@ export function tryGuardBounce(
     const plane = footY + PLAYER.H;
     const crossed = prev >= plane - STACK.GUARD_ZONE_AIR && stack.y <= plane + STACK.GUARD_ZONE_AIR;
     if (crossed || Math.abs(stack.y - plane) <= STACK.GUARD_ZONE_AIR) {
-      stack.vy = STACK.GUARD_AIR_V * (s.gimmick === 'ice' ? GIMMICK.ICE_BOUNCE_AIR : 1);
+      stack.vy = STACK.GUARD_AIR_V * (s.gimmick === 'ice' ? GIMMICK.ICE_BOUNCE_AIR : 1) * (WEAPON[s.weapon].guardLift ?? 1);
       stack.resting = false;
       // ★원작 이식(2026-08-30 사용자 확정): 공중가드 바운스는 플레이어를 아래로 튕긴다.
       // 원작 vy=8.0px/f 아래로(FUN_00405490 포즈10) — 초속 대비 비율로 옮긴다(config). 위로 상승 중이었어도 하향 덮어쓰기.

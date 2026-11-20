@@ -19,15 +19,15 @@ import { drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx
 
 /** 먹 조각: stroke 곧은 붓 획 · sweep 호 붓 획 · zig 꺾은 획(철골 · 지그재그 · 얼음 금) · dots 리벳 점 줄 · spat 먹 튐 · drop 먹 방울(땅에 닿으면 번짐) ·
  *  dust 마른 가루 · leaf 금박
- *  — 아래 줄은 weaponFx가 그린다: pix 마스크 도트 · hook 붓 획 · nail 불티 분수 · disc 먹 튐 · chunk 나는 먹 · arc 끊긴 붓 고리 */
+ *  — 아래 줄은 weaponFx가 그린다: pix 마스크 도트 · hook 붓 획 · nail 불티 분수 · disc 먹 튐 · chunk 나는 먹 · arc 끊긴 붓 고리 · tap 잘게 떠는 획 · ring 퍼지는 고리 */
 export type Kind =
   | 'stroke' | 'sweep' | 'zig' | 'dots' | 'spat' | 'drop' | 'dust' | 'leaf'
-  | 'pix' | 'hook' | 'nail' | 'disc' | 'chunk' | 'arc';
+  | 'pix' | 'hook' | 'nail' | 'disc' | 'chunk' | 'arc' | 'tap' | 'ring';
 
 /** 그리는 순서 — 가루 · 붓 잔상이 뒤, 베기 획 · 튐이 가운데, 날아가는 방울 · 금박이 맨 앞 */
 const LAYER: Record<Kind, number> = {
   disc: 0, dust: 0, sweep: 0,
-  hook: 1, arc: 1, stroke: 1, zig: 1, dots: 1, spat: 1,
+  hook: 1, arc: 1, tap: 1, ring: 1, stroke: 1, zig: 1, dots: 1, spat: 1,
   pix: 2, nail: 2, chunk: 2, drop: 2, leaf: 2,
 };
 
@@ -111,7 +111,7 @@ export function keepBits(draw: () => void): void {
 }
 
 /** v가 굵기인 조각 — 키울 때 같이 굵어진다(나머지는 v가 개수 · 납작 배율) */
-const WIDE: ReadonlySet<Kind> = new Set<Kind>(['stroke', 'sweep', 'zig', 'hook', 'arc']);
+const WIDE: ReadonlySet<Kind> = new Set<Kind>(['stroke', 'sweep', 'zig', 'hook', 'arc', 'tap', 'ring']);
 let big: { k: number; x: number; y: number } | null = null;
 /**
  * 크게 — 이 안에서 뿌린 조각은 (x, y)를 축으로 k배(자리 · 크기 · 굵기 · 속도 · 무게)이고 WEAPON_FX.LIFE배 오래 산다. 땅 밑으로는 안 간다.
@@ -225,7 +225,7 @@ function trail(footX: number, footY: number, w: number, core: string, o: StrokeO
 }
 
 /** 꺾은 획 — pts = [x0,y0, x1,y1, …](월드)를 한 붓으로. 모서리가 각진 채 머리부터 그어지고 꼬리부터 깎인다 */
-function bent(pts: number[], w: number, core: string, o: StrokeOpt = {}): void {
+export function bent(pts: number[], w: number, core: string, o: StrokeOpt = {}): void {
   const [x, y] = pts;
   put('zig', x, y, {
     life: o.life ?? 0.26, size: 0, v: w, c1: INK, c2: core, dry: o.dry ?? 0.3, pr: o.pr ?? 2, gr: o.gr ?? 0.15, hold: o.hold,
@@ -245,7 +245,7 @@ function spat(x: number, y: number, R: number, ang: number, c: string, core = ''
 }
 
 /** 먹 방울 — 부채로 튀어 떨어지고 땅에 닿으면 번졌다 오그라든다. g < 0이면 불씨처럼 오른다 */
-function drops(x: number, y: number, n: number, a0: number, a1: number, s0: number, s1: number, r: number, c: string = INK, g = 1000): void {
+export function drops(x: number, y: number, n: number, a0: number, a1: number, s0: number, s1: number, r: number, c: string = INK, g = 1000): void {
   for (let i = 0; i < n; i++) {
     const a = a0 + (a1 - a0) * (n === 1 ? 0.5 : i / (n - 1)) + sgn() * 0.12;
     put('drop', x + sgn() * 4, y + sgn() * 3, {

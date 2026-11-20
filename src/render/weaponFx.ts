@@ -4,14 +4,15 @@
 // 연장은 「먹 한 획」(docs/INK_FX_2026-11-01.md §4): 무기가 한 일이 붓 획으로 남는다. 포인트 색(WEAPON_INK)은 벤 순간의 획 속에만,
 // 알파로 지우지 않고 꼬리부터 깎는다. 맞은 자리 먹 튐 · 방울은 effects(공통 사건) 몫이라 여기서 다시 그리지 않는다(오함마 발묵만 예외).
 // 연타 한 줄(지난 타격에서 0.6초 안)은 1·2·3타로 돌며 획이 내려베기 → 올려베기 → 가로로 바뀌고 3타째가 조금 크다.
-// 조각 Kind는 bladeFx 목록의 이름을 빌려 뜻만 바꿔 쓴다 — hook = 붓 획 · disc = 먹 튐 · chunk = 나는 먹 · nail = 불티 분수 · arc = 끊긴 붓 고리.
+// 조각 Kind는 bladeFx 목록의 이름을 빌려 뜻만 바꿔 쓴다 — hook = 붓 획 · disc = 먹 튐 · chunk = 나는 먹 · nail = 불티 분수 · arc = 끊긴 붓 고리 ·
+// tap = 잘게 떠는 획(착암기) · ring = 퍼지는 고리(맨홀 뚜껑 · 파이프 단면). 연장 아홉(11-20 다섯 추가)은 저마다 다른 조각 묶음으로 터진다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
-  N, keepBits, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
+  N, bent, drops, keepBits, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
 } from './bladeFx';
-import { PRESS, brushArc, brushLine, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
+import { PRESS, brushArc, brushLine, enso, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
 
 const GROUND = VIEW.GROUND_Y;
 const TAU = Math.PI * 2;
@@ -193,7 +194,133 @@ const TOOLS: Partial<Record<WeaponId, Tool>> = {
       sparks(footX + 29, footY - 20, 2.6, 4, 0.08, 260); // 헛돈 원판 — 불티 몇 줄기
     },
   },
+  // 삽 — 퍼 올린다: 맞은 자리에서 뒤 위로 떠 올리는 튕김 획 하나(황토 속) + 흙 덩이 서너 개가 포물선으로 날아 땅에 떨어져 번진다
+  shovel: {
+    hit(x, y, b, k) {
+      stroke(x - 4, y + 4, -Math.PI / 2 - 0.55 + b.ang * 0.3, 46 * b.k, 6.5 * b.k, FLICK, 0.32, WEAPON_INK.shovel);
+      clods(x, y, jn(N(3, k)) + (b.n === 3 ? 1 : 0), 260, 400, 3.6);
+    },
+    floor(x, y, b, k) {
+      stroke(x - 6, y + 4, -Math.PI / 2 - 0.6 + b.ang * 0.3, 72, 9, FLICK, 0.38, WEAPON_INK.shovel);
+      clods(x, y, jn(N(4, k)), 300, 470, 4.4);
+    },
+    destroy(x, y, k) {
+      stroke(x - 10, y + 6, -Math.PI / 2 - 0.7, 124, 12, FLICK, 0.44, WEAPON_INK.shovel);
+      clods(x, y, N(6, k), 340, 540, 5);
+    },
+    whiff(footX, footY) {
+      stroke(footX + 26, footY - 34, -2.2 + sgn() * 0.15, 28, 3, FLICK, 0.18, GRAY, GRAY); // 허공을 뜬 삽 — 옅은 회색 획 하나
+    },
+  },
+  // 곡괭이 — 찍는다: 밑면에 박힌 쐐기 자국(꺾인 한 획, 청회 속) + 깨져 도는 돌 조각
+  pickaxe: {
+    hit(x, y, b, k) {
+      wedge(x + sgn() * 4, y, 12 * b.k, 5.5 * b.k, 0.32, WEAPON_INK.pickaxe);
+      flecks(x, y, 2 + (k >= 1.5 ? 1 : 0), -Math.PI / 2, 0.9, 320, 2, 9);
+    },
+    floor(x, y, _b, k) {
+      wedge(x, y, 18, 7.5, 0.38, WEAPON_INK.pickaxe);
+      flecks(x, y, jn(N(3, k)), -Math.PI / 2, 1.1, 380, 2, 11);
+    },
+    destroy(x, y, k) {
+      wedge(x, y, 28, 10.5, 0.44, WEAPON_INK.pickaxe);
+      flecks(x, y, N(5, k), -Math.PI / 2, 1.2, 440, 2, 13);
+    },
+    whiff(footX, footY) {
+      wedge(footX + 30, footY - 44, 7, 2.8, 0.18, GRAY, GRAY);
+    },
+  },
+  // 착암기 — 잘게 떤다: 짧은 세로 획 여럿이 차례로 박힌다(다다다, 청록 속). 층이 깨지면 금이 층 몸을 따라 아래로 간다
+  jackhammer: {
+    hit(x, y, b, k) {
+      taps(x, y, jn(N(6, k)) + (b.n === 3 ? 2 : 0), 0.26, 22 * b.k, 4.6);
+    },
+    floor(x, y, _b, k) {
+      taps(x, y, jn(N(8, k)), 0.3, 26, 5.2);
+      crackDown(x + sgn() * 3, y, 46, 3.2, 0.36);
+    },
+    destroy(x, y, k) {
+      taps(x, y, N(10, k), 0.34, 30, 6);
+      crackDown(x, y, 76, 4.4, 0.42);
+    },
+    whiff(footX, footY) {
+      taps(footX + 30, footY - 44, 3, 0.12, 9, 2.2, GRAY);
+    },
+  },
+  // 맨홀 뚜껑 — 징이 운다: 맞은 자리에서 둥근 고리 한 획이 밑면을 따라 퍼진다(녹 속). 퍼지며 가늘어져 지워진다 + 녹 가루 몇
+  manhole: {
+    hit(x, y, b, k) {
+      ring(x, y + 2, 11 * b.k, 6 * b.k, 1.7, 0.42, 0.36, WEAPON_INK.manhole);
+      flecks(x, y + 2, jn(N(3, k)), -Math.PI / 2, 1.2, 120, 1, 1.9, WEAPON_INK.manhole, 300);
+    },
+    floor(x, y, _b, k) {
+      ring(x, y + 2, 15, 7.5, 2.3, 0.4, 0.42, WEAPON_INK.manhole);
+      flecks(x, y + 2, jn(N(4, k)), -Math.PI / 2, 1.3, 150, 1, 2.1, WEAPON_INK.manhole, 300);
+    },
+    destroy(x, _y, k) {
+      // 건물이 통째로 무너지면 땅이 운다 — 발밑에 눕는 고리
+      ring(x, GROUND - 2, 20, 8.5, 2.6, 0.3, 0.48, WEAPON_INK.manhole);
+      flecks(x, GROUND - 4, N(6, k), -Math.PI / 2, 1.2, 170, 1, 2.2, WEAPON_INK.manhole, 300);
+    },
+    whiff(footX, footY) {
+      ring(footX + 30, footY - 42, 7, 2.6, 0.9, 0.45, 0.18, GRAY, GRAY);
+    },
+  },
+  // 비계 파이프 — 길게 친다: 길고 곧은 한 획(은회 속) + 그 끝에 관 단면 빈 원 하나
+  pipe: {
+    hit(x, y, b) {
+      pipeLine(x + sgn() * 4, y, b.ang * 0.35 + sgn() * 0.05, 70 * b.k, 5.5 * b.k, 7 * b.k, 0.34);
+    },
+    floor(x, y, b) {
+      pipeLine(x, y, b.ang * 0.35 + sgn() * 0.04, 100 * b.k, 7.5, 9, 0.4);
+    },
+    destroy(x, y) {
+      pipeLine(x, y, -0.3 + sgn() * 0.06, 150, 10.5, 12, 0.46); // 같은 틱 층 깨기 획과 엇갈린다
+    },
+    whiff(footX, footY) {
+      stroke(footX + 30, footY - 44, -1.35 + sgn() * 0.1, 42, 2.8, CUT, 0.18, GRAY, GRAY);
+    },
+  },
 };
+
+/** 흙 덩이 — 뒤 위로 포물선을 그리며 날아 땅에 떨어져 번진다(처음엔 황토, 마르면 먹) */
+function clods(x: number, y: number, n: number, s0: number, s1: number, r: number): void {
+  drops(x, y, n, -Math.PI / 2 - 1.0, -Math.PI / 2 - 0.25, s0, s1, r, WEAPON_INK.shovel, 1000);
+}
+
+/** 쐐기 자국 — 친 자리를 꼭짓점으로 밑면에 박힌 꺾인 한 획(왼 아래 → 꼭짓점 → 오른 아래) */
+function wedge(x: number, y: number, h: number, w: number, life: number, core: string, c1: string = INK): void {
+  const half = h * 0.9;
+  put('zig', x - half, y + h * 0.7, {
+    life, size: 0, v: w, c1, c2: core, dry: 0.3, pr: 2, gr: 0.15,
+    pts: [0, 0, half, -h, half * 2, 0],
+  });
+}
+
+/** 잘게 떠는 획 — n개가 dur초에 걸쳐 차례로 박힌다(조각 하나) */
+function taps(x: number, y: number, n: number, dur: number, len: number, w: number, core: string = WEAPON_INK.jackhammer): void {
+  put('tap', x, y, { life: dur + 0.12, size: len, v: w, a: dur, st: n, c1: INK, c2: core });
+}
+
+/** 금이 아래로 — 층 몸 위쪽에서 친 자리를 지나 아래로 꺾여 내려가는 마른 획 */
+function crackDown(x: number, y: number, len: number, w: number, life: number): void {
+  const top = y - len * 0.75;
+  const pts: number[] = [x, top];
+  for (let i = 1; i <= 4; i++) pts.push(x + (i === 4 ? 0 : (i % 2 ? 1 : -1) * (3 + n01() * 3)), top + (len * i) / 4);
+  bent(pts, w, '', { life, dry: 0.5, pr: 2, gr: 0.2 });
+}
+
+/** 퍼지는 고리 — r0에서 r0·(1 + grow)까지 퍼지며 가늘어진다. flat = 세로 배율(밑면에 누우면 납작) */
+function ring(x: number, y: number, r0: number, w: number, grow: number, flat: number, life: number, core: string, c1: string = INK): void {
+  put('ring', x, y, { life, size: r0, v: w, a: grow, sw: flat, rot: n01() * TAU, c1, c2: core });
+}
+
+/** 관 한 획 — 길고 곧은 획 + 그 끝(앞쪽)에 빈 원 단면 */
+function pipeLine(x: number, y: number, ang: number, len: number, w: number, r: number, life: number): void {
+  stroke(x, y, ang, len, w, CUT, life, WEAPON_INK.pipe);
+  const d = len / 2 + r;
+  ring(x + Math.cos(ang) * d, y + Math.sin(ang) * d, r, Math.max(2.2, w * 0.45), 0.12, 1, life, WEAPON_INK.pipe);
+}
 
 // ── 그림 없던 순간 셋 ─────────────────────────────────────────
 
@@ -443,6 +570,43 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       }
       const sp = Math.hypot(p.vx, p.vy);
       inkDrop(ctx, p.x, py, p.size * k * (p.a === 1 ? 0.6 : 1), Math.atan2(p.vy, p.vx), p.a === 1 ? 0 : Math.min(9, sp * 0.02) * k);
+      return;
+    }
+    case 'tap': {
+      // 잘게 떠는 획 — i번째는 (i/n)·a초에 박혀 0.1초 동안 가늘어지며 사라진다. 친 자리 둘레에 조금씩 비켜 박힌다. 막 박힌 획은 속이 포인트 색
+      const age0 = p.max - p.life;
+      const n = p.st;
+      for (let i = 0; i < n; i++) {
+        const age = age0 - (p.a * i) / n;
+        const span = 0.12;
+        if (age <= 0 || age >= span) continue;
+        const f = 1 - age / span;
+        const ox = (hs(p.seed, i) - 0.5) * p.size * 1.4;
+        const L = p.size * (0.7 + 0.5 * hs(p.seed, i + 30));
+        const y0 = py + p.size * 0.25;
+        const tilt = (hs(p.seed, i + 60) - 0.5) * 0.3 * L;
+        ctx.fillStyle = p.c1;
+        brushLine(ctx, p.x + ox, y0, p.x + ox + tilt, y0 - L, p.v * (0.4 + 0.6 * f), 0, 1, 0.3, p.seed + i, 0, PRESS.flick);
+        if (age < span * 0.45 && p.c2 !== p.c1) {
+          ctx.fillStyle = p.c2;
+          brushLine(ctx, p.x + ox, y0, p.x + ox + tilt * 0.8, y0 - L * 0.8, p.v * 0.42, 0, 1, 0, p.seed + i, 0, PRESS.flick);
+        }
+      }
+      return;
+    }
+    case 'ring': {
+      // 퍼지는 고리 — 앞 12%에 한 바퀴 그어지고 퍼지며 굵기가 줄어 지워진다(알파 없음). 막 그은 앞 30%엔 속이 포인트 색
+      const s1 = Math.min(1, u / 0.12);
+      const r = p.size * (1 + p.a * (1 - (1 - u) * (1 - u)));
+      const w = p.v * t;
+      if (w < 0.3) return;
+      ctx.fillStyle = p.c1;
+      enso(ctx, p.x, py, r, w, p.rot, 0, s1, 0.35, p.sw || 1, p.seed);
+      if (u < 0.3 && p.c2 !== p.c1) {
+        ctx.fillStyle = p.c2;
+        enso(ctx, p.x, py, r, w * 0.42, p.rot, 0, s1, 0, p.sw || 1, p.seed);
+        hotCore(ctx, u / 0.3, (k) => enso(ctx, p.x, py, r, w * 0.42 * k, p.rot, 0, s1, 0, p.sw || 1, p.seed));
+      }
       return;
     }
     case 'arc': {

@@ -858,6 +858,11 @@ const TOOL_ARC = {
   hammer: [31, 50, 36, 38, 28, 28, 8],
   crowbar: [31, 52, 42, 20, 14, -4, 5],
   grinder: [29, 40, 34, 22, 18, 10, 5],
+  shovel: [30, 50, 36, 30, 20, 12, 6.5],
+  pickaxe: [31, 50, 40, 24, 22, 4, 6],
+  jackhammer: [29, 42, 32, 24, 26, 10, 7.5],
+  manhole: [31, 48, 36, 34, 26, 24, 8],
+  pipe: [31, 52, 44, 18, 14, -8, 5],
 } as const;
 
 function buildIdle(): PFrame {

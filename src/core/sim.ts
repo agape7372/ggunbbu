@@ -105,6 +105,7 @@ export function advance(s: GameState, input: InputFrame): void {
   // ── 깔림 상태 ──
   const wasAirborne = s.player.y > 0;
   if (s.player.pose === 'pinned') {
+    s.player.holdTick = 0; // 깔린 동안 누른 공격(탈출 시도)이 풀린 뒤 착암기 반복으로 이어지지 않게
     stepPinned(s, input);
   } else {
     stepPlayer(s, input, TICK);
