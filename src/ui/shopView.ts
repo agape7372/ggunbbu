@@ -41,7 +41,7 @@ interface Item {
 
 const GREAT = new Set<string>(GREATSWORD_IDS);
 
-/** 무기 스물둘 — 대검은 이름표가 「대검」이라 이름은 앞말만 */
+/** 무기 스물여섯 — 대검은 이름표가 「대검」이라 이름은 앞말만 */
 const WEAPONS: readonly Item[] = WEAPON_IDS.map((id) => ({
   id,
   slot: 'weapon',
@@ -88,8 +88,8 @@ const LEGEND = WEAPON_IDS.filter((w) => WEAPON_TIER[w] === 'legend');
 
 /** 칼꽂이 칼 기울기(그림만 · 칸은 곧다) — 같은 줄이 자로 잰 듯 서지 않게. 무기 id마다(연장이 늘어도 대검 기울기가 안 밀린다) */
 const TILT: Readonly<Record<string, number>> = {
-  sword: -3, hammer: 2, crowbar: -2, grinder: 3, shovel: -3, pipe: 3, drill: -2, pickaxe: -4, coredrill: 2, auger: -3, jackhammer: 3,
-  iron: -4, brick: 2, saw: 3, hazard: -2, rod: -3, beam: 2, glass: 4, flame: 3, frost: -3, onyx: 1, gold: -4,
+  sword: -3, hammer: 2, crowbar: -2, grinder: 3, shovel: -3, pipe: 3, drill: -2, pickaxe: -4, coredrill: 2, auger: -3, jackhammer: 3, diadrill: -2,
+  iron: -4, brick: 2, saw: 3, hazard: -2, rod: -3, beam: 2, glass: 4, flame: 3, frost: -3, thunder: 2, onyx: 1, crane: -2, brush: 3, gold: -4,
 };
 
 /** 산 순간 도장 둘레 먹 튐 넷 */

@@ -15,7 +15,7 @@ import { PALETTE, SEAL_INK, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config'
 import { comboMilestone } from '../audio/consume';
 import { brushArc, brushLine, brushPath, hotCore, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter } from './ink';
 import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites';
-import { drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
+import { TOOL_RECIPES, drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
 
 /** 먹 조각: stroke 곧은 붓 획 · sweep 호 붓 획 · zig 꺾은 획(철골 · 지그재그 · 얼음 금) · dots 리벳 점 줄 · spat 먹 튐 · drop 먹 방울(땅에 닿으면 번짐) ·
  *  dust 마른 가루 · leaf 금박
@@ -228,7 +228,7 @@ function trail(footX: number, footY: number, w: number, core: string, o: StrokeO
 export function bent(pts: number[], w: number, core: string, o: StrokeOpt = {}): void {
   const [x, y] = pts;
   put('zig', x, y, {
-    life: o.life ?? 0.26, size: 0, v: w, c1: INK, c2: core, dry: o.dry ?? 0.3, pr: o.pr ?? 2, gr: o.gr ?? 0.15, hold: o.hold,
+    life: o.life ?? 0.26, size: 0, v: w, c1: INK, c2: core, dry: o.dry ?? 0.3, pr: o.pr ?? 2, gr: o.gr ?? 0.15, hold: o.hold, vx: o.vx, vy: o.vy,
     pts: pts.map((q, i) => q - (i % 2 ? y : x)),
   });
 }
@@ -299,6 +299,34 @@ function shards(x: number, y: number, n: number, spread: number, c: string, spd 
       life: 0.5 + n01() * 0.25, size: 3.6 + n01() * 3.4, rot: n01() * TAU, spin: sgn() * 10, c1: i % 3 === 2 ? INK : c, st: 3,
     });
   }
+}
+
+/** 번개 가지 — (x, y)에 위에서 len만큼 내리꽂히는 꺾인 한 획(마디 n, 방향이 번갈아 꺾인다) + 중간에서 갈라진 잔가지 하나 */
+function bolt(x: number, y: number, len: number, w: number, core: string, life = 0.24, n = 4): void {
+  const top = [x + sgn() * len * 0.25, y - len];
+  const pts = [top[0], top[1]];
+  for (let k = 1; k < n; k++) {
+    const f = k / n;
+    pts.push(top[0] + (x - top[0]) * f + (k % 2 ? 1 : -1) * len * 0.16 * (0.7 + 0.3 * n01()), top[1] + (y - top[1]) * f);
+  }
+  pts.push(x, y);
+  bent(pts, w, core, { life, dry: 0.15, pr: 1, gr: 0.1 });
+  const [bx, by] = [pts[4], pts[5]];
+  const d = bx > x ? 1 : -1;
+  bent([bx, by, bx + d * len * 0.2, by + len * 0.16, bx + d * len * 0.26, by + len * 0.34], w * 0.55, '', { life: life * 0.8, dry: 0.3, pr: 1 });
+}
+
+/** 들어 올림 — 맞은 자리에서 위로 곧게 뻗는 획 + 그 밑에 걸린 갈고리(J) 한 획. 둘 다 위로 끌려 올라간다 */
+function lift(x: number, y: number, len: number, w: number, core: string, life = 0.3): void {
+  line(x, y, x, y - len, w, core, { pr: 1, dry: 0.2, life, vy: -70, hold: 0.3 });
+  const r = 4 + w;
+  bent([x, y - 2, x, y + r, x - r * 0.6, y + r * 1.6, x - r * 1.4, y + r * 1.1, x - r * 1.5, y + r * 0.3], w * 0.8, '', { life, dry: 0.1, pr: 1, vy: -70 });
+}
+
+/** 먹 자국 — 크게 번지는 먹 한 덩이(모양으로 번진다 · 속은 포인트 색) + 사방으로 튀는 먹점 */
+function blot(x: number, y: number, R: number, c: string, n: number, life = 0.42): void {
+  spat(x, y, R, -Math.PI / 2 + sgn() * 0.5, INK, c, life, 7, true);
+  drops(x, y, n, -Math.PI - 0.3, 0.3, 120, 300, 1.5 + R * 0.08, INK, 900);
 }
 
 /** 리벳 점 줄 — (x,y)부터 ang 쪽으로 gap 간격 n개가 차례로 찍힌다 */
@@ -566,6 +594,88 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     every: 0.16,
     tint: true,
   },
+  // 번개 — 위에서 꺾인 가지 한 획이 내리꽂힌다(보라 속). 칼 기운 = 날 둘레에 짧게 갈라진 가지가 번갈아 튀었다 사라진다
+  bolt: {
+    trail: { w: 9, dry: 0.15 },
+    hit(x, y, k, c) {
+      bolt(x, y, 46 * k, 4, c);
+      drops(x, y, N(2, k), -2.4, -0.7, 80, 180, 1.3);
+    },
+    floor(x, y, k, c) {
+      bolt(x - 14, y, 70 * k, 5, c, 0.28);
+      bolt(x + 18, y + 4, 52 * k, 3.4, '', 0.24, 3);
+      dust(x, y, 12, c, 0.4, 20, 8);
+    },
+    destroy(x, y, k, c) {
+      bolt(x - 40, y, 110 * k, 6.5, c, 0.34, 5);
+      bolt(x + 30, y + 8, 90 * k, 5, c, 0.3);
+      bolt(x, y - 10, 60 * k, 3.6, '', 0.26, 3);
+      spat(x, y, 9 * k, -Math.PI / 2, INK, c, 0.2, 6);
+    },
+    whiff(x, y) {
+      zig(x, y, -Math.PI / 2 + sgn() * 0.5, 14, 1.8, 3, 3, '', 0.12, 0.2);
+    },
+    aura(b, n, c) {
+      const [x, y] = along(b, 0.3 + n01() * 0.7);
+      const a = Math.atan2(b[3] - b[1], b[2] - b[0]) + (n % 2 ? 1 : -1) * (Math.PI / 2 - 0.5);
+      zig(x, y, a, 16 + n01() * 8, 2.2, 3, 3.6, n % 2 ? c : '', 0.16, 0.1);
+    },
+    every: 0.07,
+    tint: true,
+  },
+  // 크레인 — 들어 올린다: 맞은 자리에서 위로 곧게 뻗는 획 + 갈고리가 함께 끌려 오른다(연두 속). 칼 기운 = 칼끝에서 짧은 세로 획이 위로 끌려 오른다
+  truss: {
+    trail: { w: 7, dry: 0.3 },
+    hit(x, y, k, c) {
+      lift(x, y, 40 * k, 3.4, c);
+      dust(x, y + 4, 8, INK, 0.3, 10, 5);
+    },
+    floor(x, y, k, c) {
+      lift(x - 18, y, 64 * k, 4.4, c, 0.34);
+      lift(x + 18, y + 4, 48 * k, 3.4, '', 0.3);
+      dust(x, y + 6, 16, INK, 0.4, 10, 9);
+    },
+    destroy(x, y, k, c) {
+      lift(x - 36, y, 110 * k, 5.5, c, 0.4);
+      lift(x + 4, y + 6, 90 * k, 4.6, c, 0.38);
+      lift(x + 40, y - 4, 70 * k, 3.6, '', 0.34);
+      dust(x, y + 8, 30, INK, 0.5, 10, 14);
+    },
+    whiff(x, y) {
+      line(x, y, x, y - 12, 1.8, '', { life: 0.14, vy: -40 });
+    },
+    aura(b, n, c) {
+      const [x, y] = along(b, 0.55 + n01() * 0.45);
+      line(x + sgn() * 3, y + 8, x, y - 6, 2.4, n % 2 ? c : '', { pr: 1, life: 0.26, vy: -70, dry: 0.2 });
+    },
+    every: 0.18,
+    tint: true,
+  },
+  // 먹 — 가장 넓은 붓 한 획 뒤에 크게 번지는 먹 자국 한 덩이 + 튀는 먹점. 칼 기운 = 칼끝에 먹물 방울이 모였다 떨어진다
+  sumi: {
+    trail: { w: 15, dry: 0.6 },
+    hit(x, y, k, c) {
+      blot(x, y - 4, 5.5 * k, c, N(3, k), 0.36);
+    },
+    floor(x, y, k, c) {
+      blot(x, y - 6, 9 * k, c, N(6, k), 0.46);
+      line(x - 50 * k, y + 4, x + 54 * k, y - 2, 6, '', { pr: 2, dry: 0.75, life: 0.36 });
+    },
+    destroy(x, y, k, c) {
+      blot(x, y - 8, 15 * k, c, N(10, k), 0.6);
+      line(x - 100, y + 10, x + 100, y - 6, 9, c, { pr: 2, dry: 0.8, life: 0.42 });
+      blot(x + sgn() * 50, y - 20, 6 * k, '', N(3, k), 0.4);
+    },
+    whiff(x, y) {
+      drops(x, y, 1, 1.2, 1.9, 20, 60, 1.6, INK, 900);
+    },
+    aura(b, n, c) {
+      const [x, y] = along(b, 0.94 + n01() * 0.06);
+      drops(x, y, 1, 1.35, 1.8, 10, 40, n % 3 === 2 ? 2 : 1.5, n % 3 === 2 ? c : INK, 700);
+    },
+    every: 0.14,
+    tint: true,
+  },
   // 흑철 — 가장 짙은 먹. 친 자리 먹이 위로 천천히 번지고(자주 속), 베기 획 곁에 지그재그 마른 획이 나란히 간다
   jag: {
     trail: { w: 12, dry: 0.45 },
@@ -725,11 +835,11 @@ export function bloodSpray(x: number, y: number, ang: number, spread: number, n:
   });
 }
 
-/** renderer.drawGame이 플레이어를 그릴 때마다 부른다 — 칼 기운(1200부터) */
+/** renderer.drawGame이 플레이어를 그릴 때마다 부른다 — 칼 기운(전설 · 대검과 연장 모두) */
 export function bladeAura(s: GameState): void {
   const g = greatLook(s.weapon);
-  const r = g && RECIPES[g.shape];
-  if (!g || !r?.aura || auraT < (r.every ?? 1) || s.over) return;
+  const r = g ? RECIPES[g.shape] : TOOL_RECIPES[s.weapon]; // 연장 전설(다이아 드릴)도 칼 기운을 갖는다
+  if (!r?.aura || auraT < (r.every ?? 1) || s.over) return;
   auraT = 0;
   const b = playerBlade(s.player.pose, s.player.poseTick);
   if (!b) return;

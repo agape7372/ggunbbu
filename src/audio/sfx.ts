@@ -2,7 +2,7 @@
 // 사이드이펙트 없음: 노이즈 버퍼도 모듈 내부에서 lazy 생성.
 
 export type SfxName =
-  | 'hitFlame' | 'hitFrost' | 'hitOnyx' | 'hitGold'
+  | 'hitFlame' | 'hitFrost' | 'hitOnyx' | 'hitGold' | 'hitThunder' | 'hitCraneArm' | 'hitSumi' | 'hitDiamond'
   | 'hit' | 'hitStrong' | 'whiff' | 'floorCollapse' | 'destroy' | 'gorogoro' | 'butterPop'
   | 'guardGround' | 'guardAir' | 'guardBreak' | 'gaugeWarn' | 'comboDrop'
   | 'jump' | 'land' | 'gaugeFull' | 'special'
@@ -700,6 +700,38 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
     playOsc(ctx, dest, t + 0.004, 'sine', 2637, 0.2, 0.07, rate, { attack: 0.002 });
     playOsc(ctx, dest, t + 0.05, 'sine', 1975.5, 0.18, 0.06, rate, { attack: 0.003 });
     playNoise(ctx, dest, t, 0.05, 0.08, { filterType: 'highpass', freqStart: 6500 });
+  },
+
+  // ── 11-20 전설 넷의 제 소리 ──
+  // 번개 — 아주 짧은 쩍(높은 갈라짐) + 빠르게 떠는 지직 + 늦게 오는 낮은 울림(흑철보다 낮고 길다)
+  hitThunder: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.025, 0.34, { filterType: 'highpass', freqStart: 2600 });
+    playZap(ctx, dest, t + 0.004, rate, 260, 110, 520, 0.08, 0.14);
+    playOsc(ctx, dest, t + 0.03, 'sine', 92, 0.34, 0.3, rate, { freqEnd: 38, attack: 0.02 });
+    playNoise(ctx, dest, t + 0.04, 0.3, 0.12, { filterType: 'lowpass', freqStart: 420, freqEnd: 140 });
+  },
+
+  // 크레인 팔 — 쇠 팔이 맞는 탕(삼각 + 사각 겹) + 쇠줄이 떨린다(짧은 쉬익 둘) + 무거운 쿵
+  hitCraneArm: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 110, 0.12, 0.3, rate, { freqEnd: 58, attack: 0.001 });
+    playOsc(ctx, dest, t, 'triangle', 523, 0.16, 0.14, rate, { attack: 0.001 });
+    playOsc(ctx, dest, t + 0.003, 'square', 784, 0.05, 0.05, rate, { attack: 0.001 });
+    for (let i = 0; i < 2; i++) playNoise(ctx, dest, t + 0.04 + i * 0.04, 0.022, 0.09 - i * 0.03, { filterType: 'highpass', freqStart: 3600 + i * 600 });
+  },
+
+  // 먹 — 쇳소리 없는 젖은 철퍽(낮게 내려가는 대역 잡음) + 붓이 쓸리는 쉬익 + 부드러운 퉁
+  hitSumi: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.12, 0.32, { filterType: 'bandpass', freqStart: 520 * rate, freqEnd: 140 * rate });
+    playOsc(ctx, dest, t, 'sine', 170, 0.1, 0.24, rate, { freqEnd: 72, attack: 0.004 });
+    playNoise(ctx, dest, t + 0.02, 0.16, 0.12, { filterType: 'bandpass', freqStart: 2200 * rate, freqEnd: 700 * rate });
+  },
+
+  // 다이아 드릴 — 높게 갈리는 이잉(사각이 조금 내려간다) + 맑은 팅 + 갈리는 쉬익 + 짧은 틱
+  hitDiamond: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 210, 0.05, 0.22, rate, { freqEnd: 110, attack: 0.001 });
+    playOsc(ctx, dest, t, 'square', 1760, 0.09, 0.05, rate, { freqEnd: 1480, attack: 0.002 });
+    playOsc(ctx, dest, t + 0.006, 'sine', 3136, 0.12, 0.08, rate, { attack: 0.001 });
+    playNoise(ctx, dest, t, 0.1, 0.12, { filterType: 'bandpass', freqStart: 3000 * rate, freqEnd: 6000 * rate });
   },
 
   // ── 명물 보스 ──

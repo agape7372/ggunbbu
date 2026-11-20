@@ -234,6 +234,7 @@ function triggerSpecial(s: GameState): void {
   const p = s.player;
   const wasPinned = p.pose === 'pinned';
   s.wazaGauge -= WAZA_GAUGE.COST;
+  s.wazaGauge += WEAPON[s.weapon].gaugeKeep ?? 0; // 번개 대검: 필살 뒤 이 값에서 다시 찬다(필살 종류 무관 · 여기 한 곳)
   p.pose = 'special';
   p.poseTick = 0;
   p.invulnTicks = SPECIAL.IFRAMES;
@@ -596,9 +597,10 @@ function onPlayerCrushed(s: GameState): void {
   s.events.push({ kind: 'hurt' });
 }
 
-/** 시작 장비 — 목숨 +lives, 필살 wazas번 분(첫 번은 게이지, 나머지는 wazaBank). makeState 바로 뒤에 건다 */
+/** 시작 장비 — 목숨 +lives, 필살 wazas번 분(첫 번은 게이지, 나머지는 wazaBank). makeState 뒤 무기를 정한 다음에 건다 */
 export function applyStartKit(s: GameState, lives: number, wazas: number): void {
   s.lives += lives;
+  s.wazaGauge = Math.max(s.wazaGauge, WEAPON[s.weapon].startGauge ?? 0); // 먹 대검: 판 시작 한 번(튜토리얼은 안 부른다 · 2막 진입 · 이어 하기는 0)
   if (wazas <= 0) return;
   s.wazaGauge = WAZA_GAUGE.MAX;
   s.wazaBank = wazas - 1;

@@ -1,12 +1,14 @@
 // 무기 — 철거칼은 기존 수치 그대로, 무기는 사거리·띄우기·필살 게이지만 바꾼다.
 // 어느 무기든 2막 필요 타격 수(층 HP 합)는 그대로고, 1막 연타로 건물을 띄워 둘 수 없다.
 import { describe, it, expect } from 'vitest';
-import { makeState, advance } from '../src/core/sim';
-import { enterAct2Phase } from '../src/core/act2';
+import { makeState, advance, applyStartKit } from '../src/core/sim';
+import { liftOf } from '../src/core/perks';
+import { startTraining } from '../src/core/training';
+import { enterAct2, enterAct2Phase } from '../src/core/act2';
 import { makeFloor, makeStack } from '../src/core/building';
 import { attackRange, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type PerkId, type WeaponId } from '../src/core/types';
-import { PERK, PLAYER, STACK, WEAPON } from '../src/config';
+import { PERK, PERK_RUN, PLAYER, STACK, WEAPON } from '../src/config';
 import { BLADE_IDS, BODY_IDS, DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, LETTERS_IDS, MASK_IDS, slotOf, validateLoadout, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { WEAPON_DUST_COST } from '../src/meta/economy';
 
@@ -32,7 +34,8 @@ describe('무기 표', () => {
     // 타격이 vy를 lift로 올리고 다음 타격까지 CYCLE틱 중력을 받는다 — 주기당 변위가 음수여야 한다
     const g = STACK.ACT1_G[0];
     for (const id of IDS) {
-      const disp = (WEAPON[id].lift * CYCLE - (g * CYCLE * (CYCLE + 1)) / 120) / 60;
+      const top = WEAPON[id].lift + (WEAPON[id].comboLift ?? 0); // 크레인은 콤보 100에서 가장 높다
+      const disp = (top * CYCLE - (g * CYCLE * (CYCLE + 1)) / 120) / 60;
       expect(disp, id).toBeLessThan(0);
     }
   });
@@ -180,7 +183,7 @@ describe('대검', () => {
 });
 
 // ── 고유 규칙 무기(11-20) — 세 칸 + 고유 규칙 하나(WeaponSpec 선택 칸). core에 무기 id 분기는 없다 ──
-const RULED: WeaponId[] = ['shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'brick', 'rod', 'glass'];
+const RULED: WeaponId[] = ['shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'diadrill', 'brick', 'rod', 'glass', 'thunder', 'crane', 'brush'];
 
 describe('고유 규칙', () => {
   /** 떨어지는 건물을 땅 · 공중 가드로 받는다 */
@@ -338,6 +341,55 @@ describe('고유 규칙', () => {
     expect(hit('sword', true)).toBe(0); // 철거칼(68)은 공중이어도 그대로
   });
 
+  it('번개 대검: 필살을 쓰면 게이지가 0이 아니라 gaugeKeep에서 다시 찬다(필살 종류 무관)', () => {
+    for (const waza of WAZA_IDS) {
+      for (const w of ['thunder', 'sword'] as const) {
+        const s = makeState();
+        s.weapon = w; s.waza = waza;
+        withStack(s, 40);
+        s.wazaGauge = 100;
+        advance(s, { ...EMPTY_INPUT, special: true });
+        expect(s.player.pose, `${w} ${waza}`).toBe('special');
+        expect(s.wazaGauge, `${w} ${waza}`).toBe(w === 'thunder' ? WEAPON.thunder.gaugeKeep : 0);
+      }
+    }
+  });
+
+  it('크레인 대검: 콤보 100까지 띄우기가 곧게 오르고, 퍽을 더해도 LIFT_MAX를 안 넘는다', () => {
+    const at = (combo: number, perkLift = 0): number => {
+      const s = makeState(); s.weapon = 'crane'; s.combo = combo;
+      if (perkLift) s.perk = { picked: Array.from({ length: perkLift }, () => 'bare' as PerkId), seen: [], offer: null };
+      return liftOf(s);
+    };
+    const { lift, comboLift } = WEAPON.crane;
+    expect(at(0)).toBe(lift);
+    expect(at(50)).toBeCloseTo(lift + comboLift! / 2);
+    expect(at(100)).toBeCloseTo(lift + comboLift!);
+    expect(at(500)).toBeCloseTo(lift + comboLift!);
+    expect(at(100, 5)).toBe(PERK_RUN.LIFT_MAX);
+    const sw = makeState(); sw.combo = 100;
+    expect(liftOf(sw)).toBe(WEAPON.sword.lift); // 다른 무기는 콤보와 상관없다
+  });
+
+  it('먹 대검: 판 시작(applyStartKit) 한 번만 게이지 startGauge · 2막 진입 · 이어 하기 · 튜토리얼은 0', () => {
+    const run = (w: WeaponId, wazas = 0): GameState => { const s = makeState(); s.weapon = w; applyStartKit(s, 0, wazas); return s; };
+    expect(run('brush').wazaGauge).toBe(WEAPON.brush.startGauge);
+    expect(run('sword').wazaGauge).toBe(0);
+    expect(run('brush', 1).wazaGauge).toBe(100); // 시작 장비 필살이 더 크면 그것
+    const a2 = run('brush'); enterAct2(a2);
+    expect(a2.wazaGauge).toBe(0);
+    const tr = makeState({ seed: 7, mode: 'training' }); tr.weapon = 'brush'; startTraining(tr);
+    expect(tr.wazaGauge).toBe(0);
+  });
+
+  it('다이아 드릴: 쥐고 있으면 처음부터 holdRepeat 간격(전동 드릴의 끝 간격) · 공격 한 주기보다 길다', () => {
+    const s = makeState({ seed: 3 }); s.weapon = 'diadrill'; s.lives = 99;
+    const g = gaps(swingTicks(s, held(60, { attack: true })));
+    expect(g.slice(0, 6)).toEqual(Array(6).fill(WEAPON.diadrill.holdRepeat));
+    expect(WEAPON.diadrill.holdRepeat).toBe(WEAPON.drill.holdMin);
+    expect(WEAPON.diadrill.holdRepeat!).toBeGreaterThanOrEqual(CYCLE);
+  });
+
   it('맞교환: 고유 규칙 무기는 철거칼보다 못한 칸이 하나는 있다', () => {
     for (const id of RULED) {
       const d = (['reach', 'lift', 'gauge'] as const).map((k) => Math.sign(WEAPON[id][k] - WEAPON.sword[k]));
@@ -380,7 +432,7 @@ describe('전동 드릴: 누를수록 빨라진다', () => {
 });
 
 // 누르고 있기(착암기 · 전동 드릴)가 다른 상태와 엉키지 않는다 — 셈은 이번 누름의 공격 엣지가 연다
-for (const W of ['jackhammer', 'drill'] as const) {
+for (const W of ['jackhammer', 'drill', 'diadrill'] as const) {
   describe(`${W} 누르고 있기 · 엉킴`, () => {
     const mk = (): GameState => { const s = makeState({ seed: 3 }); s.weapon = W; s.lives = 99; return s; };
 

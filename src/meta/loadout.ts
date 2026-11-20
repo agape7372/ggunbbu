@@ -8,8 +8,8 @@ export type EquipSlot = 'waza' | 'weapon' | CosmeticSlot;
 
 export const WAZA_IDS: readonly WazaId[] = ['tenchi', 'ageba', 'baram', 'mukjul', 'nakgwan', 'dalmuri'];
 /** 대검 — 상점은 이 순서(값 오름차순)로 판다 */
-export const GREATSWORD_IDS: readonly GreatswordId[] = ['iron', 'brick', 'saw', 'hazard', 'rod', 'beam', 'glass', 'flame', 'frost', 'onyx', 'gold'];
-export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', 'shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', ...GREATSWORD_IDS];
+export const GREATSWORD_IDS: readonly GreatswordId[] = ['iron', 'brick', 'saw', 'hazard', 'rod', 'beam', 'glass', 'flame', 'frost', 'thunder', 'onyx', 'crane', 'brush', 'gold'];
+export const WEAPON_IDS: readonly WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', 'shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'diadrill', ...GREATSWORD_IDS];
 export const BODY_IDS: readonly BodyId[] = ['ink', 'amber', 'slate', 'coverall', 'crown', 'ash', 'apron', 's_night', 's_powder', 's_high'];
 export const BLADE_IDS: readonly BladeId[] = ['wire', 'rebar', 'crescent', 'arc', 'royal', 'ember', 'inju', 's_moon', 's_fuse', 's_steel'];
 export const LETTERS_IDS: readonly LettersId[] = ['flyer', 'stamp', 'orbit', 'rivet', 'gilt', 'sprout'];

@@ -141,6 +141,15 @@ describe('이벤트 → 소리 배선', () => {
   it('굴착 드릴이 깔림을 대신 받으면(pinSave) 퍽 + 안전모 깨짐 소리', () => {
     expect(map({ kind: 'pinSave', y: 40 } as JuiceEvent, state({ weapon: 'auger' }))).toEqual(['hitLow', 'hatBreak']);
   });
+  it('11-20 전설 넷은 제 소리 — 타격에 그 소리, 층 깨기 · 완파엔 붕괴음 위에(다이아 드릴은 연장 전설 TOOL_OWN)', () => {
+    const hit: JuiceEvent = { kind: 'hit', lane: 0, mat: 'soft' as never, combo: 1 };
+    const own = { thunder: 'hitThunder', crane: 'hitCraneArm', brush: 'hitSumi', diadrill: 'hitDiamond' } as const;
+    for (const [weapon, name] of Object.entries(own) as [keyof typeof own, SfxName][]) {
+      expect(map(hit, state({ weapon }))![0], weapon).toBe(name);
+      expect(map({ kind: 'floorCollapse', lane: 0 } as JuiceEvent, state({ weapon })), weapon).toEqual(['floorCollapse', name]);
+      expect(map({ kind: 'stackDestroy' } as JuiceEvent, state({ weapon })), weapon).toEqual(['destroy', 'gorogoro', name]);
+    }
+  });
 });
 
 describe('스케줄러 — 밀리면 건너뛴다 (snd-08)', () => {
@@ -197,7 +206,7 @@ describe('파괴 소리 레시피 — CPU 예산', () => {
   const names: SfxName[] = [
     'hit', 'hitLow', 'hitTick', 'hitStrong', 'hitHammer', 'hitBar', 'hitGrind',
     'floorCollapse', 'destroy', 'gorogoro', 'special', 'specialCharge', 'incoming',
-    'hitFlame', 'hitFrost', 'hitOnyx', 'hitGold',
+    'hitFlame', 'hitFrost', 'hitOnyx', 'hitGold', 'hitThunder', 'hitCraneArm', 'hitSumi', 'hitDiamond',
     'bellTwin', 'bellBoom', 'bellClear', 'pagodaCreak', 'craneSnap', // 명물 2판 기믹 예고
   ];
   it('소리 하나당 노드 14개 이하, 예약값은 모두 유한·양수', () => {

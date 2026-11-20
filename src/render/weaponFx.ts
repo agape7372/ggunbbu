@@ -5,7 +5,7 @@
 // 알파로 지우지 않고 꼬리부터 깎는다. 맞은 자리 먹 튐 · 방울은 effects(공통 사건) 몫이라 여기서 다시 그리지 않는다(오함마 발묵만 예외).
 // 연타 한 줄(지난 타격에서 0.6초 안)은 1·2·3타로 돌며 획이 내려베기 → 올려베기 → 가로로 바뀌고 3타째가 조금 크다.
 // 조각 Kind는 bladeFx 목록의 이름을 빌려 뜻만 바꿔 쓴다 — hook = 붓 획 · disc = 먹 튐 · chunk = 나는 먹 · nail = 불티 분수 · arc = 끊긴 붓 고리 ·
-// tap = 잘게 떠는 획(착암기) · ring = 고리(파이프 단면 · 코어 드릴 구멍) · pix = 네모 토막(마스크 도트 · 빠진 원기둥 · 벽돌 조각). 연장 열하나는 저마다 다른 조각 묶음으로 터진다.
+// tap = 잘게 떠는 획(착암기) · ring = 고리(파이프 단면 · 코어 드릴 구멍) · pix = 네모 토막(마스크 도트 · 빠진 원기둥 · 벽돌 조각 · a 4면 다이아 드릴 마름모). 연장 열둘은 저마다 다른 조각 묶음으로 터진다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
@@ -111,6 +111,31 @@ interface Tool {
   destroy(x: number, y: number, k: number): void;
   whiff(footX: number, footY: number): void;
 }
+
+/** 마름모 파편 — 각진 마름모가 돌며 튀어 떨어진다. 셋에 하나는 먹, 나머지는 포인트 색 */
+function gems(x: number, y: number, n: number, spd: number, size: number, c: string = WEAPON_INK.diadrill): void {
+  for (let i = 0; i < n; i++) {
+    put('pix', x + sgn() * 5, y + sgn() * 3, {
+      ...vel(-Math.PI / 2 + sgn() * 1.2, spd * (0.5 + n01() * 0.6)), g: 900,
+      life: 0.42 + n01() * 0.16, size: size * (0.8 + n01() * 0.4), v: 1.5, a: 4, rot: n01() * TAU, spin: sgn() * 9, c1: i % 3 === 2 ? INK : c,
+    });
+  }
+}
+
+/** 연장 전설의 칼 기운 · 물들임 — 대검 RECIPES의 aura · every · tint와 같은 뜻(bladeFx.bladeAura가 읽는다) */
+export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number, number, number, number], n: number, c: string): void; every?: number; tint?: true }>> = {
+  // 다이아 드릴 — 칼끝 둘레를 작은 마름모 조각이 돈다(반짝 별이 아니라 각진 조각)
+  diadrill: {
+    aura(b, n, c) {
+      const a = n * 1.25;
+      const x = b[2] + Math.cos(a) * 9;
+      const y = b[3] + Math.sin(a) * 9;
+      put('pix', x, y, { ...vel(a + Math.PI / 2, 60), g: 0, life: 0.2, size: 2.8, v: 1.5, a: 4, rot: a, spin: 6, c1: n % 2 ? c : INK });
+    },
+    every: 0.07,
+    tint: true,
+  },
+};
 
 const TOOLS: Partial<Record<WeaponId, Tool>> = {
   // 철거칼 — 가장 맑은 한 획. 벤 순간 획 속이 황(칼빛 설정 색)으로 비쳤다 먹으로 마른다. 덧붙이는 것 없음
@@ -245,6 +270,24 @@ const TOOLS: Partial<Record<WeaponId, Tool>> = {
     },
     whiff(footX, footY) {
       taps(footX + 30, footY - 44, 3, 0.12, 9, 2.2, GRAY);
+    },
+  },
+  // 다이아 드릴 — 각지게 깬다: 맞은 자리에서 위로 짧은 한 획(청록 속) + 도는 마름모 파편 몇. 처음부터 가장 빠른 무기라 조각은 적고 짧게 산다
+  diadrill: {
+    hit(x, y, b, k) {
+      stroke(x + sgn() * 3, y - 6, -Math.PI / 2 + sgn() * 0.1, 30 * b.k, 4.4 * b.k, CUT, 0.18, WEAPON_INK.diadrill);
+      gems(x, y, 2 + (k >= 1.5 ? 1 : 0), 280, 3.6);
+    },
+    floor(x, y, b, k) {
+      stroke(x, y - 8, -Math.PI / 2 + b.ang * 0.3, 52, 6.5, CUT, 0.26, WEAPON_INK.diadrill);
+      gems(x, y, jn(N(4, k)), 340, 4.4);
+    },
+    destroy(x, y, k) {
+      stroke(x - 6, y - 10, -Math.PI / 2 - 0.12, 84, 8.5, CUT, 0.32, WEAPON_INK.diadrill);
+      gems(x, y, N(7, k), 420, 5);
+    },
+    whiff(footX, footY) {
+      gems(footX + 28, footY - 50, 1, 120, 2.6, GRAY);
     },
   },
   // 전동 드릴 — 파고든다: 맞은 자리에서 위로 파고든 짧은 한 획(풀빛 속) + 둘레로 튀는 곱슬 부스러기 몇 가닥. 누르면 빨라지는 무기라 수명이 짧다
@@ -490,7 +533,10 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
       scaled(x, y, WEAPON_FX.SIZE, () => t.floor(x, y, b, k));
       break;
     case 'stackDestroy':
-      scaled(x, footY - 70, WEAPON_FX.SIZE, () => t.destroy(x, footY - 70, k));
+      scaled(x, footY - 70, WEAPON_FX.SIZE, () => {
+        t.destroy(x, footY - 70, k);
+        if (TOOL_RECIPES[s.weapon]?.tint) t.floor(x + sgn() * 40, footY - 116, b, Math.max(k, 1.25)); // 완파 물들임 — 모티프 한 번 더
+      });
       break;
     case 'slash':
       t.whiff(footX, footY);
@@ -533,10 +579,19 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       ctx.rotate(p.rot);
       ctx.fillStyle = p.c1;
       const h = s * (p.v || 1); // v = 세로 배율(빠진 원기둥 · 벽돌 조각)
-      ctx.fillRect(-s / 2, -h / 2, s, h);
+      ctx.beginPath();
+      if (p.a === 4) {
+        // 마름모(다이아 드릴 파편)
+        ctx.moveTo(0, -h / 2);
+        ctx.lineTo(s / 2, 0);
+        ctx.lineTo(0, h / 2);
+        ctx.lineTo(-s / 2, 0);
+        ctx.closePath();
+      } else ctx.rect(-s / 2, -h / 2, s, h);
+      ctx.fill();
       ctx.strokeStyle = INK; // 흰 도트도 아이보리 위에서 보이게
       ctx.lineWidth = 0.8;
-      ctx.strokeRect(-s / 2, -h / 2, s, h);
+      ctx.stroke();
       ctx.restore();
       return;
     }

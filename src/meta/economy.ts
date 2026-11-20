@@ -28,6 +28,7 @@ export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
   coredrill: 800,
   auger: 1000,
   jackhammer: 1100,
+  diadrill: 1500, // 연장 전설
   // 대검 — 연장 셋을 다 사고 나서의 긴 목표. 맞교환이라 비쌀수록 세지는 않다(모양 값)
   iron: 450,
   brick: 550,
@@ -38,7 +39,10 @@ export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
   glass: 1050,
   flame: 1200,
   frost: 1200,
+  thunder: 1400,
   onyx: 1600,
+  crane: 1800,
+  brush: 2000,
   gold: 2400,
 };
 

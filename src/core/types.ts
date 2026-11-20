@@ -330,10 +330,10 @@ export type WazaId = 'tenchi' | 'ageba' | 'mukjul' | 'dalmuri' | 'nakgwan' | 'ba
 export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder' | ToolId | GreatswordId;
 
 /** 연장(11-20 다섯 → 맨홀 빼고 드릴 셋). 세 칸에 고유 규칙 하나씩(config WeaponSpec 선택 칸). 대미지 · 프레임은 같다 */
-export type ToolId = 'shovel' | 'pickaxe' | 'jackhammer' | 'pipe' | 'drill' | 'coredrill' | 'auger';
+export type ToolId = 'shovel' | 'pickaxe' | 'jackhammer' | 'pipe' | 'drill' | 'coredrill' | 'auger' | 'diadrill';
 
 /** 대검 — 칼날 모양·색(render/sprites)과 세 칸(config WEAPON)만 다르다. 쥐는 자세는 하나 */
-export type GreatswordId = 'iron' | 'brick' | 'saw' | 'hazard' | 'rod' | 'beam' | 'glass' | 'flame' | 'frost' | 'onyx' | 'gold';
+export type GreatswordId = 'iron' | 'brick' | 'saw' | 'hazard' | 'rod' | 'beam' | 'glass' | 'flame' | 'frost' | 'thunder' | 'onyx' | 'crane' | 'brush' | 'gold';
 
 /** 보급품. 상자는 고정 순서로 돈다(config SUPPLY.ROTATION) — 확률 없음. 안전모(hat)는 상자 밖, 콤보로 번다(HAT). */
 export type ItemId = 'gloves' | 'coffee' | 'hat' | 'dust';

@@ -9,7 +9,7 @@ import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx, type Bit } from '
 import { liveBits, setFxMask } from '../src/render/weaponFx';
 import { drawWazaShot } from '../src/render/wazaShow';
 
-/** 연장 열하나(철거칼 · 오함마 · 빠루 · 그라인더 + 11-20 일곱) — 대검이 아닌 무기 */
+/** 연장 열둘(철거칼 · 오함마 · 빠루 · 그라인더 + 11-20 일곱 + 다이아 드릴) — 대검이 아닌 무기 */
 const TOOL_IDS: readonly WeaponId[] = WEAPON_IDS.filter((w) => !(GREATSWORD_IDS as readonly string[]).includes(w));
 const STRIKES = ['hit', 'floorCollapse', 'stackDestroy', 'slash'] as const;
 const MOMENTS = ['special', 'gaugeFull', 'comboBreak', 'pinEscape'] as const;
@@ -62,7 +62,7 @@ beforeEach(() => {
 });
 
 describe('연장·필살 이펙트', () => {
-  it('무기 22종 × 타격·층 깨기·완파·헛스윙 — 던지지 않고, 3타째·높은 콤보·마스크까지 얹어도 상한 안, 2초 뒤엔 0', () => {
+  it('무기 26종 × 타격·층 깨기·완파·헛스윙 — 던지지 않고, 3타째·높은 콤보·마스크까지 얹어도 상한 안, 2초 뒤엔 0', () => {
     setFxMask(['#E5302E', '#FFD200']);
     for (const w of WEAPON_IDS) {
       // 대검의 높은 콤보는 기존 RECIPES가 일부러 키운다(비쌀수록 화려) — 연장만 콤보 210까지 본다
@@ -105,7 +105,7 @@ describe('연장·필살 이펙트', () => {
     }
   });
 
-  it('연장 열하나는 서로 다른 조각으로 터진다', () => {
+  it('연장 열둘은 서로 다른 조각으로 터진다', () => {
     const sigs = TOOL_IDS.map((w) => {
       resetBladeFx();
       const s = state(w);

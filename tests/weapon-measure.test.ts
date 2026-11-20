@@ -7,7 +7,8 @@ import { describe, it } from 'vitest';
 // @ts-ignore — node 타입 없이 돈다(의존성 0). 측정 도구 전용
 import { appendFileSync } from 'node:fs';
 declare const process: { env: Record<string, string | undefined> };
-import { makeState, advance } from '../src/core/sim';
+import { makeState, advance, applyStartKit } from '../src/core/sim';
+import { liftOf } from '../src/core/perks';
 import { EMPTY_INPUT, type GameState, type InputFrame, type WeaponId } from '../src/core/types';
 import { WAZA_GAUGE, WEAPON } from '../src/config';
 import { expertBot, userBot } from './stageBot';
@@ -49,6 +50,8 @@ interface Run {
   gBounce: number; gKept: number;
   /** 공중 가드 튕김 수(철근 guardGauge는 땅 · 공중 모두) · 굴착 드릴이 넘긴 깔림 수 */
   aBounce: number; saves: number;
+  /** 첫 필살까지 틱(먹 startGauge) · 베기 타격 때 띄우기 합(크레인 comboLift) */
+  firstSp: number; liftSum: number;
   /** 층 붕괴 타격 수(곡괭이 +collapseGauge) */
   collapses: number;
   /** 공중 타격 · 그중 땅 사거리 밖이라 airReach가 닿게 한 것(파이프) */
@@ -58,21 +61,23 @@ interface Run {
 function run(who: string, weapon: WeaponId, seed: number): Run {
   const s = makeState({ seed });
   s.weapon = weapon;
+  applyStartKit(s, 0, 0); // 실제 판 시작과 같게(먹 대검 startGauge)
   s.lives = 99;
   const bot = hand(BOTS[who]());
-  const r: Run = { score: 0, lost: 0, specials: 0, hits: 0, peak: 0, gBounce: 0, gKept: 0, aBounce: 0, saves: 0, collapses: 0, airHits: 0, airOnly: 0 };
+  const r: Run = { score: 0, lost: 0, specials: 0, hits: 0, peak: 0, gBounce: 0, gKept: 0, aBounce: 0, saves: 0, firstSp: -1, liftSum: 0, collapses: 0, airHits: 0, airOnly: 0 };
   for (let t = 0; t < MIN * 3600 && !s.over; t++) {
     const combo0 = s.combo;
     advance(s, bot(s));
     for (const e of s.events) {
       if (e.kind === 'lifeLost') r.lost += 1;
-      else if (e.kind === 'special') r.specials += 1;
+      else if (e.kind === 'special') { r.specials += 1; if (r.firstSp < 0) r.firstSp = s.tick; }
       else if (e.kind === 'guardBounce') { r.gBounce += 1; if (combo0 > 0 && s.combo > 0) r.gKept += 1; }
       else if (e.kind === 'guardAirBounce') r.aBounce += 1;
       else if (e.kind === 'pinSave') r.saves += 1;
       else if ((e.kind === 'hit' || e.kind === 'floorCollapse') && 'combo' in e && e.combo !== undefined) {
         // 필살 · 더미 붕괴는 combo 칸이 없다(베기 타격만 센다)
         r.hits += 1;
+        r.liftSum += liftOf(s);
         if (e.kind === 'floorCollapse') r.collapses += 1;
         if (s.player.y > 0) {
           r.airHits += 1;
@@ -99,7 +104,8 @@ describe.skipIf(!process.env.WMEASURE)('무기 비교 측정', () => {
         log(`[${who}] ${id}: 점수 ${Math.round(avg('score'))} · 분당 목숨 ${(avg('lost') / MIN).toFixed(2)} · 필살 ${avg('specials').toFixed(1)}회 · 최고 콤보 ${Math.round(avg('peak'))}`
           + ` · 땅 가드 ${avg('gBounce').toFixed(1)}(콤보 남음 ${pct(sum('gKept'), sum('gBounce'))}) · 층 붕괴 ${avg('collapses').toFixed(0)}`
           + ` · 공중 타격 ${pct(sum('airHits'), sum('hits'))}(땅 사거리 밖 ${pct(sum('airOnly'), sum('hits'))})`
-          + ` · 공중 가드 ${avg('aBounce').toFixed(1)} · 깔림 구제 ${avg('saves').toFixed(2)}`);
+          + ` · 공중 가드 ${avg('aBounce').toFixed(1)} · 깔림 구제 ${avg('saves').toFixed(2)}`
+          + ` · 첫 필살 ${(avg('firstSp') / 60).toFixed(1)}초 · 평균 띄우기 ${(sum('liftSum') / Math.max(1, sum('hits'))).toFixed(1)}`);
       }
     }
   });

@@ -562,7 +562,7 @@ function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, 
 // ── 대검 ─────────────────────────────────────────────────────
 // 종마다 칼날 모양·색만 다르고 쥐는 자세는 하나(포즈마다 weapon()의 great 좌표). 칼은 졸라맨 키의 절반을 넘는다 —
 // 가는 선 졸라맨이 굵은 칼날을 든 대비가 대검의 맛. 테두리는 몸 색(LINE)이 아니라 잉크: 칼은 따로 선 물건이다.
-type GreatShape = 'plain' | 'saw' | 'stripe' | 'beam' | 'block' | 'strand' | 'pane' | 'wave' | 'crystal' | 'jag' | 'royal';
+type GreatShape = 'plain' | 'saw' | 'stripe' | 'beam' | 'block' | 'strand' | 'pane' | 'wave' | 'crystal' | 'bolt' | 'jag' | 'truss' | 'sumi' | 'royal';
 export interface GreatLook {
   shape: GreatShape;
   blade: string;  // 칼날
@@ -581,7 +581,10 @@ const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
   glass: { shape: 'pane', blade: '#3E9E6A', hi: '#BFE3CC', guard: '#1E4A33', w: 2.4 },
   flame: { shape: 'wave', blade: '#E0401E', hi: '#FFB46B', guard: '#3A1A12', w: 2.8 },
   frost: { shape: 'crystal', blade: '#BDE6F6', hi: '#FFFFFF', guard: '#3D6E8C', w: 2.9 },
+  thunder: { shape: 'bolt', blade: '#7766CC', hi: '#C9C1EE', guard: '#2C2550', w: 2.9 },
   onyx: { shape: 'jag', blade: '#2E2D34', hi: '#625F6D', guard: PALETTE.INK, w: 3, edge: '#D2332C' },
+  crane: { shape: 'truss', blade: '#74B654', hi: '#CFE6C0', guard: '#2C4A1E', w: 3 },
+  brush: { shape: 'sumi', blade: PALETTE.INK, hi: '#4D8AE6', guard: '#5A4630', w: 3.4 },
   gold: { shape: 'royal', blade: '#E2B43A', hi: '#FFF1B8', guard: '#8A5A12', w: 3.2, edge: PALETTE.RED },
 };
 
@@ -801,6 +804,46 @@ function greatArc(c: CanvasRenderingContext2D, g: GreatLook): void {
       bristles(3, 7, 0.66);
       band(3, core, 7, 0.04, 0.6);
       break;
+    case 'bolt': // 번개 — 여섯 마디로 꺾인 띠 + 꺾인 자리에서 곧게 갈라진 잔가지 둘
+      band(9, PALETTE.INK, 6);
+      band(3, core, 6, 0.04, 0.6);
+      c.fillStyle = PALETTE.INK;
+      for (const [t, d] of [[0.22, 1], [0.48, -1]] as const) {
+        const s = smear(t);
+        const [ax, ay] = arcAt(t - 0.03, 2.4 * s * d);
+        const [bx, by] = arcAt(t + 0.1, 12 * s * d);
+        const [cx, cy] = arcAt(t + 0.03, 2.4 * s * d);
+        c.beginPath();
+        c.moveTo(ax, ay);
+        c.lineTo(bx, by);
+        c.lineTo(cx, cy);
+        c.closePath();
+        c.fill();
+      }
+      break;
+    case 'truss': { // 크레인 — 가는 띠 둘(위 · 아래 현) 사이를 가새가 지그재그로 잇는다(가새만 속 색)
+      for (const o of [-4.5, 4.5]) {
+        arcBand(c, (t) => (o + 1.3) * smear(t), (t) => (1.3 - o) * smear(t), 24, 0, 0.84);
+        c.fillStyle = PALETTE.INK;
+        c.fill();
+      }
+      c.beginPath();
+      for (let i = 0; i <= 14; i++) {
+        const t = 0.02 + i * 0.055;
+        const [x, y] = arcAt(t, (i % 2 ? 4.2 : -4.2) * smear(t));
+        if (i) c.lineTo(x, y);
+        else c.moveTo(x, y);
+      }
+      c.strokeStyle = core;
+      c.lineWidth = 1.6;
+      c.stroke();
+      break;
+    }
+    case 'sumi': // 먹 — 가장 넓고 짙은 붓 한 획, 끝이 갈래 다섯으로 일찍 마른다
+      band(15, PALETTE.INK);
+      bristles(5, 13, 0.5);
+      band(3.4, core, 24, 0.04, 0.42);
+      break;
     case 'jag': // 가장 짙고 넓은 먹, 바깥 날에만 자주 한 줄
       band(12, PALETTE.INK);
       bristles(4, 10, 0.6);
@@ -885,6 +928,7 @@ const TOOL_ARC = {
   drill: [29, 40, 32, 22, 22, 8, 4],
   coredrill: [29, 44, 34, 26, 24, 12, 6.5],
   auger: [31, 50, 38, 30, 26, 16, 8.5],
+  diadrill: [29, 44, 34, 24, 24, 10, 7],
   pipe: [31, 52, 44, 18, 14, -8, 5],
 } as const;
 
@@ -1611,7 +1655,7 @@ export function greatArcPoint(t: number, off = 0, turn = 0, grow = 1): [number, 
 
 /** 지금 프레임의 대검 칼날 — 발 기준 [손x, 손y, 칼끝x, 칼끝y](숨쉬기 포함). 대검이 아니거나 칼이 없는 포즈면 null */
 export function playerBlade(pose: PlayerPose, animTick: number): Seg | null {
-  if (!greatLook(playerWeapon)) return null;
+  if (!greatLook(playerWeapon)) return live ? liveBlade(live, false) : null; // 연장 전설(다이아 드릴)의 칼 기운 — 살아 있는 몸일 때만
   if (live) return liveBlade(live);
   const b = pickPlayerFrame(pose, animTick).blade;
   const bob = playerBob(pose, animTick);

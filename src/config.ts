@@ -170,7 +170,8 @@ export const STACK = {
 // 대미지는 전부 1, 공격 프레임(1/3/2)도 전부 같다 — 체크포인트가 층 HP 합(=타격 수)이고,
 // 프레임을 무기마다 바꾸면 3f 입력 버퍼 안에서 탭이 버려진다(10-25 반론 실측: 8탭/s에 오함마 50% 유실).
 // 그래서 무기는 세 칸을 바꾼다: 사거리(건물 판정창 위끝) · 띄우기(타격 밀어올림) · 필살 게이지 배율.
-// 11-20 연장 일곱(삽 · 비계 파이프 · 전동 드릴 · 곡괭이 · 코어 드릴 · 굴착 드릴 · 착암기)과 대검 둘(벽돌 · 철근)은 세 칸에 고유 규칙 하나를 더한다(아래 선택 칸).
+// 11-20 연장 여덟(삽 · 비계 파이프 · 전동 드릴 · 곡괭이 · 코어 드릴 · 굴착 드릴 · 착암기 · 다이아 드릴)과 대검 다섯(벽돌 · 철근 · 번개 · 크레인 · 먹)은
+// 세 칸에 고유 규칙 하나를 더한다(아래 선택 칸). 무기는 모두 스물여섯 자루다.
 // 고유 규칙도 대미지 · 프레임 · 띄우기 상한 · 층 HP를 건드리지 않는다(2막 30/138타는 그대로 · tests/weapons.test.ts).
 // core는 무기 id로 가르지 않고 이 칸만 읽는다. 칸 값은 봇 비교(tests/weapon-measure.test.ts · DEVLOG 11-20)로 맞췄다.
 //   ⚠ 띄우기 상한: 연타 1주기(7f) 동안 건물이 **1막 어디서든 가라앉아야** 한다 — 안 그러면
@@ -201,6 +202,12 @@ export interface WeaponSpec {
   guardLift?: number;
   /** 발이 땅에서 떨어져 있으면 사거리 +이 값 */
   airReach?: number;
+  /** 필살을 쓰면 게이지가 0이 아니라 이 값에서 다시 시작한다 */
+  gaugeKeep?: number;
+  /** 콤보 100까지 띄우기에 곧게 더한다: lift + comboLift × min(콤보, 100)/100. 합은 PERK_RUN.LIFT_MAX에서 자른다(perks liftOf) */
+  comboLift?: number;
+  /** 판을 필살 게이지 이 값으로 시작한다(판 시작 한 번 · sim applyStartKit) */
+  startGauge?: number;
 }
 export const WEAPON: Record<WeaponId, WeaponSpec> = {
   sword: { reach: PLAYER.ATTACK_REACH, lift: STACK.HIT_LIFT_V, gauge: 1, shake: 1 },
@@ -215,6 +222,7 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 11, holdMin: 7 },
   coredrill: { reach: 70, lift: 76, gauge: 0.85, shake: 1, comboGauge: 0.5 },
   auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1 },
+  diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7 }, // 전설 · 처음부터 전동 드릴의 끝 간격
   // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 고르는 맛은 칼날 모양과 손맛
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
   brick: { reach: 62, lift: 92, gauge: 0.95, shake: 1.5, guardLift: 1.2 }, // 띄우기 ↑ · 가드 튕김 ↑ / 사거리 ↓
@@ -227,6 +235,9 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   frost: { reach: 86, lift: 74, gauge: 0.95, shake: 1 },                 // 사거리 ↑↑ / 띄우기 ↓
   onyx: { reach: 92, lift: 92, gauge: 0.7, shake: 1.5 },                 // 사거리·띄우기 ↑↑ / 필살 ↓↓
   gold: { reach: 74, lift: 76, gauge: 1.5, shake: 1.3 },                 // 필살 ↑↑ / 띄우기 ↓
+  thunder: { reach: 82, lift: 72, gauge: 1, shake: 1.3, gaugeKeep: 20 },  // 필살 뒤 게이지가 남는다 / 띄우기 ↓
+  crane: { reach: 78, lift: 62, gauge: 1, shake: 1.6, comboLift: 36 },     // 콤보가 쌓일수록 띄우기 ↑ / 처음엔 띄우기 ↓↓
+  brush: { reach: 66, lift: 86, gauge: 1.25, shake: 1.1, startGauge: 50 },  // 게이지 절반으로 시작 / 사거리 ↓
 };
 
 // ── 보급 상자 [튜닝] ─────────────────────────────────────────────
@@ -830,6 +841,7 @@ export const WEAPON_INK = {
   iron: '#5D7183', saw: '#9A4F2C', hazard: '#E9B21A', beam: '#C0532E',
   brick: '#A84846', rod: '#86642C', glass: '#3E9E6A',
   flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
+  diadrill: '#20A7B6', thunder: '#7766CC', crane: '#74B654', brush: '#4D8AE6',
 } as const;
 /** 옛 칼빛 설정값(저장값은 그대로) → 먹에 맞는 포인트 색. 철거칼 획 속(effects · weaponFx · sprites 참격 호) */
 export const SLASH_INK: Readonly<Record<string, string>> = {

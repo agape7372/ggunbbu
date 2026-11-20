@@ -172,6 +172,7 @@ export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   shovel: { name: '삽', desc: '가드로 튕겨도 콤보가 절반 남는다. 필살이 느리다.' },
   pickaxe: { name: '곡괭이', desc: '층이 무너질 때마다 필살이 더 찬다. 벨 때는 덜 찬다.' },
   jackhammer: { name: '착암기', desc: '누르고 있으면 계속 벤다. 덜 띄우고 필살이 느리다.' },
+  diadrill: { name: '다이아 드릴', desc: '누르고 있으면 처음부터 가장 빠르게 벤다. 짧게 닿는다.' },
   pipe: { name: '비계 파이프', desc: '뛰어서 베면 멀리 닿는다. 땅에서는 짧게 닿는다.' },
   drill: { name: '전동 드릴', desc: '누르고 있으면 점점 빨리 벤다. 짧게 닿는다.' },
   coredrill: { name: '코어 드릴', desc: '콤보가 높을수록 필살이 빨리 찬다. 덜 띄운다.' },
@@ -187,6 +188,9 @@ export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   frost: { name: '서리 대검', desc: '아주 멀리 닿는다. 덜 띄운다.' },
   onyx: { name: '흑철 대검', desc: '가장 멀리 닿고 높이 띄운다. 필살이 아주 느리다.' },
   gold: { name: '황금 대검', desc: '필살이 가장 빨리 찬다. 조금 덜 띄운다.' },
+  thunder: { name: '번개 대검', desc: '필살을 써도 게이지가 조금 남는다. 덜 띄운다.' },
+  crane: { name: '크레인 대검', desc: '콤보가 쌓일수록 건물을 더 높이 띄운다. 처음엔 거의 못 띄운다.' },
+  brush: { name: '먹 대검', desc: '필살 게이지가 절반 찬 채로 판을 시작한다. 짧게 닿는다.' },
 };
 
 /** 상점 마스크 — 상점 카드·장비 탭·결과 카드 다음 목표가 같은 이름을 쓴다 */
