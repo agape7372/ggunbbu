@@ -10,7 +10,7 @@
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
-  N, bent, drops, keepBits, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
+  N, bent, drops, keepBits, later, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
 } from './bladeFx';
 import { PRESS, brushArc, brushLine, enso, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
 
@@ -122,15 +122,28 @@ function gems(x: number, y: number, n: number, spd: number, size: number, c: str
   }
 }
 
+/** 각진 금 — 맞은 자리에서 위로 뻗다 한 번 꺾이는 곧은 금 n가닥(첫 가닥만 속 색). 다이아 드릴이 깬 자리 */
+function facets(x: number, y: number, n: number, len: number, w: number, life: number, c: string = WEAPON_INK.diadrill): void {
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * 1.7) + sgn() * 0.15;
+    const L = len * (0.7 + 0.5 * n01());
+    const mx = x + Math.cos(a) * L * 0.55;
+    const my = y + Math.sin(a) * L * 0.55;
+    const a2 = a + (i % 2 ? 1 : -1) * 0.7;
+    bent([x, y, mx, my, mx + Math.cos(a2) * L * 0.45, my + Math.sin(a2) * L * 0.45], w, i === 0 ? c : '', { life, dry: 0.2, pr: 1, gr: 0.2 });
+  }
+}
+
 /** 연장 전설의 칼 기운 · 물들임 — 대검 RECIPES의 aura · every · tint와 같은 뜻(bladeFx.bladeAura가 읽는다) */
 export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number, number, number, number], n: number, c: string): void; every?: number; tint?: true }>> = {
   // 다이아 드릴 — 칼끝 둘레를 작은 마름모 조각이 돈다(반짝 별이 아니라 각진 조각)
   diadrill: {
     aura(b, n, c) {
       const a = n * 1.25;
-      const x = b[2] + Math.cos(a) * 9;
-      const y = b[3] + Math.sin(a) * 9;
-      put('pix', x, y, { ...vel(a + Math.PI / 2, 60), g: 0, life: 0.2, size: 2.8, v: 1.5, a: 4, rot: a, spin: 6, c1: n % 2 ? c : INK });
+      const x = b[2] + Math.cos(a) * 11;
+      const y = b[3] + Math.sin(a) * 6; // 비트 둘레를 납작한 길로 돈다(옆에서 본 회전)
+      put('pix', x, y, { ...vel(a + Math.PI / 2, 70), g: 0, life: 0.26, size: 4.2, v: 1.5, a: 4, rot: a, spin: 6, c1: n % 3 ? c : INK });
+      if (n % 6 === 0) gems(b[2], b[3], 1, 150, 3.6, c); // 가끔 한 조각이 튕겨 나간다
     },
     every: 0.07,
     tint: true,
@@ -275,19 +288,32 @@ const TOOLS: Partial<Record<WeaponId, Tool>> = {
   // 다이아 드릴 — 각지게 깬다: 맞은 자리에서 위로 짧은 한 획(청록 속) + 도는 마름모 파편 몇. 처음부터 가장 빠른 무기라 조각은 적고 짧게 산다
   diadrill: {
     hit(x, y, b, k) {
-      stroke(x + sgn() * 3, y - 6, -Math.PI / 2 + sgn() * 0.1, 30 * b.k, 4.4 * b.k, CUT, 0.18, WEAPON_INK.diadrill);
-      gems(x, y, 2 + (k >= 1.5 ? 1 : 0), 280, 3.6);
+      stroke(x + sgn() * 3, y - 6, -Math.PI / 2 + sgn() * 0.1, 32 * b.k, 4.6 * b.k, CUT, 0.18, WEAPON_INK.diadrill);
+      facets(x, y - 4, 2, 20 * b.k, 2.6, 0.2);
+      gems(x, y, 3 + (k >= 1.5 ? 1 : 0), 300, 4.2);
     },
     floor(x, y, b, k) {
-      stroke(x, y - 8, -Math.PI / 2 + b.ang * 0.3, 52, 6.5, CUT, 0.26, WEAPON_INK.diadrill);
-      gems(x, y, jn(N(4, k)), 340, 4.4);
+      stroke(x, y - 8, -Math.PI / 2 + b.ang * 0.3, 54, 6.5, CUT, 0.26, WEAPON_INK.diadrill);
+      facets(x, y - 4, 3, 30, 3, 0.26);
+      gems(x, y, jn(N(5, k)), 360, 5);
+      // 한 번 더 파고든다
+      later(0.07, () => {
+        stroke(x, y - 44, -Math.PI / 2, 30, 4, CUT, 0.2, WEAPON_INK.diadrill);
+        gems(x, y - 40, 2, 240, 4);
+      });
     },
+    // 밑에서 위로 뚫고 올라간다 — 획이 세 마디로 이어 오르고 마디마다 각진 금과 파편
     destroy(x, y, k) {
-      stroke(x - 6, y - 10, -Math.PI / 2 - 0.12, 84, 8.5, CUT, 0.32, WEAPON_INK.diadrill);
-      gems(x, y, N(7, k), 420, 5);
+      for (let i = 0; i < 3; i++) {
+        later(i * 0.06, () => {
+          stroke(x - 6 + i * 4, y - 10 - i * 46, -Math.PI / 2 - 0.12 + i * 0.08, 84 - i * 14, 8.5 - i * 1.6, CUT, 0.32, WEAPON_INK.diadrill);
+          facets(x - 6 + i * 4, y - i * 46, 3 - (i > 1 ? 1 : 0), 40 - i * 8, 3.4 - i * 0.5, 0.3);
+          gems(x, y - i * 46, N(4, k), 420 - i * 60, 5.2 - i * 0.6);
+        });
+      }
     },
     whiff(footX, footY) {
-      gems(footX + 28, footY - 50, 1, 120, 2.6, GRAY);
+      gems(footX + 28, footY - 50, 2, 140, 3.2);
     },
   },
   // 전동 드릴 — 파고든다: 맞은 자리에서 위로 파고든 짧은 한 획(풀빛 속) + 둘레로 튀는 곱슬 부스러기 몇 가닥. 누르면 빨라지는 무기라 수명이 짧다

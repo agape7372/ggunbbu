@@ -127,6 +127,30 @@ export function scaled(x: number, y: number, k: number, draw: () => void): void 
   }
 }
 
+/** 둘째 박자 — dt초 뒤에 뿌린다(전설 무기 그림이 한꺼번에 터지지 않고 차례로 펼쳐진다). 부른 때의 크기 배율 · 필살 표식을 그대로 쓴다 */
+const queue: { t: number; big: { k: number; x: number; y: number } | null; keep: boolean; draw: () => void }[] = [];
+export function later(dt: number, draw: () => void): void {
+  if (dt <= 0) draw();
+  else queue.push({ t: dt, big, keep: keeping, draw });
+}
+function runQueue(step: number): void {
+  for (let i = queue.length - 1; i >= 0; i--) {
+    const q = queue[i];
+    q.t -= step;
+    if (q.t > 0) continue;
+    queue.splice(i, 1);
+    const [wasBig, wasKeep] = [big, keeping];
+    big = q.big;
+    keeping = q.keep;
+    try {
+      q.draw();
+    } finally {
+      big = wasBig;
+      keeping = wasKeep;
+    }
+  }
+}
+
 interface Opt {
   life: number; size: number; c1: string; c2?: string;
   vx?: number; vy?: number; g?: number; drag?: number; rot?: number; spin?: number;
@@ -316,16 +340,46 @@ function bolt(x: number, y: number, len: number, w: number, core: string, life =
   bent([bx, by, bx + d * len * 0.2, by + len * 0.16, bx + d * len * 0.26, by + len * 0.34], w * 0.55, '', { life: life * 0.8, dry: 0.3, pr: 1 });
 }
 
-/** 들어 올림 — 맞은 자리에서 위로 곧게 뻗는 획 + 그 밑에 걸린 갈고리(J) 한 획. 둘 다 위로 끌려 올라간다 */
+/** 들어 올림 — 맞은 자리에서 위로 곧게 뻗는 줄 + 그 밑에 걸린 갈고리(J) + 갈고리에 매달린 먹 토막. 셋이 함께 끌려 오르고 토막은 곧 떨어져 한 번 튄다 */
 function lift(x: number, y: number, len: number, w: number, core: string, life = 0.3): void {
   line(x, y, x, y - len, w, core, { pr: 1, dry: 0.2, life, vy: -70, hold: 0.3 });
   const r = 4 + w;
-  bent([x, y - 2, x, y + r, x - r * 0.6, y + r * 1.6, x - r * 1.4, y + r * 1.1, x - r * 1.5, y + r * 0.3], w * 0.8, '', { life, dry: 0.1, pr: 1, vy: -70 });
+  // 갈고리는 맞은 자리 바로 위에 걸린다 — 줄 밑동에서 내려와 왼쪽으로 감아 올린 J
+  bent([x, y - r * 2.2, x, y - r * 0.9, x - r * 0.5, y - r * 0.2, x - r * 1.3, y - r * 0.5, x - r * 1.5, y - r * 1.3], w, '', { life: life + 0.1, dry: 0.05, pr: 1, vy: -70 });
+  put('pix', x - r * 0.75, y - r * 1.0, { vy: -70, g: 150, life: life + 0.55, size: 3.4 + w * 0.6, v: 0.8, rot: sgn() * 0.2, spin: sgn() * 1.2, c1: INK, bounce: 1 });
+}
+
+/** 발묵 — 번지는 먹 한 덩이. 크면 곁에 작게 번지는 둘을 붙인다(튄 방울이 한쪽 부채로만 서면 큰 덩이가 발바닥으로 읽힌다) */
+function bleed(x: number, y: number, R: number, c: string, life: number): void {
+  spat(x, y, R, -Math.PI / 2 + sgn() * 0.5, INK, c, life, R < 8 ? 4 : 0, true);
+  if (R < 8) return;
+  spat(x - R * 1.15, y + R * 0.5, R * 0.42, Math.PI + sgn() * 0.4, INK, '', life * 0.85, 2, true);
+  spat(x + R * 1.05, y + R * 0.2, R * 0.34, sgn() * 0.4, INK, '', life * 0.8, 2, true);
+}
+
+/** 땅을 타는 잔 번개 — 맞은 자리에서 양옆으로 짧게 기는 꺾인 획 둘(한쪽만 속 색) */
+function crawl(x: number, y: number, len: number, w: number, core: string): void {
+  for (const d of [-1, 1]) zig(x, y, (d > 0 ? 0 : Math.PI) + sgn() * 0.25, len * (0.7 + 0.5 * n01()), w, 4, len * 0.14, d > 0 ? core : '', 0.2, 0.2);
+}
+
+/** 거꾸로 오르는 먹 — 방울이 위로 떠오르며 줄어든다(흑철). 셋에 하나는 속 색 */
+function rise(x: number, y: number, n: number, spread: number, r: number, c: string): void {
+  for (let i = 0; i < n; i++) drops(x + sgn() * spread, y + sgn() * 4, 1, -1.85, -1.3, 50, 120, r * (0.8 + 0.4 * n01()), i % 3 === 0 ? c : INK, -130);
+}
+
+/** 금박 비 — 위에서 금박이 천천히 흩날려 내린다 */
+function leafRain(x: number, y: number, n: number, wide: number, c: string): void {
+  for (let i = 0; i < n; i++) {
+    put('leaf', x + sgn() * wide, y - n01() * 40, {
+      vx: sgn() * 26, vy: 20 + n01() * 40, g: 120, drag: 1.6,
+      life: 0.75 + n01() * 0.4, size: 3.6 + n01() * 3.4, rot: n01() * TAU, spin: sgn() * 6, c1: c,
+    });
+  }
 }
 
 /** 먹 자국 — 크게 번지는 먹 한 덩이(모양으로 번진다 · 속은 포인트 색) + 사방으로 튀는 먹점 */
 function blot(x: number, y: number, R: number, c: string, n: number, life = 0.42): void {
-  spat(x, y, R, -Math.PI / 2 + sgn() * 0.5, INK, c, life, 7, true);
+  bleed(x, y, R, c, life);
   drops(x, y, n, -Math.PI - 0.3, 0.3, 120, 300, 1.5 + R * 0.08, INK, 900);
 }
 
@@ -349,10 +403,10 @@ function zig(x: number, y: number, ang: number, len: number, w: number, n: numbe
 
 /** 불 혀 — (x,y)에서 h만큼 솟으며 lean 쪽으로 휘는 획. 밑동이 굵고 끝이 뾰족하게 빠지고, 다 그어진 채 위로 흘러 오른다.
  *  core = 벤 순간 속 색('' = 먹 연기 — 마르고 더 휜다) */
-function lick(x: number, y: number, h: number, lean: number, w: number, core: string, rise = 80): void {
+function lick(x: number, y: number, h: number, lean: number, w: number, core: string, rise = 80, hold = 0.35): void {
   line(x, y, x + lean, y - h, w, core, {
     pr: 1, bend: (lean >= 0 ? 1 : -1) * h * (core ? 0.28 : 0.45), dry: core ? 0.2 : 0.55,
-    gr: 0.3, hold: 0.35, life: 0.32 + n01() * 0.1, vx: lean * 0.6, vy: -rise,
+    gr: 0.3, hold, life: 0.32 + n01() * 0.1, vx: lean * 0.6, vy: -rise,
   });
 }
 
@@ -536,194 +590,270 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
       shards(x, y, 1, 2, c, 90);
     },
   },
-  // 화염 — 친 자리에서 불 혀가 솟아 휘며 오르고(밑동 주홍 → 먹), 위로 먹 연기 한 가닥, 불씨는 오르다 재가 된다
+  // 화염 — 친 자리에서 불 혀가 솟아 휘며 오르고(밑동 주홍 → 먹), 한 박자 뒤 먹 연기와 불티가 오른다. 층 깨기 · 완파는 가운데부터 바깥으로 번져 붙는다
   wave: {
     trail: { w: 9, dry: 0.3 },
     hit(x, y, k, c) {
       for (let i = 0; i < 3; i++) lick(x + (i - 1) * 7, y, (i === 1 ? 30 : 19) * k, (i - 1) * 11 + sgn() * 2, 5, c);
-      lick(x + sgn() * 4, y - 24 * k, 14 * k, sgn() * 8, 3, '');
-      drops(x, y, N(2, k), -2.2, -0.9, 60, 140, 1.4, c, -160);
+      later(0.07, () => {
+        lick(x + sgn() * 4, y - 24 * k, 16 * k, sgn() * 8, 3, '');
+        drops(x, y - 8, N(3, k), -2.2, -0.9, 60, 140, 1.6, c, -160);
+      });
     },
     floor(x, y, k, c) {
-      for (let i = 0; i < 5; i++) lick(x + (i - 2) * 12, y, (28 - Math.abs(i - 2) * 5 + (i % 2 ? 0 : 6)) * k, (i - 2) * 6 + sgn() * 3, 6, c, 100);
-      for (let i = 0; i < 2; i++) lick(x + (i ? 14 : -14), y - 28 * k, 24 * k, i ? 8 : -8, 3, '', 110);
-      drops(x, y, N(5, k), -2.6, -0.5, 80, 200, 1.6, c, -180);
+      for (let i = 0; i < 5; i++) {
+        const d = Math.abs(i - 2);
+        later(d * 0.035, () => lick(x + (i - 2) * 12, y, (30 - d * 5 + (i % 2 ? 0 : 6)) * k, (i - 2) * 6 + sgn() * 3, 6, c, 100));
+      }
+      later(0.1, () => {
+        for (let i = 0; i < 2; i++) lick(x + (i ? 14 : -14), y - 28 * k, 24 * k, i ? 8 : -8, 3, '', 110);
+        drops(x, y - 6, N(5, k), -2.6, -0.5, 80, 200, 1.7, c, -180);
+      });
     },
     destroy(x, y, k, c) {
-      for (let i = 0; i < 7; i++) lick(x + (i - 3) * 22, y + (i % 2) * 8, (i % 2 ? 26 : 40) * k, (i - 3) * 5 + sgn() * 4, 7, c, 120);
-      for (let i = 0; i < 3; i++) lick(x + (i - 1) * 40, y - 36 * k, 30 * k, sgn() * 10, 3.4, '', 130);
-      drops(x, y, N(8, k), -2.9, -0.25, 100, 260, 1.8, c, -200);
+      for (let i = 0; i < 7; i++) {
+        const d = Math.abs(i - 3);
+        later(d * 0.04, () => lick(x + (i - 3) * 22, y + (i % 2) * 8, (i % 2 ? 28 : 44) * k, (i - 3) * 5 + sgn() * 4, 7, c, 120));
+      }
+      // 둘째 물결 — 불 혀 사이에서 한 번 더 솟는다
+      later(0.16, () => {
+        for (let i = 0; i < 4; i++) lick(x + (i - 1.5) * 30, y - 6, (34 + (i % 2) * 10) * k, sgn() * 8, 5.5, c, 150);
+      });
+      later(0.24, () => {
+        for (let i = 0; i < 3; i++) lick(x + (i - 1) * 40, y - 40 * k, 30 * k, sgn() * 10, 3.4, '', 130);
+        drops(x, y - 10, N(9, k), -2.9, -0.25, 100, 260, 1.9, c, -200);
+      });
     },
     whiff(x, y, c) {
-      lick(x, y, 10, 4, 2.4, c, 60);
+      lick(x, y, 16, 5, 3.4, c, 70);
+      lick(x - 6, y + 6, 10, -3, 2.4, '', 60);
     },
+    // 칼 기운 — 날을 따라 불 혀가 늘 타오른다(셋에 하나는 먹 연기 · 다섯 번에 한 번 불티)
     aura(b, n, c) {
-      const [x, y] = along(b, 0.35 + n01() * 0.65);
-      lick(x, y, 9, sgn() * 3, 2.2, n % 2 ? c : '', 60);
-    },
-    every: 0.08,
-    tint: true,
-  },
-  // 서리 — 친 자리에서 결정이 자란다(곧은 줄기 + 60° 가지) · 밑면을 따라 각진 얼음 금 · 옥빛 서리 가루
-  crystal: {
-    trail: { w: 9, dry: 0.2 },
-    hit(x, y, k, c) {
-      frost(x, y, -Math.PI / 2 + sgn() * 0.7, 25 * k, 2, c);
-    },
-    floor(x, y, k, c) {
-      frost(x - 22, y - 6, -Math.PI / 2 - 0.55, 28 * k, 2, c);
-      frost(x + 22, y - 4, -Math.PI / 2 + 0.55, 24 * k, 2, c);
-      zig(x - 50 * k, y + 2, 0, 100 * k, 3, 7, 4, c, 0.36, 0.15);
-      dust(x, y, 14, c, 0.5, 30, 9);
-    },
-    destroy(x, y, k, c) {
-      frost(x - 30, y, -Math.PI / 2 - 0.5, 40 * k, 3, c);
-      frost(x + 30, y - 10, -Math.PI / 2 + 0.6, 34 * k, 3, c);
-      frost(x, y - 30, -Math.PI / 2, 26 * k, 2, c);
-      zig(x - 90, y + 10, 0.05, 180, 3.6, 9, 6, c, 0.44, 0.15);
-      dust(x, y - 10, 26, c, 0.7, 25, 14);
-    },
-    whiff(x, y, c) {
-      line(x, y, x + 6, y - 6, 1.8, c, { pr: 1, life: 0.2 });
-    },
-    aura(b, _n, c) {
-      const [x, y] = along(b, 0.35 + n01() * 0.65);
-      const a = (Math.floor(n01() * 6) * Math.PI) / 3; // 결정 결 — 60°마다
-      line(x, y, x + Math.cos(a) * 6, y + Math.sin(a) * 6, 1.6, c, { pr: 1, life: 0.3, dry: 0 });
-    },
-    every: 0.16,
-    tint: true,
-  },
-  // 번개 — 위에서 꺾인 가지 한 획이 내리꽂힌다(보라 속). 칼 기운 = 날 둘레에 짧게 갈라진 가지가 번갈아 튀었다 사라진다
-  bolt: {
-    trail: { w: 9, dry: 0.15 },
-    hit(x, y, k, c) {
-      bolt(x, y, 46 * k, 4, c);
-      drops(x, y, N(2, k), -2.4, -0.7, 80, 180, 1.3);
-    },
-    floor(x, y, k, c) {
-      bolt(x - 14, y, 70 * k, 5, c, 0.28);
-      bolt(x + 18, y + 4, 52 * k, 3.4, '', 0.24, 3);
-      dust(x, y, 12, c, 0.4, 20, 8);
-    },
-    destroy(x, y, k, c) {
-      bolt(x - 40, y, 110 * k, 6.5, c, 0.34, 5);
-      bolt(x + 30, y + 8, 90 * k, 5, c, 0.3);
-      bolt(x, y - 10, 60 * k, 3.6, '', 0.26, 3);
-      spat(x, y, 9 * k, -Math.PI / 2, INK, c, 0.2, 6);
-    },
-    whiff(x, y) {
-      zig(x, y, -Math.PI / 2 + sgn() * 0.5, 14, 1.8, 3, 3, '', 0.12, 0.2);
-    },
-    aura(b, n, c) {
-      const [x, y] = along(b, 0.3 + n01() * 0.7);
-      const a = Math.atan2(b[3] - b[1], b[2] - b[0]) + (n % 2 ? 1 : -1) * (Math.PI / 2 - 0.5);
-      zig(x, y, a, 16 + n01() * 8, 2.2, 3, 3.6, n % 2 ? c : '', 0.16, 0.1);
+      const [x, y] = along(b, 0.2 + n01() * 0.8);
+      if (n % 3 === 2) lick(x, y - 8, 16 + n01() * 8, sgn() * 7, 3.4, '', 60);
+      else lick(x, y, 16 + n01() * 10, sgn() * 5, 5.4, c, 44, 0.7);
+      if (n % 5 === 0) drops(x, y - 6, 1, -1.9, -1.2, 50, 100, 2, c, -150);
     },
     every: 0.07,
     tint: true,
   },
-  // 크레인 — 들어 올린다: 맞은 자리에서 위로 곧게 뻗는 획 + 갈고리가 함께 끌려 오른다(연두 속). 칼 기운 = 칼끝에서 짧은 세로 획이 위로 끌려 오른다
+  // 서리 — 친 자리에서 결정이 자라고(곧은 줄기 + 60° 가지) 한 박자 뒤 깨져 세모 조각으로 흩어진다 · 밑면을 따라 각진 얼음 금 · 옥빛 서리 가루
+  crystal: {
+    trail: { w: 9, dry: 0.2 },
+    hit(x, y, k, c) {
+      const a = -Math.PI / 2 + sgn() * 0.7;
+      frost(x, y, a, 27 * k, 2, c);
+      later(0.2, () => shards(x + Math.cos(a) * 14 * k, y + Math.sin(a) * 14 * k, N(3, k), 8, c, 170));
+    },
+    floor(x, y, k, c) {
+      zig(x - 50 * k, y + 2, 0, 100 * k, 3, 7, 4, c, 0.36, 0.15);
+      later(0.04, () => frost(x - 22, y - 6, -Math.PI / 2 - 0.55, 30 * k, 2, c));
+      later(0.08, () => frost(x + 22, y - 4, -Math.PI / 2 + 0.55, 26 * k, 2, c));
+      later(0.26, () => {
+        shards(x, y - 18 * k, N(6, k), 22, c, 220);
+        dust(x, y, 14, c, 0.5, 30, 9);
+      });
+    },
+    // 얼음 금이 먼저 달리고, 그 위로 결정이 차례로 솟은 뒤 한꺼번에 깨진다
+    destroy(x, y, k, c) {
+      zig(x - 90, y + 10, 0.05, 180, 3.6, 9, 6, c, 0.44, 0.15);
+      [-58, -22, 14, 50].forEach((dx, i) => later(0.04 + i * 0.045, () => frost(x + dx, y - (i % 2) * 10, -Math.PI / 2 + (dx / 58) * 0.5 + sgn() * 0.1, (i % 2 ? 44 : 34) * k, 3, c)));
+      later(0.4, () => {
+        shards(x, y - 26 * k, N(11, k), 56, c, 300);
+        dust(x, y - 10, 26, c, 0.7, 25, 14);
+      });
+    },
+    whiff(x, y, c) {
+      frost(x, y, -Math.PI / 2 + sgn() * 0.9, 10, 1, c);
+    },
+    // 칼 기운 — 날에 서리 결정이 생겼다 사라지고(60° 결) 찬 김이 아래로 가라앉는다
+    aura(b, n, c) {
+      const [x, y] = along(b, 0.25 + n01() * 0.75);
+      const a = (Math.floor(n01() * 6) * Math.PI) / 3;
+      if (n % 3 === 1) dust(x, y, 8, c, 0.7, 26, 7);
+      else if (b[3] < GROUND - 16 || n % 3 === 2) frost(x, y, a + Math.PI / 6, 15, 1, c);
+      else {
+        // 칼끝이 땅에 닿아 있으면 땅이 언다 — 칼끝에서 양옆으로 번갈아 얼음 금이 가고 그 끝에 결정 하나가 선다
+        const d = (n / 3) % 2 ? 1 : -1;
+        const L = 16 + n01() * 12;
+        zig(b[2], GROUND - 1, d > 0 ? 0 : Math.PI, L, 2.6, 3, 3, c, 0.5, 0.1);
+        later(0.1, () => frost(b[2] + d * L, GROUND - 1, -Math.PI / 2 + d * 0.3, 13, 1, c));
+      }
+    },
+    every: 0.12,
+    tint: true,
+  },
+  // 번개 — 위에서 꺾인 가지 한 획이 내리꽂히고(보라 속) 곧 가는 가지가 한 번 더 친다. 맞은 면을 따라 잔 번개가 긴다. 완파는 연달아 내리꽂는다
+  bolt: {
+    trail: { w: 9, dry: 0.15 },
+    hit(x, y, k, c) {
+      bolt(x, y, 48 * k, 4.2, c);
+      later(0.07, () => {
+        bolt(x + sgn() * 5, y, 40 * k, 2.4, '', 0.16, 3);
+        crawl(x, y, 20 * k, 2.4, c);
+      });
+    },
+    floor(x, y, k, c) {
+      bolt(x - 14, y, 72 * k, 5, c, 0.28);
+      later(0.06, () => bolt(x + 18, y + 4, 56 * k, 3.6, c, 0.24, 3));
+      later(0.11, () => {
+        crawl(x, y + 2, 38 * k, 3, c);
+        dust(x, y, 12, c, 0.4, 20, 8);
+      });
+    },
+    destroy(x, y, k, c) {
+      bolt(x - 6, y, 116 * k, 6.5, c, 0.34, 5);
+      [[-58, 4, 92, 5], [46, 8, 84, 4.6], [-98, 12, 62, 3.6], [88, 10, 56, 3.4]].forEach(([dx, dy, L, w], i) =>
+        later(0.06 * (i + 1), () => bolt(x + dx, y + dy, L * k, w, i < 2 ? c : '', 0.28, 4)));
+      later(0.1, () => spat(x, y, 9 * k, -Math.PI / 2, INK, c, 0.2, 6));
+      later(0.32, () => bolt(x + sgn() * 30, y + 6, 70 * k, 2.6, c, 0.18, 4)); // 잔뢰
+    },
+    whiff(x, y, c) {
+      zig(x, y, -Math.PI / 2 + sgn() * 0.5, 20, 2.4, 3, 4, c, 0.14, 0.2);
+    },
+    // 칼 기운 — 날 둘레에 꺾인 가지가 번갈아 튀고, 가끔 날에서 땅으로 가는 가지 하나가 떨어진다
+    aura(b, n, c) {
+      const [x, y] = along(b, 0.25 + n01() * 0.75);
+      const a = Math.atan2(b[3] - b[1], b[2] - b[0]) + (n % 2 ? 1 : -1) * (Math.PI / 2 - 0.5 + sgn() * 0.3);
+      zig(x, y, a, 20 + n01() * 10, 3.2, 3, 5, n % 3 ? c : '', 0.18, 0.1);
+      if (n % 5 === 2 && y < GROUND - 12) {
+        const d = sgn() > 0 ? 1 : -1;
+        bent([x, y, x + d * 12, y + (GROUND - y) * 0.45, x + d * 7, y + (GROUND - y) * 0.7, x + d * 16, GROUND], 2.8, c, { life: 0.18, dry: 0.15, pr: 1, gr: 0.2 });
+      }
+    },
+    every: 0.09,
+    tint: true,
+  },
+  // 크레인 — 들어 올린다: 맞은 자리에서 위로 곧게 뻗는 줄 + 갈고리 + 매달린 토막이 함께 끌려 오른다(연두 속). 완파는 줄이 차례로 걸린다
   truss: {
     trail: { w: 7, dry: 0.3 },
     hit(x, y, k, c) {
-      lift(x, y, 40 * k, 3.4, c);
+      lift(x, y, 42 * k, 3.6, c);
       dust(x, y + 4, 8, INK, 0.3, 10, 5);
     },
     floor(x, y, k, c) {
-      lift(x - 18, y, 64 * k, 4.4, c, 0.34);
-      lift(x + 18, y + 4, 48 * k, 3.4, '', 0.3);
+      lift(x - 18, y, 66 * k, 4.4, c, 0.34);
+      later(0.06, () => lift(x + 18, y + 4, 50 * k, 3.6, c, 0.3));
       dust(x, y + 6, 16, INK, 0.4, 10, 9);
     },
     destroy(x, y, k, c) {
-      lift(x - 36, y, 110 * k, 5.5, c, 0.4);
-      lift(x + 4, y + 6, 90 * k, 4.6, c, 0.38);
-      lift(x + 40, y - 4, 70 * k, 3.6, '', 0.34);
+      [[-44, 0, 112, 5.5], [0, 6, 92, 4.8], [44, -4, 74, 4], [-84, 8, 56, 3.4]].forEach(([dx, dy, L, w], i) =>
+        later(i * 0.06, () => lift(x + dx, y + dy, L * k, w, i < 3 ? c : '', 0.4 - i * 0.02)));
       dust(x, y + 8, 30, INK, 0.5, 10, 14);
     },
-    whiff(x, y) {
-      line(x, y, x, y - 12, 1.8, '', { life: 0.14, vy: -40 });
+    whiff(x, y, c) {
+      line(x, y + 4, x, y - 14, 2.4, c, { pr: 1, life: 0.16, vy: -50 });
     },
+    // 칼 기운 — 칼날에서 짧은 줄이 위로 끌려 오르고, 칼끝 곁에서 잔돌 하나가 줄에 걸려 들려 오른다
     aura(b, n, c) {
-      const [x, y] = along(b, 0.55 + n01() * 0.45);
-      line(x + sgn() * 3, y + 8, x, y - 6, 2.4, n % 2 ? c : '', { pr: 1, life: 0.26, vy: -70, dry: 0.2 });
+      if (n % 2) {
+        const [x, y] = along(b, 0.4 + n01() * 0.6);
+        line(x + sgn() * 3, y + 6, x, y - 12, 3, c, { pr: 1, life: 0.32, vy: -60, dry: 0.2, hold: 0.6 });
+        return;
+      }
+      const x = b[2] + ((n >> 1) % 2 ? 1 : -1) * (10 + n01() * 8);
+      const y = Math.min(GROUND - 4, b[3] + 6);
+      line(x, y - 3, x, y - 30, 2.8, c, { pr: 1, life: 0.5, vy: -46, dry: 0.15, hold: 0.7, gr: 0.2 });
+      put('pix', x, y, { vy: -46, g: 70, life: 0.58, size: 5.6, v: 0.8, rot: sgn() * 0.3, spin: sgn() * 2, c1: INK });
     },
-    every: 0.18,
+    every: 0.16,
     tint: true,
   },
-  // 먹 — 가장 넓은 붓 한 획 뒤에 크게 번지는 먹 자국 한 덩이 + 튀는 먹점. 칼 기운 = 칼끝에 먹물 방울이 모였다 떨어진다
+  // 먹 — 가장 넓은 붓 한 획 뒤에 크게 번지는 먹 자국 + 튀는 먹점, 붓을 떼며 삐침 한 번. 칼 기운 = 붓끝에서 먹물이 듣는다
   sumi: {
     trail: { w: 15, dry: 0.6 },
     hit(x, y, k, c) {
       blot(x, y - 4, 5.5 * k, c, N(3, k), 0.36);
+      later(0.06, () => {
+        const a = -Math.PI / 2 + sgn() * 1.1;
+        line(x, y - 4, x + Math.cos(a) * 26 * k, y - 4 + Math.sin(a) * 26 * k, 4.4, '', { pr: 1, dry: 0.55, life: 0.26 });
+      });
     },
     floor(x, y, k, c) {
-      blot(x, y - 6, 9 * k, c, N(6, k), 0.46);
-      line(x - 50 * k, y + 4, x + 54 * k, y - 2, 6, '', { pr: 2, dry: 0.75, life: 0.36 });
+      line(x - 50 * k, y + 4, x + 54 * k, y - 2, 6.5, c, { pr: 2, dry: 0.75, life: 0.36 });
+      later(0.06, () => blot(x, y - 6, 9 * k, c, N(6, k), 0.46));
     },
+    // 큰 가로획 → 번짐 → 곁에 작은 번짐 하나 더 → 먹물이 듣는다
     destroy(x, y, k, c) {
-      blot(x, y - 8, 15 * k, c, N(10, k), 0.6);
-      line(x - 100, y + 10, x + 100, y - 6, 9, c, { pr: 2, dry: 0.8, life: 0.42 });
-      blot(x + sgn() * 50, y - 20, 6 * k, '', N(3, k), 0.4);
+      line(x - 100, y + 10, x + 100, y - 6, 10, c, { pr: 2, dry: 0.8, life: 0.46 });
+      later(0.08, () => blot(x, y - 8, 15 * k, c, N(10, k), 0.6));
+      later(0.2, () => blot(x + (n01() > 0.5 ? 54 : -54), y - 24, 7 * k, c, N(4, k), 0.44));
+      later(0.3, () => drops(x, y - 60 * k, N(6, k), 1.1, 2.05, 40, 160, 2, INK, 900));
     },
-    whiff(x, y) {
-      drops(x, y, 1, 1.2, 1.9, 20, 60, 1.6, INK, 900);
+    whiff(x, y, c) {
+      drops(x, y, 2, 1.0, 2.1, 30, 90, 2, c, 900);
     },
     aura(b, n, c) {
-      const [x, y] = along(b, 0.94 + n01() * 0.06);
-      drops(x, y, 1, 1.35, 1.8, 10, 40, n % 3 === 2 ? 2 : 1.5, n % 3 === 2 ? c : INK, 700);
+      // 붓끝에서 먹물이 튀어 양옆 땅에 번진다(셋에 하나는 쪽빛) — 웅덩이는 만들지 않는다
+      const [x, y] = along(b, 0.88 + n01() * 0.1);
+      const a = -Math.PI / 2 + (n % 2 ? 1 : -1) * (0.35 + n01() * 0.6);
+      drops(x, y - 3, 1, a, a, 70, 130, n % 3 === 2 ? 3.2 : 2.6, n % 3 === 2 ? c : INK, 700);
     },
-    every: 0.14,
+    every: 0.13,
     tint: true,
   },
-  // 흑철 — 가장 짙은 먹. 친 자리 먹이 위로 천천히 번지고(자주 속), 베기 획 곁에 지그재그 마른 획이 나란히 간다
+  // 흑철 — 가장 짙은 먹. 친 자리 먹이 천천히 번지고(자주 속) 한 박자 뒤 먹 방울이 거꾸로 떠오른다. 베기 획 곁에 지그재그 마른 획이 나란히 간다
   jag: {
     trail: { w: 12, dry: 0.45 },
     // 지그재그 마른 획은 번진 먹에서 뻗지 않고 베기 획을 나란히 따라간다 — 덩이에서 사방으로 뻗으면 거미 · 팔 벌린 사람으로 읽힌다
     hit(x, y, k, c) {
-      spat(x, y - 10, 4.5 * k, -Math.PI / 2 + sgn() * 0.4, INK, c, 0.36, 4, true);
+      bleed(x, y - 10, 4.5 * k, c, 0.36);
       zig(x - 30 * k, y - 14, -0.2, 60 * k, 3.2, 6, 4, c, 0.26, 0.5);
+      later(0.08, () => rise(x, y - 12, N(3, k), 10, 2.4, c));
     },
     floor(x, y, k, c) {
-      spat(x, y - 14, 6.5 * k, -Math.PI / 2, INK, c, 0.44, 6, true);
+      bleed(x, y - 14, 6.5 * k, c, 0.44);
       zig(x - 60 * k, y - 34, 0.3, 120 * k, 3.8, 9, 5, c, 0.32, 0.45);
+      later(0.1, () => rise(x, y - 16, N(6, k), 26, 2.8, c));
     },
     destroy(x, y, k, c) {
-      spat(x, y - 10, 12 * k, -Math.PI / 2, INK, c, 0.6, 8, true);
-      for (const d of [-1, 1]) zig(x - 120, y - 26 + d * 24, 0.22, 240, 4.6, 14, 6, d > 0 ? c : '', 0.36, 0.4);
+      bleed(x, y - 10, 12 * k, c, 0.6);
+      zig(x - 120, y - 2, 0.22, 240, 4.6, 14, 6, c, 0.36, 0.4);
+      later(0.07, () => zig(x - 120, y - 50, 0.22, 240, 4.6, 14, 6, '', 0.36, 0.4));
+      later(0.14, () => rise(x, y - 10, N(7, k), 60, 3.2, c));
+      later(0.28, () => rise(x, y - 30, N(6, k), 80, 2.6, c));
     },
-    whiff(x, y) {
-      drops(x, y, 1, -1.8, -1.2, 40, 70, 1.6, INK, -120);
+    whiff(x, y, c) {
+      rise(x, y, 2, 4, 2, c);
     },
+    // 칼 기운 — 날에서 먹이 거꾸로 떠오른다(셋에 하나는 자주 속), 두 번에 한 번은 먹 연기 한 가닥
     aura(b, n, c) {
-      const [x, y] = along(b, 0.35 + n01() * 0.65);
-      drops(x, y, 1, -1.9, -1.2, 30, 60, n % 4 === 3 ? 1.7 : 1.3, n % 4 === 3 ? c : INK, -110);
+      const [x, y] = along(b, 0.3 + n01() * 0.7);
+      drops(x, y, 1, -1.9, -1.2, 40, 80, n % 3 === 2 ? 3 : 2.4, n % 3 === 2 ? c : INK, -110);
+      if (n % 2) lick(x, y - 4, 18 + n01() * 10, sgn() * 8, 4, n % 6 === 5 ? c : '', 40, 0.6);
     },
     every: 0.1,
     tint: true,
   },
-  // 황금 — 금 속 획과 금박. 금박은 흔들리며 떨어지다 접혀 사라진다
+  // 황금 — 금빛 튐과 금박. 금박은 흔들리며 떨어지다 접혀 사라지고, 완파 뒤엔 위에서 금박 비가 한 번 더 내린다
   royal: {
     trail: { w: 9, dry: 0.25 },
     hit(x, y, k, c) {
-      leaves(x, y, N(3, k), 10, c);
+      spat(x, y, 3.6 * k, -Math.PI / 2 + sgn() * 0.5, c, '', 0.16, 3);
+      leaves(x, y, N(5, k), 10, c, 250);
     },
     floor(x, y, k, c) {
-      leaves(x, y, N(7, k), 24, c, 300);
-      spat(x, y, 5 * k, -Math.PI / 2, c, '', 0.16, 4);
+      spat(x, y, 5.5 * k, -Math.PI / 2, c, '', 0.18, 4);
+      leaves(x, y, N(8, k), 24, c, 300);
+      later(0.12, () => leaves(x + sgn() * 20, y - 20 * k, N(4, k), 16, c, 200));
     },
     destroy(x, y, k, c) {
-      leaves(x, y, N(14, k), 60, c, 380);
       spat(x, y, 9 * k, -Math.PI / 2, c, '', 0.2, 6);
+      leaves(x, y, N(14, k), 60, c, 380);
+      later(0.22, () => leafRain(x, y - 90 * k, N(8, k), 80, c));
+      later(0.36, () => leafRain(x, y - 110 * k, N(6, k), 100, c));
     },
     whiff(x, y, c) {
-      leaves(x, y, 1, 2, c, 80);
+      leaves(x, y, 2, 3, c, 90);
     },
-    aura(b, _n, c) {
-      const [x, y] = along(b, 0.4 + n01() * 0.6);
-      leaves(x, y, 1, 1, c, 40);
+    // 칼 기운 — 금박이 날에서 일어 한 번 떠올랐다 흔들리며 내린다
+    aura(b, n, c) {
+      const [x, y] = along(b, 0.25 + n01() * 0.6);
+      put('leaf', x, y, { vx: sgn() * 22, vy: -50 - n01() * 30, g: 150, drag: 1.4, life: 0.8 + n01() * 0.3, size: 3.6 + n01() * 2.4, rot: n01() * TAU, spin: sgn() * 6, c1: c });
+      if (n % 5 === 0) dust(x, y, 6, c, 0.5, -18, 5);
     },
-    every: 0.2,
+    every: 0.15,
     tint: true,
   },
 };
@@ -839,7 +969,8 @@ export function bloodSpray(x: number, y: number, ang: number, spread: number, n:
 export function bladeAura(s: GameState): void {
   const g = greatLook(s.weapon);
   const r = g ? RECIPES[g.shape] : TOOL_RECIPES[s.weapon]; // 연장 전설(다이아 드릴)도 칼 기운을 갖는다
-  if (!r?.aura || auraT < (r.every ?? 1) || s.over) return;
+  // 콤보 단이 오르면 칼 기운이 잦아진다(50콤보 1.25배 · 100콤보부터 1.5배)
+  if (!r?.aura || auraT < (r.every ?? 1) / Math.min(1.5, tierK(s.combo)) || s.over) return;
   auraT = 0;
   const b = playerBlade(s.player.pose, s.player.poseTick);
   if (!b) return;
@@ -854,6 +985,7 @@ export function resetBladeFx(): void {
   allocAt = 0;
   auraT = 0;
   lastCombo = 0;
+  queue.length = 0;
   resetWeaponFx();
 }
 
@@ -861,6 +993,7 @@ export function resetBladeFx(): void {
 export function updateBladeFx(dt: number): void {
   const step = dt > 0 ? Math.min(dt, 0.05) : TICK;
   auraT += step;
+  if (queue.length) runQueue(step);
   if (live <= 0) return;
   for (let i = 0; i < POOL; i++) {
     const p = pool[i];
