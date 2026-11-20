@@ -90,7 +90,7 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     case 'guardA': {
       p.poseTick += 1;
       // 게이지 지속 소모 [정본]
-      s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.HOLD_DRAIN_PER_S * dt);
+      s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.HOLD_DRAIN_PER_S * (WEAPON[s.weapon].guardDrain ?? 1) * dt); // 철골 대검: 덜 닳는다
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
       if (s.guardGauge <= 0) {
         p.pose = 'guardBreak';

@@ -28,7 +28,8 @@ export function addCombo(s: GameState): void {
   // 안전모 = 콤보 고비 상. 2막은 벗고 들어가니 주지 않는다. 같은 틱 뒤의 깔림도 바로 막는다
   // 작업 지시서 외주는 안전모가 없다
   const hatOk = s.mode !== 'act2' && !(s.stage && !STAGE.DIFF[s.stage.diff].hat);
-  if (!s.hat && hatOk && HAT.COMBO_AT.includes(s.combo)) {
+  const at = WEAPON[s.weapon].hatAt ?? 1; // 공사중 대검: 안전모 콤보에 배율
+  if (!s.hat && hatOk && HAT.COMBO_AT.some((c) => Math.round(c * at) === s.combo)) {
     s.hat = true;
     s.events.push({ kind: 'hatGet', combo: s.combo, y: s.player.y + PLAYER.H });
   }
@@ -48,9 +49,13 @@ export function guardBounced(s: GameState, ground: boolean): void {
   if (ground) groundGuardCombo(s);
 }
 
-/** 땅 가드가 막았다(튕김 · 종탑 내려찍기). 무기 keepCombo가 있으면 끊지 않고 그 몫만 남긴다(1 밑으론 안 간다) */
+/** 땅 가드가 막았다(튕김 · 종탑 내려찍기). 삽 keepCombo는 그 몫만 남긴다 */
 function groundGuardCombo(s: GameState): void {
-  const keep = WEAPON[s.weapon].keepCombo;
+  cutCombo(s, WEAPON[s.weapon].keepCombo);
+}
+
+/** 콤보를 끊는다. keep(0~1)이 있으면 끊지 않고 그 몫만 남긴다(1 밑으론 안 간다 · 삽 땅 가드 · 흑철 깔림) */
+export function cutCombo(s: GameState, keep: number | undefined): void {
   if (!keep || s.combo === 0) { breakCombo(s); return; }
   if (s.combo > s.peakCombo) s.peakCombo = s.combo;
   s.combo = Math.max(1, Math.floor(s.combo * keep));
@@ -63,7 +68,8 @@ export function gaugePerHit(combo: number): number {
 /** 무기 게이지 배율. comboGauge(코어 드릴)는 콤보 100까지 곧게 더 곱한다: 1 + comboGauge × min(콤보, 100)/100 */
 export function weaponGaugeMul(s: GameState): number {
   const w = WEAPON[s.weapon];
-  return w.gauge * (1 + (w.comboGauge ?? 0) * Math.min(s.combo, 100) / 100);
+  const last = s.lives === 1 ? w.lastLifeGauge ?? 1 : 1; // 화염 대검: 목숨 하나면 이 배율
+  return w.gauge * (1 + (w.comboGauge ?? 0) * Math.min(s.combo, 100) / 100) * last;
 }
 
 /** 이번 타격이 채우는 필살 게이지 — 콤보 계단 × 무기 배율 */
@@ -73,6 +79,7 @@ export function hitGauge(s: GameState): number {
 
 export function addGauge(s: GameState, n: number): void {
   const before = s.wazaGauge;
+  if (before < WAZA_GAUGE.MAX && n > 0) s.wazaFree = false; // 스스로 채우기 시작했다(먹 대검 덤 셈)
   s.wazaGauge = Math.max(0, Math.min(WAZA_GAUGE.MAX, s.wazaGauge + n));
   if (before < WAZA_GAUGE.MAX && s.wazaGauge >= WAZA_GAUGE.MAX) s.events.push({ kind: 'gaugeFull' });
 }
@@ -80,6 +87,7 @@ export function addGauge(s: GameState, n: number): void {
 /** 유효 타격 공통 처리: 콤보 +1 → 점수 → 게이지. collapse = 이 타격에 층이 무너졌다(무기 collapseGauge를 그대로 더한다) */
 export function registerHit(s: GameState, opts?: { scoreBonus?: number; noGauge?: boolean; collapse?: boolean }): void {
   addCombo(s);
+  if (opts?.collapse) for (let i = WEAPON[s.weapon].collapseCombo ?? 0; i > 0; i--) addCombo(s); // 톱날 대검: 층 붕괴 콤보 더
   addScore(s, SCORE.BASE_HIT * Math.min(s.combo, SCORE.COMBO_CAP) + (opts?.scoreBonus ?? 0));
   if (!opts?.noGauge) addGauge(s, hitGauge(s) + (opts?.collapse ? WEAPON[s.weapon].collapseGauge ?? 0 : 0));
 }
@@ -110,7 +118,7 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
     const isButter = mat === 'butter';
     s.events.push({
       kind: isButter ? 'butterCollapse' : 'floorCollapse',
-      lane, y: yHit, mat, combo: s.combo + 1,
+      lane, y: yHit, mat, combo: Math.min(SCORE.COMBO_CAP, s.combo + 1 + (WEAPON[s.weapon].collapseCombo ?? 0)),
     });
     registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, collapse: true });
     spawnFloorDebris(s, yHit);
@@ -148,12 +156,14 @@ function spawnFloorDebris(s: GameState, yHit: number): void {
 export function destroyStack(s: GameState): void {
   const stack = s.stack;
   if (!stack) return;
-  s.events.push({ kind: 'stackDestroy', n: stack.totalFloors });
   if (stack.variant === 'butterbar') {
+    s.events.push({ kind: 'stackDestroy', n: stack.totalFloors });
     addScore(s, stack.totalFloors * SCORE.BUTTER_DESTROY_PER_LAYER);
     if (s.bonus) s.bonus.destroyed += 1;
   } else {
-    addScore(s, SCORE.DESTROY_BONUS);
+    const pts = Math.round(SCORE.DESTROY_BONUS * (WEAPON[s.weapon].destroyMul ?? 1)); // 황금 대검: 완파 점수 배율
+    s.events.push({ kind: 'stackDestroy', n: stack.totalFloors, pts });
+    addScore(s, pts);
   }
   s.stack = null;
   s.stackSpawnCd = stack.vary?.joined ? STAGE.JOINED_GAP // 아케이드 변종 「붙어 오기」(대본 「>」)

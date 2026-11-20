@@ -358,6 +358,8 @@ export interface JuiceEvent {
   combo?: number;
   /** 부가 수치 (완파 층수 등) */
   n?: number;
+  /** stackDestroy: 받은 완파 점수(황금 destroyMul을 탄 값 · 자막이 그대로 쓴다) */
+  pts?: number;
   /** supply: 상자에서 나온 것 */
   item?: ItemId;
 }
@@ -413,6 +415,8 @@ export interface GameState {
   wazaGauge: number;
   /** 시작 장비 「필살 충전」 남은 수 — 게이지가 비면 하나 써서 가득 채운다. 평소엔 0 */
   wazaBank: number;
+  /** 지금 게이지가 받은 것(시작 장비 · 충전 · 먹 대검 덤)이다. 스스로 채우기 시작하면(addGauge) 풀린다 */
+  wazaFree: boolean;
   /** 방어 게이지 회복 대기 틱 (가드 사용 직후 잠시 회복 정지) */
   guardRegenCd: number;
   lives: number;

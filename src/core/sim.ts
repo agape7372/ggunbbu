@@ -5,7 +5,7 @@
 import type { GameState, InputFrame } from './types';
 import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carryUnderStack } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
-import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, registerHit, wonAlready } from './combat';
+import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, cutCombo, addScore, registerHit, wonAlready } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
 import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, STAGE, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN, WEAPON } from '../config';
 import type { WazaRunId } from '../config';
@@ -39,6 +39,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     guardGauge: GUARD_GAUGE.MAX,
     wazaGauge: 0,
     wazaBank: 0,
+    wazaFree: false,
     guardRegenCd: 0,
     lives: PLAYER.LIVES,
     hitstop: 0,
@@ -82,6 +83,7 @@ export function advance(s: GameState, input: InputFrame): void {
   if (s.wazaBank > 0 && s.wazaGauge < WAZA_GAUGE.COST) {
     s.wazaBank -= 1;
     s.wazaGauge = WAZA_GAUGE.MAX;
+    s.wazaFree = true;
   }
   // 이번 틱에 발행되는 이벤트만 히트스톱 주입 대상 (advance 말미 참조)
   const evStart = s.events.length;
@@ -235,6 +237,13 @@ function triggerSpecial(s: GameState): void {
   const wasPinned = p.pose === 'pinned';
   s.wazaGauge -= WAZA_GAUGE.COST;
   s.wazaGauge += WEAPON[s.weapon].gaugeKeep ?? 0; // 번개 대검: 필살 뒤 이 값에서 다시 찬다(필살 종류 무관 · 여기 한 곳)
+  // 먹 대검: 스스로 채운 게이지로 쓴 필살이면 바로 한 번 더 찬다. 그 덤 · 시작 장비 · 충전으로 받은 게이지는 다시 안 채운다
+  const gift = s.wazaFree;
+  s.wazaFree = false;
+  if (WEAPON[s.weapon].wazaEcho && !gift && !s.training) {
+    s.wazaGauge = WAZA_GAUGE.MAX;
+    s.wazaFree = true;
+  }
   p.pose = 'special';
   p.poseTick = 0;
   p.invulnTicks = SPECIAL.IFRAMES;
@@ -581,7 +590,7 @@ function onPlayerCrushed(s: GameState): void {
   }
   loseLife(s);
   if (s.over) return;
-  breakCombo(s);
+  cutCombo(s, WEAPON[s.weapon].pinCombo); // 흑철 pinCombo는 몫만큼 남는다
   s.player.pose = 'pinned';
   s.player.poseTick = 0;
   s.player.pinTick = 0;
@@ -600,9 +609,9 @@ function onPlayerCrushed(s: GameState): void {
 /** 시작 장비 — 목숨 +lives, 필살 wazas번 분(첫 번은 게이지, 나머지는 wazaBank). makeState 뒤 무기를 정한 다음에 건다 */
 export function applyStartKit(s: GameState, lives: number, wazas: number): void {
   s.lives += lives;
-  s.wazaGauge = Math.max(s.wazaGauge, WEAPON[s.weapon].startGauge ?? 0); // 먹 대검: 판 시작 한 번(튜토리얼은 안 부른다 · 2막 진입 · 이어 하기는 0)
   if (wazas <= 0) return;
   s.wazaGauge = WAZA_GAUGE.MAX;
+  s.wazaFree = true; // 받은 게이지 — 먹 대검 덤이 붙지 않는다
   s.wazaBank = wazas - 1;
 }
 

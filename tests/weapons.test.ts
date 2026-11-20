@@ -3,12 +3,11 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, advance, applyStartKit } from '../src/core/sim';
 import { liftOf } from '../src/core/perks';
-import { startTraining } from '../src/core/training';
 import { enterAct2, enterAct2Phase } from '../src/core/act2';
-import { makeFloor, makeStack } from '../src/core/building';
-import { attackRange, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
+import { makeFloor, makeStack, stackPhysics } from '../src/core/building';
+import { addCombo, addGauge, attackRange, destroyStack, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type PerkId, type WeaponId } from '../src/core/types';
-import { PERK, PERK_RUN, PLAYER, STACK, WEAPON } from '../src/config';
+import { GUARD_GAUGE, HAT, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
 import { BLADE_IDS, BODY_IDS, DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, LETTERS_IDS, MASK_IDS, slotOf, validateLoadout, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { WEAPON_DUST_COST } from '../src/meta/economy';
 
@@ -183,7 +182,8 @@ describe('대검', () => {
 });
 
 // ── 고유 규칙 무기(11-20) — 세 칸 + 고유 규칙 하나(WeaponSpec 선택 칸). core에 무기 id 분기는 없다 ──
-const RULED: WeaponId[] = ['shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'diadrill', 'brick', 'rod', 'glass', 'thunder', 'crane', 'brush'];
+const RULED: WeaponId[] = ['shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'diadrill',
+  'brick', 'saw', 'hazard', 'rod', 'beam', 'flame', 'frost', 'thunder', 'onyx', 'crane', 'brush', 'gold'];
 
 describe('고유 규칙', () => {
   /** 떨어지는 건물을 땅 · 공중 가드로 받는다 */
@@ -371,17 +371,6 @@ describe('고유 규칙', () => {
     expect(liftOf(sw)).toBe(WEAPON.sword.lift); // 다른 무기는 콤보와 상관없다
   });
 
-  it('먹 대검: 판 시작(applyStartKit) 한 번만 게이지 startGauge · 2막 진입 · 이어 하기 · 튜토리얼은 0', () => {
-    const run = (w: WeaponId, wazas = 0): GameState => { const s = makeState(); s.weapon = w; applyStartKit(s, 0, wazas); return s; };
-    expect(run('brush').wazaGauge).toBe(WEAPON.brush.startGauge);
-    expect(run('sword').wazaGauge).toBe(0);
-    expect(run('brush', 1).wazaGauge).toBe(100); // 시작 장비 필살이 더 크면 그것
-    const a2 = run('brush'); enterAct2(a2);
-    expect(a2.wazaGauge).toBe(0);
-    const tr = makeState({ seed: 7, mode: 'training' }); tr.weapon = 'brush'; startTraining(tr);
-    expect(tr.wazaGauge).toBe(0);
-  });
-
   it('다이아 드릴: 쥐고 있으면 처음부터 holdRepeat 간격(전동 드릴의 끝 간격) · 공격 한 주기보다 길다', () => {
     const s = makeState({ seed: 3 }); s.weapon = 'diadrill'; s.lives = 99;
     const g = gaps(swingTicks(s, held(60, { attack: true })));
@@ -494,4 +483,127 @@ for (const W of ['jackhammer', 'drill', 'diadrill'] as const) {
 it('철거칼은 쥐고 있어도 첫 누름 한 번뿐', () => {
   const s = makeState({ seed: 3 });
   expect(swings(s, held(60, { attack: true }))).toBe(1);
+});
+
+// ── 대검 규칙(11-20) — 무쇠 · 유리 말고 대검마다 하나씩 ──
+describe('대검 규칙', () => {
+  /** 단단한 건물에 깔린다(안전모 없음). 깔리거나 300틱이 지나면 멈춘다 */
+  function crush(s: GameState): void {
+    s.player.invulnTicks = 0;
+    s.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('hard'), makeFloor('hard')], y: 100 });
+    s.stack.vy = -600;
+    for (let t = 0; t < 300 && s.player.pose !== 'pinned'; t++) { advance(s, EMPTY_INPUT); s.events.length = 0; }
+  }
+  /** 약한 층 하나를 무너뜨린다 */
+  function cutFloor(w: WeaponId, combo = 0): GameState {
+    const s = makeState();
+    s.weapon = w; s.combo = combo;
+    s.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('weak'), makeFloor('weak')], y: 30, vy: 0 });
+    for (let t = 0; t < 8; t++) advance(s, { ...EMPTY_INPUT, attack: t === 0 });
+    return s;
+  }
+  /** 필살 한 번(대상 건물을 깔고 게이지를 쓴다) · 끝날 때까지 돈다 */
+  function special(s: GameState): void {
+    withStack(s, 40);
+    advance(s, { ...EMPTY_INPUT, special: true });
+    expect(s.player.pose).toBe('special');
+    for (let t = 0; t < 400 && (s.player.pose === 'special' || s.wazaRun); t++) { advance(s, EMPTY_INPUT); s.events.length = 0; }
+  }
+
+  it('톱날: 층을 무너뜨린 타격은 콤보가 1 + collapseCombo 오른다(철거칼은 1)', () => {
+    expect(cutFloor('saw').combo).toBe(1 + WEAPON.saw.collapseCombo!);
+    expect(cutFloor('sword').combo).toBe(1);
+    expect(swing('saw', 30).combo).toBe(1); // 안 무너지는 타격은 그대로
+  });
+
+  it('공사중: 안전모 콤보가 hatAt배(50 → 25), 철거칼은 50', () => {
+    const at = (w: WeaponId, combo: number): boolean => { const s = makeState(); s.weapon = w; s.combo = combo - 1; addCombo(s); return s.hat; };
+    const c = Math.round(HAT.COMBO_AT[0] * WEAPON.hazard.hatAt!);
+    expect(at('hazard', c)).toBe(true);
+    expect(at('sword', c)).toBe(false);
+    expect(at('hazard', HAT.COMBO_AT[0])).toBe(false);
+    expect(at('sword', HAT.COMBO_AT[0])).toBe(true);
+  });
+
+  it('철골: 가드를 쥐고 있는 동안 게이지가 guardDrain배로 닳는다', () => {
+    const held = (w: WeaponId): number => {
+      const s = makeState(); s.weapon = w;
+      for (let t = 0; t < 60; t++) advance(s, { ...EMPTY_INPUT, guard: true });
+      return GUARD_GAUGE.MAX - s.guardGauge;
+    };
+    expect(held('beam')).toBeCloseTo(held('sword') * WEAPON.beam.guardDrain!, 0);
+    expect(held('beam')).toBeGreaterThan(0);
+  });
+
+  it('화염: 목숨이 하나면 게이지 배율 × lastLifeGauge', () => {
+    const mul = (w: WeaponId, lives: number): number => { const s = makeState(); s.weapon = w; s.lives = lives; return weaponGaugeMul(s); };
+    expect(mul('flame', 1)).toBeCloseTo(mul('flame', 2) * WEAPON.flame.lastLifeGauge!);
+    expect(mul('sword', 1)).toBe(1);
+  });
+
+  it('서리: 1막 · 토코톤만 낙하 중력 · 종단 속도 × fallMul(지시서 · 2막 · 튜토리얼은 그대로)', () => {
+    const phys = (w: WeaponId, mode: GameState['mode']): { g: number; vterm: number } => { const s = makeState({ mode }); s.weapon = w; return stackPhysics(s); };
+    for (const mode of ['act1', 'tokoton'] as const) {
+      expect(phys('frost', mode).g, mode).toBeCloseTo(phys('sword', mode).g * WEAPON.frost.fallMul!);
+      expect(phys('frost', mode).vterm, mode).toBeCloseTo(phys('sword', mode).vterm * WEAPON.frost.fallMul!);
+    }
+    expect(phys('frost', 'training')).toEqual(phys('sword', 'training'));
+    const a2 = (w: WeaponId) => { const s = makeState(); s.weapon = w; enterAct2(s); return stackPhysics(s); };
+    expect(a2('frost')).toEqual(a2('sword'));
+  });
+
+  it('흑철: 깔려도 콤보가 pinCombo 몫 남는다(철거칼은 0)', () => {
+    const after = (w: WeaponId): GameState => { const s = makeState(); s.weapon = w; s.lives = 5; s.combo = 9; crush(s); return s; };
+    const o = after('onyx');
+    expect(o.player.pose).toBe('pinned');
+    expect(o.lives).toBe(4); // 목숨은 그대로 잃는다
+    expect(o.combo).toBe(Math.floor(9 * WEAPON.onyx.pinCombo!));
+    expect(o.peakCombo).toBe(9);
+    expect(after('sword').combo).toBe(0);
+  });
+
+  it('황금: 완파 점수 × destroyMul · 자막 숫자(이벤트 pts)도 같다', () => {
+    const raze = (w: WeaponId): GameState => { const s = makeState(); s.weapon = w; withStack(s, 40); destroyStack(s); return s; };
+    const g = raze('gold');
+    expect(g.score).toBe(Math.round(SCORE.DESTROY_BONUS * WEAPON.gold.destroyMul!));
+    expect(g.events.find((e) => e.kind === 'stackDestroy')?.pts).toBe(g.score);
+    expect(raze('sword').score).toBe(SCORE.DESTROY_BONUS);
+  });
+
+  it('먹: 스스로 채운 필살은 바로 한 번 더 · 그 덤은 다시 안 찬다(무한 반복 없음)', () => {
+    const s = makeState(); s.weapon = 'brush'; s.lives = 99;
+    addGauge(s, 100); // 스스로 채웠다
+    special(s);
+    expect(s.wazaGauge).toBe(100); // 덤
+    special(s);
+    expect(s.wazaGauge).toBe(0); // 덤으로 쓴 것은 다시 안 채운다
+    addGauge(s, 100);
+    special(s);
+    expect(s.wazaGauge).toBe(100); // 다시 스스로 채운 것부터 또 한 번
+    const sw = makeState(); addGauge(sw, 100); special(sw);
+    expect(sw.wazaGauge).toBe(0);
+  });
+
+  it('먹: 시작 장비 필살 · 충전(wazaBank)에는 덤이 안 붙고 충전 수도 안 는다', () => {
+    const s = makeState(); s.weapon = 'brush'; s.lives = 99;
+    applyStartKit(s, 0, 2); // 게이지 가득 + 충전 1
+    special(s);
+    expect(s.wazaBank).toBe(0); // 충전 하나가 게이지를 채웠다
+    expect(s.wazaGauge).toBe(100);
+    special(s);
+    expect(s.wazaGauge).toBe(0);
+    expect(s.wazaBank).toBe(0);
+  });
+
+  it('먹: 덤이 남은 채 2막에 들어가거나 이어 하면 덤은 사라진다', () => {
+    const s = makeState(); s.weapon = 'brush'; s.lives = 99;
+    addGauge(s, 100); special(s);
+    expect(s.wazaGauge).toBe(100);
+    enterAct2(s);
+    expect(s.wazaGauge).toBe(0);
+    expect(s.wazaBank).toBe(0);
+    // 2막에서 스스로 채운 첫 필살은 다시 덤을 받는다
+    addGauge(s, 100);
+    expect(s.wazaFree).toBe(false);
+  });
 });

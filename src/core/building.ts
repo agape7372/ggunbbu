@@ -5,7 +5,7 @@
 // docs/ORIGINAL_BENCHMARK_2026-08-30.md §5-B.
 
 import type { FallingStack, Floor, GameState, Lane, Material, Theme } from './types';
-import { MAT_HP, STACK, STAGE, VIEW } from '../config';
+import { MAT_HP, STACK, STAGE, VIEW, WEAPON } from '../config';
 
 // M11 단일 레인 전환 후 "층 공유 HP 풀" 특례는 세그먼트 1개로 자동 성립 —
 // sharedHp 파라미터는 무효 사문이라 08-30 제거했다 (audit ③-8).
@@ -53,7 +53,9 @@ export function stackPhysics(s: GameState): { g: number; vterm: number } {
   // 아케이드 변종(stack.vary): 빠른 낙하 = 한 단계(STAGE.FAST_SPEED_ADD) 앞의 p · 성급 급락 = fall 배율(지시서 stage.ts와 같은 셈)
   const v = s.stack?.vary;
   const p = v?.fast ? s.p + STAGE.FAST_SPEED_ADD : s.p;
-  const m = v ? v.fall : 1;
+  // 서리 대검 fallMul: 1막 · 토코톤(구역 작전은 1막)만. 튜토리얼 · 2막 · 지시서 · 버터바는 위에서 갈렸거나 여기서 뺀다
+  const fm = s.mode === 'act1' || s.mode === 'tokoton' ? WEAPON[s.weapon].fallMul ?? 1 : 1;
+  const m = (v ? v.fall : 1) * fm;
   if (p <= 1) {
     const g = STACK.ACT1_G[0] + (STACK.ACT1_G[1] - STACK.ACT1_G[0]) * p;
     const vterm = STACK.ACT1_VTERM[0] + (STACK.ACT1_VTERM[1] - STACK.ACT1_VTERM[0]) * Math.pow(p, 0.7);

@@ -206,8 +206,22 @@ export interface WeaponSpec {
   gaugeKeep?: number;
   /** 콤보 100까지 띄우기에 곧게 더한다: lift + comboLift × min(콤보, 100)/100. 합은 PERK_RUN.LIFT_MAX에서 자른다(perks liftOf) */
   comboLift?: number;
-  /** 판을 필살 게이지 이 값으로 시작한다(판 시작 한 번 · sim applyStartKit) */
-  startGauge?: number;
+  /** 층을 무너뜨린 타격은 콤보가 이 값만큼 더 오른다 */
+  collapseCombo?: number;
+  /** 안전모 콤보(HAT.COMBO_AT)에 이 배율 */
+  hatAt?: number;
+  /** 가드를 쥐고 있는 동안 방어 게이지 소모에 이 배율 */
+  guardDrain?: number;
+  /** 목숨이 하나 남으면 필살 게이지 배율에 이 값을 곱한다 */
+  lastLifeGauge?: number;
+  /** 1막 · 토코톤(구역 작전 포함)에서 건물 낙하 중력 · 종단 속도에 이 배율 */
+  fallMul?: number;
+  /** 깔려도 콤보가 0이 되지 않고 이 몫(0~1)이 남는다(삽 keepCombo와 같은 꼴) */
+  pinCombo?: number;
+  /** 건물 완파 보너스 점수(SCORE.DESTROY_BONUS)에 이 배율 */
+  destroyMul?: number;
+  /** 스스로 채운 게이지로 필살을 쓰면 게이지가 바로 한 번 다시 찬다(그 두 번째는 다시 채우지 않는다) */
+  wazaEcho?: boolean;
 }
 export const WEAPON: Record<WeaponId, WeaponSpec> = {
   sword: { reach: PLAYER.ATTACK_REACH, lift: STACK.HIT_LIFT_V, gauge: 1, shake: 1 },
@@ -223,21 +237,21 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   coredrill: { reach: 70, lift: 76, gauge: 0.85, shake: 1, comboGauge: 0.5 },
   auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1 },
   diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7 }, // 전설 · 처음부터 전동 드릴의 끝 간격
-  // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 고르는 맛은 칼날 모양과 손맛
+  // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 무쇠 · 유리 말고는 고유 규칙이 하나씩 있다(11-20)
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
   brick: { reach: 62, lift: 92, gauge: 0.95, shake: 1.5, guardLift: 1.2 }, // 띄우기 ↑ · 가드 튕김 ↑ / 사거리 ↓
   rod: { reach: 80, lift: 70, gauge: 0.9, shake: 1.1, guardGauge: 10 },   // 사거리 ↑ · 가드가 필살을 채움 / 띄우기 ↓
   glass: { reach: 90, lift: 58, gauge: 1.3, shake: 0.8 },                  // 사거리 · 필살 ↑↑ / 띄우기 ↓↓
-  saw: { reach: 72, lift: 70, gauge: 1.25, shake: 0.9 },                 // 필살 ↑ / 띄우기 ↓
-  hazard: { reach: 76, lift: 88, gauge: 0.85, shake: 1.2 },              // 사거리·띄우기 ↑ / 필살 ↓
-  beam: { reach: 64, lift: 98, gauge: 1, shake: 1.7 },                   // 띄우기 ↑↑ / 사거리 ↓
-  flame: { reach: 76, lift: 72, gauge: 1.2, shake: 1.1 },                // 사거리·필살 ↑ / 띄우기 ↓
-  frost: { reach: 86, lift: 74, gauge: 0.95, shake: 1 },                 // 사거리 ↑↑ / 띄우기 ↓
-  onyx: { reach: 92, lift: 92, gauge: 0.7, shake: 1.5 },                 // 사거리·띄우기 ↑↑ / 필살 ↓↓
-  gold: { reach: 74, lift: 76, gauge: 1.5, shake: 1.3 },                 // 필살 ↑↑ / 띄우기 ↓
+  saw: { reach: 66, lift: 70, gauge: 1.1, shake: 0.9, collapseCombo: 2 },  // 층 붕괴 콤보 ↑ · 필살 ↑ / 띄우기 ↓
+  hazard: { reach: 76, lift: 88, gauge: 0.85, shake: 1.2, hatAt: 0.5 },   // 안전모가 빨리 · 사거리·띄우기 ↑ / 필살 ↓
+  beam: { reach: 64, lift: 98, gauge: 1, shake: 1.7, guardDrain: 0.6 },  // 가드가 오래 · 띄우기 ↑↑ / 사거리 ↓
+  flame: { reach: 76, lift: 72, gauge: 1.2, shake: 1.1, lastLifeGauge: 2 }, // 목숨 하나면 필살 ×2 · 사거리·필살 ↑ / 띄우기 ↓
+  frost: { reach: 80, lift: 68, gauge: 0.9, shake: 1, fallMul: 0.88 },    // 건물이 천천히 · 사거리 ↑↑ / 띄우기 ↓
+  onyx: { reach: 92, lift: 92, gauge: 0.7, shake: 1.5, pinCombo: 0.5 },  // 깔려도 콤보 절반 · 사거리·띄우기 ↑↑ / 필살 ↓↓
+  gold: { reach: 74, lift: 72, gauge: 1.5, shake: 1.3, destroyMul: 1.5 }, // 완파 점수 ↑ · 필살 ↑↑ / 띄우기 ↓
   thunder: { reach: 82, lift: 72, gauge: 1, shake: 1.3, gaugeKeep: 20 },  // 필살 뒤 게이지가 남는다 / 띄우기 ↓
   crane: { reach: 78, lift: 62, gauge: 1, shake: 1.6, comboLift: 36 },     // 콤보가 쌓일수록 띄우기 ↑ / 처음엔 띄우기 ↓↓
-  brush: { reach: 66, lift: 86, gauge: 1.25, shake: 1.1, startGauge: 50 },  // 게이지 절반으로 시작 / 사거리 ↓
+  brush: { reach: 74, lift: 86, gauge: 0.7, shake: 1.1, wazaEcho: true },   // 필살을 바로 한 번 더 / 필살 ↓↓
 };
 
 // ── 보급 상자 [튜닝] ─────────────────────────────────────────────

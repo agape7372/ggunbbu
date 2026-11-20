@@ -1287,6 +1287,7 @@ export function createApp(
     state = makeState({ seed: debugSeed(0xabcdef) });
     applyRunMeta(state);
     state.wazaGauge = WAZA_GAUGE.MAX;
+    state.wazaFree = true; // 버터바 도전은 받은 게이지(먹 대검 덤 없음)
     enterBonus(state, round);
     butterChallenge = true;
     butterRoundNo = round;

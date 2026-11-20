@@ -262,7 +262,7 @@ function reactImpact(s: GameState, e: JuiceEvent): void {
       // 버터바(보너스)는 겹 수로 점수가 따로 붙는다 — 일반 건물만 층수·완파 점수 자막.
       // 모드로는 못 가린다: 마지막 버터바를 부순 틱에 core가 같은 틱 안에서 본편으로 돌아간다
       const gone = releasing ? releasing.ghost ?? releasing.before : lastStack;
-      if (gone?.variant !== 'butterbar') fx.startCaption(destroyedCaption(n), `+${SCORE.DESTROY_BONUS.toLocaleString('en-US')}`);
+      if (gone?.variant !== 'butterbar') fx.startCaption(destroyedCaption(n), `+${(e.pts ?? SCORE.DESTROY_BONUS).toLocaleString('en-US')}`);
       return;
     }
     case 'bossDefeat': fx.startImpact(VIEW.W / 2, VIEW.FIELD_TOP + (VIEW.FIELD_H - VIEW.FIELD_TOP) * 0.45, true); return;

@@ -50,7 +50,7 @@ interface Run {
   gBounce: number; gKept: number;
   /** 공중 가드 튕김 수(철근 guardGauge는 땅 · 공중 모두) · 굴착 드릴이 넘긴 깔림 수 */
   aBounce: number; saves: number;
-  /** 첫 필살까지 틱(먹 startGauge) · 베기 타격 때 띄우기 합(크레인 comboLift) */
+  /** 첫 필살까지 틱 · 베기 타격 때 띄우기 합(크레인 comboLift) */
   firstSp: number; liftSum: number;
   /** 층 붕괴 타격 수(곡괭이 +collapseGauge) */
   collapses: number;
@@ -61,7 +61,7 @@ interface Run {
 function run(who: string, weapon: WeaponId, seed: number): Run {
   const s = makeState({ seed });
   s.weapon = weapon;
-  applyStartKit(s, 0, 0); // 실제 판 시작과 같게(먹 대검 startGauge)
+  applyStartKit(s, 0, 0); // 실제 판 시작과 같게
   s.lives = 99;
   const bot = hand(BOTS[who]());
   const r: Run = { score: 0, lost: 0, specials: 0, hits: 0, peak: 0, gBounce: 0, gKept: 0, aBounce: 0, saves: 0, firstSp: -1, liftSum: 0, collapses: 0, airHits: 0, airOnly: 0 };
