@@ -210,8 +210,8 @@ export interface WeaponSpec {
   comboLift?: number;
   /** 층을 무너뜨린 타격은 콤보가 이 값만큼 더 오른다 */
   collapseCombo?: number;
-  /** 안전모가 없을 때 콤보가 이 값의 배수가 되면 안전모를 얻는다(기본 문턱 HAT.COMBO_AT도 그대로) */
-  hatEvery?: number;
+  /** 깔려서 목숨을 잃고 판이 이어지면 필살 게이지 +이 값(안전모 · 굴착 드릴 구제 · 마지막 깔림 · 튜토리얼은 없음) */
+  pinGauge?: number;
   /** 가드를 쥐고 있는 동안 방어 게이지 소모에 이 배율 */
   guardDrain?: number;
   /** 목숨이 하나 남으면 필살 게이지 배율에 이 값을 곱한다 */
@@ -237,7 +237,7 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   pipe: { reach: 62, lift: 80, gauge: 1, shake: 1, airReach: 26 },
   drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 11, holdMin: 7 },
   coredrill: { reach: 70, lift: 76, gauge: 0.85, shake: 1, comboGauge: 0.5 },
-  auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1, pinSaveEvery: 10 },
+  auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1, pinSaveEvery: 25 },
   diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7 }, // 전설 · 처음부터 전동 드릴의 끝 간격
   // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 무쇠 · 유리 말고는 고유 규칙이 하나씩 있다(11-20)
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
@@ -245,7 +245,7 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   rod: { reach: 80, lift: 70, gauge: 0.9, shake: 1.1, guardGauge: 10 },   // 사거리 ↑ · 가드가 필살을 채움 / 띄우기 ↓
   glass: { reach: 90, lift: 58, gauge: 1.3, shake: 0.8 },                  // 사거리 · 필살 ↑↑ / 띄우기 ↓↓
   saw: { reach: 66, lift: 70, gauge: 1.1, shake: 0.9, collapseCombo: 2 },  // 층 붕괴 콤보 ↑ · 필살 ↑ / 띄우기 ↓
-  hazard: { reach: 76, lift: 88, gauge: 0.85, shake: 1.2, hatEvery: 30 }, // 안전모가 자주 · 사거리·띄우기 ↑ / 필살 ↓
+  hazard: { reach: 72, lift: 84, gauge: 0.85, shake: 1.2, pinGauge: 100 }, // 깔리면 필살 가득 · 사거리·띄우기 조금 ↑ / 필살 ↓
   beam: { reach: 64, lift: 98, gauge: 1, shake: 1.7, guardDrain: 0.6 },  // 가드가 오래 · 띄우기 ↑↑ / 사거리 ↓
   flame: { reach: 76, lift: 72, gauge: 1.2, shake: 1.1, lastLifeGauge: 2 }, // 목숨 하나면 필살 ×2 · 사거리·필살 ↑ / 띄우기 ↓
   frost: { reach: 80, lift: 68, gauge: 0.9, shake: 1, fallMul: 0.88 },    // 건물이 천천히 · 사거리 ↑↑ / 띄우기 ↓

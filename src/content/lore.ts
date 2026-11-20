@@ -50,7 +50,7 @@ export const LORE: Readonly<Record<string, LoreEntry>> = {
   },
   'weapon:auger': {
     lore: '땅을 파던 것이다. 건물도 판다.',
-    use: '안전모 없이 깔려도 한 번은 목숨을 안 잃고 빠져나온다. 건물 10채를 부수면 다시 찬다.',
+    use: '안전모 없이 깔려도 한 번은 목숨을 안 잃고 빠져나온다. 건물 25채를 부수면 다시 찬다.',
   },
   'weapon:jackhammer': {
     lore: '소음 민원은 담당자가 받는다.',
@@ -74,7 +74,7 @@ export const LORE: Readonly<Record<string, LoreEntry>> = {
   },
   'weapon:hazard': {
     lore: '공사중 표지판을 칼 모양으로 오려 냈다. 노랑 검정 빗금이 날 끝까지 간다. 벨 때마다 날리는 테이프 토막은 늘 나중에 치운다.',
-    use: '안전모가 없으면 콤보 30 · 60 · 90처럼 30마다 안전모를 얻는다. 필살은 느리다.',
+    use: '깔려서 목숨을 잃으면 필살 게이지가 가득 찬다. 평소엔 필살이 느리게 찬다.',
   },
   'weapon:rod': {
     lore: '콘크리트는 떨어져 나가고 뼈만 남았다.',

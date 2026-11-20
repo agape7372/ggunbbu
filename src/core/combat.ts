@@ -28,8 +28,7 @@ export function addCombo(s: GameState): void {
   // 안전모 = 콤보 고비 상. 2막은 벗고 들어가니 주지 않는다. 같은 틱 뒤의 깔림도 바로 막는다
   // 작업 지시서 외주는 안전모가 없다
   const hatOk = s.mode !== 'act2' && !(s.stage && !STAGE.DIFF[s.stage.diff].hat);
-  const every = WEAPON[s.weapon].hatEvery; // 공사중 대검: 콤보 N의 배수마다(벗겨진 뒤에도 다음 배수에서 다시)
-  if (!s.hat && hatOk && (HAT.COMBO_AT.includes(s.combo) || (!!every && s.combo % every === 0))) {
+  if (!s.hat && hatOk && HAT.COMBO_AT.includes(s.combo)) {
     s.hat = true;
     s.events.push({ kind: 'hatGet', combo: s.combo, y: s.player.y + PLAYER.H });
   }

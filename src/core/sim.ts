@@ -5,7 +5,7 @@
 import type { GameState, InputFrame } from './types';
 import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carryUnderStack } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
-import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, cutCombo, addScore, registerHit, wonAlready } from './combat';
+import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, cutCombo, addGauge, addScore, registerHit, wonAlready } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
 import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, STAGE, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN, WEAPON } from '../config';
 import type { WazaRunId } from '../config';
@@ -603,6 +603,8 @@ function onPlayerCrushed(s: GameState): void {
   }
   loseLife(s);
   if (s.over) return;
+  // 공사중 대검: 목숨을 실제로 잃고 판이 이어질 때만 필살 게이지(gaugeFull이 버튼을 켠다). 튜토리얼은 목숨이 안 준다
+  if (s.mode !== 'training') addGauge(s, WEAPON[s.weapon].pinGauge ?? 0);
   cutCombo(s, WEAPON[s.weapon].pinCombo); // 흑철 pinCombo는 몫만큼 남는다
   s.player.pose = 'pinned';
   s.player.poseTick = 0;

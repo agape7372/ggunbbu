@@ -177,10 +177,12 @@ describe('튜토리얼', () => {
   it('깔렸을 때: 건물이 바로 깔고 판이 선다 · 가드(탈출)로만 풀린다 · 목숨은 그대로', () => {
     const s = fresh();
     reach(s, 'escape');
+    s.weapon = 'hazard'; s.wazaGauge = 10; // 공사중 대검 pinGauge는 목숨을 잃어야 찬다
     expect(trainingKeys(s)).toEqual([]);
     const ev = idle(s, TRAINING.GAP + 3);
     expect(ev).not.toContain('guardBounce'); // 떨어지며 튕길 틈이 없다
     expect(s.player.pose).toBe('pinned');
+    expect(s.wazaGauge).toBe(10);
     expect(trainingGuide(s)).toMatchObject({ waiting: true, need: 'guard' });
     expect(trainingKeys(s)).toEqual(['guard']);
     idle(s, 200, { ...EMPTY_INPUT, attack: true });

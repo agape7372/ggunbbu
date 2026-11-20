@@ -5,9 +5,9 @@ import { makeState, advance, applyStartKit } from '../src/core/sim';
 import { liftOf } from '../src/core/perks';
 import { continueFromCheckpoint, enterAct2, enterAct2Phase } from '../src/core/act2';
 import { makeFloor, makeStack, stackPhysics } from '../src/core/building';
-import { addCombo, addGauge, attackRange, destroyStack, gaugePerHit, registerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
+import { addGauge, attackRange, destroyStack, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type PerkId, type WeaponId } from '../src/core/types';
-import { GUARD_GAUGE, HAT, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
+import { GUARD_GAUGE, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
 import { BLADE_IDS, BODY_IDS, DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, LETTERS_IDS, MASK_IDS, slotOf, validateLoadout, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { WEAPON_DUST_COST } from '../src/meta/economy';
 
@@ -275,6 +275,7 @@ describe('고유 규칙', () => {
       }
       expect(s.stack).toBeNull();
       s.stackSpawnCd = 999;
+      s.hat = false; // 채를 많이 부수면 콤보 50 안전모가 생긴다. 구제 셈만 보려고 벗긴다
       return ready;
     };
     const N = WEAPON.auger.pinSaveEvery!;
@@ -544,25 +545,46 @@ describe('대검 규칙', () => {
     expect(swing('saw', 30).combo).toBe(1); // 안 무너지는 타격은 그대로
   });
 
-  it('공사중: 콤보가 hatEvery의 배수가 될 때마다(안전모가 없으면) 안전모 · 기본 문턱도 산다', () => {
-    const hats = (w: WeaponId): number[] => {
-      const s = makeState(); s.weapon = w;
-      const got: number[] = [];
-      for (let i = 0; i < 520; i++) { addCombo(s); if (s.hat) { got.push(s.combo); s.hat = false; } } // 얻자마자 벗긴다
-      return got;
+  it('공사중: 깔려서 목숨을 잃고 판이 이어질 때만 필살 게이지 +pinGauge(가득 · gaugeFull)', () => {
+    const pin = (w: WeaponId, set: (s: GameState) => void = () => {}): GameState => {
+      const s = makeState(); s.weapon = w; s.lives = 5; s.wazaGauge = 10;
+      set(s);
+      crush(s);
+      return s;
     };
-    const n = WEAPON.hazard.hatEvery!;
-    const want = [...new Set([...HAT.COMBO_AT, ...Array.from({ length: Math.floor(520 / n) }, (_, k) => (k + 1) * n)])].sort((x, y) => x - y);
-    expect(hats('hazard')).toEqual(want);
-    expect(hats('sword')).toEqual([...HAT.COMBO_AT]);
-    // 쓰고 있으면 배수를 지나도 겹쳐 받지 않는다
-    const keep = makeState(); keep.weapon = 'hazard'; keep.hat = true; keep.combo = n - 1;
-    addCombo(keep);
-    expect(keep.events.some((e) => e.kind === 'hatGet')).toBe(false);
-    // 톱날처럼 한 타격에 콤보가 여러 칸 뛰어도 배수를 건너뛰지 않는다(addCombo를 칸마다 부른다)
-    const jump = makeState(); jump.weapon = 'hazard'; jump.combo = n - 2;
-    registerHit(jump); registerHit(jump);
-    expect(jump.hat).toBe(true);
+    const full = pin('hazard', (s) => { s.events.length = 0; });
+    expect(full.player.pose).toBe('pinned');
+    expect(full.wazaGauge).toBe(Math.min(100, 10 + WEAPON.hazard.pinGauge!));
+    expect(pin('sword').wazaGauge).toBe(10);
+    // 안전모가 막은 깔림 · 마지막 목숨 깔림(게임오버) · 튜토리얼은 채우지 않는다
+    const hat = makeState(); hat.weapon = 'hazard'; hat.lives = 5; hat.wazaGauge = 10; hat.hat = true;
+    hat.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('hard'), makeFloor('hard')], y: 100 }); hat.stack.vy = -600;
+    for (let t = 0; t < 300 && hat.hat; t++) advance(hat, EMPTY_INPUT);
+    expect(hat.hat).toBe(false);
+    expect(hat.lives).toBe(5);
+    expect(hat.wazaGauge).toBe(10);
+    const last = pin('hazard', (s) => { s.lives = 1; });
+    expect(last.over).toBe('gameover');
+    expect(last.wazaGauge).toBe(10);
+    // 튜토리얼은 training.test 「깔렸을 때」에서 본다
+    // 2막도 같다(목숨을 잃고 이어지면 채운다)
+    const a2 = makeState(); a2.weapon = 'hazard'; a2.lives = 5; enterAct2(a2);
+    crush(a2);
+    expect(a2.lives).toBe(4);
+    expect(a2.wazaGauge).toBe(100);
+    // 굴착 드릴식 구제는 목숨을 안 잃으니 채우지 않는다(같은 onPlayerCrushed 앞쪽에서 돌아간다)
+    const au = makeState(); au.weapon = 'auger'; au.wazaGauge = 10; crush(au);
+    expect(au.wazaGauge).toBe(10);
+    // 먹 대검 덤 셈과 무관: 스스로 채운 게이지로 남는다
+    expect(full.wazaFree).toBe(false);
+  });
+
+  it('공사중: 깔려서 가득 찬 게이지는 gaugeFull을 낸다(필살 버튼이 켜진다)', () => {
+    const s = makeState(); s.weapon = 'hazard'; s.lives = 5;
+    s.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('hard'), makeFloor('hard')], y: 100 }); s.stack.vy = -600;
+    let full = false;
+    for (let t = 0; t < 300 && s.player.pose !== 'pinned'; t++) { advance(s, EMPTY_INPUT); if (s.events.some((e) => e.kind === 'gaugeFull')) full = true; s.events.length = 0; }
+    expect(full).toBe(true);
   });
 
   it('철골: 가드를 쥐고 있는 동안 게이지가 guardDrain배로 닳는다', () => {
