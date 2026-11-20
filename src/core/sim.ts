@@ -54,6 +54,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     drops: 0,
     hat: false,
     pinSaved: 0,
+    pinDowns: 0,
     tokotonCycle: 0,
     stage: null,
     lm: null,
@@ -192,6 +193,18 @@ export function advance(s: GameState, input: InputFrame): void {
   if (countsDrops) {
     for (let i = evStart; i < s.events.length; i++) {
       if (s.events[i].kind === 'stackDestroy') onBuildingDown(s);
+    }
+  }
+  // ── 굴착 드릴 다시 채우기 (완파 수) ── 상자 셈과 따로 · 모든 모드 · 버터바는 건물이 아니다(완파 점수 pts가 없다)
+  const every = WEAPON[s.weapon].pinSaveEvery;
+  if (every && s.pinSaved > 0) {
+    for (let i = evStart; i < s.events.length && s.pinSaved > 0; i++) {
+      if (s.events[i].kind !== 'stackDestroy' || s.events[i].pts === undefined) continue;
+      s.pinDowns += 1;
+      if (s.pinDowns < every) continue;
+      s.pinDowns = 0;
+      s.pinSaved -= 1;
+      s.events.push({ kind: 'pinReady', y: s.player.y + PLAYER.H });
     }
   }
 
@@ -582,7 +595,7 @@ function onPlayerCrushed(s: GameState): void {
     absorbWithHat(s);
     return;
   }
-  // 굴착 드릴(pinSave): 안전모가 없으면 한 판 N번 안전모처럼 받는다(목숨 · 콤보 유지). 튜토리얼 「깔렸을 때」 걸음은 깔려야 배운다
+  // 굴착 드릴(pinSave): 안전모가 없으면 남은 수만큼 안전모처럼 받는다(목숨 · 콤보 유지). 다시 차는 셈은 advance 완파 셈. 튜토리얼 「깔렸을 때」 걸음은 깔려야 배운다
   if (!s.training && s.pinSaved < (WEAPON[s.weapon].pinSave ?? 0)) {
     s.pinSaved += 1;
     absorbWithHat(s, 'pinSave');

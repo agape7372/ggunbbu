@@ -194,8 +194,10 @@ export interface WeaponSpec {
   holdMin?: number;
   /** 콤보가 높을수록 필살 게이지 배율에 더한다: 콤보 100에서 +이 값(그 위는 같다) */
   comboGauge?: number;
-  /** 한 판에 이 횟수만큼 깔려도 목숨을 안 잃고 빠져나온다 */
+  /** 이 횟수만큼 깔려도 목숨을 안 잃고 빠져나온다(판 시작에 든다) */
   pinSave?: number;
+  /** 쓴 pinSave는 건물을 이 채 수만큼 부수면 하나씩 다시 찬다(pinSave를 넘지 않는다) */
+  pinSaveEvery?: number;
   /** 가드로 튕길 때마다 필살 게이지 +이 값(배율 안 곱함 · 상한 100) */
   guardGauge?: number;
   /** 가드 튕김 속도(땅 · 공중) 배율 */
@@ -208,8 +210,8 @@ export interface WeaponSpec {
   comboLift?: number;
   /** 층을 무너뜨린 타격은 콤보가 이 값만큼 더 오른다 */
   collapseCombo?: number;
-  /** 안전모 콤보(HAT.COMBO_AT)에 이 배율 */
-  hatAt?: number;
+  /** 안전모가 없을 때 콤보가 이 값의 배수가 되면 안전모를 얻는다(기본 문턱 HAT.COMBO_AT도 그대로) */
+  hatEvery?: number;
   /** 가드를 쥐고 있는 동안 방어 게이지 소모에 이 배율 */
   guardDrain?: number;
   /** 목숨이 하나 남으면 필살 게이지 배율에 이 값을 곱한다 */
@@ -235,7 +237,7 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   pipe: { reach: 62, lift: 80, gauge: 1, shake: 1, airReach: 26 },
   drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 11, holdMin: 7 },
   coredrill: { reach: 70, lift: 76, gauge: 0.85, shake: 1, comboGauge: 0.5 },
-  auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1 },
+  auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1, pinSaveEvery: 10 },
   diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7 }, // 전설 · 처음부터 전동 드릴의 끝 간격
   // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 무쇠 · 유리 말고는 고유 규칙이 하나씩 있다(11-20)
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
@@ -243,7 +245,7 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   rod: { reach: 80, lift: 70, gauge: 0.9, shake: 1.1, guardGauge: 10 },   // 사거리 ↑ · 가드가 필살을 채움 / 띄우기 ↓
   glass: { reach: 90, lift: 58, gauge: 1.3, shake: 0.8 },                  // 사거리 · 필살 ↑↑ / 띄우기 ↓↓
   saw: { reach: 66, lift: 70, gauge: 1.1, shake: 0.9, collapseCombo: 2 },  // 층 붕괴 콤보 ↑ · 필살 ↑ / 띄우기 ↓
-  hazard: { reach: 76, lift: 88, gauge: 0.85, shake: 1.2, hatAt: 0.5 },   // 안전모가 빨리 · 사거리·띄우기 ↑ / 필살 ↓
+  hazard: { reach: 76, lift: 88, gauge: 0.85, shake: 1.2, hatEvery: 30 }, // 안전모가 자주 · 사거리·띄우기 ↑ / 필살 ↓
   beam: { reach: 64, lift: 98, gauge: 1, shake: 1.7, guardDrain: 0.6 },  // 가드가 오래 · 띄우기 ↑↑ / 사거리 ↓
   flame: { reach: 76, lift: 72, gauge: 1.2, shake: 1.1, lastLifeGauge: 2 }, // 목숨 하나면 필살 ×2 · 사거리·필살 ↑ / 띄우기 ↓
   frost: { reach: 80, lift: 68, gauge: 0.9, shake: 1, fallMul: 0.88 },    // 건물이 천천히 · 사거리 ↑↑ / 띄우기 ↓
@@ -705,6 +707,7 @@ export const JUICE: Record<string, JuiceSpec> = {
   supply:         { hitstop: 0, shake: 0, flash: 0, particles: 8 },
   hatBreak:       { hitstop: 3, shake: 5, flash: 0, particles: 10 },
   pinSave:        { hitstop: 3, shake: 5, flash: 0, particles: 10 }, // 굴착 드릴이 깔림을 대신 받음(안전모 깨짐과 같은 무게)
+  pinReady:       { hitstop: 0, shake: 0, flash: 0, particles: 4 },  // 굴착 드릴 구제가 다시 찼다(가볍게)
   // 안전모 받기 — 시뮬은 안 세운다(봇 테스트 타이밍 보존). 화면 연출은 렌더 hatFx가 따로 맡는다
   hatGet:         { hitstop: 0, shake: 0, flash: 0, particles: 0 },
   // 번개 착탄(hurt가 따로 붙는다) — 땅에 꽂히는 순간 불꽃·먼지

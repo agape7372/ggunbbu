@@ -509,6 +509,9 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
     case 'pinEscape':
       pinEscape(footX, footY);
       return b;
+    case 'pinReady': // 굴착 드릴 구제가 다시 찼다 — pinSave 나선을 작게 한 번
+      spiral(footX, footY, 48, 6, 3.5, 0.35);
+      return b;
     case 'pinSave':
       spiral(footX, footY, 96, 12, 7, 0.5);
       spiral(footX + 4, footY - 20, 80, 8, 3.5, 0.44, INK);

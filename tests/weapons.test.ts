@@ -3,9 +3,9 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, advance, applyStartKit } from '../src/core/sim';
 import { liftOf } from '../src/core/perks';
-import { enterAct2, enterAct2Phase } from '../src/core/act2';
+import { continueFromCheckpoint, enterAct2, enterAct2Phase } from '../src/core/act2';
 import { makeFloor, makeStack, stackPhysics } from '../src/core/building';
-import { addCombo, addGauge, attackRange, destroyStack, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
+import { addCombo, addGauge, attackRange, destroyStack, gaugePerHit, registerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type PerkId, type WeaponId } from '../src/core/types';
 import { GUARD_GAUGE, HAT, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
 import { BLADE_IDS, BODY_IDS, DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, LETTERS_IDS, MASK_IDS, slotOf, validateLoadout, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
@@ -247,7 +247,7 @@ describe('고유 규칙', () => {
     expect(weaponGaugeMul(sw)).toBe(1); // 철거칼은 콤보와 상관없다
   });
 
-  it('굴착 드릴: 한 판에 pinSave번 깔려도 목숨을 안 잃고 빠져나온다(그다음은 깔린다)', () => {
+  it('굴착 드릴: 구제를 하나 들고 시작 · 쓰면 건물 pinSaveEvery채를 부술 때 다시 찬다 · 쌓이지 않는다', () => {
     const crush = (s: GameState): { lost: number; saved: boolean } => {
       const lives = s.lives;
       s.player.invulnTicks = 0;
@@ -263,18 +263,42 @@ describe('고유 규칙', () => {
       }
       return { lost: lives - s.lives, saved };
     };
+    /** 약한 1층 건물 하나를 베어 완파한다 · pinReady가 났는지 */
+    const raze = (s: GameState): boolean => {
+      s.player.pose = 'idle'; s.player.poseTick = 0; s.player.invulnTicks = 99;
+      s.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('weak')], y: 30, vy: 0 });
+      let ready = false;
+      for (let t = 0; t < 12 && s.stack; t++) {
+        advance(s, { ...EMPTY_INPUT, attack: t === 0 });
+        if (s.events.some((e) => e.kind === 'pinReady')) ready = true;
+        s.events.length = 0;
+      }
+      expect(s.stack).toBeNull();
+      s.stackSpawnCd = 999;
+      return ready;
+    };
+    const N = WEAPON.auger.pinSaveEvery!;
     const s = makeState();
-    s.weapon = 'auger';
-    s.lives = 5;
-    s.combo = 9;
-    const first = crush(s);
-    expect(first).toEqual({ lost: 0, saved: true });
+    s.weapon = 'auger'; s.lives = 9; s.combo = 9;
+    expect(crush(s)).toEqual({ lost: 0, saved: true });
     expect(s.player.pose).not.toBe('pinned');
     expect(s.combo).toBe(9); // 안전모처럼 콤보도 지킨다
-    expect(s.pinSaved).toBe(WEAPON.auger.pinSave);
-    const second = crush(s);
-    expect(second).toEqual({ lost: 1, saved: false });
-    expect(s.player.pose).toBe('pinned');
+    expect(crush(s)).toEqual({ lost: 1, saved: false }); // 다 썼다
+    s.player.pose = 'idle';
+    for (let i = 1; i < N; i++) expect(raze(s), `채 ${i}`).toBe(false);
+    expect(raze(s)).toBe(true); // N채째에 다시 찬다
+    expect(s.pinSaved).toBe(0);
+    for (let i = 0; i < N; i++) expect(raze(s)).toBe(false); // 찬 채로는 세지 않는다(쌓이지 않는다)
+    expect(s.pinDowns).toBe(0);
+    expect(crush(s)).toEqual({ lost: 0, saved: true });
+    // 2막 진입 · 이어 하기는 남은 구제 · 셈을 그대로 잇는다(공짜로 채우지 않는다)
+    for (let i = 0; i < 3; i++) raze(s);
+    const before = [s.pinSaved, s.pinDowns];
+    enterAct2(s);
+    expect([s.pinSaved, s.pinDowns]).toEqual(before);
+    s.checkpoint = 40;
+    continueFromCheckpoint(s);
+    expect([s.pinSaved, s.pinDowns]).toEqual(before);
     // 안전모가 있으면 안전모가 먼저 받고 굴착 드릴 몫은 남는다
     const h = makeState();
     h.weapon = 'auger'; h.hat = true;
@@ -282,8 +306,12 @@ describe('고유 규칙', () => {
     expect(h.hat).toBe(false);
     expect(h.pinSaved).toBe(0);
     // 철거칼은 바로 깔린다
-    const w = makeState();
-    expect(crush(w)).toEqual({ lost: 1, saved: false });
+    expect(crush(makeState())).toEqual({ lost: 1, saved: false });
+    // 버터바(보너스)는 건물이 아니다 — 완파 점수(pts)가 없어 다시 채우는 셈에 안 들어간다
+    const b = makeState();
+    b.stack = makeStack({ variant: 'butterbar', theme: 'europe', floors: [makeFloor('butter')], y: 30, vy: 0 });
+    destroyStack(b);
+    expect(b.events.find((e) => e.kind === 'stackDestroy')?.pts).toBeUndefined();
   });
 
   it('굴착 드릴: 튜토리얼에선 구제하지 않는다(「깔렸을 때」 걸음은 깔려야 배운다)', () => {
@@ -516,13 +544,25 @@ describe('대검 규칙', () => {
     expect(swing('saw', 30).combo).toBe(1); // 안 무너지는 타격은 그대로
   });
 
-  it('공사중: 안전모 콤보가 hatAt배(50 → 25), 철거칼은 50', () => {
-    const at = (w: WeaponId, combo: number): boolean => { const s = makeState(); s.weapon = w; s.combo = combo - 1; addCombo(s); return s.hat; };
-    const c = Math.round(HAT.COMBO_AT[0] * WEAPON.hazard.hatAt!);
-    expect(at('hazard', c)).toBe(true);
-    expect(at('sword', c)).toBe(false);
-    expect(at('hazard', HAT.COMBO_AT[0])).toBe(false);
-    expect(at('sword', HAT.COMBO_AT[0])).toBe(true);
+  it('공사중: 콤보가 hatEvery의 배수가 될 때마다(안전모가 없으면) 안전모 · 기본 문턱도 산다', () => {
+    const hats = (w: WeaponId): number[] => {
+      const s = makeState(); s.weapon = w;
+      const got: number[] = [];
+      for (let i = 0; i < 520; i++) { addCombo(s); if (s.hat) { got.push(s.combo); s.hat = false; } } // 얻자마자 벗긴다
+      return got;
+    };
+    const n = WEAPON.hazard.hatEvery!;
+    const want = [...new Set([...HAT.COMBO_AT, ...Array.from({ length: Math.floor(520 / n) }, (_, k) => (k + 1) * n)])].sort((x, y) => x - y);
+    expect(hats('hazard')).toEqual(want);
+    expect(hats('sword')).toEqual([...HAT.COMBO_AT]);
+    // 쓰고 있으면 배수를 지나도 겹쳐 받지 않는다
+    const keep = makeState(); keep.weapon = 'hazard'; keep.hat = true; keep.combo = n - 1;
+    addCombo(keep);
+    expect(keep.events.some((e) => e.kind === 'hatGet')).toBe(false);
+    // 톱날처럼 한 타격에 콤보가 여러 칸 뛰어도 배수를 건너뛰지 않는다(addCombo를 칸마다 부른다)
+    const jump = makeState(); jump.weapon = 'hazard'; jump.combo = n - 2;
+    registerHit(jump); registerHit(jump);
+    expect(jump.hat).toBe(true);
   });
 
   it('철골: 가드를 쥐고 있는 동안 게이지가 guardDrain배로 닳는다', () => {

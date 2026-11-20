@@ -345,7 +345,7 @@ export type JuiceKind =
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
-  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape' | 'pinSave'
+  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape' | 'pinSave' | 'pinReady'
   | 'wazaSwing' | 'wazaHit' | 'wazaBurst'
   | 'perkOffer' | 'perkPick';
 
@@ -442,8 +442,10 @@ export interface GameState {
   drops: number;
   /** 안전모를 쓰고 있다 — 다음 깔림 1회를 막는다. 2막에 들어가면 벗는다 */
   hat: boolean;
-  /** 이번 판에 무기 pinSave(굴착 드릴)로 넘긴 깔림 수 */
+  /** 무기 pinSave(굴착 드릴)에서 쓰고 아직 다시 안 찬 수 */
   pinSaved: number;
+  /** 굴착 드릴을 쓴 뒤 부순 건물 수(pinSaveEvery에서 다시 찬다) */
+  pinDowns: number;
   /** 토코톤 버터바 사이클 진입 인덱스 — 히트스톱이 경계 틱을 삼켜도 소실 없게 (08-30 검증) */
   tokotonCycle: number;
   /** 작업 지시서 진행 (mode 'stage'일 때만) */
