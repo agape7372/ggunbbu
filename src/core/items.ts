@@ -35,8 +35,8 @@ export function applyItem(s: GameState, item: ItemId): void {
  * 안전모가 깔림 1회를 대신 받는다 — 목숨·콤보 그대로, 건물은 튕겨 올리고 짧은 무적.
  * 값은 깔림 방치 바운스(stepPinned)와 같다: 무적이 스택 왕복(≈47f)보다 길면 다음 "쿵"이 안 온다.
  */
-export function absorbWithHat(s: GameState): void {
-  s.hat = false;
+export function absorbWithHat(s: GameState, by: 'hatBreak' | 'pinSave' = 'hatBreak'): void {
+  if (by === 'hatBreak') s.hat = false;
   const st = s.stack;
   if (st?.resting) {
     st.vy = STACK.PIN_MERCY_V;
@@ -44,5 +44,5 @@ export function absorbWithHat(s: GameState): void {
     st.y = Math.max(st.y, 0.001);
   }
   s.player.invulnTicks = PLAYER.PIN_TIMEOUT_IFRAMES;
-  s.events.push({ kind: 'hatBreak', y: s.player.y + PLAYER.H }); // 머리 높이 — 파편이 거기서 튄다
+  s.events.push({ kind: by, y: s.player.y + PLAYER.H }); // 머리 높이 — 파편이 거기서 튄다(pinSave = 굴착 드릴이 대신 받음)
 }

@@ -162,6 +162,8 @@ export interface PlayerState {
   attackFromAir: boolean;
   /** 착암기(WeaponSpec.holdRepeat) 누름 셈. 0 = 닫힘(공격 엣지가 1로 연다), 쥐고 있는 동안 틱마다 +1. 놓거나 깔리면 0 */
   holdTick: number;
+  /** 이번 누름에서 반복으로 벤 횟수(WeaponSpec.holdMin 가속). 공격 엣지가 0으로 */
+  holdN: number;
 }
 
 export type Act2Phase = 'cathedral' | 'tower' | 'bolt' | 'rock' | 'moon';
@@ -327,11 +329,11 @@ export type WazaId = 'tenchi' | 'ageba' | 'mukjul' | 'dalmuri' | 'nakgwan' | 'ba
  */
 export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder' | ToolId | GreatswordId;
 
-/** 연장 다섯(11-20). 세 칸에 고유 규칙 하나씩(config WeaponSpec 선택 칸). 대미지 · 프레임은 같다 */
-export type ToolId = 'shovel' | 'pickaxe' | 'jackhammer' | 'manhole' | 'pipe';
+/** 연장(11-20 다섯 → 맨홀 빼고 드릴 셋). 세 칸에 고유 규칙 하나씩(config WeaponSpec 선택 칸). 대미지 · 프레임은 같다 */
+export type ToolId = 'shovel' | 'pickaxe' | 'jackhammer' | 'pipe' | 'drill' | 'coredrill' | 'auger';
 
 /** 대검 — 칼날 모양·색(render/sprites)과 세 칸(config WEAPON)만 다르다. 쥐는 자세는 하나 */
-export type GreatswordId = 'iron' | 'saw' | 'hazard' | 'beam' | 'flame' | 'frost' | 'onyx' | 'gold';
+export type GreatswordId = 'iron' | 'brick' | 'saw' | 'hazard' | 'rod' | 'beam' | 'glass' | 'flame' | 'frost' | 'onyx' | 'gold';
 
 /** 보급품. 상자는 고정 순서로 돈다(config SUPPLY.ROTATION) — 확률 없음. 안전모(hat)는 상자 밖, 콤보로 번다(HAT). */
 export type ItemId = 'gloves' | 'coffee' | 'hat' | 'dust';
@@ -343,7 +345,7 @@ export type JuiceKind =
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
-  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape'
+  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape' | 'pinSave'
   | 'wazaSwing' | 'wazaHit' | 'wazaBurst'
   | 'perkOffer' | 'perkPick';
 
@@ -436,6 +438,8 @@ export interface GameState {
   drops: number;
   /** 안전모를 쓰고 있다 — 다음 깔림 1회를 막는다. 2막에 들어가면 벗는다 */
   hat: boolean;
+  /** 이번 판에 무기 pinSave(굴착 드릴)로 넘긴 깔림 수 */
+  pinSaved: number;
   /** 토코톤 버터바 사이클 진입 인덱스 — 히트스톱이 경계 틱을 삼켜도 소실 없게 (08-30 검증) */
   tokotonCycle: number;
   /** 작업 지시서 진행 (mode 'stage'일 때만) */

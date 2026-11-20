@@ -179,8 +179,6 @@
 .sh-pic .p, .sh-pic .y { stroke: none; }
 .tools .sh-cell { height: 136px; }
 .tools .sh-pw { width: 36px; height: 90px; }
-/* 무기(연장 아홉)는 3열 3줄 — 4열이면 마지막 줄에 한 칸만 남는다. 칸 높이 · 그림 상자 · 줄 간격은 4열과 같다 */
-.sh-rack.tools { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .sh-cname { font: 700 15px/1 var(--body); white-space: nowrap; }
 .sh-cprice { font: 700 14px/1 var(--body); white-space: nowrap; }

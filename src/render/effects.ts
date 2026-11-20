@@ -809,6 +809,10 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     dust(x, y, Math.max(0, n - 5));
     return;
   }
+  if (e.kind === 'pinSave') {
+    dust(x, y, JUICE.pinSave?.particles ?? 10); // 뚫고 나온 나선 획 · 흙덩이는 weaponFx(굴착 드릴)
+    return;
+  }
   if (e.kind === 'special') return; // 필살은 wazaShow가 그린다
   if (e.kind === 'guardBounce' && s.gimmick === 'ice') iceSparks(x, y, JUICE_SYS.ICE_SPARKS);
   spawnHitParticles(e.kind, x, y, JUICE[e.kind]?.particles ?? 0, e.mat);

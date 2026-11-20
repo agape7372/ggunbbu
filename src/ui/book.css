@@ -112,6 +112,7 @@
 .k-waza .bk-sil { aspect-ratio: 80 / 96; }
 
 .bk-name { font: var(--t-name); text-wrap: balance; }
+.bk-grid.c4 .bk-name { white-space: nowrap; letter-spacing: -0.06em; word-spacing: -0.08em; } /* 4열 칸 — 「비계 파이프」가 두 줄로 꺾이지 않게 */
 /* 사용자가 지은 가면 이름 — 글꼴은 .uname이 정한다. 긴 이름은 칸 안에서 말줄임 */
 .bk-name.uname { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 팝업 제목(.m-title는 붓글씨) — 사용자 이름이면 시스템 글꼴 묶음으로 통째로(.uname과 같은 묶음) */

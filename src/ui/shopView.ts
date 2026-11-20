@@ -41,7 +41,7 @@ interface Item {
 
 const GREAT = new Set<string>(GREATSWORD_IDS);
 
-/** 무기 열둘 — 대검은 이름표가 「대검」이라 이름은 앞말만 */
+/** 무기 스물둘 — 대검은 이름표가 「대검」이라 이름은 앞말만 */
 const WEAPONS: readonly Item[] = WEAPON_IDS.map((id) => ({
   id,
   slot: 'weapon',
@@ -86,10 +86,10 @@ const tierTag = (id: string): string => {
 /** 전설 칼 순서 — 칸마다 섬광 박자를 어긋나게 */
 const LEGEND = WEAPON_IDS.filter((w) => WEAPON_TIER[w] === 'legend');
 
-/** 칼꽂이 칼 기울기(그림만 · 칸은 곧다) — 같은 줄이 자로 잰 듯 서지 않게. 무기 id마다(연장이 늘어도 대검 기울기가 안 밀린다). 원판인 맨홀 뚜껑은 곧게 */
+/** 칼꽂이 칼 기울기(그림만 · 칸은 곧다) — 같은 줄이 자로 잰 듯 서지 않게. 무기 id마다(연장이 늘어도 대검 기울기가 안 밀린다) */
 const TILT: Readonly<Record<string, number>> = {
-  sword: -3, hammer: 2, crowbar: -2, grinder: 3, shovel: -3, pipe: 3, pickaxe: -4, manhole: 0, jackhammer: 3,
-  iron: -4, saw: 3, hazard: -2, beam: 2, flame: 3, frost: -3, onyx: 1, gold: -4,
+  sword: -3, hammer: 2, crowbar: -2, grinder: 3, shovel: -3, pipe: 3, drill: -2, pickaxe: -4, coredrill: 2, auger: -3, jackhammer: 3,
+  iron: -4, brick: 2, saw: 3, hazard: -2, rod: -3, beam: 2, glass: 4, flame: 3, frost: -3, onyx: 1, gold: -4,
 };
 
 /** 산 순간 도장 둘레 먹 튐 넷 */
@@ -421,11 +421,11 @@ function rackCell(it: Item, st: CardState, sel: boolean, on: boolean, fresh: boo
   const ring = sel ? '<svg class="sh-ring" viewBox="0 0 80 104" aria-hidden="true"><path d="M40 4 C70 2 80 30 76 60 C72 92 40 104 20 96 C2 88 0 50 8 28 C14 12 28 6 44 6"/></svg>' : '';
   const say = on ? '장착 중' : st === 'owned' ? '보유' : st === 'ok' ? `${price} 먼지` : `먼지 ${fmt(it.cost - inv.dust)} 더`;
   const tier = WEAPON_TIER[it.id as WeaponId];
-  const ghost = tier === 'rare' ? swordSvg(it.id, 'sh-pic sh-gh', false, true) : '';
+  const ghost = tier === 'rare' ? swordSvg(it.id, 'sh-pic sh-gh') : '';
   const flash = tier === 'legend' ? '<svg class="sw sh-cflash" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path class="y" d="M0 100 Q50 56 100 0 Q54 74 0 100 Z"/></svg>' : '';
   const label = tier === 'common' ? '' : tierTag(it.id);
   return `<button type="button" class="sh-cell t-${tier} is-${st}" data-sel="${it.id}" aria-pressed="${sel}" aria-label="${escapeHtml(WEAPON_COPY[it.id as WeaponId].name)} ${TIER_COPY[tier]} ${say}" style="--i:${i};--k:${LEGEND.indexOf(it.id as WeaponId)};--r:${TILT[it.id] ?? 0}deg">
-    ${ring}<span class="sh-pw">${ghost}${swordSvg(it.id, 'sh-pic', false, true)}${flash}</span>${stand}${label}${badge}${more}
+    ${ring}<span class="sh-pw">${ghost}${swordSvg(it.id, 'sh-pic')}${flash}</span>${stand}${label}${badge}${more}
     <span class="sh-cname">${escapeHtml(it.name)}</span><span class="sh-cprice">${price}</span>
   </button>`;
 }

@@ -4,10 +4,10 @@ import { describe, it, expect } from 'vitest';
 import { makeState, advance } from '../src/core/sim';
 import { enterAct2Phase } from '../src/core/act2';
 import { makeFloor, makeStack } from '../src/core/building';
-import { attackRange, gaugePerHit, tryGuardBounce } from '../src/core/combat';
+import { attackRange, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type PerkId, type WeaponId } from '../src/core/types';
 import { PERK, PLAYER, STACK, WEAPON } from '../src/config';
-import { DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, slotOf, validateLoadout, WEAPON_IDS } from '../src/meta/loadout';
+import { BLADE_IDS, BODY_IDS, DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, LETTERS_IDS, MASK_IDS, slotOf, validateLoadout, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { WEAPON_DUST_COST } from '../src/meta/economy';
 
 const IDS = Object.keys(WEAPON) as WeaponId[];
@@ -86,7 +86,8 @@ describe('무기가 실제로 바꾸는 것', () => {
   it('필살 게이지는 무기 배율을 탄다', () => {
     for (const id of IDS) {
       const s = swing(id, 30);
-      expect(s.wazaGauge, id).toBeCloseTo(gaugePerHit(1) * WEAPON[id].gauge);
+      // 코어 드릴(comboGauge)은 콤보 1만큼 더 곱한다
+      expect(s.wazaGauge, id).toBeCloseTo(gaugePerHit(1) * WEAPON[id].gauge * (1 + (WEAPON[id].comboGauge ?? 0) / 100));
     }
   });
 });
@@ -151,10 +152,16 @@ describe('무기 장착·저장', () => {
     expect(equip(DEFAULT_LOADOUT, 'weapon', 'hammer', new Set(['hammer'])).weapon).toBe('hammer');
   });
 
+  it('무기 id는 다른 장착 칸 id와 안 겹친다(owned를 같이 쓴다 · 불변 15)', () => {
+    for (const id of WEAPON_IDS) expect(slotOf(id), id).toBe('weapon');
+    for (const id of [...BODY_IDS, ...BLADE_IDS, ...LETTERS_IDS, ...MASK_IDS, ...WAZA_IDS]) expect(WEAPON_IDS as readonly string[], id).not.toContain(id);
+  });
+
   it('무기 칸 없는 옛 저장은 철거칼로 읽는다', () => {
     const { weapon: _weapon, ...old } = DEFAULT_LOADOUT;
     expect(validateLoadout(old).weapon).toBe('sword');
     expect(validateLoadout({ ...old, weapon: 'laser' }).weapon).toBe('sword');
+    expect(validateLoadout({ ...old, weapon: 'manhole' }).weapon).toBe('sword'); // 11-20 뺀 맨홀 뚜껑
   });
 });
 
@@ -172,8 +179,10 @@ describe('대검', () => {
   });
 });
 
-// ── 연장 다섯(11-20) — 세 칸 + 고유 규칙 하나(WeaponSpec 선택 칸). core에 무기 id 분기는 없다 ──
-describe('연장 다섯의 고유 규칙', () => {
+// ── 고유 규칙 무기(11-20) — 세 칸 + 고유 규칙 하나(WeaponSpec 선택 칸). core에 무기 id 분기는 없다 ──
+const RULED: WeaponId[] = ['shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'brick', 'rod', 'glass'];
+
+describe('고유 규칙', () => {
   /** 떨어지는 건물을 땅 · 공중 가드로 받는다 */
   function bounce(weapon: WeaponId, zone: 'ground' | 'air'): GameState {
     const s = makeState();
@@ -191,10 +200,22 @@ describe('연장 다섯의 고유 규칙', () => {
     expect(bounce('sword', 'ground').combo).toBe(0);
   });
 
-  it('맨홀 뚜껑: 가드 튕김 속도가 땅 · 공중 모두 1.2배', () => {
+  it('벽돌 대검: 가드 튕김 속도가 땅 · 공중 모두 guardLift배', () => {
     for (const zone of ['ground', 'air'] as const) {
-      expect(bounce('manhole', zone).stack!.vy, zone).toBeCloseTo(bounce('sword', zone).stack!.vy * 1.2);
+      expect(bounce('brick', zone).stack!.vy, zone).toBeCloseTo(bounce('sword', zone).stack!.vy * WEAPON.brick.guardLift!);
     }
+  });
+
+  it('철근 대검: 가드로 튕길 때마다 게이지 +guardGauge(땅 · 공중, 배율 안 곱함)', () => {
+    for (const zone of ['ground', 'air'] as const) {
+      expect(bounce('rod', zone).wazaGauge, zone).toBe(WEAPON.rod.guardGauge);
+      expect(bounce('sword', zone).wazaGauge, zone).toBe(0);
+    }
+    const s = bounce('rod', 'ground');
+    s.wazaGauge = 98;
+    s.stack!.vy = -300; s.stack!.y = 40;
+    tryGuardBounce(s, 'ground', 0);
+    expect(s.wazaGauge).toBe(100); // 상한
   });
 
   it('곡괭이: 층이 무너질 때마다 게이지 +2(무기 배율 안 곱함)', () => {
@@ -209,6 +230,73 @@ describe('연장 다섯의 고유 규칙', () => {
     expect(cut('shovel')).toBeCloseTo(gaugePerHit(1) * WEAPON.shovel.gauge); // 같은 배율 0.8, 고유 규칙 없음
     // 층이 안 무너지는 타격엔 더하지 않는다
     expect(swing('pickaxe', 30).wazaGauge).toBeCloseTo(gaugePerHit(1) * WEAPON.pickaxe.gauge);
+  });
+
+  it('코어 드릴: 콤보 100까지 게이지 배율이 곧게 오르고 그 위는 같다', () => {
+    const mul = (combo: number): number => { const s = makeState(); s.weapon = 'coredrill'; s.combo = combo; return weaponGaugeMul(s); };
+    const g = WEAPON.coredrill.gauge;
+    const cg = WEAPON.coredrill.comboGauge!;
+    expect(mul(0)).toBeCloseTo(g);
+    expect(mul(50)).toBeCloseTo(g * (1 + cg / 2));
+    expect(mul(100)).toBeCloseTo(g * (1 + cg));
+    expect(mul(400)).toBeCloseTo(g * (1 + cg));
+    const sw = makeState(); sw.combo = 100;
+    expect(weaponGaugeMul(sw)).toBe(1); // 철거칼은 콤보와 상관없다
+  });
+
+  it('굴착 드릴: 한 판에 pinSave번 깔려도 목숨을 안 잃고 빠져나온다(그다음은 깔린다)', () => {
+    const crush = (s: GameState): { lost: number; saved: boolean } => {
+      const lives = s.lives;
+      s.player.invulnTicks = 0;
+      s.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('hard'), makeFloor('hard')], y: 100 });
+      s.stack.vy = -600;
+      let saved = false;
+      for (let t = 0; t < 300 && s.player.pose !== 'pinned' && !saved; t++) {
+        advance(s, EMPTY_INPUT);
+        saved = s.events.some((e) => e.kind === 'pinSave');
+        const hat = s.events.some((e) => e.kind === 'hatBreak');
+        s.events.length = 0;
+        if (hat) break;
+      }
+      return { lost: lives - s.lives, saved };
+    };
+    const s = makeState();
+    s.weapon = 'auger';
+    s.lives = 5;
+    s.combo = 9;
+    const first = crush(s);
+    expect(first).toEqual({ lost: 0, saved: true });
+    expect(s.player.pose).not.toBe('pinned');
+    expect(s.combo).toBe(9); // 안전모처럼 콤보도 지킨다
+    expect(s.pinSaved).toBe(WEAPON.auger.pinSave);
+    const second = crush(s);
+    expect(second).toEqual({ lost: 1, saved: false });
+    expect(s.player.pose).toBe('pinned');
+    // 안전모가 있으면 안전모가 먼저 받고 굴착 드릴 몫은 남는다
+    const h = makeState();
+    h.weapon = 'auger'; h.hat = true;
+    crush(h);
+    expect(h.hat).toBe(false);
+    expect(h.pinSaved).toBe(0);
+    // 철거칼은 바로 깔린다
+    const w = makeState();
+    expect(crush(w)).toEqual({ lost: 1, saved: false });
+  });
+
+  it('굴착 드릴: 튜토리얼에선 구제하지 않는다(「깔렸을 때」 걸음은 깔려야 배운다)', () => {
+    const s = makeState({ seed: 7, mode: 'training' });
+    s.weapon = 'auger';
+    s.training = { lesson: 0, rep: 0, spawned: true, wait: 0, hold: 0, beat: 99, need: null, ok: false, launch: false };
+    s.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('hard'), makeFloor('hard')], y: 100 });
+    s.stack.vy = -600;
+    let saved = false;
+    for (let t = 0; t < 300 && s.player.pose !== 'pinned'; t++) {
+      advance(s, EMPTY_INPUT);
+      if (s.events.some((e) => e.kind === 'pinSave')) saved = true;
+      s.events.length = 0;
+    }
+    expect(saved).toBe(false);
+    expect(s.pinSaved).toBe(0);
   });
 
   it('착암기: 한 번 누르고 쥐고만 있어도 계속 벤다(철거칼은 1타)', () => {
@@ -227,7 +315,7 @@ describe('연장 다섯의 고유 규칙', () => {
       return n;
     };
     expect(hits('sword')).toBe(1);
-    // 첫 누름 1타 + holdRepeat(9)틱마다 1타. 타격 멈춤(hitstop) 틱은 세지 않아 이론값보다 적다
+    // 첫 누름 1타 + holdRepeat틱마다 1타. 타격 멈춤(hitstop) 틱은 세지 않아 이론값보다 적다
     expect(hits('jackhammer')).toBeGreaterThanOrEqual(5);
     expect(hits('jackhammer')).toBeLessThanOrEqual(1 + Math.floor(N / WEAPON.jackhammer.holdRepeat!));
   });
@@ -250,76 +338,108 @@ describe('연장 다섯의 고유 규칙', () => {
     expect(hit('sword', true)).toBe(0); // 철거칼(68)은 공중이어도 그대로
   });
 
-  it('연장은 대검처럼 맞교환이다: 철거칼보다 못한 칸이 하나는 있다', () => {
-    for (const id of ['shovel', 'pickaxe', 'jackhammer', 'manhole', 'pipe'] as const) {
+  it('맞교환: 고유 규칙 무기는 철거칼보다 못한 칸이 하나는 있다', () => {
+    for (const id of RULED) {
       const d = (['reach', 'lift', 'gauge'] as const).map((k) => Math.sign(WEAPON[id][k] - WEAPON.sword[k]));
       expect(d, id).toContain(-1);
     }
   });
 });
 
-// 착암기 누르고 있기가 다른 상태와 엉키지 않는다 — 셈은 이번 누름의 공격 엣지가 연다
-describe('착암기 누르고 있기 · 엉킴', () => {
-  /** 휘두름이 시작된 틱 수(자세가 attack으로 막 바뀐 틱) */
-  function swings(s: GameState, frames: InputFrame[]): number {
-    let n = 0;
-    for (const f of frames) {
-      const before = s.player.pose === 'attack' ? s.player.poseTick : -1;
-      advance(s, f);
-      if (s.player.pose === 'attack' && (before < 0 || s.player.poseTick <= before)) n += 1;
-      s.events.length = 0;
-    }
-    return n;
-  }
-  const held = (n: number, first?: Partial<InputFrame>): InputFrame[] =>
-    Array.from({ length: n }, (_, t) => ({ ...EMPTY_INPUT, attackHeld: true, ...(t === 0 ? first : {}) }));
-  const jack = (): GameState => { const s = makeState({ seed: 3 }); s.weapon = 'jackhammer'; s.lives = 99; return s; };
-
-  it('누르고 있으면 holdRepeat틱마다 한 번(빈 판: 60틱에 첫 누름 + 7번)', () => {
-    expect(swings(jack(), held(60, { attack: true }))).toBe(1 + Math.floor(59 / WEAPON.jackhammer.holdRepeat!));
-  });
-
-  it('새 판이 열릴 때 키를 쥐고 있었어도 새로 누르기 전엔 베지 않는다', () => {
-    expect(swings(jack(), held(120))).toBe(0);
-  });
-
-  it('탭 연타는 그대로 빠르다(쥔 채 7틱마다 탭 = 탭 수만큼)', () => {
-    const f = Array.from({ length: 70 }, (_, t) => ({ ...EMPTY_INPUT, attackHeld: true, attack: t % 7 === 0 }));
-    expect(swings(jack(), f)).toBe(10);
-  });
-
-  it('깔리면 셈이 닫힌다 — 풀린 뒤 쥐고만 있으면 안 벤다', () => {
-    const s = jack();
-    swings(s, held(4, { attack: true }));
-    s.player.pose = 'pinned';
-    advance(s, { ...EMPTY_INPUT, attackHeld: true, attack: true }); // 깔린 채 공격으로 빠져나오려 누른다
-    s.player.pose = 'idle'; s.player.poseTick = 0; s.player.bufAttack = 0;
-    expect(swings(s, held(40))).toBe(0);
-  });
-
-  it('튜토리얼 판 세우기가 다른 키로 풀려도 쥔 공격이 터지지 않는다', () => {
-    const s = makeState({ seed: 7, mode: 'training' });
-    s.weapon = 'jackhammer';
-    s.training = { lesson: 0, rep: 0, spawned: true, wait: 0, hold: -1, beat: 0, need: 'guard', ok: false, launch: false };
-    swings(s, held(20, { attack: true })); // 선 동안 공격을 눌러 쥔다
-    expect(s.training.hold).not.toBe(0);
-    advance(s, { ...EMPTY_INPUT, attackHeld: true, guard: true }); // 가드로 푼다
+/** 휘두름이 시작된 틱 목록(자세가 attack으로 막 바뀐 틱) */
+function swingTicks(s: GameState, frames: InputFrame[]): number[] {
+  const at: number[] = [];
+  frames.forEach((f, t) => {
+    const before = s.player.pose === 'attack' ? s.player.poseTick : -1;
+    advance(s, f);
+    if (s.player.pose === 'attack' && (before < 0 || s.player.poseTick <= before)) at.push(t);
     s.events.length = 0;
-    expect(swings(s, held(40))).toBe(0);
+  });
+  return at;
+}
+const swings = (s: GameState, frames: InputFrame[]): number => swingTicks(s, frames).length;
+const held = (n: number, first?: Partial<InputFrame>): InputFrame[] =>
+  Array.from({ length: n }, (_, t) => ({ ...EMPTY_INPUT, attackHeld: true, ...(t === 0 ? first : {}) }));
+const gaps = (ticks: number[]): number[] => ticks.slice(1).map((t, i) => t - ticks[i]);
+
+describe('전동 드릴: 누를수록 빨라진다', () => {
+  const drill = (): GameState => { const s = makeState({ seed: 3 }); s.weapon = 'drill'; s.lives = 99; return s; };
+  const { holdRepeat: R, holdMin: M } = WEAPON.drill;
+
+  it('간격이 holdRepeat에서 1틱씩 줄어 holdMin에서 멈춘다', () => {
+    const want = Array.from({ length: 8 }, (_, k) => Math.max(M!, R! - k));
+    expect(gaps(swingTicks(drill(), held(120, { attack: true }))).slice(0, 8)).toEqual(want);
   });
 
-  it('현장 조건 쪽지를 공격으로 고르고 쥐고 있어도 저절로 베지 않는다', () => {
-    const s = jack();
-    swings(s, held(4, { attack: true }));
-    const [a, b] = Object.keys(PERK) as PerkId[];
-    s.perk = { picked: [], seen: [a, b], offer: { a, b, t: 0, calm: 99 } };
-    advance(s, { ...EMPTY_INPUT, attack: true, attackHeld: true });
-    expect(s.perk.offer).toBeNull();
-    expect(swings(s, held(40))).toBe(0);
+  it('떼었다 다시 누르면 처음 간격으로', () => {
+    const s = drill();
+    swingTicks(s, held(60, { attack: true }));
+    swingTicks(s, Array.from({ length: 12 }, () => ({ ...EMPTY_INPUT }))); // 손을 떼고 휘두름이 끝날 때까지
+    expect(gaps(swingTicks(s, held(40, { attack: true })))[0]).toBe(R);
   });
+});
 
-  it('철거칼은 쥐고 있어도 첫 누름 한 번뿐', () => {
-    const s = makeState({ seed: 3 });
-    expect(swings(s, held(60, { attack: true }))).toBe(1);
+// 누르고 있기(착암기 · 전동 드릴)가 다른 상태와 엉키지 않는다 — 셈은 이번 누름의 공격 엣지가 연다
+for (const W of ['jackhammer', 'drill'] as const) {
+  describe(`${W} 누르고 있기 · 엉킴`, () => {
+    const mk = (): GameState => { const s = makeState({ seed: 3 }); s.weapon = W; s.lives = 99; return s; };
+
+    if (W === 'jackhammer') {
+      it('누르고 있으면 holdRepeat틱마다 한 번(빈 판: 60틱에 첫 누름 + 7번)', () => {
+        expect(swings(mk(), held(60, { attack: true }))).toBe(1 + Math.floor(59 / WEAPON.jackhammer.holdRepeat!));
+      });
+    }
+
+    it('새 판이 열릴 때 키를 쥐고 있었어도 새로 누르기 전엔 베지 않는다', () => {
+      expect(swings(mk(), held(120))).toBe(0);
+    });
+
+    it('탭 연타는 그대로 빠르다(쥔 채 7틱마다 탭 = 탭 수만큼)', () => {
+      const f = Array.from({ length: 70 }, (_, t) => ({ ...EMPTY_INPUT, attackHeld: true, attack: t % 7 === 0 }));
+      expect(swings(mk(), f)).toBe(10);
+    });
+
+    it('깔리면 셈이 닫힌다 — 풀린 뒤 쥐고만 있으면 안 벤다', () => {
+      const s = mk();
+      swings(s, held(4, { attack: true }));
+      s.player.pose = 'pinned';
+      advance(s, { ...EMPTY_INPUT, attackHeld: true, attack: true }); // 깔린 채 공격으로 빠져나오려 누른다
+      s.player.pose = 'idle'; s.player.poseTick = 0; s.player.bufAttack = 0;
+      expect(swings(s, held(40))).toBe(0);
+    });
+
+    it('죽으면 셈이 닫힌다', () => {
+      const s = mk();
+      swings(s, held(4, { attack: true }));
+      s.player.pose = 'dead';
+      advance(s, { ...EMPTY_INPUT, attackHeld: true });
+      expect(s.player.holdTick).toBe(0);
+    });
+
+    it('튜토리얼 판 세우기가 다른 키로 풀려도 쥔 공격이 터지지 않는다', () => {
+      const s = makeState({ seed: 7, mode: 'training' });
+      s.weapon = W;
+      s.training = { lesson: 0, rep: 0, spawned: true, wait: 0, hold: -1, beat: 0, need: 'guard', ok: false, launch: false };
+      swings(s, held(20, { attack: true })); // 선 동안 공격을 눌러 쥔다
+      expect(s.training.hold).not.toBe(0);
+      advance(s, { ...EMPTY_INPUT, attackHeld: true, guard: true }); // 가드로 푼다
+      s.events.length = 0;
+      expect(swings(s, held(40))).toBe(0);
+    });
+
+    it('현장 조건 쪽지를 공격으로 고르고 쥐고 있어도 저절로 베지 않는다', () => {
+      const s = mk();
+      swings(s, held(4, { attack: true }));
+      const [a, b] = Object.keys(PERK) as PerkId[];
+      s.perk = { picked: [], seen: [a, b], offer: { a, b, t: 0, calm: 99 } };
+      advance(s, { ...EMPTY_INPUT, attack: true, attackHeld: true });
+      expect(s.perk.offer).toBeNull();
+      expect(swings(s, held(40))).toBe(0);
+    });
   });
+}
+
+it('철거칼은 쥐고 있어도 첫 누름 한 번뿐', () => {
+  const s = makeState({ seed: 3 });
+  expect(swings(s, held(60, { attack: true }))).toBe(1);
 });

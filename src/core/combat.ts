@@ -41,8 +41,15 @@ export function breakCombo(s: GameState): void {
   if (s.mode === 'act2') s.fullCombo = false;
 }
 
+/** 가드가 튕겼다(땅 · 공중 · 종탑 막기). 무기 guardGauge(철근)만큼 필살 게이지를 그대로 더한다 */
+export function guardBounced(s: GameState, ground: boolean): void {
+  const g = WEAPON[s.weapon].guardGauge;
+  if (g) addGauge(s, g);
+  if (ground) groundGuardCombo(s);
+}
+
 /** 땅 가드가 막았다(튕김 · 종탑 내려찍기). 무기 keepCombo가 있으면 끊지 않고 그 몫만 남긴다(1 밑으론 안 간다) */
-export function groundGuardCombo(s: GameState): void {
+function groundGuardCombo(s: GameState): void {
   const keep = WEAPON[s.weapon].keepCombo;
   if (!keep || s.combo === 0) { breakCombo(s); return; }
   if (s.combo > s.peakCombo) s.peakCombo = s.combo;
@@ -53,9 +60,15 @@ export function gaugePerHit(combo: number): number {
   return Math.min(WAZA_GAUGE.PER_HIT_MAX, WAZA_GAUGE.PER_HIT_BASE + Math.floor(combo / WAZA_GAUGE.PER_HIT_DIV));
 }
 
+/** 무기 게이지 배율. comboGauge(코어 드릴)는 콤보 100까지 곧게 더 곱한다: 1 + comboGauge × min(콤보, 100)/100 */
+export function weaponGaugeMul(s: GameState): number {
+  const w = WEAPON[s.weapon];
+  return w.gauge * (1 + (w.comboGauge ?? 0) * Math.min(s.combo, 100) / 100);
+}
+
 /** 이번 타격이 채우는 필살 게이지 — 콤보 계단 × 무기 배율 */
 export function hitGauge(s: GameState): number {
-  return gaugePerHit(s.combo) * WEAPON[s.weapon].gauge * wazaMul(s);
+  return gaugePerHit(s.combo) * weaponGaugeMul(s) * wazaMul(s);
 }
 
 export function addGauge(s: GameState, n: number): void {
@@ -167,7 +180,7 @@ export function tryGuardBounce(
       stack.resting = false;
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_GROUND);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
-      groundGuardCombo(s); // [정본] 지면 가드 = 콤보 단절(삽 keepCombo는 몫만큼 남는다)
+      guardBounced(s, true); // [정본] 지면 가드 = 콤보 단절(삽 keepCombo는 몫만큼 남는다)
       s.events.push({ kind: 'guardBounce', y: stack.y });
       return true;
     }
@@ -182,7 +195,7 @@ export function tryGuardBounce(
       s.player.vy = Math.min(s.player.vy, -STACK.GUARD_AIR_RECOIL_V);
       s.guardGauge = Math.max(0, s.guardGauge - GUARD_GAUGE.BOUNCE_COST_AIR);
       s.guardRegenCd = GUARD_GAUGE.REGEN_DELAY_TICKS;
-      // [정본] 점프 가드 = 콤보 유지
+      guardBounced(s, false); // [정본] 점프 가드 = 콤보 유지
       s.events.push({ kind: 'guardAirBounce', y: stack.y });
       return true;
     }

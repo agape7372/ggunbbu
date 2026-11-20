@@ -12,7 +12,7 @@ export function makePlayer(): PlayerState {
     invulnTicks: 0,
     bufAttack: 0, bufJump: 0, bufGuard: 0, bufSpecial: 0,
     pinTick: 0,
-    attackHit: false, attackFromAir: false, holdTick: 0,
+    attackHit: false, attackFromAir: false, holdTick: 0, holdN: 0,
   };
 }
 
@@ -34,7 +34,7 @@ const ATTACK_TOTAL = PLAYER.ATTACK_PRE + PLAYER.ATTACK_ACTIVE + PLAYER.ATTACK_PO
 
 /** 입력 버퍼 수집 — 히트스톱 중에도 호출된다(버퍼 침범 금지 규칙) */
 export function collectBuffers(p: PlayerState, input: InputFrame): void {
-  if (input.attack) { p.bufAttack = PLAYER.INPUT_BUFFER; p.holdTick = 1; } // 누름 셈을 연다(착암기 holdRepeat)
+  if (input.attack) { p.bufAttack = PLAYER.INPUT_BUFFER; p.holdTick = 1; p.holdN = 0; } // 누름 셈을 연다(착암기 · 드릴 holdRepeat)
   if (input.jump) p.bufJump = PLAYER.INPUT_BUFFER;
   if (input.guard) p.bufGuard = PLAYER.INPUT_BUFFER;
   if (input.special) p.bufSpecial = PLAYER.INPUT_BUFFER;
@@ -52,10 +52,13 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   if (p.pose === 'pinned' || p.pose === 'dead') { p.holdTick = 0; return; }
   // 누르고 있으면 holdRepeat틱마다 공격 버퍼를 채운다(착암기). 셈은 이번 누름의 엣지(collectBuffers)가 연다:
   // 쥔 채 새 판이 열리거나 깔림 · 판 세우기에서 풀려도 새로 누르기 전엔 저절로 베지 않는다
-  const rep = WEAPON[s.weapon].holdRepeat;
+  // holdMin이 있으면(전동 드릴) 반복할 때마다 간격이 1틱씩 줄어 holdMin까지 빨라진다. 떼면 엣지부터 다시
+  const w = WEAPON[s.weapon];
+  const rep = w.holdRepeat;
   if (!rep || !input.attackHeld || p.holdTick === 0) p.holdTick = 0;
   else {
-    if (p.holdTick > rep) { p.holdTick = 1; p.bufAttack = PLAYER.INPUT_BUFFER; }
+    const gap = w.holdMin ? Math.max(w.holdMin, rep - p.holdN) : rep;
+    if (p.holdTick > gap) { p.holdTick = 1; p.holdN += 1; p.bufAttack = PLAYER.INPUT_BUFFER; }
     p.holdTick += 1;
   }
 

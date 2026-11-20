@@ -153,7 +153,7 @@ function artUrl(e: BookEntry, c: Ctx): string {
 
 /** 그림 한 장 — 가졌으면 그대로, 못 가졌으면 알파를 마스크로 쓴 옅은 먹 실루엣 */
 function artHtml(e: BookEntry, c: Ctx, big = false): string {
-  if (e.slot === 'weapon') return swordSvg(e.id, big ? 'bk-sw big' : 'bk-sw', false, !big);
+  if (e.slot === 'weapon') return swordSvg(e.id, big ? 'bk-sw big' : 'bk-sw');
   if (e.slot === 'item') return ITEM_ICON[e.id as ItemId];
   const url = artUrl(e, c);
   if (!url) return '';
@@ -339,7 +339,7 @@ export function paintBook(
       top = headHtml('h3', 'bk-grp', g.title, g.entries);
     }
     head = g.head ?? g.title;
-    const cols = g.id === 'greats' || g.id === 'item' ? ' c4' : ''; // 무기(연장 아홉)는 3열 3줄 — 4열이면 마지막 줄에 한 칸만 남는다
+    const cols = g.id === 'greats' || g.id === 'item' || g.id === 'tools' ? ' c4' : ''; // 무기 · 대검 열하나씩 = 4 · 4 · 3
     return `<section class="bk-set">${top}<div class="bk-grid${cols}">${g.entries.map((e) => cellHtml(e, ctx)).join('')}</div></section>`;
   }).join('');
   root.innerHTML = `<div class="bk">

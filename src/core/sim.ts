@@ -7,7 +7,7 @@ import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carr
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, addScore, registerHit, wonAlready } from './combat';
 import { spawnAct1Building, spawnButterbar, chapterOf } from './spawner';
-import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, STAGE, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN } from '../config';
+import { ACT1, ACT2, BONUS, DEBRIS, GUARD_GAUGE, JUICE, PLAYER, SCORE, SPECIAL, STACK, STAGE, TICK, TOKOTON, VIEW, WAZA_GAUGE, WAZA_RUN, WEAPON } from '../config';
 import type { WazaRunId } from '../config';
 import { stepAct2, enterAct2, tryHitAct2Targets } from './act2';
 import { absorbWithHat, onBuildingDown } from './items';
@@ -52,6 +52,7 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     weapon: 'sword',
     drops: 0,
     hat: false,
+    pinSaved: 0,
     tokotonCycle: 0,
     stage: null,
     lm: null,
@@ -569,6 +570,12 @@ function onPlayerCrushed(s: GameState): void {
   if (wonAlready(s)) return; // 안전모도 안 깨진다 — 깬 뒤 모자가 깨지면 「이상 없음」 도장을 잃는다
   if (s.hat) {
     absorbWithHat(s);
+    return;
+  }
+  // 굴착 드릴(pinSave): 안전모가 없으면 한 판 N번 안전모처럼 받는다(목숨 · 콤보 유지). 튜토리얼 「깔렸을 때」 걸음은 깔려야 배운다
+  if (!s.training && s.pinSaved < (WEAPON[s.weapon].pinSave ?? 0)) {
+    s.pinSaved += 1;
+    absorbWithHat(s, 'pinSave');
     return;
   }
   loseLife(s);

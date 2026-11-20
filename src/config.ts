@@ -170,7 +170,7 @@ export const STACK = {
 // 대미지는 전부 1, 공격 프레임(1/3/2)도 전부 같다 — 체크포인트가 층 HP 합(=타격 수)이고,
 // 프레임을 무기마다 바꾸면 3f 입력 버퍼 안에서 탭이 버려진다(10-25 반론 실측: 8탭/s에 오함마 50% 유실).
 // 그래서 무기는 세 칸을 바꾼다: 사거리(건물 판정창 위끝) · 띄우기(타격 밀어올림) · 필살 게이지 배율.
-// 11-20 무기 다섯(삽 · 비계 파이프 · 곡괭이 · 맨홀 뚜껑 · 착암기)은 세 칸에 고유 규칙 하나를 더한다(아래 선택 칸).
+// 11-20 연장 일곱(삽 · 비계 파이프 · 전동 드릴 · 곡괭이 · 코어 드릴 · 굴착 드릴 · 착암기)과 대검 둘(벽돌 · 철근)은 세 칸에 고유 규칙 하나를 더한다(아래 선택 칸).
 // 고유 규칙도 대미지 · 프레임 · 띄우기 상한 · 층 HP를 건드리지 않는다(2막 30/138타는 그대로 · tests/weapons.test.ts).
 // core는 무기 id로 가르지 않고 이 칸만 읽는다. 칸 값은 봇 비교(tests/weapon-measure.test.ts · DEVLOG 11-20)로 맞췄다.
 //   ⚠ 띄우기 상한: 연타 1주기(7f) 동안 건물이 **1막 어디서든 가라앉아야** 한다 — 안 그러면
@@ -189,6 +189,14 @@ export interface WeaponSpec {
   collapseGauge?: number;
   /** 공격 키를 누르고 있으면 이 틱마다 벤다(탭은 그대로) */
   holdRepeat?: number;
+  /** 있으면 누르고 있는 동안 벨 때마다 holdRepeat 간격이 1틱씩 줄어 이 값까지 빨라진다. 떼면 처음으로 */
+  holdMin?: number;
+  /** 콤보가 높을수록 필살 게이지 배율에 더한다: 콤보 100에서 +이 값(그 위는 같다) */
+  comboGauge?: number;
+  /** 한 판에 이 횟수만큼 깔려도 목숨을 안 잃고 빠져나온다 */
+  pinSave?: number;
+  /** 가드로 튕길 때마다 필살 게이지 +이 값(배율 안 곱함 · 상한 100) */
+  guardGauge?: number;
   /** 가드 튕김 속도(땅 · 공중) 배율 */
   guardLift?: number;
   /** 발이 땅에서 떨어져 있으면 사거리 +이 값 */
@@ -199,14 +207,19 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   hammer: { reach: 60, lift: 95, gauge: 1, shake: 1.6 },     // 띄우기 ↑ / 사거리 ↓
   crowbar: { reach: 88, lift: STACK.HIT_LIFT_V, gauge: 0.8, shake: 1 }, // 사거리 ↑ / 필살 ↓
   grinder: { reach: PLAYER.ATTACK_REACH, lift: 65, gauge: 1.4, shake: 0.8 }, // 필살 ↑ / 띄우기 ↓
-  // 연장 다섯(11-20). 세 칸 + 고유 규칙 하나
+  // 연장 일곱(11-20 다섯 → 맨홀 뚜껑 빼고 드릴 셋). 세 칸 + 고유 규칙 하나
   shovel: { reach: 66, lift: 82, gauge: 0.8, shake: 1.1, keepCombo: 0.5 },
   pickaxe: { reach: 72, lift: 78, gauge: 0.8, shake: 1.2, collapseGauge: 2 },
   jackhammer: { reach: 64, lift: 76, gauge: 0.95, shake: 1.5, holdRepeat: 8 },
-  manhole: { reach: 58, lift: 94, gauge: 1.1, shake: 1.4, guardLift: 1.2 },
   pipe: { reach: 62, lift: 80, gauge: 1, shake: 1, airReach: 26 },
+  drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 11, holdMin: 7 },
+  coredrill: { reach: 70, lift: 76, gauge: 0.85, shake: 1, comboGauge: 0.5 },
+  auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1 },
   // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 고르는 맛은 칼날 모양과 손맛
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
+  brick: { reach: 62, lift: 92, gauge: 0.95, shake: 1.5, guardLift: 1.2 }, // 띄우기 ↑ · 가드 튕김 ↑ / 사거리 ↓
+  rod: { reach: 80, lift: 70, gauge: 0.9, shake: 1.1, guardGauge: 10 },   // 사거리 ↑ · 가드가 필살을 채움 / 띄우기 ↓
+  glass: { reach: 90, lift: 58, gauge: 1.3, shake: 0.8 },                  // 사거리 · 필살 ↑↑ / 띄우기 ↓↓
   saw: { reach: 72, lift: 70, gauge: 1.25, shake: 0.9 },                 // 필살 ↑ / 띄우기 ↓
   hazard: { reach: 76, lift: 88, gauge: 0.85, shake: 1.2 },              // 사거리·띄우기 ↑ / 필살 ↓
   beam: { reach: 64, lift: 98, gauge: 1, shake: 1.7 },                   // 띄우기 ↑↑ / 사거리 ↓
@@ -666,6 +679,7 @@ export const JUICE: Record<string, JuiceSpec> = {
   guardDenied:    { hitstop: 0, shake: 1, flash: 0, particles: 0 },
   supply:         { hitstop: 0, shake: 0, flash: 0, particles: 8 },
   hatBreak:       { hitstop: 3, shake: 5, flash: 0, particles: 10 },
+  pinSave:        { hitstop: 3, shake: 5, flash: 0, particles: 10 }, // 굴착 드릴이 깔림을 대신 받음(안전모 깨짐과 같은 무게)
   // 안전모 받기 — 시뮬은 안 세운다(봇 테스트 타이밍 보존). 화면 연출은 렌더 hatFx가 따로 맡는다
   hatGet:         { hitstop: 0, shake: 0, flash: 0, particles: 0 },
   // 번개 착탄(hurt가 따로 붙는다) — 땅에 꽂히는 순간 불꽃·먼지
@@ -811,8 +825,10 @@ export const PALETTE = {
  */
 export const WEAPON_INK = {
   sword: '#E3A21A', hammer: '#8C877D', crowbar: '#2F5C9A', grinder: '#E8701E',
-  shovel: '#C08A4E', pickaxe: '#646AA0', jackhammer: '#1F9E8A', manhole: '#7E6B3B', pipe: '#9AA7B0',
+  shovel: '#C08A4E', pickaxe: '#646AA0', jackhammer: '#1F9E8A', pipe: '#9AA7B0',
+  drill: '#4B7A40', coredrill: '#B44E86', auger: '#7E8A28',
   iron: '#5D7183', saw: '#9A4F2C', hazard: '#E9B21A', beam: '#C0532E',
+  brick: '#A84846', rod: '#86642C', glass: '#3E9E6A',
   flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
 } as const;
 /** 옛 칼빛 설정값(저장값은 그대로) → 먹에 맞는 포인트 색. 철거칼 획 속(effects · weaponFx · sprites 참격 호) */

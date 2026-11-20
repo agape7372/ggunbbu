@@ -11,7 +11,8 @@ import { stageBot } from './stageBot';
 import { ACT1, GIMMICK, SCORE, WAZA_GAUGE, GUARD_GAUGE } from '../src/config';
 
 const WAZAS: WazaId[] = ['tenchi', 'ageba', 'mukjul', 'dalmuri', 'nakgwan', 'baram'];
-const WEAPONS: WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', 'shovel', 'pipe', 'pickaxe', 'manhole', 'jackhammer', 'iron', 'saw', 'hazard', 'beam', 'flame', 'frost', 'onyx', 'gold'];
+const WEAPONS: WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', 'shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer',
+  'iron', 'brick', 'saw', 'hazard', 'rod', 'beam', 'glass', 'flame', 'frost', 'onyx', 'gold'];
 
 function mk(seed: number): () => number {
   let a = seed >>> 0;
@@ -27,9 +28,8 @@ interface Scn { name: string; make: (seed: number) => GameState; ticks: number; 
 
 const scn: Scn[] = [
   { name: 'act1', make: (k) => makeState({ seed: k }), ticks: 4000, bot: 0.6, seed: 1 },
-  // 무기는 seed % WEAPONS — 연장 다섯 중 앞 씨앗에 안 걸리는 맨홀(7) · 착암기(8)를 1막으로 한 판씩
-  { name: 'act1-manhole', make: (k) => makeState({ seed: k }), ticks: 3000, bot: 0.6, seed: 7 },
-  { name: 'act1-jackhammer', make: (k) => makeState({ seed: k }), ticks: 3000, bot: 0.4, seed: 8 },
+  // 무기는 seed % WEAPONS — 고유 규칙이 있는 무기 가운데 앞 씨앗(1~6)에 안 걸리는 것을 1막으로 한 판씩
+  ...[7, 8, 9, 10, 12, 15, 17].map((seed): Scn => ({ name: `act1-w${seed}`, make: (k) => makeState({ seed: k }), ticks: 2500, bot: 0.5, seed })),
   { name: 'op-orbit', ticks: 3000, bot: 0.6, seed: 2, make: (k) => {
     const s = makeState({ seed: k }); s.gimmick = 'orbit'; s.chapter = 3; s.p = GIMMICK.START_P.orbit; s.score = Math.floor(ACT1.UNLOCK_SCORE * s.p); return s;
   } },

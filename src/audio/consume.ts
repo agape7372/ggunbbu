@@ -15,11 +15,11 @@ const COMBO_DROP_COVER: ReadonlySet<JuiceKind> = new Set([
 
 /** 1200부터 대검은 제 소리 — 타격에, 층 깨기·완파엔 붕괴음 위에 얹는다 */
 export const GREAT_OWN: Partial<Record<WeaponId, SfxName>> = { flame: 'hitFlame', frost: 'hitFrost', onyx: 'hitOnyx', gold: 'hitGold' };
-/** 무기별 타격음 — 연장 여덟(새 다섯은 있는 소리를 빌린다: 삽 퍽 · 곡괭이 깨짐 · 착암기 지익 · 맨홀 쿵 · 파이프 깡), 값싼 대검 넷(연장 소리를 빌린다), 비싼 대검 넷. 없으면(철거칼) 재질·변형 */
+/** 무기별 타격음 — 연장(11-20 새것은 있는 소리를 빌린다: 삽 퍽 · 곡괭이 깨짐 · 착암기 지익 · 파이프 깡 · 드릴 틱 · 코어 드릴 지익 · 굴착 드릴 퍽), 값싼 대검(연장 소리를 빌린다: 벽돌 쿵 · 철근 깡 · 유리 틱), 비싼 대검 넷. 없으면(철거칼) 재질·변형 */
 const WEAPON_HIT: Partial<Record<WeaponId, SfxName>> = {
   hammer: 'hitHammer', crowbar: 'hitBar', grinder: 'hitGrind',
-  shovel: 'hitLow', pickaxe: 'hitStrong', jackhammer: 'hitGrind', manhole: 'hitHammer', pipe: 'hitBar',
-  iron: 'hitStrong', saw: 'hitGrind', hazard: 'hitBar', beam: 'hitHammer', ...GREAT_OWN,
+  shovel: 'hitLow', pickaxe: 'hitStrong', jackhammer: 'hitGrind', pipe: 'hitBar', drill: 'hitTick', coredrill: 'hitGrind', auger: 'hitLow',
+  iron: 'hitStrong', saw: 'hitGrind', hazard: 'hitBar', beam: 'hitHammer', brick: 'hitHammer', rod: 'hitBar', glass: 'hitTick', ...GREAT_OWN,
 };
 
 /** 기본 타격 3변형(중음·저음·노이즈 비중) — 라운드로빈으로 반복 피로를 던다 */
@@ -124,6 +124,8 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
       return ['supply'];
     case 'hatBreak':
       return ['hatBreak'];
+    case 'pinSave': // 굴착 드릴이 깔림을 뚫고 나왔다 — 퍽 + 안전모 깨짐 소리를 빌린다
+      return ['hitLow', 'hatBreak'];
     case 'hatGet':
       return ['hatGet'];
     case 'floorCollapse': {

@@ -5,7 +5,7 @@
 // 알파로 지우지 않고 꼬리부터 깎는다. 맞은 자리 먹 튐 · 방울은 effects(공통 사건) 몫이라 여기서 다시 그리지 않는다(오함마 발묵만 예외).
 // 연타 한 줄(지난 타격에서 0.6초 안)은 1·2·3타로 돌며 획이 내려베기 → 올려베기 → 가로로 바뀌고 3타째가 조금 크다.
 // 조각 Kind는 bladeFx 목록의 이름을 빌려 뜻만 바꿔 쓴다 — hook = 붓 획 · disc = 먹 튐 · chunk = 나는 먹 · nail = 불티 분수 · arc = 끊긴 붓 고리 ·
-// tap = 잘게 떠는 획(착암기) · ring = 퍼지는 고리(맨홀 뚜껑 · 파이프 단면). 연장 아홉(11-20 다섯 추가)은 저마다 다른 조각 묶음으로 터진다.
+// tap = 잘게 떠는 획(착암기) · ring = 고리(파이프 단면 · 코어 드릴 구멍) · pix = 네모 토막(마스크 도트 · 빠진 원기둥 · 벽돌 조각). 연장 열하나는 저마다 다른 조각 묶음으로 터진다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
@@ -247,23 +247,60 @@ const TOOLS: Partial<Record<WeaponId, Tool>> = {
       taps(footX + 30, footY - 44, 3, 0.12, 9, 2.2, GRAY);
     },
   },
-  // 맨홀 뚜껑 — 징이 운다: 맞은 자리에서 둥근 고리 한 획이 밑면을 따라 퍼진다(녹 속). 퍼지며 가늘어져 지워진다 + 녹 가루 몇
-  manhole: {
-    hit(x, y, b, k) {
-      ring(x, y + 2, 11 * b.k, 6 * b.k, 1.7, 0.42, 0.36, WEAPON_INK.manhole);
-      flecks(x, y + 2, jn(N(3, k)), -Math.PI / 2, 1.2, 120, 1, 1.9, WEAPON_INK.manhole, 300);
+  // 전동 드릴 — 파고든다: 맞은 자리에서 위로 파고든 짧은 한 획(풀빛 속) + 둘레로 튀는 곱슬 부스러기 몇 가닥. 누르면 빨라지는 무기라 수명이 짧다
+  drill: {
+    hit(x, y, b) {
+      stroke(x + sgn() * 3, y - 6, -Math.PI / 2 + sgn() * 0.12, 26 * b.k, 4 * b.k, CUT, 0.2, WEAPON_INK.drill);
+      curls(x, y, 3 + (b.n === 3 ? 1 : 0), 4, 0.2);
     },
-    floor(x, y, _b, k) {
-      ring(x, y + 2, 15, 7.5, 2.3, 0.4, 0.42, WEAPON_INK.manhole);
-      flecks(x, y + 2, jn(N(4, k)), -Math.PI / 2, 1.3, 150, 1, 2.1, WEAPON_INK.manhole, 300);
+    floor(x, y, b) {
+      stroke(x, y - 10, -Math.PI / 2 + sgn() * 0.08, 40 * b.k, 5.5, CUT, 0.26, WEAPON_INK.drill);
+      curls(x, y, 5, 5, 0.24);
     },
-    destroy(x, _y, k) {
-      // 건물이 통째로 무너지면 땅이 운다 — 발밑에 눕는 고리
-      ring(x, GROUND - 2, 20, 8.5, 2.6, 0.3, 0.48, WEAPON_INK.manhole);
-      flecks(x, GROUND - 4, N(6, k), -Math.PI / 2, 1.2, 170, 1, 2.2, WEAPON_INK.manhole, 300);
+    destroy(x, y) {
+      stroke(x, y - 16, -Math.PI / 2, 64, 7.5, CUT, 0.32, WEAPON_INK.drill);
+      curls(x, y, 8, 6, 0.3);
     },
     whiff(footX, footY) {
-      ring(footX + 30, footY - 42, 7, 2.6, 0.9, 0.45, 0.18, GRAY, GRAY);
+      curls(footX + 22, footY - 50, 2, 3, 0.16, GRAY);
+    },
+  },
+  // 코어 드릴 — 동그랗게 뚫는다: 맞은 자리에 구멍 자국(빈 원 한 획, 자주 속) + 그 가운데서 빠진 원기둥 조각 하나가 떨어진다
+  coredrill: {
+    hit(x, y, b) {
+      ring(x, y + 1, 9 * b.k, 4.2 * b.k, 0.1, 1, 0.38, WEAPON_INK.coredrill);
+      plug(x, y + 2, 6 * b.k);
+    },
+    floor(x, y) {
+      ring(x, y + 1, 13, 5.5, 0.12, 1, 0.44, WEAPON_INK.coredrill);
+      plug(x, y + 2, 8.5);
+    },
+    destroy(x, y) {
+      ring(x - 18, y, 15, 6.5, 0.12, 1, 0.48, WEAPON_INK.coredrill);
+      ring(x + 20, y + 6, 11, 5, 0.12, 1, 0.44, WEAPON_INK.coredrill);
+      plug(x - 18, y + 2, 10);
+      plug(x + 20, y + 8, 7.5);
+    },
+    whiff(footX, footY) {
+      ring(footX + 30, footY - 50, 5, 2, 0.1, 1, 0.16, GRAY, GRAY);
+    },
+  },
+  // 굴착 드릴 — 퍼 올린다: 맞은 자리에서 나선으로 감겨 올라가는 흙 띠 한 획(올리브 속) + 흙덩이. 깔림을 대신 받으면 발밑에서 나선이 위로 솟는다
+  auger: {
+    hit(x, y, b, k) {
+      spiral(x, y + 4, 40 * b.k, 9 * b.k, 4.5 * b.k, 0.36);
+      drops(x, y, jn(N(2, k)), -Math.PI / 2 - 0.9, -Math.PI / 2 + 0.9, 160, 260, 3, WEAPON_INK.auger, 900);
+    },
+    floor(x, y, _b, k) {
+      spiral(x, y + 6, 62, 13, 6, 0.42);
+      drops(x, y, jn(N(4, k)), -Math.PI / 2 - 1, -Math.PI / 2 + 1, 200, 320, 3.6, WEAPON_INK.auger, 900);
+    },
+    destroy(x, y, k) {
+      spiral(x, y + 10, 96, 18, 8, 0.5);
+      drops(x, y, N(6, k), -Math.PI / 2 - 1.1, -Math.PI / 2 + 1.1, 240, 380, 4.2, WEAPON_INK.auger, 900);
+    },
+    whiff(footX, footY) {
+      spiral(footX + 26, footY - 40, 18, 5, 2.4, 0.18, GRAY);
     },
   },
   // 비계 파이프 — 길게 친다: 길고 곧은 한 획(은회 속) + 그 끝에 관 단면 빈 원 하나
@@ -308,6 +345,34 @@ function crackDown(x: number, y: number, len: number, w: number, life: number): 
   const pts: number[] = [x, top];
   for (let i = 1; i <= 4; i++) pts.push(x + (i === 4 ? 0 : (i % 2 ? 1 : -1) * (3 + n01() * 3)), top + (len * i) / 4);
   bent(pts, w, '', { life, dry: 0.5, pr: 2, gr: 0.2 });
+}
+
+/** 곱슬 부스러기 — 짧게 말린 붓 고리 토막이 돌며 튄다(첫 가닥만 속 색) */
+function curls(x: number, y: number, n: number, r: number, life: number, c: string = INK): void {
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + sgn() * 1.3;
+    put('arc', x + sgn() * 4, y + sgn() * 3, {
+      ...vel(a, 120 + n01() * 110), g: 520, drag: 1.4, life: life + n01() * 0.06, size: r * (0.8 + n01() * 0.4), v: 2.2,
+      rot: a, spin: sgn() * 14, c1: i === 0 && c === INK ? WEAPON_INK.drill : c, a: 3.4,
+    });
+  }
+}
+
+/** 빠진 원기둥 — 구멍에서 빠져 돌며 떨어져 땅에서 한 번 튄다(세로로 긴 먹 토막) */
+function plug(x: number, y: number, w: number): void {
+  put('pix', x, y, { ...vel(Math.PI / 2 + sgn() * 0.5, 60 + n01() * 40), g: 900, life: 0.7, size: w, v: 1.7, rot: sgn() * 0.3, spin: sgn() * 5, c1: INK, bounce: 1 });
+}
+
+/** 감겨 오르는 흙 띠 — (x, y)에서 h만큼 위로 나선 두 바퀴 반(옆에서 본 꼴: 좌우로 감기며 폭이 줄어든다) */
+function spiral(x: number, y: number, h: number, amp: number, w: number, life: number, c: string = WEAPON_INK.auger): void {
+  const pts: number[] = [];
+  const n = 22;
+  const ph = n01() * TAU;
+  for (let i = 0; i <= n; i++) {
+    const f = i / n;
+    pts.push(x + Math.sin(ph + f * TAU * 2.5) * amp * (1 - 0.55 * f), y - h * f);
+  }
+  bent(pts, w, c === GRAY || c === INK ? '' : c, { life, dry: 0.35, pr: 2, gr: 0.3 });
 }
 
 /** 퍼지는 고리 — r0에서 r0·(1 + grow)까지 퍼지며 가늘어진다. flat = 세로 배율(밑면에 누우면 납작) */
@@ -401,6 +466,11 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
     case 'pinEscape':
       pinEscape(footX, footY);
       return b;
+    case 'pinSave':
+      spiral(footX, footY, 96, 12, 7, 0.5);
+      spiral(footX + 4, footY - 20, 80, 8, 3.5, 0.44, INK);
+      drops(footX, footY - 90, 5, -Math.PI / 2 - 1.1, -Math.PI / 2 + 1.1, 220, 360, 3.8, WEAPON_INK.auger, 900);
+      return b;
     case 'stackDestroy':
       pixels(x, footY - 70, 8, 380); // 대검도 — 마지막 층이 있던 머리 위
       break;
@@ -462,10 +532,11 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       ctx.translate(p.x, py);
       ctx.rotate(p.rot);
       ctx.fillStyle = p.c1;
-      ctx.fillRect(-s / 2, -s / 2, s, s);
+      const h = s * (p.v || 1); // v = 세로 배율(빠진 원기둥 · 벽돌 조각)
+      ctx.fillRect(-s / 2, -h / 2, s, h);
       ctx.strokeStyle = INK; // 흰 도트도 아이보리 위에서 보이게
       ctx.lineWidth = 0.8;
-      ctx.strokeRect(-s / 2, -s / 2, s, s);
+      ctx.strokeRect(-s / 2, -h / 2, s, h);
       ctx.restore();
       return;
     }

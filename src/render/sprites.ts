@@ -562,7 +562,7 @@ function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, 
 // ── 대검 ─────────────────────────────────────────────────────
 // 종마다 칼날 모양·색만 다르고 쥐는 자세는 하나(포즈마다 weapon()의 great 좌표). 칼은 졸라맨 키의 절반을 넘는다 —
 // 가는 선 졸라맨이 굵은 칼날을 든 대비가 대검의 맛. 테두리는 몸 색(LINE)이 아니라 잉크: 칼은 따로 선 물건이다.
-type GreatShape = 'plain' | 'saw' | 'stripe' | 'beam' | 'wave' | 'crystal' | 'jag' | 'royal';
+type GreatShape = 'plain' | 'saw' | 'stripe' | 'beam' | 'block' | 'strand' | 'pane' | 'wave' | 'crystal' | 'jag' | 'royal';
 export interface GreatLook {
   shape: GreatShape;
   blade: string;  // 칼날
@@ -576,6 +576,9 @@ const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
   saw: { shape: 'saw', blade: '#98A3AB', hi: '#E3E9ED', guard: '#3E4549', w: 2.6 },
   hazard: { shape: 'stripe', blade: PALETTE.YELLOW, hi: '#FFF0A0', guard: PALETTE.INK, w: 3 },
   beam: { shape: 'beam', blade: '#C2552D', hi: '#EA9068', guard: '#5A2A18', w: 3.3 },
+  brick: { shape: 'block', blade: '#A84846', hi: '#D9A49A', guard: '#4A2420', w: 3.4 },
+  rod: { shape: 'strand', blade: '#86642C', hi: '#C8AE7E', guard: '#3E3120', w: 2.8 },
+  glass: { shape: 'pane', blade: '#3E9E6A', hi: '#BFE3CC', guard: '#1E4A33', w: 2.4 },
   flame: { shape: 'wave', blade: '#E0401E', hi: '#FFB46B', guard: '#3A1A12', w: 2.8 },
   frost: { shape: 'crystal', blade: '#BDE6F6', hi: '#FFFFFF', guard: '#3D6E8C', w: 2.9 },
   onyx: { shape: 'jag', blade: '#2E2D34', hi: '#625F6D', guard: PALETTE.INK, w: 3, edge: '#D2332C' },
@@ -775,6 +778,24 @@ function greatArc(c: CanvasRenderingContext2D, g: GreatLook): void {
       c.fillStyle = core;
       c.fill();
       break;
+    case 'block': // 벽돌 — 다섯 마디로 각진 넓은 띠, 갈래 없이 뭉툭하게 끊는다
+      band(12, PALETTE.INK, 5, 0, 0.8);
+      band(4.5, core, 5, 0.04, 0.55);
+      break;
+    case 'strand': // 철근 — 가는 띠 셋이 나란히 간다(가운데만 속 색)
+      for (const o of [-4.2, 0, 4.2]) {
+        arcBand(c, (t) => (o + 1.5) * smear(t), (t) => (1.5 - o) * smear(t), 24, 0, o ? 0.78 : 0.86);
+        c.fillStyle = PALETTE.INK;
+        c.fill();
+      }
+      arcBand(c, (t) => 0.7 * smear(t), (t) => 0.7 * smear(t), 24, 0.04, 0.6);
+      c.fillStyle = core;
+      c.fill();
+      break;
+    case 'pane': // 유리 — 얇고 날 선 띠, 갈래 없이 곧게 빠진다
+      band(6, PALETTE.INK, 24, 0, 0.9);
+      band(2.4, core, 24, 0.04, 0.7);
+      break;
     case 'crystal': // 일곱 마디로 꺾인 띠
       band(8, PALETTE.INK, 7);
       bristles(3, 7, 0.66);
@@ -861,7 +882,9 @@ const TOOL_ARC = {
   shovel: [30, 50, 36, 30, 20, 12, 6.5],
   pickaxe: [31, 50, 40, 24, 22, 4, 6],
   jackhammer: [29, 42, 32, 24, 26, 10, 7.5],
-  manhole: [31, 48, 36, 34, 26, 24, 8],
+  drill: [29, 40, 32, 22, 22, 8, 4],
+  coredrill: [29, 44, 34, 26, 24, 12, 6.5],
+  auger: [31, 50, 38, 30, 26, 16, 8.5],
   pipe: [31, 52, 44, 18, 14, -8, 5],
 } as const;
 

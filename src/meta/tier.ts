@@ -11,8 +11,8 @@ export const TIERS: readonly Tier[] = ['common', 'fine', 'rare', 'legend'];
 export const WEAPON_TIER: Readonly<Record<WeaponId, Tier>> = {
   sword: 'common',
   hammer: 'fine', crowbar: 'fine', grinder: 'fine',
-  shovel: 'fine', pipe: 'rare', pickaxe: 'rare', manhole: 'rare', jackhammer: 'rare',
-  iron: 'rare', saw: 'rare', hazard: 'rare', beam: 'rare',
+  shovel: 'fine', pipe: 'rare', drill: 'rare', pickaxe: 'rare', coredrill: 'rare', auger: 'rare', jackhammer: 'rare',
+  iron: 'rare', brick: 'rare', saw: 'rare', hazard: 'rare', rod: 'rare', beam: 'rare', glass: 'rare',
   flame: 'legend', frost: 'legend', onyx: 'legend', gold: 'legend',
 };
 

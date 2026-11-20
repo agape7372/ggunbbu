@@ -20,17 +20,22 @@ export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
   hammer: 300,
   crowbar: 300,
   grinder: 400,
-  // 연장 다섯(11-20). 전설이 아니라 전설 값(1200~) 밑에 둔다(값이 오를수록 등급이 안 내려간다)
+  // 연장(11-20). 전설이 아니라 전설 값(1200~) 밑에 둔다(값이 오를수록 등급이 안 내려간다)
   shovel: 350,
   pipe: 500,
+  drill: 600,
   pickaxe: 700,
-  manhole: 1000,
+  coredrill: 800,
+  auger: 1000,
   jackhammer: 1100,
   // 대검 — 연장 셋을 다 사고 나서의 긴 목표. 맞교환이라 비쌀수록 세지는 않다(모양 값)
   iron: 450,
+  brick: 550,
   saw: 600,
   hazard: 750,
+  rod: 850, // 철근 대검(칼빛 꾸미기 rebar와 owned를 같이 쓰니 id를 따로 둔다)
   beam: 900,
+  glass: 1050,
   flame: 1200,
   frost: 1200,
   onyx: 1600,

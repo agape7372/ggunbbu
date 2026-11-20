@@ -132,10 +132,14 @@ describe('이벤트 → 소리 배선', () => {
     expect(map({ kind: 'stackDestroy', n: 4 }, state({ weapon: 'onyx' }))).toEqual(['destroy', 'gorogoro', 'hitOnyx']);
     expect(map({ kind: 'stackDestroy', n: 4 }, state({ weapon: 'iron' }))).toEqual(['destroy', 'gorogoro']);
   });
-  it('11-20 연장 다섯은 새 합성 없이 있는 타격음을 빌린다', () => {
+  it('11-20 새 무기는 새 합성 없이 있는 타격음을 빌린다(연장 일곱 · 대검 셋)', () => {
     const hit: JuiceEvent = { kind: 'hit', lane: 0, mat: 'soft' as never, combo: 1 };
-    const got = (['shovel', 'pickaxe', 'jackhammer', 'manhole', 'pipe'] as const).map((weapon) => map(hit, state({ weapon }))![0]);
-    expect(got).toEqual(['hitLow', 'hitStrong', 'hitGrind', 'hitHammer', 'hitBar']);
+    const ids = ['shovel', 'pickaxe', 'jackhammer', 'pipe', 'drill', 'coredrill', 'auger', 'brick', 'rod', 'glass'] as const;
+    const got = ids.map((weapon) => map(hit, state({ weapon }))![0]);
+    expect(got).toEqual(['hitLow', 'hitStrong', 'hitGrind', 'hitBar', 'hitTick', 'hitGrind', 'hitLow', 'hitHammer', 'hitBar', 'hitTick']);
+  });
+  it('굴착 드릴이 깔림을 대신 받으면(pinSave) 퍽 + 안전모 깨짐 소리', () => {
+    expect(map({ kind: 'pinSave', y: 40 } as JuiceEvent, state({ weapon: 'auger' }))).toEqual(['hitLow', 'hatBreak']);
   });
 });
 

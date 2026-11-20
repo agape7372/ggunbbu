@@ -270,6 +270,37 @@ function leaves(x: number, y: number, n: number, spread: number, c: string, spd 
   }
 }
 
+/** 벽돌 조각 — 네모 토막(가로로 긴)이 돌며 튀어 떨어져 한 번 튄다. 색 = 포인트 색 속 + 먹 테 */
+function bricks(x: number, y: number, n: number, size: number, c: string, spd = 260): void {
+  for (let i = 0; i < n; i++) {
+    put('pix', x + sgn() * 10, y + sgn() * 4, {
+      ...vel(-Math.PI / 2 + sgn() * 1.25, spd * (0.45 + n01() * 0.7)), g: 1100,
+      life: 0.62 + n01() * 0.25, size: size * (0.8 + n01() * 0.4), v: 0.55, rot: n01() * TAU, spin: sgn() * 8, c1: i % 3 === 2 ? INK : c, bounce: 1,
+    });
+  }
+}
+
+/** 나란한 가는 획 — 철근 다발이 지나간 자리(n줄, 간격 gap). 가운데 한 줄만 속 색 */
+function strands(x: number, y: number, ang: number, len: number, n: number, gap: number, w: number, c: string, life = 0.3): void {
+  const nx = -Math.sin(ang);
+  const ny = Math.cos(ang);
+  for (let i = 0; i < n; i++) {
+    const o = (i - (n - 1) / 2) * gap;
+    const L = len * (0.75 + 0.25 * n01());
+    stroke(x + nx * o + Math.cos(ang) * sgn() * 4, y + ny * o, ang, L, w, i === (n >> 1) ? c : '', { pr: 2, dry: 0.55, life: life + n01() * 0.05 });
+  }
+}
+
+/** 유리 파편 — 날카로운 세모가 돌며 흩어져 떨어진다(접히듯 얇아지며). 셋에 하나는 먹 */
+function shards(x: number, y: number, n: number, spread: number, c: string, spd = 300): void {
+  for (let i = 0; i < n; i++) {
+    put('leaf', x + sgn() * spread, y + sgn() * spread * 0.4, {
+      ...vel(-Math.PI / 2 + sgn() * 1.4, spd * (0.45 + n01() * 0.7)), g: 700, drag: 0.8,
+      life: 0.5 + n01() * 0.25, size: 3.6 + n01() * 3.4, rot: n01() * TAU, spin: sgn() * 10, c1: i % 3 === 2 ? INK : c, st: 3,
+    });
+  }
+}
+
 /** 리벳 점 줄 — (x,y)부터 ang 쪽으로 gap 간격 n개가 차례로 찍힌다 */
 function rivets(x: number, y: number, n: number, gap: number, ang: number, core: string, life = 0.42): void {
   put('dots', x, y, { life, size: gap, v: n, rot: ang, c1: INK, c2: core });
@@ -414,6 +445,67 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
       rivets(x - 50, y + 16, 6, 17, 0, c, 0.6);
       line(x - 90 * k, y + 30, x, y - 20, 13, c, { pr: 2, dry: 0.3, life: 0.36 });
       line(x, y - 20, x + 90 * k, y + 26, 13, '', { pr: 1, dry: 0.4, life: 0.36 });
+    },
+  },
+  // 벽돌 — 뭉툭한 넓은 붓. 맞은 자리에서 네모 벽돌 조각이 튀어 떨어지고 붉은 가루가 인다
+  block: {
+    trail: { w: 13, dry: 0.12 },
+    hit(x, y, k, c) {
+      bricks(x, y, N(3, k), 6, c);
+      dust(x, y + 2, 9, c, 0.36, 30, 8);
+    },
+    floor(x, y, k, c) {
+      bricks(x, y, N(5, k), 7, c, 300);
+      dust(x, y + 4, 16, c, 0.45, 40, 12);
+      spat(x, y - 4, 5 * k, -Math.PI / 2, INK, '', 0.16, 4);
+    },
+    destroy(x, y, k, c) {
+      bricks(x, y, N(9, k), 8, c, 360);
+      dust(x, y + 6, 28, c, 0.6, 50, 16);
+      dust(x, y - 10, 18, INK, 0.5, 30, 9);
+    },
+    whiff(x, y, c) {
+      dust(x, y, 5, c, 0.26, 20, 5);
+    },
+  },
+  // 철근 — 가는 갈래 붓. 다발이 지나간 자리에 나란한 가는 획 여럿 + 녹 가루
+  strand: {
+    trail: { w: 8, dry: 0.75 },
+    hit(x, y, k, c) {
+      strands(x, y - 2, -0.35 + sgn() * 0.1, 40 * k, 3, 4.5, 2.2, c);
+      dust(x, y + 4, 8, c, 0.4, 30, 7);
+    },
+    floor(x, y, k, c) {
+      strands(x, y - 4, -0.3, 64 * k, 4, 5, 2.6, c, 0.34);
+      dust(x - 8, y + 6, 14, c, 0.5, 40, 11);
+    },
+    destroy(x, y, k, c) {
+      strands(x, y - 6, -0.3, 110 * k, 5, 6, 3, c, 0.4);
+      strands(x, y + 8, 0.32, 90 * k, 4, 6, 2.6, '', 0.38);
+      dust(x, y + 6, 26, c, 0.6, 50, 16);
+    },
+    whiff(x, y, c) {
+      strands(x, y, -0.9, 16, 2, 3, 1.4, c, 0.16);
+    },
+  },
+  // 유리 — 얇고 날 선 붓. 맞은 자리에 가는 한 획 + 날카로운 세모 파편이 흩어진다(빛 번짐 · 반짝이 없음)
+  pane: {
+    trail: { w: 6, dry: 0.1 },
+    hit(x, y, k, c) {
+      stroke(x, y - 2, -0.5 + sgn() * 0.3, 34 * k, 2.4, c, { life: 0.2, dry: 0.05 });
+      shards(x, y, N(4, k), 8, c);
+    },
+    floor(x, y, k, c) {
+      stroke(x, y - 4, -0.4, 58 * k, 3, c, { life: 0.26, dry: 0.05 });
+      shards(x, y, N(7, k), 18, c, 340);
+      zig(x - 30 * k, y + 2, 0.04, 60 * k, 2.2, 6, 4, '', 0.3, 0.1);
+    },
+    destroy(x, y, k, c) {
+      stroke(x, y - 6, -0.3, 120 * k, 4, c, { life: 0.34, dry: 0.05 });
+      shards(x, y, N(13, k), 40, c, 400);
+    },
+    whiff(x, y, c) {
+      shards(x, y, 1, 2, c, 90);
     },
   },
   // 화염 — 친 자리에서 불 혀가 솟아 휘며 오르고(밑동 주홍 → 먹), 위로 먹 연기 한 가닥, 불씨는 오르다 재가 된다
@@ -855,9 +947,10 @@ function drawBit(ctx: CanvasRenderingContext2D, p: Bit, py: number): void {
       ctx.rotate(p.seed);
       ctx.scale(sx, 1);
       ctx.beginPath();
-      // 찢긴 금박 — 다섯 귀가 제각각(조각마다 seed로)
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * TAU + 0.4 * Math.sin(p.seed + i * 3.1);
+      // 찢긴 금박 — 다섯 귀가 제각각(조각마다 seed로). st = 귀 수(유리 파편은 셋 — 날카로운 세모)
+      const n = p.st || 5;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + 0.4 * Math.sin(p.seed + i * 3.1);
         const r = s * (0.55 + 0.5 * Math.abs(Math.sin(p.seed * 1.3 + i * 2.1)));
         ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
       }
