@@ -131,6 +131,10 @@ export function mapEvent(e: JuiceEvent, s: GameState, kinds: Set<JuiceKind>): Sf
       return ['hatBreak'];
     case 'pinSave': // 굴착 드릴이 깔림을 뚫고 나왔다 — 퍽 + 안전모 깨짐 소리를 빌린다
       return ['hitLow', 'hatBreak'];
+    case 'overheat': // 드릴류 과열로 멈춤 · 다 식음
+      return ['overheat'];
+    case 'cooled':
+      return ['cooled'];
     case 'pinReady': // 다시 찼다 — pinSave의 퍽만 가볍게
       return ['hitLow'];
     case 'hatGet':
