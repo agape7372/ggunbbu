@@ -20,6 +20,7 @@
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, SEAL_INK, TICK, VIEW, WEAPON_FX, WEAPON_INK, WEAPON_LITE } from '../config';
 import { comboMilestone } from '../audio/consume';
+import { comboReachK } from '../core/perks';
 import { brushArc, brushLine, brushPath, hotCore, hs, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter, type Tone } from './ink';
 import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites';
 import { TOOL_RECIPES, drawWeaponBit, resetWeaponFx, toolBurst, toolPiece, weaponReact } from './weaponFx';
@@ -182,6 +183,28 @@ let holes: readonly (readonly [number, number, number, number])[] = [];
 export function setWazaHoles(h: readonly (readonly [number, number, number, number])[]): void {
   holes = h;
 }
+const inHoles = (px: number, py: number): boolean => holes.some((r) => px > r[0] && px < r[2] && py > r[1] && py < r[3]);
+/** 선분을 16px마다 짚어 구멍에 닿나 본다 */
+function segInHoles(ax: number, ay: number, bx: number, by: number): boolean {
+  const n = Math.ceil(Math.hypot(bx - ax, by - ay) / 16);
+  for (let i = 1; i <= n; i++) if (inHoles(ax + ((bx - ax) * i) / n, ay + ((by - ay) * i) / n)) return true;
+  return false;
+}
+/** 조각이 긋는 자리 전체(곧은 획 · 호 · 꺾은 획)가 구멍에 닿나 — 머리 점만 보면 긴 획 몸이 「끝」 도장 위를 지난다(11-21 해일 낙관) */
+function strokeInHoles(k: Kind, x: number, y: number, size: number, rot: number, sw: number, pts: readonly number[]): boolean {
+  if (inHoles(x, y)) return true;
+  if (k === 'stroke') return segInHoles(x, y, x + Math.cos(rot) * size, y + Math.sin(rot) * size);
+  if (k === 'sweep') {
+    const n = Math.max(2, Math.ceil((Math.abs(sw) * size) / 16));
+    for (let i = 0; i <= n; i++) {
+      const a = rot + (sw * i) / n;
+      if (inHoles(x + Math.cos(a) * size, y + Math.sin(a) * size)) return true;
+    }
+    return false;
+  }
+  for (let i = 2; i + 1 < pts.length; i += 2) if (segInHoles(x + pts[i - 2], y + pts[i - 1], x + pts[i], y + pts[i + 1])) return true;
+  return false;
+}
 
 export function put(k: Kind, x: number, y: number, o: Opt): void {
   const K = big ? big.k : 1;
@@ -189,7 +212,7 @@ export function put(k: Kind, x: number, y: number, o: Opt): void {
     x = big.x + (x - big.x) * K;
     y = Math.min(GROUND - 1, big.y + (y - big.y) * K);
   }
-  if (keeping && holes.some((r) => x > r[0] && x < r[2] && y > r[1] && y < r[3])) return;
+  if (keeping && holes.length && strokeInHoles(k, x, y, o.size * K, o.rot ?? 0, o.sw ?? 0, o.pts ? o.pts.map((q) => q * K) : NO_PTS)) return;
   const p = take();
   p.k = k;
   p.x = x;
@@ -541,7 +564,7 @@ export interface Recipe {
   destroy(x: number, y: number, k: number, c: string): void;
   /** 헛스윙 — 칼끝 자리에서 */
   whiff?(x: number, y: number, c: string): void;
-  /** 칼 기운 — b = 칼날(손 → 칼끝, 월드), n = 몇 번째, cr = 콤보 비율 min(콤보, 100) / 100(불새가 혀 길이로 쓴다) */
+  /** 칼 기운 — b = 칼날(손 → 칼끝, 월드), n = 몇 번째, cr = core/perks comboReachK(불새 콤보 사거리 0~1 · 혀 길이) */
   aura?(b: Seg, n: number, c: string, cr?: number): void;
   every?: number;
   /** 완파 물들임 — 완파 때 그 칼의 모티프가 한 번 더 크게(전화면은 칠하지 않는다). own이면 destroy가 둘째 박자로 스스로 한다 */
@@ -1584,7 +1607,7 @@ export function bladeAura(s: GameState): void {
   if (!b) return;
   const x = VIEW.LANE_X[s.player.lane];
   const y = GROUND - s.player.y;
-  r.aura([x + b[0], y + b[1], x + b[2], y + b[3]], auraN++, inkOf(s.weapon), Math.min(s.combo, 100) / 100);
+  r.aura([x + b[0], y + b[1], x + b[2], y + b[3]], auraN++, inkOf(s.weapon), comboReachK(s)); // 규칙과 같은 값(불새 콤보 사거리)
 }
 
 export function resetBladeFx(): void {

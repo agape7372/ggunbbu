@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { PALETTE, WEAPON } from '../src/config';
 import { makeState } from '../src/core/sim';
-import { endWazaBits, paperInk, resetBladeFx, setWazaHoles, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
+import { bent, endWazaBits, keepBits, line, paperInk, resetBladeFx, setWazaHoles, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
 import { liveBits } from '../src/render/weaponFx';
 import { HEAT_STEPS, heatStep } from '../src/audio/consume';
 
@@ -15,6 +15,19 @@ describe('필살 손질', () => {
     setWazaHoles([]);
     weaponBloom('hammer', 180, 300, -Math.PI / 2, 1.4);
     expect(liveBits().length).toBeGreaterThan(0);
+    resetBladeFx();
+  });
+
+  it('머리가 구멍 밖이어도 획 몸이 구멍을 지나면 뿌리지 않는다(곧은 획 · 꺾은 획)', () => {
+    resetBladeFx();
+    setWazaHoles([[150, 280, 210, 320]]);
+    keepBits(() => {
+      line(60, 300, 300, 300, 6, ''); // 몸이 구멍을 가로지른다
+      bent([60, 200, 180, 300, 300, 200], 6, ''); // 꺾인 점이 구멍 안
+      line(60, 100, 300, 100, 6, ''); // 구멍 위로 지나간다 → 남는다
+    });
+    expect(liveBits().length).toBe(1);
+    setWazaHoles([]);
     resetBladeFx();
   });
 
