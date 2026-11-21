@@ -861,8 +861,9 @@ export const WEAPON_INK = {
   diadrill: '#20A7B6', thunder: '#7766CC', crane: '#74B654', brush: '#4D8AE6',
 } as const;
 /**
- * 전설 여덟의 밝은 짝 — 같은 색의 한 단 밝은 면(2026-11-21 사용자 「먹 안에 빗금으로 심지 말고 무기 시그니처색 자체로」).
- * 전설 이펙트는 시그니처 색(WEAPON_INK)이 몸이고, 이 색은 그 몸의 밝은 면(불 속 · 얼음 면 · 금박 뒤 · 결정 면)에만 쓴다. 형광 · 순백이 아니다.
+ * 전설 여덟의 밝은 짝 — 같은 색의 한 단 밝은 붓 색(2026-11-21).
+ * 전설 이펙트는 먹 붓 화법 그대로 먹 색이 시그니처 색(WEAPON_INK)이고, 이 색은 곁 조각(덧 혀 · 불티 · 얼음 조각 · 금박 · 오르는 방울 · 나란한 금 획)에만 쓴다.
+ * 형광 · 순백이 아니다. effects.isLegend도 이 표로 전설을 가린다.
  */
 export const WEAPON_LITE = {
   flame: '#F2A03C', frost: '#A3D6EA', thunder: '#CDC6F4', onyx: '#B27DBE',

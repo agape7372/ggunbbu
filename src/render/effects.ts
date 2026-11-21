@@ -100,7 +100,7 @@ export function setSlashColor(c: string): void {
   setSwordInk(slashInk);
 }
 
-/** 전설 — 맞은 자리 · 완파를 시그니처 색 몸으로 제 꼴만 그린다(bladeFx · weaponFx). 공통 먹 튐 · 색 속을 얹으면 「먹 안에 색」으로 돌아간다 */
+/** 전설 — 맞은 자리 · 완파를 시그니처 색 붓으로 제 붓놀림만 긋는다(bladeFx · weaponFx). 공통 먹 튐 · 색 속을 얹으면 「먹 안에 색」으로 돌아간다 */
 const isLegend = (w: WeaponId): boolean => w in WEAPON_LITE;
 
 /** 무기의 포인트 색 — 벤 순간 먹 튐 속 · 큰 엔소 속. 철거칼은 칼빛 설정 색 */

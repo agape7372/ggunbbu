@@ -8,9 +8,9 @@
 // tap = 잘게 떠는 획(착암기) · ring = 고리(파이프 단면 · 코어 드릴 구멍) · pix = 네모 토막(마스크 도트 · 빠진 원기둥 · 벽돌 조각 · a 4면 다이아 드릴 마름모). 연장 열둘은 저마다 다른 조각 묶음으로 터진다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
-import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK, WEAPON_LITE } from '../config';
+import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
-  CEL, N, bent, cel, drops, keepBits, later, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
+  N, bent, drops, keepBits, later, line, n01, pool, put, scaled, sgn, sweep, tierK, vel, type Bit,
 } from './bladeFx';
 import { PRESS, brushArc, brushLine, enso, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
 
@@ -112,34 +112,33 @@ interface Tool {
   whiff(footX: number, footY: number): void;
 }
 
-/** 드릴 비트 — (x, y)에서 ang 쪽을 가리키는 오거(끝까지 좁아지는 청록 원추 + 끝으로 갈수록 조밀한 짙은 청록 나선 띠가 흘러 돈다). 밑에서 뚫고 올라오는 꼴이라 자루는 없다. 박히며 앞으로 밀리다 멈춘다 */
-function drillCone(x: number, y: number, ang: number, len: number, w: number, life = 0.22, push = 160): void {
-  cel(CEL.drill, x, y, { life, size: len, v: w, c1: WEAPON_INK.diadrill, c2: WEAPON_LITE.diadrill, rot: ang, ...vel(ang, push), drag: 5, gr: 0.18, hold: 0.8, dry: 1 });
-}
-
-
-/** 절삭 부스러기 — 얕게 휜 청록 쇳밥 가시가 돌며 옆으로 튀어 떨어진다(마름모 조각은 금박과 겹친다) */
-function chips(x: number, y: number, n: number, spd: number, size: number, a = -Math.PI / 2, fan = 1.3): void {
-  for (let i = 0; i < n; i++) {
-    cel(CEL.curl, x + sgn() * 4, y + sgn() * 3, {
-      ...vel(a + sgn() * fan, spd * (0.5 + n01() * 0.6)), g: 1400, life: 0.36 + n01() * 0.14, size: size * (0.75 + n01() * 0.5), v: 1.4,
-      c1: WEAPON_INK.diadrill, rot: n01() * TAU, spin: sgn() * 14, gr: 0.1, hold: 0.8, rim: false, // 먹 쇳밥 · 먹 테 쇳밥 · 큰 쇳밥은 하늘의 새와 같은 꼴 — 작은 청록만 · 빨리 떨어진다
-    });
-  }
+/**
+ * 다이아 드릴 붓 — 밑동 (x, y)에서 ang 쪽으로 len, 댄 데가 굵고 끝이 뾰족하게 빠지는 굵은 청록 붓 한 획 + 그 끝자리에 감겨 드는 붓 소용돌이 두 획
+ * (바깥 R · 안 R/2, 끊기지 않고 이어 돈다 = 돌며 파고든 자리). 먹은 쓰지 않고 시그니처 청록 한 색 · 마른 붓 결.
+ * 오독 기록(11-21 심사 여섯 번): 감긴 굵은 한 획 = 고래 · 고리 두른 획 = 오징어 · 띄엄띄엄 자국 = 용수철 · 사다리 · 맞붙은 자국 = 깃털 ·
+ * 띠 자국으로 채운 고깔 = 평면 도형 · 가는 테두리와 홈 선 = 사다리 · 와이어프레임 · 고깔 붓 한 획 + 밝은 홈 = 아이스크림콘 · 나팔.
+ * 지금 판(소용돌이)도 고사리 순 · 물결로 읽힐 때가 있다 — 사용자 판정 대기
+ */
+function drillCoil(x: number, y: number, ang: number, len: number, w: number, life = 0.24, R = w * 1.2): void {
+  const c = WEAPON_INK.diadrill;
+  const [tx, ty] = [x + Math.cos(ang) * len, y + Math.sin(ang) * len];
+  line(x, y, tx, ty, w, '', { body: c, pr: 1, life, dry: 0.3, gr: 0.1 });
+  const a0 = ang + Math.PI / 2;
+  sweep(tx, ty, R, a0, Math.PI * 1.25, Math.max(2.4, w * 0.55), '', { body: c, pr: 1, life, dry: 0.35, gr: 0.12 });
+  later(0.03, () => sweep(tx, ty, R * 0.5, a0 + Math.PI * 1.25, Math.PI * 1.1, Math.max(2, w * 0.4), '', { body: c, pr: 1, life: life * 0.9, dry: 0.35, gr: 0.12 }));
 }
 
 /** 연장 전설의 칼 기운 · 물들임 — 대검 RECIPES의 aura · every · tint와 같은 뜻(bladeFx.bladeAura가 읽는다) */
 export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number, number, number, number], n: number, c: string): void; every?: number; tint?: true }>> = {
-  // 다이아 드릴 — 칼끝에 작은 비트가 겹쳐 청록 나선이 돈다(떠다니는 조각 · 반짝이는 없다). 가끔 부스러기 하나가 튄다
+  // 다이아 드릴 — 칼끝(비트)에서 짧게 내지르는 획과 작은 소용돌이가 이어 그어진다. 가끔 쇳밥(끊긴 붓 고리) 하나가 튄다
   diadrill: {
     aura(b, n) {
-      // 번갈아 건너뛰면 청록 · 먹 사이로 깜빡인다 — 겹쳐 이어 그린다
       const a = Math.atan2(b[3] - b[1], b[2] - b[0]);
-      cel(CEL.drill, b[2] - Math.cos(a) * 8, b[3] - Math.sin(a) * 8, { life: 0.22, size: 18, v: 8, c1: WEAPON_INK.diadrill, c2: WEAPON_LITE.diadrill, rot: a, gr: 0.2, hold: 0.8 });
-      if (n % 6 === 0) chips(b[2], b[3], 1, 140, 5, a, 0.8);
+      drillCoil(b[2] - Math.cos(a) * 16, b[3] - Math.sin(a) * 16, a, 20, 5, 0.2, 6);
+      if (n % 6 === 0) curls(b[2], b[3], 1, 3, 0.2, WEAPON_INK.diadrill);
     },
     every: 0.1,
-    tint: true, // 완파가 시그니처 색 몸의 둘째 박자 마무리(같은 자리에서 큰 비트가 솟는다) — 층 깨기 그림을 덧얹지 않는다
+    tint: true, // 완파가 제 붓놀림의 둘째 박자 마무리 — 층 깨기 그림을 덧얹지 않는다
   },
 };
 
@@ -278,35 +277,31 @@ const TOOLS: Partial<Record<WeaponId, Tool>> = {
       taps(footX + 30, footY - 44, 3, 0.12, 9, 2.2, GRAY);
     },
   },
-  // 다이아 드릴(전설) — 파고든다: 끝으로 갈수록 조밀한 짙은 청록 나선 띠(휜 활꼴)가 흘러 도는 굵은 청록 오거(끝까지 좁아지는 원추 + 밑동 척)가
-  // 맞은 것에 끝을 박고 축을 따라 밀려 들어간다. 타격 · 층 깨기는 머리 옆 허공(층 밑면 높이)에서 45도로 층 아래 모서리에 밀어 넣고,
-  // 완파는 머리 위에서 잔해로 50도 눕혀 내리꽂힌다. 그림은 확대 1.6배로 놓이니 밑동은 맞은 높이 위 · 옆에 둔다(밑에 두면 땅까지 내려가 바닥에서 솟은 고깔이 된다).
-  // 거의 서서 내리꽂히면 회오리 · 깔때기로 읽힌다. 닿은 자리에서 청록 쇳밥이 한쪽으로 튀어 바로 떨어진다. 먹 획 없이 청록이 몸
+  // 다이아 드릴(전설) — 돌며 파고든다: 굵고 뾰족한 청록 붓 한 획이 맞은 것에 끝을 박고, 그 끝자리에 붓 소용돌이가 감겨 들고, 청록 쇳밥(끊긴 붓 고리)이 튄다.
+  // 완파는 소용돌이 바깥으로 한 바퀴 더 크게 감긴다.
+  // 먹 붓 화법 그대로 먹 색만 시그니처 청록. 타격 · 층 깨기는 머리 왼쪽 밑동에서 오른쪽 위로(/) 층 아래 모서리에, 완파는 머리 위에서 왼쪽 잔해로 내리꽂힌다.
+  // 그림은 확대 1.6배로 놓이니 밑동은 맞은 높이 위 · 옆에 둔다(밑에 두면 땅까지 내려가 바닥에서 솟은 꼴이 된다)
   diadrill: {
-    // 늘 머리 왼쪽 밑동에서 오른쪽 위로(/) 박는다 — 서리 타격 사슬(\) · 흑철 사선과 축이 갈리고, 완파 끝이 오른쪽 콤보 표시에 꽂히지 않는다
     hit(x, y, b, k) {
-      const L = 44 * b.k;
-      drillCone(x - 36, y - 4, -Math.PI / 2 + 0.8, L, 17, 0.11, 40); // 끝이 플레이어 머리 위 층 안에 박힌다(30도로 눕히면 끝이 머리를 겨눈 창으로 읽힌다)
-      chips(x - 4, y - 38, 2 + (k >= 1.5 ? 1 : 0), 260, 6, -Math.PI / 2 - 1.1, 0.5); // 쇳밥은 끝(닿은 자리)에서 — 밑동에서 튀면 로켓 분사로 읽힌다
+      drillCoil(x - 36, y, -Math.PI / 2 + 0.8, 54 * b.k, 12, 0.26, 15 * b.k);
+      curls(x - 2, y - 36, 2 + (k >= 1.5 ? 1 : 0), 5, 0.22, WEAPON_INK.diadrill);
     },
     floor(x, y, _b, k) {
-      drillCone(x - 44, y - 6, -Math.PI / 2 + 0.8, 56, 24, 0.22, 60);
-      chips(x - 2, y - 48, jn(N(5, k)), 320, 7, -Math.PI / 2 - 1.1, 0.6);
+      drillCoil(x - 46, y - 2, -Math.PI / 2 + 0.8, 68, 15, 0.3, 20);
+      curls(x, y - 46, jn(N(4, k)), 6, 0.26, WEAPON_INK.diadrill);
     },
-    // 완파 — 머리 위에서 왼쪽 잔해 더미로 50도 눕혀 내리꽂혀 파고든다(끝 = 잔해 · 축을 따라 밀린다). 쇳밥은 닿은 자리에서 바깥쪽 위로
     destroy(x, y, k) {
-      const s = -1;
-      const L = 60;
-      const ang = Math.PI / 2 - s * 0.9;
-      const [bx, by] = [x - s * 2, y - 22];
+      const ang = Math.PI / 2 + 0.9;
+      const L = 84;
+      const [bx, by] = [x + 4, y - 30];
       const [tx, ty] = [bx + Math.cos(ang) * L, by + Math.sin(ang) * L];
-      drillCone(bx, by, ang, L, 30, 0.3, 70); // 다음 층이 떨어지기 전에 거둔다
-      chips(tx, ty, N(5, k), 300, 8, -Math.PI / 2 + s * 1.0, 0.5);
-      later(0.08, () => chips(tx, ty - 6, N(4, k), 260, 8, -Math.PI / 2 + s * 1.2, 0.4)); // 한쪽으로만 — 양쪽으로 엇갈리면 X · 별로 읽힌다
+      drillCoil(bx, by, ang, L, 19, 0.4, 28);
+      later(0.12, () => sweep(tx, ty, 42, ang - Math.PI / 2, Math.PI * 1.15, 9, '', { body: WEAPON_INK.diadrill, pr: 1, life: 0.3, dry: 0.4, gr: 0.12 }));
+      curls(tx, ty, N(5, k), 7, 0.32, WEAPON_INK.diadrill);
+      later(0.08, () => curls(tx, ty - 6, N(4, k), 7, 0.3, WEAPON_INK.diadrill));
     },
-    // 헛스윙 — 칼끝 자리에서 휜 쇳밥 셋이 한쪽으로 빠르게 튄다(허공에 따로 뜬 비트는 불꽃놀이 · 로켓으로, 느리게 뜬 쇳밥은 새 떼로 읽힌다)
     whiff(footX, footY) {
-      chips(footX + 26, footY - 50, 3, 300, 6, -0.5, 0.3);
+      curls(footX + 26, footY - 50, 3, 4, 0.18, WEAPON_INK.diadrill);
     },
   },
   // 전동 드릴 — 파고든다: 맞은 자리에서 위로 파고든 짧은 한 획(풀빛 속) + 둘레로 튀는 곱슬 부스러기 몇 가닥. 누르면 빨라지는 무기라 수명이 짧다

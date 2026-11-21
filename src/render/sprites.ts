@@ -898,7 +898,7 @@ function greatArc(c: CanvasRenderingContext2D, g: GreatLook): void {
 /** attack 타격 프레임의 참격 호 — 무기별 모양, 호는 하나. */
 function slashArc(c: CanvasRenderingContext2D): void {
   const g = greatLook(playerWeapon);
-  // 전설 여덟(WEAPON_LITE 키) — 먹 띠에 색 속을 심지 않는다. 대검 칼길은 bladeFx swing이 그 칼의 꼴로 긋고, 다이아 드릴은 시그니처 색이 몸인 한 획
+  // 전설 여덟(WEAPON_LITE 키) — 먹 색 자체가 시그니처 색이고 속 띠를 심지 않는다. 대검 칼길은 bladeFx swing이 그 칼의 붓놀림으로 긋고, 다이아 드릴은 시그니처 색 한 획
   const legend = playerWeapon in WEAPON_LITE;
   if (g) {
     if (!legend) greatArc(c, g);
@@ -915,7 +915,8 @@ function slashArc(c: CanvasRenderingContext2D): void {
   const ink = WEAPON_INK[playerWeapon as keyof typeof WEAPON_INK];
   c.fillStyle = legend ? ink : PALETTE.INK;
   brushPath(c, pts, w, 0, 1, 0.45, 7, PRESS.flick);
-  c.fillStyle = legend ? WEAPON_LITE[playerWeapon as keyof typeof WEAPON_LITE] : playerWeapon === 'sword' ? SLASH_INK[ARC.toUpperCase()] ?? ARC : ink;
+  if (legend) return;
+  c.fillStyle = playerWeapon === 'sword' ? SLASH_INK[ARC.toUpperCase()] ?? ARC : ink;
   brushPath(c, pts, w * 0.36, 0.04, 0.55, 0, 7, PRESS.flick);
 }
 
