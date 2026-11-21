@@ -11,7 +11,7 @@ import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { JUICE_SYS, PALETTE, TICK, VIEW, WEAPON, WEAPON_FX, WEAPON_INK } from '../config';
 import { playerBlade } from './sprites';
 import {
-  N, bent, drops, keepBits, later, line, n01, pool, put, scaled, sgn, sweep, tierK, vel, type Bit, type WazaArt,
+  N, bent, drops, keepBits, later, line, n01, pool, put, samplePath, scaled, sgn, sweep, tierK, vel, type Bit, type WazaArt,
 } from './bladeFx';
 import { PRESS, brushArc, brushLine, enso, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
 
@@ -129,7 +129,7 @@ function drillCoil(x: number, y: number, ang: number, len: number, w: number, li
   later(0.03, () => sweep(tx, ty, R * 0.5, a0 + Math.PI * 1.25, Math.PI * 1.1, Math.max(2, w * 0.4), '', { body: c, pr: 1, life: life * 0.9, dry: 0.35, gr: 0.12 }));
 }
 
-/** 연장 전설의 칼 기운 · 물들임 — 대검 RECIPES의 aura · every · tint와 같은 뜻(bladeFx.bladeAura가 읽는다) */
+/** 연장 전설의 칼 기운 · 물들임 — 대검 RECIPES의 aura · every · tint와 같은 뜻(bladeFx.bladeAura가 읽는다) · waza = 연장 열둘의 필살 번짐(weaponAlong · weaponBloom) */
 export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number, number, number, number], n: number, c: string): void; every?: number; tint?: true; waza?: WazaArt }>> = {
   // 다이아 드릴 — 칼끝(비트)에서 짧게 내지르는 획과 작은 소용돌이가 이어 그어진다. 가끔 쇳밥(끊긴 붓 고리) 하나가 튄다
   diadrill: {
@@ -140,6 +140,178 @@ export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number,
     },
     every: 0.1,
     tint: true, // 완파가 제 붓놀림의 둘째 박자 마무리 — 층 깨기 그림을 덧얹지 않는다
+    // 필살 번짐 — 큰 획을 감는 청록 붓 소용돌이(한 붓에 먹과 색) + 쇳밥
+    waza: {
+      along: walk((x, y, _a, o) => {
+        const c = WEAPON_INK.diadrill;
+        sweep(x, y, 20, o, Math.PI * 1.25, 6, '', { body: c, pr: 1, life: 0.4, dry: 0.35, gr: 0.12 });
+        curls(...fwd(x, y, o, 20), 1, 5, 0.24, c, o, 0.5);
+      }),
+      bloom: burst((x, y, ang) => {
+        drillCoil(x, y, ang, 70, 16, 0.36, 24);
+        curls(...fwd(x, y, ang, 70), 5, 7, 0.3, WEAPON_INK.diadrill, ang, 0.9);
+      }),
+    },
+  },
+  // 철거칼 — 큰 획 가장자리마다 앞으로 비껴 벤 짧은 획(칼빛 속) + 칼빛 방울 하나
+  sword: {
+    waza: {
+      along: walk((x, y, a, o) => {
+        const d = lean(o, a, 0.5);
+        stroke(...fwd(x, y, d, 30), d, 44, 5.5, CUT, 0.4, swordInk);
+        drops(...fwd(x, y, d, 44), 1, d - 0.25, d + 0.25, 140, 240, 3, swordInk, 900);
+      }),
+      bloom: burst((x, y, ang) => {
+        stroke(...fwd(x, y, ang, 50), ang, 140, 11, CUT, 0.42, swordInk);
+        stroke(...fwd(x, y, ang - 0.75, 34), ang - 0.75, 90, 6, CUT, 0.34, swordInk); // 엇갈려 X
+        drops(...fwd(x, y, ang, 90), 5, ang - 0.6, ang + 0.6, 180, 320, 3.4, swordInk, 900);
+      }),
+    },
+  },
+  // 오함마 — 회색 속은 먹 위에서 안 보인다: 큰 획에서 앞으로 갈라져 나가는 먹 금 + 떨어지는 먹 흙덩이
+  hammer: {
+    waza: {
+      along: walk((x, y, a, o, _up, i) => {
+        crackAt(...fwd(x, y, o, 10), lean(o, a, 0.6), 34 + n01() * 10, 3.8, 0.46, WEAPON_INK.hammer);
+        if (i % 3 === 1) crackAt(...fwd(x, y, o + Math.PI, 10), lean(o + Math.PI, a, 0.7), 24, 3, 0.42);
+        drops(...fwd(x, y, o, 12), 1, o - 0.4, o + 0.4, 90, 180, 3.6, INK, 900);
+      }),
+      bloom: burst((x, y, ang) => {
+        splash(x, y, 18, ang, 0.42, WEAPON_INK.hammer, 0.5, 7);
+        for (const [t, len] of [[0.05, 70], [0.25, 50], [0.5, 34]] as const) {
+          crackAt(x, y, ang + Math.PI / 2 + t, len, 3.8, 0.46); // 친 방향의 양옆으로 — 땅을 치면 땅을 따라
+          crackAt(x, y, ang - Math.PI / 2 - t, len, 3.8, 0.46);
+        }
+        drops(x, y, 5, ang - 0.7, ang + 0.7, 200, 340, 3.8, INK, 900);
+      }),
+    },
+  },
+  // 빠루 — 큰 획 가장자리를 비틀어 젖히는 감기 획(쪽빛 속) + 뜯긴 나뭇결 하나
+  crowbar: {
+    waza: {
+      along: walk((x, y, a, o, up) => {
+        const d = lean(o, a, 0.35);
+        stroke(...fwd(x, y, d, 26), d, 40, 5.5, o === up ? 1 : -1, 0.4, WEAPON_INK.crowbar);
+        flecks(...fwd(x, y, d, 38), 1, d, 0.4, 260, 2, 10);
+      }),
+      bloom: burst((x, y, ang) => {
+        stroke(...fwd(x, y, ang, 45), ang, 90, 9, 1, 0.42, WEAPON_INK.crowbar);
+        stroke(...fwd(x, y, ang - 0.6, 32), ang - 0.6, 60, 6, -1, 0.36, WEAPON_INK.crowbar);
+        flecks(...fwd(x, y, ang, 60), 5, ang, 0.8, 380, 2, 12);
+      }),
+    },
+  },
+  // 그라인더 — 큰 획 곁에 긁힌 홈 + 그 자리에서 뒤로 뿜는 불티 줄기
+  grinder: {
+    waza: {
+      along: walk((x, y, a, o) => {
+        stroke(...fwd(x, y, o, 12), a, 30, 4, GOUGE, 0.44, WEAPON_INK.grinder);
+        sparks(...fwd(x, y, o, 10), lean(o, a, -0.5), 7, 0.2, 420);
+      }),
+      bloom: burst((x, y, ang) => {
+        stroke(x, y, ang + Math.PI / 2, 90, 7, GOUGE, 0.5, WEAPON_INK.grinder);
+        sparks(x, y, ang, 18, 0.24, 540);
+        sparks(x, y, ang + 0.6, 10, 0.18, 460);
+        flecks(x, y, 4, ang + Math.PI, 0.6, 160, 1, 1.8);
+      }),
+    },
+  },
+  // 삽 — 큰 획에서 위 뒤로 떠 올리는 튕김 획(황토 속) + 흙덩이
+  shovel: {
+    waza: {
+      along: walk((x, y, a, _o, up) => {
+        const d = lean(up, a, -0.45);
+        stroke(...fwd(x, y, d, 22), d, 34, 6, FLICK, 0.42, WEAPON_INK.shovel);
+        clods(...fwd(x, y, d, 30), 1, 200, 330, 3.6);
+      }),
+      bloom: burst((x, y, ang) => {
+        stroke(...fwd(x, y, ang, 45), ang, 100, 11, FLICK, 0.44, WEAPON_INK.shovel);
+        drops(...fwd(x, y, ang, 80), 6, ang - 0.5, ang + 0.5, 300, 500, 4.6, WEAPON_INK.shovel, 1000);
+      }),
+    },
+  },
+  // 곡괭이 — 큰 획 가장자리에 바깥으로 박힌 쐐기(청회 속) + 깨져 도는 돌 조각
+  pickaxe: {
+    waza: {
+      along: walk((x, y, _a, o) => {
+        wedgeAt(...fwd(x, y, o, 8), o, 20, 9, 6, 0.44, WEAPON_INK.pickaxe);
+        chips(...fwd(x, y, o, 24), 1, o, 0.5, 220, 5);
+      }),
+      bloom: burst((x, y, ang) => {
+        wedgeAt(x, y, ang, 40, 18, 10, 0.48, WEAPON_INK.pickaxe);
+        wedgeAt(...fwd(x, y, ang + 1.2, 18), ang + 0.8, 16, 7, 5, 0.38, WEAPON_INK.pickaxe);
+        chips(...fwd(x, y, ang, 26), 5, ang, 0.9, 380, 6);
+      }),
+    },
+  },
+  // 착암기 — 큰 획 가장자리에서 바깥으로 잘게 떠는 획(다다다, 청록 속) + 짧은 먹 금
+  jackhammer: {
+    waza: {
+      along: walk((x, y, a, o) => {
+        tapsAt(...fwd(x, y, o, 10), o, 5, 0.3, 24, 5);
+        crackAt(...fwd(x, y, o + Math.PI, 10), lean(o + Math.PI, a, 0.3), 24, 3, 0.42);
+      }),
+      bloom: burst((x, y, ang) => {
+        tapsAt(x, y, ang, 12, 0.34, 30, 6);
+        crackAt(x, y, ang + Math.PI / 2 + 0.2, 60, 3.6, 0.44);
+        crackAt(x, y, ang - Math.PI / 2 - 0.2, 60, 3.6, 0.44);
+        flecks(x, y, 4, ang, 0.8, 150, 1, 1.8);
+      }),
+    },
+  },
+  // 전동 드릴 — 큰 획 바깥으로 파고든 짧은 획(풀빛 속) + 곱슬 쇳밥
+  drill: {
+    waza: {
+      along: walk((x, y, _a, o) => {
+        stroke(...fwd(x, y, o, 24), o, 30, 6.5, CUT, 0.36, WEAPON_INK.drill); // 가늘면 안 보인다 — 뭉툭하게
+        curls(...fwd(x, y, o, 40), 1, 6, 0.34, INK, o, 0.5);
+      }),
+      bloom: burst((x, y, ang) => {
+        stroke(...fwd(x, y, ang, 30), ang, 60, 7, CUT, 0.32, WEAPON_INK.drill);
+        curls(...fwd(x, y, ang, 56), 7, 6, 0.3, INK, ang, 0.8);
+      }),
+    },
+  },
+  // 코어 드릴 — 큰 획 곁에 뚫린 구멍 고리(자주 속) + 바깥으로 뽑혀 나는 심
+  coredrill: {
+    waza: {
+      along: walk((x, y, _a, o) => {
+        ring(...fwd(x, y, o, 18), 9, 4, 0.12, 1, 0.46, WEAPON_INK.coredrill);
+        plugOut(...fwd(x, y, o, 18), o, 5);
+      }),
+      bloom: burst((x, y, ang) => {
+        ring(...fwd(x, y, ang, 10), 15, 6, 0.12, 1, 0.48, WEAPON_INK.coredrill);
+        ring(...fwd(x, y, ang + 0.9, 30), 9, 4, 0.12, 1, 0.42, WEAPON_INK.coredrill);
+        plugOut(...fwd(x, y, ang, 10), ang, 9);
+        plugOut(...fwd(x, y, ang + 0.9, 30), ang + 0.6, 6);
+      }),
+    },
+  },
+  // 굴착 드릴 — 큰 획 바깥으로 감겨 나가는 흙 띠 나선(올리브 속) + 흙 방울
+  auger: {
+    waza: {
+      along: walk((x, y, _a, o) => {
+        spiral(...fwd(x, y, o, 10), 34, 6, 3.8, 0.44, WEAPON_INK.auger, o);
+        drops(...fwd(x, y, o, 34), 1, o - 0.4, o + 0.4, 140, 220, 3, WEAPON_INK.auger, 900);
+      }),
+      bloom: burst((x, y, ang) => {
+        spiral(x, y, 90, 16, 7, 0.48, WEAPON_INK.auger, ang);
+        drops(...fwd(x, y, ang, 90), 5, ang - 0.9, ang + 0.9, 220, 360, 4, WEAPON_INK.auger, 900);
+      }),
+    },
+  },
+  // 비계 파이프 — 큰 획에서 바깥으로 비껴 꽂힌 짧은 관(은회 속) + 끝 단면 고리
+  pipe: {
+    waza: {
+      along: walk((x, y, a, o) => {
+        const d = lean(o, a, 0.25);
+        pipeLine(...fwd(x, y, d, 26), d, 30, 4.5, 6, 0.44);
+      }),
+      bloom: burst((x, y, ang) => {
+        pipeLine(...fwd(x, y, ang + 0.3, 60), ang + 0.3, 120, 9, 11, 0.46); // 엇갈린 관 둘 — 나란히 세 갈래는 삼지창 아이콘으로 읽혔다
+        pipeLine(...fwd(x, y, ang - 0.75, 40), ang - 0.75, 80, 6, 8, 0.42);
+      }),
+    },
   },
 };
 
@@ -405,10 +577,10 @@ function crackDown(x: number, y: number, len: number, w: number, life: number): 
   bent(pts, w, '', { life, dry: 0.5, pr: 2, gr: 0.2 });
 }
 
-/** 곱슬 부스러기 — 짧게 말린 붓 고리 토막이 돌며 튄다(첫 가닥만 속 색) */
-function curls(x: number, y: number, n: number, r: number, life: number, c: string = INK): void {
+/** 곱슬 부스러기 — 짧게 말린 붓 고리 토막이 돌며 튄다(첫 가닥만 속 색). dir · spread = 튀는 쪽(기본 위로 넓게) */
+function curls(x: number, y: number, n: number, r: number, life: number, c: string = INK, dir = -Math.PI / 2, spread = 1.3): void {
   for (let i = 0; i < n; i++) {
-    const a = -Math.PI / 2 + sgn() * 1.3;
+    const a = dir + sgn() * spread;
     put('arc', x + sgn() * 4, y + sgn() * 3, {
       ...vel(a, 120 + n01() * 110), g: 520, drag: 1.4, life: life + n01() * 0.06, size: r * (0.8 + n01() * 0.4), v: 2.2,
       rot: a, spin: sgn() * 14, c1: i === 0 && c === INK ? WEAPON_INK.drill : c, a: 3.4,
@@ -421,14 +593,16 @@ function plug(x: number, y: number, w: number): void {
   put('pix', x, y, { ...vel(Math.PI / 2 + sgn() * 0.5, 60 + n01() * 40), g: 900, life: 0.7, size: w, v: 1.7, rot: sgn() * 0.3, spin: sgn() * 5, c1: INK, bounce: 1 });
 }
 
-/** 감겨 오르는 흙 띠 — (x, y)에서 h만큼 위로 나선 두 바퀴 반(옆에서 본 꼴: 좌우로 감기며 폭이 줄어든다) */
-function spiral(x: number, y: number, h: number, amp: number, w: number, life: number, c: string = WEAPON_INK.auger): void {
+/** 감겨 오르는 흙 띠 — (x, y)에서 h만큼 위로(dir을 주면 그쪽으로) 나선 두 바퀴 반(옆에서 본 꼴: 좌우로 감기며 폭이 줄어든다) */
+function spiral(x: number, y: number, h: number, amp: number, w: number, life: number, c: string = WEAPON_INK.auger, dir?: number): void {
   const pts: number[] = [];
   const n = 22;
   const ph = n01() * TAU;
+  const [dx, dy] = dir === undefined ? [0, -1] : [Math.cos(dir), Math.sin(dir)];
   for (let i = 0; i <= n; i++) {
     const f = i / n;
-    pts.push(x + Math.sin(ph + f * TAU * 2.5) * amp * (1 - 0.55 * f), y - h * f);
+    const o = Math.sin(ph + f * TAU * 2.5) * amp * (1 - 0.55 * f);
+    pts.push(x + dx * h * f - dy * o, y + dy * h * f + dx * o);
   }
   bent(pts, w, c === GRAY || c === INK ? '' : c, { life, dry: 0.35, pr: 2, gr: 0.3 });
 }
@@ -444,6 +618,88 @@ function pipeLine(x: number, y: number, ang: number, len: number, w: number, r: 
   const d = len / 2 + r;
   ring(x + Math.cos(ang) * d, y + Math.sin(ang) * d, r, Math.max(2.2, w * 0.45), 0.12, 1, life, WEAPON_INK.pipe);
 }
+
+// ── 필살 번짐(waza) — 연장 열둘이 필살 큰 획을 따라 ─────────────────
+// 설계서 11-21 §5: 지금 레시피의 붓놀림을 큰 획 양옆으로 번지게 한다(새 아이콘 · 새 색 없음). 큰 획 몸은 먹이라
+// 그 위에 얹은 먹은 안 보인다 — 모티프는 획 가장자리에서 바깥(법선)으로 뻗고, 위 · 아래를 번갈아 선다.
+// 한 번 부름 = 자리 넷 ~ 일곱(길이 80px당 하나) × 조각 둘 꼴 → 8 ~ 16(시험 weapon-fx)
+
+/** (x, y)에서 a 쪽으로 d만큼 */
+const fwd = (x: number, y: number, a: number, d: number): [number, number] => [x + Math.cos(a) * d, y + Math.sin(a) * d];
+/** 법선 o를 진행 방향 a 쪽으로 t만큼 눕힌 각(t < 0이면 뒤로) */
+const lean = (o: number, a: number, t: number): number => o + t * Math.sign(Math.sin(a - o));
+
+/** 큰 획 위 모티프 자리 — 길이 80px당 하나 꼴로 넷 ~ 일곱, 같은 간격(양 끝 포함) */
+function spots(pts: readonly number[]): ReturnType<typeof samplePath> {
+  let L = 0;
+  for (let i = 2; i + 1 < pts.length; i += 2) L += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]);
+  const n = Math.min(7, Math.max(4, Math.round(L / 80) + 1));
+  return samplePath(pts, L > 1 ? (L / (n - 1)) * 0.999 : 1);
+}
+
+/** 번짐 · 마무리 크기 — 모티프 값은 평타 그림 치수로 적고 여기서 키운다(키운 그림은 WEAPON_FX.LIFE배 오래 산다) */
+const ALONG_K = 1.45;
+const BLOOM_K = 1.2;
+
+/** 번짐 모티프 하나 — (x, y) = 큰 획 위 자리, a = 진행 방향, o = 이 자리가 뻗는 쪽 법선(위 · 아래 번갈아), up = 위쪽 법선, i = 몇 번째 */
+type Motif = (x: number, y: number, a: number, o: number, up: number, i: number) => void;
+
+/** along 틀 — 자리마다 u × dur초 뒤(뿌리 → 끝) 그 자리를 축으로 k배로 모티프 하나 */
+function walk(motif: Motif): WazaArt['along'] {
+  return (pts, k, _c, dur) => {
+    spots(pts).forEach((s, i) => {
+      let up = s.ang - Math.PI / 2;
+      if (Math.sin(up) > 0) up += Math.PI;
+      const o = i % 2 ? up + Math.PI : up;
+      later(s.u * dur, () => scaled(s.x, s.y, k * ALONG_K, () => motif(s.x, s.y, s.ang, o, up, i)));
+    });
+  };
+}
+
+/** bloom 틀 — (x, y)를 축으로 k배 */
+function burst(draw: (x: number, y: number, ang: number) => void): WazaArt['bloom'] {
+  return (x, y, ang, k) => scaled(x, y, k * BLOOM_K, () => draw(x, y, ang));
+}
+
+/** 갈라지는 금 — (x, y)에서 d 쪽으로 len, 마디 셋이 좌우로 꺾이는 마른 먹 한 획 */
+function crackAt(x: number, y: number, d: number, len: number, w: number, life: number, core = ''): void {
+  const pts = [x, y];
+  for (let j = 1; j <= 3; j++) {
+    const off = j === 3 ? 0 : (j % 2 ? 1 : -1) * (2.5 + n01() * 3.5);
+    const [px, py] = fwd(x, y, d, (len * j) / 3);
+    pts.push(px - Math.sin(d) * off, py + Math.cos(d) * off);
+  }
+  bent(pts, w, core, { life, dry: 0.5, pr: 2, gr: 0.2 });
+}
+
+/** 쐐기 자국 — 꼭짓점이 (x, y)에서 d 쪽 h, 밑변 폭 2b(꺾인 한 획) */
+function wedgeAt(x: number, y: number, d: number, h: number, b: number, w: number, life: number, core: string): void {
+  const [ax, ay] = fwd(x, y, d, h);
+  const [nx, ny] = [-Math.sin(d) * b, Math.cos(d) * b];
+  bent([x - nx, y - ny, ax, ay, x + nx, y + ny], w, core, { life, dry: 0.3, pr: 2, gr: 0.15 });
+}
+
+/** 돌 조각 — 돌며 튀어 떨어지는 작은 네모(곡괭이 청회 · 먹 테) */
+function chips(x: number, y: number, n: number, d: number, spread: number, spd: number, size: number): void {
+  for (let i = 0; i < n; i++) {
+    const a = d + sgn() * spread;
+    put('pix', x + sgn() * 3, y + sgn() * 3, {
+      ...vel(a, spd * (0.6 + n01() * 0.5)), g: 900, life: 0.45 + n01() * 0.15, size: size * (0.7 + n01() * 0.5), v: 0.8 + n01() * 0.5,
+      rot: n01() * TAU, spin: sgn() * 10, c1: WEAPON_INK.pickaxe, bounce: 1,
+    });
+  }
+}
+
+/** 뽑힌 심 — 구멍에서 d 쪽으로 빠져 돌며 떨어지는 세로로 긴 먹 토막 */
+function plugOut(x: number, y: number, d: number, w: number): void {
+  put('pix', x, y, { ...vel(d + sgn() * 0.3, 110 + n01() * 70), g: 900, life: 0.6, size: w, v: 1.7, rot: d + Math.PI / 2, spin: sgn() * 6, c1: INK, bounce: 1 });
+}
+
+/** 두드림 — 큰 획 바깥(d 쪽)으로 잘게 떠는 획 n개(착암기 tap을 돌려 놓는다) */
+function tapsAt(x: number, y: number, d: number, n: number, dur: number, len: number, w: number): void {
+  put('tap', x, y, { life: dur + 0.12, size: len, v: w, a: dur, st: n, rot: d + Math.PI / 2, c1: INK, c2: WEAPON_INK.jackhammer });
+}
+
 
 // ── 그림 없던 순간 셋 ─────────────────────────────────────────
 
@@ -734,6 +990,14 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
       // 잘게 떠는 획 — i번째는 (i/n)·a초에 박혀 0.1초 동안 가늘어지며 사라진다. 친 자리 둘레에 조금씩 비켜 박힌다. 막 박힌 획은 속이 포인트 색
       const age0 = p.max - p.life;
       const n = p.st;
+      if (p.rot) { // 필살 번짐 — 큰 획 바깥(rot − π/2 쪽)으로 박힌다. 평타는 rot 0(세로 그대로)
+        ctx.save();
+        ctx.translate(p.x, py);
+        ctx.rotate(p.rot);
+        drawWeaponBit(ctx, { ...p, x: 0, rot: 0 }, 0);
+        ctx.restore();
+        return;
+      }
       for (let i = 0; i < n; i++) {
         const age = age0 - (p.a * i) / n;
         const span = 0.12;
