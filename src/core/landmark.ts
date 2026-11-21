@@ -6,10 +6,11 @@
 // 난수 없음 — 순서가 고정이라 공략이 그대로 통한다.
 
 import type { FallingStack, Floor, GameState, LandmarkId, LandmarkSt, LandmarkState, Material } from './types';
-import { LANDMARK, PLAYER, SCORE, SPECIAL, STAGE, VIEW, WEAPON, GUARD_GAUGE } from '../config';
+import { LANDMARK, PLAYER, SCORE, SPECIAL, STAGE, VIEW, GUARD_GAUGE } from '../config';
 import { makeFloor, makeStack } from './building';
 import { addScore, attackRange, guardBounced, hurtPlayer, registerHit } from './combat';
 import { guardActive } from './player';
+import { reachOf } from './perks';
 
 const L = LANDMARK;
 const MAT: Readonly<Record<string, Material>> = { w: 'weak', m: 'mid', h: 'hard' };
@@ -176,7 +177,7 @@ export function tryHitLandmark(s: GameState): boolean {
   const lm = s.lm;
   const b = lm?.body;
   if (!lm || !b || lm.st !== 'sit' || b.floors.length === 0) return false;
-  const [lo, hi] = attackRange(s.player.y, WEAPON[s.weapon].reach);
+  const [lo, hi] = attackRange(s.player.y, reachOf(s)); // 퍽 · 공중 · 불새 불길도 명물에 먹는다(11-21)
   if (b.y < lo || b.y > hi) return false;
   const mat = b.floors[0].mat;
   if (damageBody(s, lm, 1)) {

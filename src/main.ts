@@ -14,7 +14,7 @@ import { notifyAppReady, onLifecycle, isNative } from './platform/native';
 import { initOta } from './platform/ota';
 import { unlockAllSave } from './ui/debugMenu';
 
-// 시험판은 켤 때마다 상점 전부 · 재화를 채운다 — 메인 화면이 바뀌어 로고 7연타(전해금) 자리가 없어졌다(11-21 사용자
+// 시험판은 열 때마다 상점 전부 · 재화를 채운다 — 메인 화면이 바뀌어 로고 7연타(전해금) 자리가 없어졌다(11-21 사용자
 // 「메인이바뀌어서 로고가안보여」). 앱이 저장을 읽기 전이라 새로고침이 필요 없다. 릴리스 빌드엔 이 분기가 없다
 if (import.meta.env.VITE_TESTER === '1') unlockAllSave();
 
