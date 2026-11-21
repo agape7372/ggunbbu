@@ -541,8 +541,8 @@ export interface Recipe {
   destroy(x: number, y: number, k: number, c: string): void;
   /** 헛스윙 — 칼끝 자리에서 */
   whiff?(x: number, y: number, c: string): void;
-  /** 칼 기운 — b = 칼날(손 → 칼끝, 월드), n = 몇 번째 */
-  aura?(b: Seg, n: number, c: string): void;
+  /** 칼 기운 — b = 칼날(손 → 칼끝, 월드), n = 몇 번째, cr = 콤보 비율 min(콤보, 100) / 100(불새가 혀 길이로 쓴다) */
+  aura?(b: Seg, n: number, c: string, cr?: number): void;
   every?: number;
   /** 완파 물들임 — 완파 때 그 칼의 모티프가 한 번 더 크게(전화면은 칠하지 않는다). own이면 destroy가 둘째 박자로 스스로 한다 */
   tint?: true;
@@ -1584,7 +1584,7 @@ export function bladeAura(s: GameState): void {
   if (!b) return;
   const x = VIEW.LANE_X[s.player.lane];
   const y = GROUND - s.player.y;
-  r.aura([x + b[0], y + b[1], x + b[2], y + b[3]], auraN++, inkOf(s.weapon));
+  r.aura([x + b[0], y + b[1], x + b[2], y + b[3]], auraN++, inkOf(s.weapon), Math.min(s.combo, 100) / 100);
 }
 
 export function resetBladeFx(): void {
