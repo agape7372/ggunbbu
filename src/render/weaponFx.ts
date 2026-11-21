@@ -10,7 +10,7 @@
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
-  N, bent, drops, keepBits, later, line, n01, pool, put, scaled, sgn, sweep, tierK, vel, type Bit,
+  N, bent, drops, keepBits, later, line, n01, pool, put, scaled, sgn, sweep, tierK, vel, type Bit, type WazaArt,
 } from './bladeFx';
 import { PRESS, brushArc, brushLine, enso, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
 
@@ -129,7 +129,7 @@ function drillCoil(x: number, y: number, ang: number, len: number, w: number, li
 }
 
 /** 연장 전설의 칼 기운 · 물들임 — 대검 RECIPES의 aura · every · tint와 같은 뜻(bladeFx.bladeAura가 읽는다) */
-export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number, number, number, number], n: number, c: string): void; every?: number; tint?: true }>> = {
+export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number, number, number, number], n: number, c: string): void; every?: number; tint?: true; waza?: WazaArt }>> = {
   // 다이아 드릴 — 칼끝(비트)에서 짧게 내지르는 획과 작은 소용돌이가 이어 그어진다. 가끔 쇳밥(끊긴 붓 고리) 하나가 튄다
   diadrill: {
     aura(b, n) {
@@ -567,10 +567,15 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
 
 /** 필살 박자 — 그 연장의 타격 · 층 깨기 · 완파 그림 하나(줄 끝 가로 박자 · 콤보 단 1.5). 키우기 · 지키기는 bladeFx.weaponBurst가 */
 export function toolBurst(w: WeaponId, x: number, y: number, power: 'hit' | 'floor' | 'destroy'): void {
+  toolPiece(w, power, x, y, 1.5);
+}
+
+/** 연장 그림 하나 — 콤보 단 k · 줄 박자 b(기본 = 줄 끝 가로). weaponAlong · weaponBloom 기본 판도 이 길로 부른다 */
+export function toolPiece(w: WeaponId, power: 'hit' | 'floor' | 'destroy', x: number, y: number, k: number, b: Beat = BEATS[2]): void {
   const t = TOOLS[w];
   if (!t) return;
-  if (power === 'destroy') t.destroy(x, y, 1.5);
-  else t[power](x, y, BEATS[2], 1.5);
+  if (power === 'destroy') t.destroy(x, y, k);
+  else t[power](x, y, b, k);
 }
 
 /** resetBladeFx가 부른다 — 연타 줄을 처음부터. 마스크 색은 장착이라 그대로 둔다 */
