@@ -496,6 +496,33 @@ function zig(x: number, y: number, ang: number, len: number, w: number, n: numbe
   bent(pts, w, core, { life, dry, body });
 }
 
+// ── 필살 큰 획을 따라(waza.along) ────────────────────────────
+
+interface Sample { x: number; y: number; ang: number; u: number }
+/**
+ * 경로 위 표본 — 길이 50px당 하나(max개까지 같은 간격으로 솎는다)를 앞 → 뒤 차례로 시각 u × dur에 f로 그린다. 표본 둘레를 k배로 키운다.
+ * f(s, i, gap, n) — s = 표본(자리 · 진행 각 · 진행 0~1), i = 몇 번째, gap = 이웃 표본까지 거리, n = 표본 수
+ */
+function walk(pts: readonly number[], k: number, dur: number, max: number, f: (s: Sample, i: number, gap: number, n: number) => void): void {
+  const all = samplePath(pts, ALONG_STEP);
+  const n = Math.min(all.length, max);
+  const at = (i: number): Sample => all[n === all.length ? i : Math.round((i * (all.length - 1)) / (n - 1))];
+  for (let i = 0; i < n; i++) {
+    const s = at(i);
+    const t = at(i + 1 < n ? i + 1 : Math.max(0, i - 1));
+    const gap = Math.hypot(t.x - s.x, t.y - s.y) || ALONG_STEP;
+    later(s.u * dur, () => scaled(s.x, s.y, k, () => f(s, i, gap, n)));
+  }
+}
+/** 표본을 가운데 두고 진행 방향으로 L, 법선(진행 각 + 90°) 쪽으로 off 비킨 토막 [x0, y0, x1, y1] */
+function seg(s: Sample, L: number, off = 0): [number, number, number, number] {
+  const [ca, sa] = [Math.cos(s.ang), Math.sin(s.ang)];
+  const [x, y] = [s.x - sa * off, s.y + ca * off];
+  return [x - (ca * L) / 2, y - (sa * L) / 2, x + (ca * L) / 2, y + (sa * L) / 2];
+}
+/** 불 · 줄처럼 위로 가는 것 — 친 방향이 위쪽이면 그 방향과 하늘 사이, 아래쪽이면 하늘 */
+const upward = (ang: number): number => (Math.sin(ang) < 0 ? (ang - Math.PI / 2) / 2 : -Math.PI / 2);
+
 // ── 칼마다 ───────────────────────────────────────────────────
 
 export interface Recipe {
@@ -548,6 +575,22 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
       drops(x, y, N(7, k), -2.9, -0.25, 200, 380, 3.2);
       dust(x, y + 6, 30, INK, 0.5);
     },
+    // 필살 — 큰 획에서 무거운 먹 방울이 차례로 떨어진다(뭉툭한 튐 + 방울 둘, 셋에 하나는 포인트 색 방울)
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 6, (s, i) => {
+          spat(s.x, s.y, 6.5, normalUp(s.ang) + sgn() * 0.3, INK, c, 0.2, 3);
+          drops(s.x, s.y, 2, 0.7, 2.4, 60, 170, 3.4, i % 3 === 1 ? c : INK);
+        });
+      },
+      bloom(x, y, ang, k, c) {
+        scaled(x, y, k, () => {
+          spat(x, y, 11, ang, INK, c, 0.24, 8);
+          drops(x, y, 7, ang - 1.2, ang + 1.2, 200, 380, 3.4);
+          dust(x, y + 6, 30, INK, 0.5);
+        });
+      },
+    },
   },
   // 톱날 — 갈래가 많은 거친 붓, 친 자리엔 톱질 왕복과 녹빛 톱밥
   saw: {
@@ -570,6 +613,31 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     whiff(x, y, c) {
       dust(x, y, 5, c, 0.3, 30, 5);
     },
+    // 필살 — 큰 획을 따라 톱질 왕복(밀고 당기는 짧은 획 둘)이 차례로 긁히고 녹빛 톱밥이 인다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 7, (s, i, gap) => {
+          const L = Math.min(42, gap * 0.85);
+          const [a0, a1, a2, a3] = seg(s, L, -3);
+          const [b0, b1, b2, b3] = seg(s, L * 0.8, 3);
+          line(a0, a1, a2, a3, 5.2, c, { pr: 2, dry: 0.6, life: 0.42, gr: 0.2 });
+          line(b2, b3, b0, b1, 4.2, '', { pr: 2, dry: 0.6, life: 0.46, gr: 0.2 }); // 당기는 획은 거꾸로
+          if (i % 2 === 0) dust(s.x, s.y + 6, 11, c, 0.5, 40, 8);
+        });
+      },
+      bloom(x, y, ang, k, c) {
+        scaled(x, y, k, () => {
+          const a = ang + Math.PI / 2; // 친 방향을 가로지르는 왕복
+          for (let i = 0; i < 3; i++) {
+            const d = i % 2 ? -1 : 1;
+            const [ox, oy] = [x + Math.cos(ang) * i * 9, y + Math.sin(ang) * i * 9];
+            stroke(ox, oy, a + d * 0.05, (56 - i * 6) * d, 5 - i * 0.6, i === 0 ? c : '', { pr: 2, dry: 0.6, life: 0.26 + i * 0.05, gr: 0.2 });
+          }
+          dust(x, y + 8, 30, c, 0.7, 60, 16);
+          dust(x, y - 10, 22, INK, 0.55, 40, 10);
+        });
+      },
+    },
   },
   // 공사중 — 노랑 속을 먹 빗금이 가르는 띠 획(테이프 결)
   stripe: {
@@ -584,6 +652,23 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     destroy(x, y, k, c) {
       stroke(x, y, -0.28, 170 * k, 14, c, { stripes: 1, pr: 2, life: 0.42 });
       stroke(x, y + 8, 0.3, 150 * k, 13, c, { stripes: 1, pr: 2, life: 0.4 });
+    },
+    // 필살 — 큰 획을 따라 빗금 띠 토막이 엇갈려 차례로 붙는다(출입 금지 테이프)
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 7, (s, i, gap) => {
+          stroke(s.x, s.y, s.ang + (i % 2 ? 0.24 : -0.24), Math.min(56, gap * 0.9), 11, c, { stripes: 1, pr: 2, life: 0.46 });
+          if (i % 2) spat(s.x, s.y, 4.5, normalUp(s.ang), INK, '', 0.16, 4);
+        });
+      },
+      bloom(x, y, ang, k, c) {
+        scaled(x, y, k, () => {
+          const a = ang + Math.PI / 2;
+          stroke(x, y, a - 0.32, 160, 14, c, { stripes: 1, pr: 2, life: 0.42 });
+          stroke(x + Math.cos(ang) * 8, y + Math.sin(ang) * 8, a + 0.32, 140, 13, c, { stripes: 1, pr: 2, life: 0.4 });
+          spat(x, y, 7, ang, INK, '', 0.18, 6);
+        });
+      },
     },
   },
   // 철골 — 꺾인 획(잔상은 bentTrail), 밑면에 줄지어 찍히는 리벳, 둔한 마른 획
@@ -601,6 +686,32 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
       rivets(x - 50, y + 16, 6, 17, 0, c, 0.6);
       line(x - 90 * k, y + 30, x, y - 20, 13, c, { pr: 2, dry: 0.3, life: 0.36 });
       line(x, y - 20, x + 90 * k, y + 26, 13, '', { pr: 1, dry: 0.4, life: 0.36 });
+    },
+    // 필살 — 큰 획을 따라 리벳 줄이 차례로 박히고, 한쪽 곁엔 둔한 마른 획(철골 날개)이 나란히 붙는다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 7, (s, i, gap) => {
+          const [x0, y0] = seg(s, gap * 0.8, -7);
+          rivets(x0, y0, 4, Math.min(13, gap * 0.22), s.ang, c, 0.56);
+          if (i % 2 === 0) {
+            const [a0, a1, a2, a3] = seg(s, gap * 1.05, 8);
+            line(a0, a1, a2, a3, 7, '', { pr: 2, dry: 0.75, life: 0.46 });
+          }
+        });
+      },
+      // 마무리 — 친 쪽으로 꺾인 철골 두 다리 + 다리마다 리벳 줄
+      bloom(x, y, ang, k, c) {
+        scaled(x, y, k, () => {
+          const [ca, sa] = [Math.cos(ang), Math.sin(ang)];
+          const [nx, ny] = [-sa, ca];
+          const tip: [number, number] = [x + ca * 26, y + sa * 26];
+          for (const d of [1, -1]) {
+            const [bx, by] = [x - ca * 34 + nx * d * 92, y - sa * 34 + ny * d * 92];
+            line(bx, by, tip[0], tip[1], 13, d > 0 ? c : '', { pr: 2, dry: d > 0 ? 0.3 : 0.4, life: 0.38 });
+            rivets(bx - nx * d * 10, by - ny * d * 10, 6, 15, Math.atan2(tip[1] - by, tip[0] - bx), c, 0.6);
+          }
+        });
+      },
     },
   },
   // 벽돌 — 뭉툭한 넓은 붓. 맞은 자리에서 네모 벽돌 조각이 튀어 떨어지고 붉은 가루가 인다
@@ -623,6 +734,22 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     whiff(x, y, c) {
       dust(x, y, 5, c, 0.26, 20, 5);
     },
+    // 필살 — 큰 획을 따라 벽돌 조각이 차례로 튀어나와 떨어지고 붉은 가루가 인다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 6, (s, i) => {
+          bricks(s.x, s.y, 2, 6.5, c, 230);
+          if (i % 2 === 0) dust(s.x, s.y + 2, 10, c, 0.4, 30, 8);
+        });
+      },
+      bloom(x, y, _ang, k, c) {
+        scaled(x, y, k, () => {
+          bricks(x, y, 9, 8, c, 360);
+          dust(x, y + 6, 28, c, 0.6, 50, 16);
+          dust(x, y - 10, 18, INK, 0.5, 30, 9);
+        });
+      },
+    },
   },
   // 철근 — 가는 갈래 붓. 다발이 지나간 자리에 나란한 가는 획 여럿 + 녹 가루
   strand: {
@@ -643,6 +770,22 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     whiff(x, y, c) {
       strands(x, y, -0.9, 16, 2, 3, 1.4, c, 0.16);
     },
+    // 필살 — 큰 획을 따라 철근 다발(나란한 가는 획 셋)이 차례로 지나가고 녹 가루가 인다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 5, (s, i, gap) => {
+          strands(s.x, s.y, s.ang + sgn() * 0.06, Math.min(70, gap * 1.05), 3, 5, 2.6, c, 0.46);
+          if (i % 2) dust(s.x, s.y + 4, 9, c, 0.42, 30, 7);
+        });
+      },
+      bloom(x, y, ang, k, c) {
+        scaled(x, y, k, () => {
+          strands(x, y, ang - 0.3, 110, 5, 6, 3, c, 0.4);
+          strands(x, y + 8, ang + 0.35, 90, 4, 6, 2.6, '', 0.38);
+          dust(x, y + 6, 26, c, 0.6, 50, 16);
+        });
+      },
+    },
   },
   // 유리 — 얇고 날 선 붓. 맞은 자리에 가는 한 획 + 날카로운 세모 파편이 흩어진다(빛 번짐 · 반짝이 없음)
   pane: {
@@ -662,6 +805,25 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     whiff(x, y, c) {
       shards(x, y, 1, 2, c, 90);
+    },
+    // 필살 — 큰 획을 따라 유리가 차례로 금 가고(가는 획 · 지그재그 금 번갈아) 날 선 파편이 흩어진다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 6, (s, i, gap) => {
+          if (i % 2) zig(s.x, s.y, s.ang + sgn() * 0.1, gap * 0.9, 2.2, 4, 4.5, '', 0.42, 0.1);
+          else {
+            const [a0, a1, a2, a3] = seg(s, gap * 0.8, 5);
+            line(a0, a1, a2, a3, 2.6, c, { life: 0.42, dry: 0.05 });
+          }
+          shards(s.x, s.y, 2, 6, c, 240);
+        });
+      },
+      bloom(x, y, ang, k, c) {
+        scaled(x, y, k, () => {
+          stroke(x, y, ang + Math.PI / 2 - 0.3, 120, 4, c, { life: 0.34, dry: 0.05 });
+          shards(x, y, 13, 40, c, 400);
+        });
+      },
     },
   },
   // ★전설 일곱(아래 · 먹 포함)은 own — 공통 먹 베기 획 · 튐 없이 제 붓놀림만 긋는다. 먹 붓 화법 그대로, 먹 색 자체가 시그니처 색이다(속 색을 심지 않는다)
@@ -723,6 +885,34 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     every: 0.07,
     tint: true,
+    // 필살 — 큰 획 위쪽으로 불 혀가 뿌리부터 차례로 솟는다(가운데가 길다 · 셋에 하나 곁에 밝은 혀), 끝에서 불티가 오른다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 8, (s, i, _gap, n) => {
+          const a = upward(normalUp(s.ang)); // 법선 위쪽과 하늘 사이 — 불은 위로 오른다
+          const h = (24 + 26 * Math.sin(Math.PI * s.u)) * (0.85 + 0.3 * n01());
+          lick(s.x, s.y, -Math.sin(a) * h, Math.cos(a) * h + sgn() * 3, 10 - 4 * Math.abs(s.u - 0.5), c, 90);
+          if (i % 3 === 1) later(0.05, () => lick(s.x + sgn() * 4, s.y - 4, -Math.sin(a) * h * 0.55, Math.cos(a) * h * 0.4, 4.6, WEAPON_LITE.flame, 110));
+          if (i === n - 1) later(0.06, () => drops(s.x, s.y - 10, 3, -2.4, -0.7, 70, 180, 2.2, c, -170, true));
+        });
+      },
+      bloom(x, y, ang, k, c) {
+        const base = upward(ang);
+        const H = [26, 42, 52, 38, 24];
+        scaled(x, y, k, () => {
+          for (let i = 0; i < 5; i++) {
+            const d = Math.abs(i - 2);
+            const a = base + (i - 2) * 0.28;
+            later(d * 0.035, () => lick(x + (i - 2) * 13 + sgn() * 3, y + d * 2, -Math.sin(a) * H[i], Math.cos(a) * H[i], 11 - d, c, 100));
+          }
+          later(0.1, () => {
+            lick(x - 8, y - 8, 22, -5, 5, WEAPON_LITE.flame, 120);
+            lick(x + 10, y - 6, 18, 6, 4.5, WEAPON_LITE.flame, 120);
+            drops(x, y - 10, 5, -2.6, -0.5, 80, 210, 2.2, c, -180, true);
+          });
+        });
+      },
+    },
   },
   // 서리 — 얼음 그림 붓놀림: 마르지 않은 날 선 곧은 쪽빛 획이 결정(곧은 줄기 + 60° 가지)으로 자라고, 한 박자 뒤 세모 조각으로 깨진다. 밑면엔 각진 얼음 금이 달린다.
   // 칼길은 여덟 점을 지나며 꺾인 날 선 획(결정 면) — 불 · 먹의 휜 마른 획과 갈린다
@@ -769,6 +959,28 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     every: 0.12,
     tint: true,
+    // 필살 — 큰 획을 따라 각진 얼음 금이 달리고, 그 금에서 양옆 번갈아 얼음 가시가 곧게(획에 수직으로) 솟는다. 다 선 뒤 가운데에서 세모 조각으로 깨진다
+    // (가시를 진행 쪽으로 기울이면 금과 V자가 되어 새 떼로 읽혔다)
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 7, (s, i, gap, n) => {
+          const sd = i % 2 ? 1 : -1;
+          const [x0, y0] = seg(s, gap);
+          iceCrack(x0, y0, s.ang, gap, 3.2, c, 0.5);
+          iceSpike(s.x, s.y, s.ang + sd * (Math.PI / 2) + sgn() * 0.08, 28 + 22 * Math.sin(Math.PI * s.u), 8, c, 0.46, false);
+          if (i === n >> 1) later(dur * 0.6 + 0.2, () => iceBits(s.x, s.y - 8, 4, 16, c, 200));
+        });
+      },
+      bloom(x, y, ang, k, c) {
+        const [px, py] = [Math.cos(ang + Math.PI / 2), Math.sin(ang + Math.PI / 2)];
+        scaled(x, y, k, () => {
+          iceCrack(x - px * 70, y - py * 70, ang + Math.PI / 2, 140, 4, c, 0.44);
+          [-1, -0.45, 0, 0.45, 1].forEach((d, i) =>
+            later(0.02 + i * 0.025, () => iceSpike(x + px * d * 40, y + py * d * 40, ang + d * 0.6 + sgn() * 0.05, [36, 58, 74, 54, 34][i], 12 - Math.abs(i - 2) * 1.5, c, 0.44)));
+          later(0.34, () => iceBits(x + Math.cos(ang) * 30, y + Math.sin(ang) * 30, 8, 40, c, 260));
+        });
+      },
+    },
   },
   // 번개 — 번개 그림 붓놀림: 하늘에서 마디가 고르지 않게 꺾인 보라 한 획이 내리꽂히고(하늘 쪽이 굵다) 곧 가는 가지가 한 번 더 친다. 맞은 면을 따라 잔 번개가 긴다.
   // 칼길은 일곱 점을 지나며 꺾인 보라 획 + 꺾인 자리에서 바깥으로 갈라진 잔가지 둘. 완파는 가운데 줄기가 가장 크고 양옆 줄기가 차례로
@@ -817,6 +1029,28 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     every: 0.09,
     tint: true,
+    // 필살 — 큰 획을 따라 잔 번개가 뿌리부터 기어가고(꺾인 가는 획), 두 마디에 하나 옆으로 가지가 갈라진다. 끝에서 두 갈래로 갈라져 빠진다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 7, (s, i, gap, n) => {
+          zig(s.x, s.y, s.ang + sgn() * 0.12, gap * 1.05, 3.8, 4, 7, '', 0.34, 0.2, c);
+          if (i % 2) {
+            const sd = side();
+            later(0.04, () => zig(s.x, s.y, s.ang + sd * (Math.PI / 2 - 0.5), 22 + 10 * n01(), 2.8, 3, 5, '', 0.18, 0.15, c));
+          }
+          if (i === n - 1) later(0.06, () => { for (const d of [-1, 1]) zig(s.x, s.y, s.ang + d * 0.55, 28, 2.8, 3, 5, '', 0.2, 0.15, c); });
+        });
+      },
+      // 마무리 — 그 자리에 내리꽂는 번개 + 맞은 면을 기는 잔 번개 + 친 쪽으로 갈라진 가지 셋(부채 반쪽), 한 박자 뒤 잔뢰
+      bloom(x, y, ang, k, c) {
+        scaled(x, y, k, () => {
+          bolt(x, y, 96, 8, c, 0.3, 5);
+          crawl(x, y, 40, 3.6, c);
+          for (const d of [-0.5, 0, 0.5]) zig(x, y, ang + d, 34 - Math.abs(d) * 16, 3, 3, 5, '', 0.2, 0.15, c);
+          later(0.12, () => bolt(x + sgn() * 24, y, 60, 3.4, c, 0.18, 4));
+        });
+      },
+    },
   },
   // 크레인 — 들어 올린다: 맞은 자리에서 연두 줄이 위로 곧게 끌려 오르고 줄 끝 갈고리에 매달린 짐(마른 붓 토막)이 함께 들린다(줄 위 지브 토막은 글자로 읽혀 뺐다).
   // 칼길은 나란히 가는 가는 연두 획 둘(지브 현). 완파는 탑 크레인: 기둥 + 꼭대기 위로 솟은 머리 + 긴 지브와 짧은 뒤 지브 + 머리에서 두 끝으로 당긴 줄 + 뒤 지브 밑 균형추 + 지브에서 내려온 줄 셋이 잔해를 끌어 올린다
@@ -865,6 +1099,23 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     every: 0.16,
     tint: true,
+    // 필살 — 큰 획을 따라 연두 줄이 차례로 위로 끌려 오르고, 세 마디에 하나는 갈고리에 걸린 짐까지 함께 들린다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 7, (s, i) => {
+          line(s.x + sgn() * 3, s.y + 6, s.x, s.y - (40 + 18 * n01()), 4.2, '', { body: c, pr: 1, life: 0.46, vy: -64, dry: 0.2 });
+          if (i % 2) later(0.05, () => lift(s.x + sgn() * 8, s.y + 6, 44, 4.6, c, 0.44, -52));
+        });
+      },
+      // 마무리 — 그 위에 지브 한 획이 걸리고 줄 셋이 차례로 짐을 끌어 올린다
+      bloom(x, y, _ang, k, c) {
+        scaled(x, y, k, () => {
+          const top = y - 70;
+          line(x - 74, top + 2, x + 74, top - 3, 9, '', { body: c, pr: 5, dry: 0.35, life: 0.48, gr: 0.12 });
+          [[-46, 58], [0, 80], [46, 52]].forEach(([dx, L], i) => later(0.06 + i * 0.05, () => lift(x + dx, top + L, L, 4.5 - i * 0.4, c, 0.36, -34)));
+        });
+      },
+    },
   },
   // 먹 — 쪽빛 붓글씨(먹은 쓰지 않는다): 칼길이 쪽빛 마른 붓 획이 된다. 획은 붓 누름(머리를 눌러 대 뭉툭 · 끝이 갈라지며 빠진다).
   // 친 자리엔 비스듬히 오르는 굵은 가로 획 + 물방울 점, 층 깨기는 삐침 하나 + 점(가로 띠로 깔지 않는다), 완파는 플레이어 옆 한 칸에 클 태 자를 빠른 획 순서로. 방울은 땅에 닿으면 사라진다(웅덩이 없음)
@@ -923,6 +1174,30 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     every: 0.16,
     tint: true,
+    // 필살 — 큰 획 곁을 따라 쪽빛 붓 획(머리 눌러 대 · 끝 갈라짐)이 양옆 번갈아 이어 그어지고, 두 획에 하나 반대쪽으로 붓 튐이 난다(둥근 방울은 빗방울로 읽혀 안 쓴다)
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 7, (s, i, gap) => {
+          const sd = i % 2 ? 1 : -1;
+          const [a0, a1, a2, a3] = seg(s, Math.min(60, gap * 1.05), sd * 10);
+          line(a0, a1, a2, a3, 11, '', { body: c, pr: 5, gr: 0.24, dry: 0.45, life: 0.46 });
+          if (i % 2 === 0) later(0.03, () => spat(s.x + Math.sin(s.ang) * sd * 12, s.y - Math.cos(s.ang) * sd * 12, 7, s.ang - sd * (Math.PI / 2), c, '', 0.2, 4));
+        });
+      },
+      // 마무리 — 친 쪽으로 삐침 → 파임 → 점(붓글씨 획 순서) + 붓 튐
+      bloom(x, y, ang, k, c) {
+        const s = side();
+        const [ca, sa] = [Math.cos(ang), Math.sin(ang)];
+        const [nx, ny] = [-sa * s, ca * s];
+        const o = { body: c, gr: 0.12, dry: 0.4, life: 0.4 };
+        scaled(x, y, k, () => {
+          line(x - nx * 34, y - ny * 34, x + ca * 64 + nx * 10, y + sa * 64 + ny * 10, 15, '', { ...o, pr: 5, bend: -8 }); // 삐침
+          later(0.04, () => line(x + ca * 30, y + sa * 30, x + ca * 10 + nx * 44, y + sa * 10 + ny * 44, 14, '', { ...o, pr: 4, dry: 0.3 })); // 파임
+          later(0.08, () => line(x + ca * 70 - nx * 22, y + sa * 70 - ny * 22, x + ca * 58 - nx * 30, y + sa * 58 - ny * 30, 19, '', { ...o, pr: 1, dry: 0.1, life: 0.36 })); // 점
+          spat(x, y, 8, ang, c, '', 0.22, 5);
+        });
+      },
+    },
   },
   // 흑철 — 가장 무거운 붓: 친 자리에 자주 물감이 번지고(발묵 · 마르지 않는다) 그 곁을 머리를 눌러 댄 굵은 자주 곧은 획이 베기 방향으로 무겁게 내려 긋고(물결 획은 문어 · 오징어 발로 읽혔다),
   // 한 박자 뒤 자주 방울이 거꾸로 떠오른다(셋에 하나는 밝은 짝). 칼길은 가장 넓고 젖은 자주 획
@@ -961,6 +1236,28 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     every: 0.1,
     tint: true,
+    // 필살 — 큰 획을 따라 자주 물감이 차례로 번지고(발묵), 두 마디에 하나 곁을 누름 획이 나란히 내려 긋는다. 한 박자 뒤 방울이 거꾸로 떠오른다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 6, (s, i, gap) => {
+          bleed(s.x, s.y, 6, c, 0.5);
+          if (i % 2 === 0) {
+            const [a0, a1, a2, a3] = seg(s, gap * 0.95, 9);
+            line(a0, a1, a2, a3, 7.5, '', { body: c, pr: 5, dry: 0.5, gr: 0.1, life: 0.46 });
+          } else later(0.08, () => rise(s.x, s.y - 6, 2, 8, 2.8, c));
+        });
+      },
+      // 마무리 — 그 자리에서 친 쪽으로 무겁게 누른 굵은 한 획 + 끝에 고이는 발묵 + 떠오르는 방울
+      bloom(x, y, ang, k, c) {
+        const [ca, sa] = [Math.cos(ang), Math.sin(ang)];
+        const [ex, ey] = [x + ca * 96 - sa * 26, y + sa * 96 + ca * 26];
+        scaled(x, y, k, () => {
+          line(x, y, ex, ey, 18, '', { body: c, pr: 5, dry: 0.5, gr: 0.12, life: 0.42 });
+          later(0.05, () => bleed(ex, ey, 10, c, 0.42));
+          later(0.14, () => rise(x + ca * 40, y + sa * 40, 6, 40, 3.4, c));
+        });
+      },
+    },
   },
   // 황금 — 금 물감 붓놀림: 금 튐과 접혔다 펴지며 흔들려 내리는 금박(셋에 하나는 밝은 금). 칼길은 마른 금 획에서 금박이 떨어져 나간다.
   // 완파는 넓은 붓으로 마르게 그은 금 획(비백) 한 번 + 큰 금 튐 + 금박이 터지고, 위에서 금박 비가 두 번 더 내린다
@@ -1007,6 +1304,30 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
     every: 0.15,
     tint: true,
+    // 필살 — 큰 획을 따라 마른 금 획 둘(금 · 밝은 금)이 나란히 이어 그어지고, 두 마디에 하나 금박이 떨어져 나간다
+    waza: {
+      along(pts, k, c, dur) {
+        walk(pts, k, dur, 6, (s, i, gap) => {
+          const L = gap * 1.02;
+          const [a0, a1, a2, a3] = seg(s, L, -6);
+          const [b0, b1, b2, b3] = seg(s, L * 0.9, 5);
+          line(a0, a1, a2, a3, 6.5, '', { body: c, pr: 5, dry: 0.55, gr: 0.12, life: 0.46 });
+          later(0.02, () => line(b0, b1, b2, b3, 3.8, '', { body: WEAPON_LITE.gold, pr: 5, dry: 0.55, gr: 0.12, life: 0.44 }));
+          if (i % 2) leaves(s.x, s.y - 6, 2, 8, c, 200);
+        });
+      },
+      // 마무리 — 친 방향을 가로지르는 마른 금 획 둘(나란히) + 금 튐 + 금박이 터지고 위에서 금박 비가 한 번 내린다
+      bloom(x, y, ang, k, c) {
+        const a = ang + Math.PI / 2;
+        scaled(x, y, k, () => {
+          stroke(x, y, a - 0.25, 160, 11, '', { body: c, pr: 5, dry: 0.6, gr: 0.14, life: 0.42 });
+          later(0.03, () => stroke(x + Math.cos(ang) * 14, y + Math.sin(ang) * 14, a - 0.25, 150, 5.5, '', { body: WEAPON_LITE.gold, pr: 5, dry: 0.6, gr: 0.14, life: 0.4 }));
+          later(0.05, () => spat(x, y - 6, 7, ang, c, '', 0.24, 5, false, true));
+          later(0.06, () => leaves(x, y - 6, 10, 50, c, 360));
+          later(0.24, () => leafRain(x, y - 80, 5, 70, c));
+        });
+      },
+    },
   },
   // 11-21 원소 다섯 — 레시피는 무기마다 파일 하나(render/legend5/<무기 id>.ts, 2단계 담당이 그 파일만 고친다). 여기선 이어 붙이기만
   wing: phoenix,
@@ -1196,15 +1517,10 @@ export function weaponAlong(w: WeaponId, pts: readonly number[], k: number, dur:
       art.along(pts, k, c, dur);
       return;
     }
-    const all = samplePath(pts, ALONG_STEP);
-    const n = Math.min(all.length, ALONG_MAX); // 긴 획은 같은 간격으로 솎는다
-    for (let i = 0; i < n; i++) {
-      const s = all[n === all.length ? i : Math.round((i * (all.length - 1)) / (n - 1))];
-      later(s.u * dur, () => {
-        if (g) RECIPES[g.shape].hit(s.x, s.y, k * 0.5, c);
-        else toolPiece(w, 'hit', s.x, s.y, k * 0.5, { n: 1, ang: normalUp(s.ang), k: k * 0.5, turn: 0 });
-      });
-    }
+    walk(pts, 1, dur, ALONG_MAX, (s) => { // 긴 획은 같은 간격으로 솎는다
+      if (g) RECIPES[g.shape].hit(s.x, s.y, k * 0.5, c);
+      else toolPiece(w, 'hit', s.x, s.y, k * 0.5, { n: 1, ang: normalUp(s.ang), k: k * 0.5, turn: 0 });
+    });
   });
 }
 

@@ -5,7 +5,7 @@ import { PALETTE, WEAPON_INK, WEAPON_LITE } from '../src/config';
 import type { WazaId } from '../src/core/types';
 import { WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import {
-  RECIPES, drawBladeFx, drops, line, pool, resetBladeFx, samplePath, strokeTone, updateBladeFx, weaponAlong, weaponBloom, type Bit,
+  RECIPES, drawBladeFx, drops, line, pool, resetBladeFx, samplePath, strokeTone, updateBladeFx, weaponAlong, weaponBloom, type Bit, type WazaArt,
 } from '../src/render/bladeFx';
 import { TOOL_RECIPES, liveBits } from '../src/render/weaponFx';
 import { drawWazaShot } from '../src/render/wazaShow';
@@ -150,7 +150,8 @@ describe('strokeTone', () => {
   });
 });
 
-describe('weaponAlong · weaponBloom 기본 판(waza 없음)', () => {
+/** 상한 — 기본 판 · 제 판(waza) 둘 다 지킨다 */
+function limits(): void {
   it('26 무기 모두 짧은 획에서도 조각 1개 이상, 2초 뒤엔 0, 그리다 던지지 않는다', () => {
     for (const w of WEAPON_IDS) {
       const { total } = run(() => {
@@ -171,19 +172,6 @@ describe('weaponAlong · weaponBloom 기본 판(waza 없음)', () => {
         expect(keepPeak, w).toBeGreaterThan(0); // 필살 그림은 풀이 넘쳐도 안 덮인다
       }
     }
-  });
-
-  it('dur 동안 뿌리 → 끝 차례: 시작 표본은 바로, 끝 표본은 dur 뒤에 나온다', () => {
-    resetBladeFx();
-    weaponAlong('iron', [0, 400, 600, 400], 1, 0.5);
-    expect(liveBits().length).toBeGreaterThan(0);
-    expect(Math.max(...liveBits().map((p) => p.x))).toBeLessThan(150); // 뿌리(앞 끝)에서만
-    let reached = false;
-    for (let i = 0; i < 40; i++) { // 0.67초 — 끝 표본까지
-      updateBladeFx(1 / 60);
-      if (liveBits().some((p) => p.x > 450)) reached = true;
-    }
-    expect(reached).toBe(true);
   });
 
   it('weaponBloom — 26 무기 모두 조각 1개 이상 · 상한 48 이하(k 1.4) · 2초 뒤 0', () => {
@@ -208,6 +196,35 @@ describe('weaponAlong · weaponBloom 기본 판(waza 없음)', () => {
       expect(keepPeak, w).toBeLessThanOrEqual(94);
     }
   });
+}
+
+describe('weaponAlong · weaponBloom 기본 판(waza 없음)', () => {
+  // 대검 · 연장이 제 waza를 가져도 이 묶음은 기본 판을 본다 — 걷어 두었다 되돌린다
+  const stash = new Map<{ waza?: WazaArt }, WazaArt>();
+  beforeEach(() => {
+    for (const r of [...Object.values(RECIPES), ...Object.values(TOOL_RECIPES)]) {
+      if (r?.waza) { stash.set(r, r.waza); delete r.waza; }
+    }
+  });
+  afterEach(() => {
+    for (const [r, a] of stash) r.waza = a;
+    stash.clear();
+  });
+
+  limits();
+
+  it('dur 동안 뿌리 → 끝 차례: 시작 표본은 바로, 끝 표본은 dur 뒤에 나온다', () => {
+    resetBladeFx();
+    weaponAlong('iron', [0, 400, 600, 400], 1, 0.5);
+    expect(liveBits().length).toBeGreaterThan(0);
+    expect(Math.max(...liveBits().map((p) => p.x))).toBeLessThan(150); // 뿌리(앞 끝)에서만
+    let reached = false;
+    for (let i = 0; i < 40; i++) { // 0.67초 — 끝 표본까지
+      updateBladeFx(1 / 60);
+      if (liveBits().some((p) => p.x > 450)) reached = true;
+    }
+    expect(reached).toBe(true);
+  });
 
   it('상점 필살 칸(drawWazaShot)은 여전히 조각 0', () => {
     for (const waza of WAZA_IDS as readonly WazaId[]) {
@@ -217,10 +234,18 @@ describe('weaponAlong · weaponBloom 기본 판(waza 없음)', () => {
   });
 });
 
+describe('weaponAlong · weaponBloom 제 판(무기마다 waza 그대로)', () => {
+  limits();
+});
+
 describe('waza 선택 칸', () => {
+  // 진짜 waza를 지우지 않게 — 저장했다 되돌린다
+  const was = { plain: RECIPES.plain.waza, sword: TOOL_RECIPES.sword };
   afterEach(() => {
-    delete RECIPES.plain.waza;
-    delete TOOL_RECIPES.sword;
+    if (was.plain) RECIPES.plain.waza = was.plain;
+    else delete RECIPES.plain.waza;
+    if (was.sword) TOOL_RECIPES.sword = was.sword;
+    else delete TOOL_RECIPES.sword;
   });
 
   it('대검 레시피에 waza가 있으면 기본 판 대신 그것을 부른다 — pts · k · 그 무기 색 · dur 그대로', () => {
