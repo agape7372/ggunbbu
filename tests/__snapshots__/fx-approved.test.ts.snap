@@ -1,0 +1,131 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > brush 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "e4863031896a",
+  "hit": "892c8ed0dd4d",
+  "slash": "8bd412d468dd",
+  "stackDestroy": "cc81f98931c6",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > crane 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "6881872175b0",
+  "hit": "87154ad1e4ef",
+  "slash": "f337fd0eadbd",
+  "stackDestroy": "7a1eae1dee4b",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > diadrill 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "28df1f0873e2",
+  "hit": "96b948b92a8c",
+  "slash": "8f4fae77e12d",
+  "stackDestroy": "631e79e0e332",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > flame 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "bec338b9a20b",
+  "hit": "a12c079c928e",
+  "slash": "f543bc7ecbd1",
+  "stackDestroy": "a3dc52b3b06d",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > frost 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "a1790285a060",
+  "hit": "c20babffb645",
+  "slash": "a9ad5c8eaaec",
+  "stackDestroy": "d9d09f962769",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > gold 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "1beba2a29027",
+  "hit": "d054a41911f8",
+  "slash": "e0e645f472d0",
+  "stackDestroy": "4eb05dab631f",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > icicle 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "d7d594f01b76",
+  "hit": "605e88c1012e",
+  "slash": "dedbb7211473",
+  "stackDestroy": "aab54a678721",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > onyx 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "7ef1334a9ea4",
+  "hit": "90d21d93d610",
+  "slash": "f68267995c6d",
+  "stackDestroy": "83cc4583e1e4",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > phoenix 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "6bd9f3048729",
+  "hit": "258b49d2961c",
+  "slash": "013f596296d5",
+  "stackDestroy": "51ed0c86042a",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > shade 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "8b4a2084f942",
+  "hit": "2c27f2897582",
+  "slash": "459698388a7c",
+  "stackDestroy": "8d997fd12418",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > thunder 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "a2eb28af35ee",
+  "hit": "c218bb2012da",
+  "slash": "d3f1aaaa8332",
+  "stackDestroy": "94d3993e5e21",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > tide 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "2085998f558b",
+  "hit": "4b9b41dbf341",
+  "slash": "50d9f7298dc2",
+  "stackDestroy": "8831a9103fdc",
+}
+`;
+
+exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > volt 1`] = `
+{
+  "aura": "500fdcc0491c",
+  "floorCollapse": "eb39f4c36b25",
+  "hit": "cf9e7188eb05",
+  "slash": "d5df8f896b91",
+  "stackDestroy": "7295f297d93d",
+}
+`;

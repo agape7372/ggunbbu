@@ -60,6 +60,8 @@ export interface Bit {
   /** 먹 조각 — dry 마름(비백) · pr 누름 곡선(PRESSES 번호) · sw 호 각(sweep) · gr 앞 몇 %에 다 그어지나(spat은 > 0이면 번진다) ·
    *  st 공사중 빗금(stroke · sweep) · drop은 1이면 땅에 번진 먹 · hold 속 색이 남는 몫(0 = 앞 40%, 빗금은 55%) · pts 꺾은 획의 점들(zig, x·y 기준 상대 좌표) */
   dry: number; pr: number; sw: number; gr: number; st: number; hold: number; pts: readonly number[];
+  /** 붓 획 박자(0 = 기본) — fd 꼬리가 깎이기 시작하는 때(기본 0.4) · fe 꼬리 깎임 곡선 지수(1보다 크면 버티다 빨리) · ge 머리가 그어지는 곡선 지수(1보다 작으면 빨리 나가 느리게 닿는다) */
+  fd: number; fe: number; ge: number;
   /** 필살 그림 — 풀이 넘쳐도 덮지 않는다(keepBits) */
   keep: boolean;
   /** 뿌린 자리 y(월드) — 크레인 갈고리 줄 꼭대기가 여기 붙는다 */
@@ -80,7 +82,7 @@ const NO_PTS: readonly number[] = [];
 export const pool: Bit[] = Array.from({ length: POOL }, (): Bit => ({
   alive: false, k: 'stroke', x: 0, y: 0, vx: 0, vy: 0, g: 0, drag: 0, life: 0, max: 1,
   size: 1, rot: 0, spin: 0, c1: INK, c2: INK, v: 0, a: 0, bounce: 0, seed: 0,
-  dry: 0, pr: 0, sw: 0, gr: 0, st: 0, hold: 0, pts: NO_PTS, keep: false, oy: 0,
+  dry: 0, pr: 0, sw: 0, gr: 0, st: 0, hold: 0, pts: NO_PTS, fd: 0, fe: 0, ge: 0, keep: false, oy: 0,
 }));
 let allocAt = 0;
 let live = 0;
@@ -176,6 +178,7 @@ interface Opt {
   vx?: number; vy?: number; g?: number; drag?: number; rot?: number; spin?: number;
   v?: number; a?: number; bounce?: number;
   dry?: number; pr?: number; sw?: number; gr?: number; st?: number; hold?: number; pts?: readonly number[];
+  fd?: number; fe?: number; ge?: number;
 }
 
 /** 필살 그림이 비워 둘 자리(월드 네모 [x0, y0, x1, y1]) — 「끝」 도장 · 철거 띠. 이 안에서 나는 필살 조각은 뿌리지 않는다(wazaShow가 건다) */
@@ -237,6 +240,9 @@ export function put(k: Kind, x: number, y: number, o: Opt): void {
   p.gr = o.gr ?? 0;
   p.st = o.st ?? 0;
   p.hold = o.hold ?? 0;
+  p.fd = o.fd ?? 0;
+  p.fe = o.fe ?? 0;
+  p.ge = o.ge ?? 0;
   p.pts = o.pts ? (K !== 1 ? o.pts.map((q) => q * K) : o.pts) : NO_PTS;
   p.seed = n01() * 1000;
   p.oy = y;
@@ -251,13 +257,13 @@ const along = (b: Seg, u: number): [number, number] => [b[0] + (b[2] - b[0]) * u
 // ── 먹 뿌리개 ────────────────────────────────────────────────
 
 /** body = 획 몸 색(없으면 먹 · 전설은 시그니처 색) */
-interface StrokeOpt { life?: number; dry?: number; pr?: number; bend?: number; stripes?: number; gr?: number; hold?: number; vx?: number; vy?: number; body?: string }
+interface StrokeOpt { life?: number; dry?: number; pr?: number; bend?: number; stripes?: number; gr?: number; hold?: number; vx?: number; vy?: number; body?: string; fd?: number; fe?: number; ge?: number }
 
 /** 곧은 붓 획 — (x0,y0) 댄 곳 → (x1,y1) 뗀 곳. core = 벤 순간 속 색('' = 없음) */
 export function line(x0: number, y0: number, x1: number, y1: number, w: number, core: string, o: StrokeOpt = {}): void {
   put('stroke', x0, y0, {
     life: o.life ?? 0.22, size: Math.hypot(x1 - x0, y1 - y0), rot: Math.atan2(y1 - y0, x1 - x0), v: w, a: o.bend ?? 0,
-    c1: o.body ?? INK, c2: core, dry: o.dry ?? 0.15, pr: o.pr ?? 0, st: o.stripes ?? 0, gr: o.gr ?? 0, hold: o.hold, vx: o.vx, vy: o.vy,
+    c1: o.body ?? INK, c2: core, dry: o.dry ?? 0.15, pr: o.pr ?? 0, st: o.stripes ?? 0, gr: o.gr ?? 0, hold: o.hold, vx: o.vx, vy: o.vy, fd: o.fd, fe: o.fe, ge: o.ge,
   });
 }
 
@@ -272,7 +278,7 @@ export function stroke(x: number, y: number, ang: number, len: number, w: number
 export function sweep(cx: number, cy: number, r: number, a0: number, sw: number, w: number, core: string, o: StrokeOpt = {}): void {
   put('sweep', cx, cy, {
     life: o.life ?? 0.26, size: r, rot: a0, sw, v: w, a: 1,
-    c1: o.body ?? INK, c2: core, dry: o.dry ?? 0.15, pr: o.pr ?? 0, st: o.stripes ?? 0, gr: o.gr ?? 0, hold: o.hold, vx: o.vx, vy: o.vy,
+    c1: o.body ?? INK, c2: core, dry: o.dry ?? 0.15, pr: o.pr ?? 0, st: o.stripes ?? 0, gr: o.gr ?? 0, hold: o.hold, vx: o.vx, vy: o.vy, fd: o.fd, fe: o.fe, ge: o.ge,
   });
 }
 
@@ -303,7 +309,7 @@ export function trail(footX: number, footY: number, w: number, core: string, o: 
 export function bent(pts: number[], w: number, core: string, o: StrokeOpt = {}): void {
   const [x, y] = pts;
   put('zig', x, y, {
-    life: o.life ?? 0.26, size: 0, v: w, c1: o.body ?? INK, c2: core, dry: o.dry ?? 0.3, pr: o.pr ?? 2, gr: o.gr ?? 0.15, hold: o.hold, vx: o.vx, vy: o.vy,
+    life: o.life ?? 0.26, size: 0, v: w, c1: o.body ?? INK, c2: core, dry: o.dry ?? 0.3, pr: o.pr ?? 2, gr: o.gr ?? 0.15, hold: o.hold, vx: o.vx, vy: o.vy, fd: o.fd, fe: o.fe, ge: o.ge,
     pts: pts.map((q, i) => q - (i % 2 ? y : x)),
   });
 }
@@ -1610,6 +1616,12 @@ export function bladeAura(s: GameState): void {
   r.aura([x + b[0], y + b[1], x + b[2], y + b[3]], auraN++, inkOf(s.weapon), comboReachK(s)); // 규칙과 같은 값(불새 콤보 사거리)
 }
 
+/** 난수 · 칼 기운 차례를 처음으로 — 검수 도구 · 시험이 같은 그림을 다시 얻으려고 부른다(판에서는 안 부른다) */
+export function seedBladeFx(n = 7): void {
+  fxSeed = n;
+  auraN = 0;
+}
+
 export function resetBladeFx(): void {
   for (const p of pool) p.alive = false;
   live = 0;
@@ -1730,7 +1742,10 @@ export function paperInk(ctx: CanvasRenderingContext2D): CanvasRenderingContext2
 
 /** 획의 그려진 구간 [s0, s1] — 앞 gr(기본 12%)에 다 그어지고 40%부터 꼬리부터 깎인다 */
 function span(p: Bit, u: number): [number, number] {
-  return [u < 0.4 ? 0 : Math.min(1, (u - 0.4) / 0.6), Math.min(1, u / (p.gr || 0.12))];
+  const from = p.fd || 0.4;
+  const tail = u < from ? 0 : Math.min(1, (u - from) / (1 - from));
+  const head = Math.min(1, u / (p.gr || 0.12));
+  return [p.fe ? tail ** p.fe : tail, p.ge ? head ** p.ge : head];
 }
 
 const LEGEND_IDS = Object.keys(WEAPON_LITE) as (keyof typeof WEAPON_LITE)[];

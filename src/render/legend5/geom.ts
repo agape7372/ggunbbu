@@ -60,13 +60,16 @@ export const liteOf = (c: string): string => {
   return w ? WEAPON_LITE[w] : c;
 };
 
+/** 박자 곡선 — 0 → 1을 받아 0 → 1을 낸다. 안 주면 고른 간격 */
+export type Pace = (u: number) => number;
+
 /** 꺾은선 pts(월드)를 따라 — t0초 뒤부터 dur초에 걸쳐 앞 → 뒤로 n자리(필살 큰 획 · weaponAlong). 표본은 길이 비례 */
-export function follow(pts: readonly number[], t0: number, dur: number, n: number, f: Elem): void {
+export function follow(pts: readonly number[], t0: number, dur: number, n: number, f: Elem, pace?: Pace): void {
   const all = samplePath(pts, 4);
   if (!all.length) return;
   for (let i = 0; i < n; i++) {
     const s = all[n === 1 ? all.length - 1 : Math.round((i * (all.length - 1)) / (n - 1))];
-    later(t0 + s.u * dur, () => f(s.x, s.y, s.ang, s.u, i));
+    later(t0 + (pace ? pace(s.u) : s.u) * dur, () => f(s.x, s.y, s.ang, s.u, i));
   }
 }
 
@@ -78,6 +81,6 @@ export function pathLen(pts: readonly number[]): number {
 }
 
 /** 흩어짐 박자 — t0초부터 frames프레임(기본 7, 60fps)에 걸쳐 n번 f(i)를 부른다 */
-export function scatter(t0: number, n: number, f: (i: number) => void, frames = 7): void {
-  for (let i = 0; i < n; i++) later(t0 + (n === 1 ? 0 : (i / (n - 1)) * (frames / 60)), () => f(i));
+export function scatter(t0: number, n: number, f: (i: number) => void, frames = 7, pace?: Pace): void {
+  for (let i = 0; i < n; i++) later(t0 + (n === 1 ? 0 : (pace ? pace(i / (n - 1)) : i / (n - 1)) * (frames / 60)), () => f(i));
 }
