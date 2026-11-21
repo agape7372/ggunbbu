@@ -117,6 +117,16 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
       break;
     }
     case 'attack': {
+      // 쥔 채 반복 휘두름 도중에 다시 누르면 그 휘두름을 끊고 바로 띄우며 벤다(누름 엣지가 holdN을 0으로 연다).
+      // 끝날 때까지 기다리게 하면 반복 휘두름이 누를 자리를 먹어 쥐고 갈다가 다시 누르는 손이 그냥 탭보다 못했다(11-21 봇 실측)
+      if (p.attackHold && p.holdN === 0 && p.bufAttack > 0) { startAttack(p, airborne); break; }
+      // 손을 떼면 갈던 휘두름은 바로 멈춘다(그 틱에 가드도 된다). 안 멈추면 막으려고 뗀 손이 남은 휘두름에 막혀 쥐는 손이 탭보다 못했다(11-22 봇 실측)
+      if (p.attackHold && !input.attackHeld) {
+        p.pose = airborne ? 'jump' : 'idle';
+        p.poseTick = 0;
+        if (input.guard) tryEnterGuard(s, airborne);
+        break;
+      }
       p.poseTick += 1;
       if (p.poseTick >= ATTACK_TOTAL) {
         p.pose = p.y > 0 ? 'jump' : 'idle';
@@ -161,7 +171,7 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
   p.attackHit = false;
   p.attackFromAir = fromAir;
   // 공격 버퍼를 채우는 건 누름 엣지(holdN = 0으로 연다)와 위 반복(holdN + 1) 둘뿐이라 휘두를 때 holdN > 0 = 반복 타격.
-  // 반복 타격은 층만 깎고 건물을 밀어 올리지 않는다 — 드릴은 박혀서 갈아 내고, 띄우려면 다시 눌러야 한다(11-21 과열을 걷고 바꿈)
+  // 반복 타격은 건물을 밀어 올리지 않고 끌어내린다(combat.tryHitStack) — 드릴은 박혀서 갈아 내고, 띄우려면 다시 눌러야 한다(11-21 과열을 걷고 바꿈)
   p.attackHold = p.holdN > 0;
 }
 

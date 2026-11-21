@@ -793,7 +793,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     const k = tierK(e.combo ?? s.combo);
     // 오함마는 맞은 자리를 제 발묵으로 누르고, 그라인더는 불티 · 쇳가루로 갈리고, 삽은 흙 덩이 · 곡괭이는 돌 조각이 튄다(weaponFx) — 먹 튐을 겹치지 않는다
     if (e.kind === 'floorCollapse') inkCollapse(x, y, k, e.mat, !isLegend(s.weapon));
-    else if (!isLegend(s.weapon)) inkHit(x, y, k, pointInk(s.weapon), OWN_SPLASH.has(s.weapon));
+    else if (!isLegend(s.weapon)) inkHit(x, y, e.grind ? JUICE_SYS.GRIND : k, pointInk(s.weapon), OWN_SPLASH.has(s.weapon)); // 쥔 채 반복 타격은 작게 갈아 낸다
     return;
   }
   if (e.kind === 'gaugeFull') {

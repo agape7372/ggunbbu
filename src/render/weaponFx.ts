@@ -8,7 +8,7 @@
 // tap = 잘게 떠는 획(착암기) · ring = 고리(파이프 단면 · 코어 드릴 구멍) · pix = 네모 토막(마스크 도트 · 빠진 원기둥 · 벽돌 조각 · a 4면 다이아 드릴 마름모). 연장 열둘은 저마다 다른 조각 묶음으로 터진다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
-import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
+import { JUICE_SYS, PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
 import {
   N, bent, drops, keepBits, later, line, n01, pool, put, samplePath, scaled, sgn, sweep, tierK, vel, type Bit, type WazaArt,
 } from './bladeFx';
@@ -802,7 +802,7 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
     case 'bossHit':
     case 'butterCollapse':
       if (e.kind === 'butterCollapse' && e.last && TOOL_RECIPES[s.weapon]?.tint) break; // 연장 전설 — 버터 마지막 겹도 완파 그림만
-      scaled(x, y, WEAPON_FX.SIZE, () => t.hit(x, y, b, k));
+      scaled(x, y, WEAPON_FX.SIZE * (e.grind ? JUICE_SYS.GRIND : 1), () => t.hit(x, y, b, k)); // 쥔 채 반복 타격은 작게 갈아 낸다
       break;
     case 'floorCollapse':
       if ((e.last || e.waza) && TOOL_RECIPES[s.weapon]?.tint) break; // 연장 전설 — 마지막 층은 완파 그림만(같은 틱에 비트가 두 벌 선다) · 올려베기 층마다는 필살 그림이 맡는다

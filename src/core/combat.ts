@@ -116,11 +116,12 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   s.hitAt = s.tick;
 
   // 종은 세게 밀린다(저글링) · 바람탑 들숨은 두 배 — 아케이드 재질은 배율 1.
-  // 쥔 채 반복 타격(드릴류)은 밀지 않는다: 쥐고만 있으면 건물이 내려와 깔린다(player.ts swing · tests/weapons.test.ts)
-  if (!s.player.attackHold) {
+  // 쥔 채 반복 타격(드릴류)은 밀지 않고 드릴이 박혀 끌어내린다(WeaponSpec.holdPull · 명물 포함 · 2막 빼고): 쥐고만 있으면 건물이 금방 내려와 깔린다(tests/weapons.test.ts)
+  const grind = s.player.attackHold;
+  if (!grind) {
     stack.vy = Math.max(stack.vy, liftOf(s) * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
     stack.resting = false;
-  }
+  } else if (s.mode !== 'act2') stack.y = Math.max(0, stack.y - (WEAPON[s.weapon].holdPull ?? 0));
 
   if (res === 'collapse') {
     const isButter = mat === 'butter';
@@ -130,6 +131,7 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
       lane, y: yHit, mat, combo: Math.min(SCORE.COMBO_CAP, s.combo + 1 + (WEAPON[s.weapon].collapseCombo ?? 0)),
       ...(stack.floors.length === 0 ? { last: true } : {}),
       ...(chain ? { chain: true } : {}),
+      ...(grind ? { grind: true } : {}),
     });
     registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, collapse: true });
     spawnFloorDebris(s, yHit);
@@ -137,7 +139,7 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
       destroyStack(s);
     } else if (chain) chainHit(s, stack);
   } else {
-    s.events.push({ kind: 'hit', lane, y: yHit, mat, combo: s.combo + 1 });
+    s.events.push({ kind: 'hit', lane, y: yHit, mat, combo: s.combo + 1, ...(grind ? { grind: true } : {}) });
     registerHit(s);
   }
   return true;
