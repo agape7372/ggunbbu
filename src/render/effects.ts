@@ -774,7 +774,9 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     return;
   }
   if (e.kind === 'stackDestroy') {
-    stackBurst(x, y - 40, e.n, isLegend(s.weapon) ? '' : pointInk(s.weapon)); // 이벤트 y가 없어 발 높이다 — 마지막 층이 있던 머리 위로 올린다
+    // 전설은 완파를 제 그림(bladeFx · legend5 destroy)으로 한다 — 공통 먹 엔소를 덧그리면 열세 자루가 같은 둥근 고리를 두른다
+    // (2026-11-21 사용자 빨간 선 「왜 모든 스킬에 똑같이 … 일괄적으로」). 연장은 이 엔소가 완파의 대표 그림이라 그대로
+    stackBurst(x, y - 40, e.n, pointInk(s.weapon), !isLegend(s.weapon)); // 이벤트 y가 없어 발 높이다 — 마지막 층이 있던 머리 위로 올린다
     return;
   }
   if (e.kind === 'bossDefeat') {
@@ -843,13 +845,15 @@ function iceSparks(x: number, y: number, n: number): void {
   }
 }
 
-/** 완파(옛 판) — 층수(n)가 클수록 파편 · 엔소가 커진다. 층수 3 이상이면 포인트 색으로 긋는 바깥 엔소가 하나 더. 먹 왕관 · 먼지 구름 */
-function stackBurst(x: number, y: number, n: number | undefined, core: string): void {
+/** 완파(옛 판) — 층수(n)가 클수록 파편 · 엔소가 커진다. 층수 3 이상이면 포인트 색으로 긋는 바깥 엔소가 하나 더(ring false = 전설, 엔소 없음). 먹 왕관 · 먼지 구름 */
+function stackBurst(x: number, y: number, n: number | undefined, core: string, ring = true): void {
   const k = stackScale(n);
   shards(x, y, Math.min(48, Math.round(JUICE.stackDestroy.particles * k)), undefined, 1.45 + 0.2 * k);
   blot(x, y, 15 * k, 0.24);
-  ensoAt(x, y, 18, 70 * k, 0.4, 8 * k);
-  if ((n ?? 0) >= JUICE_SYS.STACK_RING_FLOORS) ensoAt(x, y, 30, 120 * k, 0.5, 11 * k, 1, core);
+  if (ring) {
+    ensoAt(x, y, 18, 70 * k, 0.4, 8 * k);
+    if ((n ?? 0) >= JUICE_SYS.STACK_RING_FLOORS) ensoAt(x, y, 30, 120 * k, 0.5, 11 * k, 1, core);
+  }
   drops(x, y, Math.round(8 * k), -Math.PI / 2 - 1.5, -Math.PI / 2 + 1.5, 260, 640, 3.4, 0.7, true);
   puffs(x, y, JUICE_SYS.PUFF_DESTROY, VIEW.LANE_W * 0.42, 15 + 3 * k, 150, 0.8);
 }
