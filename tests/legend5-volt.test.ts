@@ -1,5 +1,5 @@
 // 고압선 대검 4판 — 아래서 위로 기어오르는 S자 아크(먹 머리 → 노랑 꼬리 · 마디마다 굵기가 다름 · 굵은 마디 속 종이색 줄) →
-// 꼭대기 두 갈래 → 끊김 → 같은 밑동에서 다시 붙음 · 크기 순서 · 칼 기운은 날에서 솟는 고리(먹 목 + 노랑 몸) · 달(sweep) 없음 · 필살 상한.
+// 꼭대기 두 갈래 → 끊김 → 같은 밑동에서 다시 붙음 · 크기 순서 · 칼 기운은 날에서 하늘로 튀는 꺾인 아크(먹 목 + 노랑 몸 + 두 갈래) · 달(sweep) 없음 · 필살 상한.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RECIPES, pool, resetBladeFx, scaled, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
@@ -104,51 +104,57 @@ describe('고압선 — 아래서 기어오르는 아크', () => {
     expect(liveBits()).toHaveLength(0);
   });
 
-  it('칼 기운: 날 위 노랑 실 + 날에서 솟는 고리 둘(굵은 먹 목 → 노랑 몸 · 종이색 속줄) · 칼 둘레 40 안 · 땅에 닿지 않는다', () => {
-    const b = [189, 580, 205, 609] as const; // 서 있을 때 칼날(손 → 칼끝, 칼끝이 땅 1px 위)
-    RECIPES.volt.aura!(b, 0, c);
-    // 고리 둘은 0~11프레임 사이에 어긋나 선다 — 20프레임 동안 본 목 · 몸을 모은다(풀 칸은 다시 쓰이니 본 때 값을 떠 둔다)
-    type Seen = { c1: string; c2: string; v: number; pts: [number, number][] };
-    const necks = new Map<B, Seen>();
-    const bodies = new Map<B, Seen>();
-    let th: B[] = [];
-    for (let i = 0; i < 20; i++) {
-      step(1);
-      if (i === 7) th = threads();
-      for (const p of alive().filter((q) => q.k === 'zig')) {
-        const m = p.pr === 5 ? necks : p.pr === 0 && p.c2 === PALETTE.BG ? bodies : null;
-        if (m && !m.has(p)) m.set(p, { c1: p.c1, c2: p.c2, v: p.v, pts: world(p) });
-      }
-    }
-    expect(th.length).toBeGreaterThan(0);
-    expect(th.every((p) => p.c1 === lite)).toBe(true); // 날 위 실은 밝은 짝(먹은 점화 점 · 고리 목)
-    const nk = [...necks.values()];
-    const bd = [...bodies.values()];
-    expect(nk).toHaveLength(2);
-    expect(bd).toHaveLength(2);
-    expect(nk.every((p) => p.c1 === c && !p.c2)).toBe(true); // 목 = 시그니처 색 붓(먹 머리) · 속줄 없음(먹 테가 되지 않게)
-    expect(bd.every((p) => p.c1 === lite)).toBe(true); // 몸 = 밝은 짝(먹이 다시 묻지 않는다)
-    expect(Math.max(...nk.map((p) => p.v))).toBeGreaterThan(6); // 굵은 먹 목
+  it('칼 기운: 큰 아크 = 날에 붙은 굵은 먹 목(거꾸로 그어 뿌리가 남는다) → 꺾인 노랑 몸(굵기 7~9 · 종이색 속) → 끝 두 갈래 · 하늘 쪽 50 넘게 · 다섯에 둘 · 작은 아크는 날로 돌아온다 · 몸 쪽 · 땅 · 머리를 비운다', () => {
+    const b = [189, 580, 205, 609] as const; // 서 있을 때 칼날(손 → 칼끝, 칼끝이 땅 1px 위) · 주인공 x 180
     const L = Math.hypot(b[2] - b[0], b[3] - b[1]);
-    const off = ([x, y]: [number, number]): number => Math.abs((b[2] - b[0]) * (b[1] - y) - (b[0] - x) * (b[3] - b[1])) / L;
-    for (const p of nk) expect(off(p.pts[0])).toBeLessThan(3); // 날에서 떠나
-    for (const p of bd) expect(off(p.pts[p.pts.length - 1])).toBeLessThan(3); // 날로 돌아온다
-    expect(Math.max(...bd.flatMap((p) => p.pts.map(off)))).toBeGreaterThan(20); // 큰 고리는 20 넘게 바깥으로(10회차는 15~23)
-    for (const p of [...nk, ...bd]) {
-      for (const [x, y] of p.pts) {
-        expect(off([x, y])).toBeLessThan(40); // 칼 밖으로 크게 나가지 않는다(칼 길이 대비)
-        expect(y).toBeLessThan(VIEW.GROUND_Y);
-      }
-    }
-    resetBladeFx();
-    RECIPES.volt.aura!(b, 0, c);
-    for (let i = 0; i < 20; i++) {
+    const [ux, uy] = [(b[2] - b[0]) / L, (b[3] - b[1]) / L];
+    const up = ([x, y]: [number, number]): number => (x - b[0]) * uy - (y - b[1]) * ux; // 날의 위쪽 법선 쪽 거리(+ = 몸 바깥 · 하늘)
+    const off = ([x, y]: [number, number]): number => Math.abs(up([x, y]));
+    type Seen = { pr: number; c1: string; c2: string; v: number; pts: [number, number][] };
+    const seen = new Map<B, Seen>();
+    let peak = 0;
+    // 실제 판처럼 0.09초(6프레임)마다 열 번 부르고 1초 더 본다 — 풀 칸은 다시 쓰이니 처음 본 때 값을 떠 둔다
+    for (let f = 0, n = 0; f < 120; f++) {
+      if (f % 6 === 0 && n < 10) RECIPES.volt.aura!(b, n++, c);
       step(1);
-      for (const p of alive().filter((q) => q.k === 'zig')) for (const [x, y] of world(p)) {
-        expect(off([x, y])).toBeLessThan(40); // 갈래 끝 · 날 위 실 포함
-        expect(y).toBeLessThan(VIEW.GROUND_Y);
+      peak = Math.max(peak, alive().length);
+      for (const p of alive().filter((q) => q.k === 'zig')) if (!seen.has(p)) seen.set(p, { pr: p.pr, c1: p.c1, c2: p.c2, v: p.v, pts: world(p) });
+    }
+    const all = [...seen.values()];
+    const necks = all.filter((p) => p.c1 === PALETTE.INK);
+    const bodies = all.filter((p) => p.c1 === c && p.c2 === PALETTE.BG);
+    const big = bodies.filter((p) => p.v >= 7);
+    expect(necks.length).toBeGreaterThanOrEqual(4 * 6 - 8); // 큰 아크 넷(n 0 · 3 · 5 · 8) × 꼴 여섯~여덟 — 끝 하나는 1초 안에 다 못 그을 수 있다
+    expect(necks.length).toBeLessThanOrEqual(4 * 8);
+    expect(necks.every((p) => p.v > 5.5 && off(p.pts[p.pts.length - 1]) < 2)).toBe(true); // 굵은 먹 목 · 끝 점이 날 위(거꾸로 그어 뿌리가 남는다)
+    expect(big.length).toBeGreaterThan(0);
+    expect(big.every((p) => p.v <= 9)).toBe(true); // 노랑 몸 7~9
+    // 꺾임 — 이웃 마디 사이 방향이 0.7라디안 넘게 꺾이는 데가 있다(매끈한 고리 · 리본이 아니다)
+    const turn = (pts: [number, number][]): number => {
+      let most = 0;
+      for (let i = 2; i < pts.length; i++) {
+        const a1 = Math.atan2(pts[i - 1][1] - pts[i - 2][1], pts[i - 1][0] - pts[i - 2][0]);
+        const a2 = Math.atan2(pts[i][1] - pts[i - 1][1], pts[i][0] - pts[i - 1][0]);
+        most = Math.max(most, Math.abs(Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1))));
+      }
+      return most;
+    };
+    expect(Math.max(...big.map((p) => turn(p.pts)))).toBeGreaterThan(0.7);
+    const top = Math.min(...big.flatMap((p) => p.pts.map(([, y]) => y)));
+    expect(top).toBeLessThan(b[1] - 30); // 뿌리(날 아래쪽 반)에서 하늘 쪽으로 50 넘게
+    expect(top).toBeGreaterThan(b[1] - 110);
+    expect(all.some((p) => p.pr === 1 && p.c1 === lite && p.pts[0][1] < b[1] - 20)).toBe(true); // 끝 두 갈래(하늘에서)
+    // 작은 아크 — 목 없이 날에서 떠나 날로 돌아온다
+    const small = bodies.filter((p) => p.v < 7 && off(p.pts[0]) < 2 && off(p.pts[p.pts.length - 1]) < 2.5);
+    expect(small.length).toBeGreaterThan(4);
+    for (const p of all) {
+      for (const q of p.pts) {
+        expect(up(q)).toBeGreaterThan(-5); // 몸 쪽(날 아래 · 다리)으로 가지 않는다
+        expect(q[1]).toBeLessThan(VIEW.GROUND_Y); // 땅에 닿지 않는다
+        expect(q[0] >= 162 && q[0] <= 189 && q[1] >= 540).toBe(false); // 머리 · 몸 상자를 덮지 않는다
       }
     }
+    expect(peak).toBeLessThanOrEqual(40);
     step(60);
     expect(liveBits()).toHaveLength(0);
   });

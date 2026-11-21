@@ -1,7 +1,7 @@
 // 고압선 대검(전기) 레시피 4판 — 방향표 「고압선」 절(11-21). bladeFx RECIPES가 이어 붙이기만 한다.
 // 꼴: 아래서 위로 기어오르는 아크. 매끈하게 휘는 S자 곡선(꺾은선 아님)에 작은 떨림. 실은 가늘고(밑동이 가장 가늘다)
 // 마디마다 굵기가 다르다: 가운데 · 위쪽 마디가 3~4배로 부풀고 그 속에 종이색 가는 속줄. 먹 머리 → 노랑 꼬리.
-// 꼭대기에서 두 갈래로 갈라지고 짧은 쪽이 먼저 끊긴다. 자료: 야곱의 사다리(strike 15 16 17 · motion B E) · 귀멸 2 · aura 6 7 8.
+// 꼭대기에서 두 갈래로 갈라지고 짧은 쪽이 먼저 끊긴다.
 // 박자: 점화(먹 점) → 기어오름 → 끊김(밑동부터 깎여 위로 떨어져 나간다) → 13~21프레임 뒤 같은 밑동에서 다시 붙음.
 // 자리: 친 자리(건물 몸)에서 위로. 완파는 무너지는 건물 높이만큼 큰 아크 셋 + 조각 사이로 튀는 짧은 아크(전류가 번진다).
 // 갈림: 번개 대검 = 하늘에서 내리꽂는 곧은 보라 꺾은 줄기 / 이쪽 = 아래서 기어오르는 휜 노랑 아크.
@@ -23,7 +23,7 @@ const P_CUT = 0;
 const P_FLICK = 1;
 const P_LINE = 2;
 const P_SWELL = 3;
-const P_BRUSH = 5; // 붓 — 붓머리를 눌러 대고(1.3배) 끝으로 빠진다
+const P_YI = 4; // 한 일 — 양 끝을 눌러 댄다
 
 /**
  * 사건마다 크기(키우기 전 px · 사건 그림은 scaled 1.6배, 완파는 k 1.25 이상이라 2배 남짓).
@@ -183,6 +183,104 @@ function surge(x: number, y: number, S: Size, k: number, c: string): void {
   }
 }
 
+type P = readonly [number, number];
+
+/**
+ * 칼 기운 꺾은 아크 점열 — 등뼈는 a → (조절점 m) → e 2차 곡선, 그 위에 길이가 제각각인 큰 마디 n개를 바깥 · 안쪽으로 번갈아 꺾는다
+ * (넷에 하나는 같은 쪽으로 한 번 더 — 고른 톱니가 되지 않게). 꺾는 폭 K는 끝으로 갈수록 커지고, 큰 마디 사이마다 1px 남짓 떠는 점 하나.
+ * 땅 밑으로는 안 간다
+ */
+function crack(a: P, m: P, e: P, K: number, n: number): number[] {
+  const ts = [0];
+  for (let i = 0; i < n; i++) ts.push(ts[i] + 0.6 + 0.8 * n01());
+  const pts = [a[0], a[1]];
+  let side = sgn() > 0 ? 1 : -1;
+  for (let i = 1; i <= n; i++) {
+    const t = ts[i] / ts[n];
+    const s = 1 - t;
+    const [dx, dy] = [s * (m[0] - a[0]) + t * (e[0] - m[0]), s * (m[1] - a[1]) + t * (e[1] - m[1])];
+    const d = Math.hypot(dx, dy) || 1;
+    const k = i < n ? side * K * (0.45 + 0.55 * n01()) * (0.6 + 0.8 * t) : 0;
+    if (n01() < 0.75) side = -side;
+    const x = s * s * a[0] + 2 * s * t * m[0] + t * t * e[0] - (dy / d) * k;
+    const y = s * s * a[1] + 2 * s * t * m[1] + t * t * e[1] + (dx / d) * k;
+    const [px, py] = [pts[pts.length - 2], pts[pts.length - 1]];
+    pts.push((px + x) / 2 + sgn() * 0.9, (py + y) / 2 + sgn() * 0.9, x, y);
+  }
+  for (let j = 1; j < pts.length; j += 2) pts[j] = Math.min(GROUND - 2, pts[j]);
+  return pts;
+}
+
+/**
+ * 칼 기운 아크 한 줄 칠하기 — 짧게(4~6프레임) 살고 같은 등뼈의 새 꼴이 덮는다(깜빡).
+ * 목(neck 몫, 0이면 없음) = 앞쪽 굵은 먹. 점을 거꾸로(목 끝 → 날) 그어 깎일 때 날 쪽 뿌리가 끝까지 남는다 — 획은 댄 쪽부터 깎여서
+ * 바로 그으면 노랑만 날에서 떨어져 하늘에 떴다(5판 1~7회차). 양 끝을 눌러 대는 붓이라 날 쪽이 굵고 목 끝이 잘록하다.
+ * 몸 = 나머지를 시그니처 색 베기 붓으로(제 머리 먹이 목에 이어 짙은 올리브 → 노랑 → 밝은 짝 끝 · 가운데가 가장 굵고 끝이 가늘다 ·
+ * 막 그었을 때만 속 종이색 줄 · 마른 결 거의 없이). 끝이 가늘어 깎이고 남은 조각이 가는 실로만 남는다 — 고른 굵기 관은 남은 조각까지 굵어
+ * 겹친 꼴이 노랑 다발로 뭉쳤고(10~14회차), 뒤가 부푸는 붓은 불꽃으로 읽혔다(9회차). 돌려주는 값 = 몸이 다 그어지는 때(초)
+ */
+function zap(pts: number[], w: number, life: number, c: string, neck: number): number {
+  const k = Math.round((pts.length / 2 - 1) * neck);
+  if (k) {
+    const back: number[] = [];
+    for (let i = k; i >= 0; i--) back.push(pts[i * 2], pts[i * 2 + 1]);
+    bent(back, w * 0.85, '', { body: INK, life, dry: 0.08, pr: P_YI, gr: 0.25 });
+  }
+  bent(pts.slice(k * 2), w, PAPER, { body: c, life, dry: 0.04, pr: P_CUT, gr: 0.25, hold: 0.55 });
+  return life * 0.25;
+}
+
+/** 끝 두 갈래 — 끝 방향(a)에서 어긋나게 벌어진 꺾은 가지 둘(긴 쪽은 종이색 속줄 · 짧은 쪽이 먼저 끊긴다). 밝은 짝 획(노랑 → 밝은 짝) */
+function prongs(x: number, y: number, a: number, len: number, w: number, life: number, c: string): void {
+  const s = sgn() > 0 ? 1 : -1;
+  const arms = [[0.3 + 0.3 * n01(), 1, 1.2], [-(0.55 + 0.35 * n01()), 0.45 + 0.2 * n01(), 0.75]] as const;
+  arms.forEach(([da, f, ww], i) => {
+    const b = a + s * da;
+    const l = len * f;
+    const m: P = [x + Math.cos(b - s * 0.25) * l * 0.5, y + Math.sin(b - s * 0.25) * l * 0.5];
+    bent(crack([x, y], m, [x + Math.cos(b) * l, y + Math.sin(b) * l], 2.4, 2), w * ww, i ? '' : PAPER, {
+      body: liteOf(c), life: life * (i ? 0.5 : 1), dry: 0.2, pr: P_FLICK, gr: 0.2, hold: 0.6,
+    });
+  });
+}
+
+/**
+ * 칼 기운 큰 아크 한 번 — 날 위 A에서 몸 바깥(법선 nrm)으로 튀어 나가 하늘 쪽으로 휘어 오른다(길이 70~90 · 높이 60~85).
+ * 등뼈는 한 번만 정하고 꺾임만 새로 뽑아 2프레임 남짓마다 다시 긋는다(여섯~여덟 번 · 그을 때마다 조금씩 길어진다 — 아크가 떨며 튀어 오르는 깜빡).
+ * 꼴마다 4~6프레임 살아 앞 꼴이 깎이는 동안 새 꼴이 늘 날에 붙어 있다 — 꼴 사이 틈이 길면 깎이는 노랑만 떴다(5판 1~7회차).
+ * 마지막 꼴 끝에서 두 갈래로 갈라져 끊긴다. 점화 먹 점 · 꺾인 자리에서 바깥으로 튄 먹 점 하나 둘
+ */
+function leap(A: P, nrm: P, c: string): void {
+  const a0 = Math.atan2(nrm[1], nrm[0]);
+  const a = a0 + (UP - a0) * (0.55 + 0.25 * n01()); // 법선과 하늘 사이(하늘 쪽으로 더)
+  const len = 70 + 22 * n01();
+  put('spat', A[0], A[1], { life: 0.08, size: 2.8, rot: a0, v: 2, c1: INK });
+  const shots = 6 + Math.floor(n01() * 3);
+  for (let s = 0, t0 = 0; s < shots; s++) {
+    const last = s === shots - 1;
+    const l = len * (last ? 1 : 0.78 + (0.2 * (s + 0.5 * n01())) / (shots - 1));
+    const b = a + sgn() * 0.05;
+    const E: P = [A[0] + Math.cos(b) * l, A[1] + Math.sin(b) * l];
+    const sway = (s % 2 ? 1 : -1) * (0.04 + 0.05 * n01()); // 꼴마다 휘는 쪽을 뒤집어 겹친 꼴이 엇갈린다 — 같은 쪽이면 나란한 다발이 불 혀 · 풀로 읽혔다(12회차)
+    const M: P = [A[0] + nrm[0] * l * 0.42 - Math.sin(b) * sway * l, A[1] + nrm[1] * l * 0.42 - l * 0.1 + Math.cos(b) * sway * l];
+    const life = (last ? 5 + n01() : 4.5 + n01()) * F;
+    later(t0, () => {
+      const pts = crack(A, M, E, 9, 4 + Math.round(n01()));
+      const t = zap(pts, 7 + 2 * n01(), life, c, 0.16 + 0.06 * n01()); // 몸 굵기 7~9
+      if (!last) return;
+      const m = pts.length;
+      later(t, () => prongs(E[0], E[1], Math.atan2(pts[m - 1] - pts[m - 5], pts[m - 2] - pts[m - 6]), 20 + 10 * n01(), 5, life, c));
+      later(t, () => {
+        for (let j = n01() < 0.5 ? 0 : 1; j < 2; j++) {
+          const i = 2 * (2 + Math.floor(n01() * Math.max(1, m / 2 - 4)));
+          put('spat', pts[i] + sgn() * 5, pts[i + 1] + sgn() * 5, { life: 0.1, size: 1.8 + n01(), rot: b, v: 2, c1: INK });
+        }
+      });
+    });
+    t0 += (1.8 + 0.4 * n01()) * F;
+  }
+}
+
 export const volt: Recipe = {
   trail: { w: 10, dry: 0.3 },
   own: true,
@@ -215,57 +313,50 @@ export const volt: Recipe = {
     const H = 26 + 8 * n01();
     climb(arcPts(x, y, x + sgn() * 8, y - H, 6), { w: 1.6, crawl: 5 * F, life: 0.2, vy: -20, bulge: 1, fork: 7, dot: true }, c);
   },
-  // 칼 기운 — 칼날을 막대 삼아 고리 아크가 손잡이 쪽에서 떠나 하늘 쪽으로 솟았다 칼끝 쪽 날로 내려앉는다(자료 aura 8 막대 위 반고리 · 귀멸 aura 6 칼 몸 둘레).
-  // 한 번에 고리 둘(큰 것 27~34 · 작은 것 20~26, 자리 · 각 · 굵기가 다르다) + 날 위를 기는 노랑 실 + 칼끝 두 갈래.
-  // 고리 하나 = 두 획. 목 = 시그니처 색 붓(붓머리를 눌러 댄 굵은 먹 3~5px → 짙은 올리브 → 노랑, 앞 4점만) ·
-  // 몸 = 밝은 짝 획에 종이색 속줄(목 끝에서 가늘게 이어 한 번 부풀었다 날에 뾰족하게 닿는다). 먹 테는 두르지 않는다.
-  // 한 획으로 그으면 그라데이션 축(머리 → 꼬리 곧은 줄)이 고리와 어긋나 먹 · 올리브가 나가는 다리를 다 덮어 먹 혀로 읽혔고,
-  // 꼭대기를 칼끝 너머로 밀면 몸 전체가 밝은 짝이라 종이 위에서 사라졌다(4판 고침 회차 시안 다섯).
-  // 몸 쪽(날 아래)으로는 감지 않는다 — 주인공 다리를 덮는다. 부르는 틈 0.24초 · 사는 0.3초 남짓이라 고리가 늘 하나둘 떠 있다.
-  // 앞 회차: 8 = 날 위쪽 가는 실 하나 · 9 = 날을 넘나드는 굵은 실 + 부푼 마디(노랑 얼룩) · 10 = 반경 15~23 · 굵기 4.5(폰 1배 노랑 낙서)
-  aura(b, _n, c) {
+  // 칼 기운 — 「전기가 튀는 칼」. 날 둘레 작은 꺾은 아크(날에서 튀어 나갔다 날로 내려앉는다 · 발이 두 갈래)가 부를 때마다 하나씩
+  // 붙었다 끊기고(다섯에 둘은 하나 더), 다섯 번에 두 번(12 · 18프레임 엇갈린 틈) 큰 아크 하나가 몸 바깥에서 하늘 쪽으로
+  // 튀어 올라 떨다가 두 갈래로 갈라지며 끊긴다(다음 큰 아크까지 잠깐 빈다 — 붙음 → 끊김 → 다시 붙음).
+  // 큰 아크 = 굵은 먹 목 → 짙은 올리브 → 노랑 몸(속 종이색) → 밝은 짝 끝 · 작은 아크는 날이 먹이라 목 없이 몸만.
+  // 몸 쪽(날 아래)으로는 가지 않는다 — 주인공 머리 · 다리를 덮는다. 땅에 닿지 않는다.
+  // 앞 판: 날을 떠났다 돌아오는 매끈한 고리 둘(반경 20~34)은 폰 1배에서 칼 옆 옅은 노랑 낙서 · 리본으로 읽혔다(사용자 반려)
+  aura(b, n, c) {
     const [hx, hy, tx, ty] = b;
     const L = Math.hypot(tx - hx, ty - hy) || 1;
     const [ux, uy] = [(tx - hx) / L, (ty - hy) / L];
-    const [nx, ny] = ux > 0 ? [uy, -ux] : [-uy, ux]; // 칼날의 위쪽 법선
-    const on = (u: number): [number, number] => [hx + ux * L * u, hy + uy * L * u];
-    const t0 = n01() * 5 * F;
-    put('spat', hx + ux * L * 0.08, hy + uy * L * 0.08, { life: 0.08, size: 3.4, rot: Math.atan2(ny, nx), v: 2, c1: INK }); // 점화
-    // 날 위 실 — 검은 날 위를 손잡이에서 칼끝으로 기는 노랑(날이 전기를 머금었다). 종이 위 노랑보다 검은 날 위 노랑이 또렷하다
-    const run: number[] = [];
-    for (let i = 0; i < 8; i++) {
-      const [x, y] = on(0.1 + 0.85 * (i / 7));
-      const o = i && i < 7 ? sgn() * 1.8 : 0;
-      run.push(x + nx * o, y + ny * o);
-    }
-    later(t0, () => bent(run, 2.2, '', { body: liteOf(c), life: 0.26, dry: 0.1, pr: P_LINE, gr: 0.5 }));
-    for (let j = 0; j < 2; j++) {
-      const u0 = j ? 0.35 + 0.25 * n01() : 0.06 + 0.2 * n01();
-      const u1 = Math.min(1, u0 + 0.3 + 0.15 * n01());
-      const R = j ? 20 + 6 * n01() : 27 + 7 * n01();
-      const a = Math.atan2(ny, nx) - (ux > 0 ? 1 : -1) * (0.15 + 0.2 * n01()) + sgn() * 0.2; // 법선에서 조금 하늘 쪽으로 · 고리마다 다르게
-      const [dx, dy] = [Math.cos(a), Math.sin(a)];
-      const [ax, ay] = on(u0);
-      const [bx, by] = on(u1);
-      const lean = (0.15 + 0.2 * n01()) * (u1 - u0) * L; // 꼭대기가 칼끝 쪽으로 조금 쏠린다
-      const q: number[] = [];
-      for (let i = 0; i < 14; i++) {
-        const t = i / 13;
-        const e = i && i < 13 ? 1 : 0;
-        const h = R * Math.sin(Math.PI * t) + e * sgn() * 1.6;
-        const f = lean * Math.sin(Math.PI * t) + e * sgn() * 1.2;
-        q.push(ax + (bx - ax) * t + dx * h + ux * f, Math.min(GROUND - 4, ay + (by - ay) * t + dy * h + uy * f));
+    const nrm: P = ux > 0 ? [uy, -ux] : [-uy, ux]; // 날의 위쪽 법선(몸 바깥 · 하늘 쪽)
+    const on = (u: number): P => [hx + ux * L * u, Math.min(GROUND - 2, hy + uy * L * u)];
+    // 작은 아크 — 날에서 튀어 나갔다 날로 내려앉는다(높이 14~26). 등뼈 하나에 꺾임만 바꿔 두 번 긋고(2프레임 남짓 틈) 마지막 꼴은
+    // 내려앉는 발이 둘로 갈라져 날에 닿는다. 부를 때마다 하나, 다섯에 둘은 3프레임 뒤 다른 자리에 하나 더
+    const small = (): void => {
+      const u0 = 0.25 + 0.35 * n01();
+      const u1 = Math.min(1, u0 + 0.35 + 0.25 * n01());
+      const h = 14 + 12 * n01();
+      const [A, E] = [on(u0), on(u1)];
+      const j = sgn() * 5;
+      const M: P = [(A[0] + E[0]) / 2 + nrm[0] * h * 2 + ux * j, (A[1] + E[1]) / 2 + nrm[1] * h * 2 + uy * j];
+      const w = 5.5 + 1.5 * n01();
+      const shots = 2;
+      for (let s = 0, t0 = 0; s < shots; s++) {
+        const last = s === shots - 1;
+        later(t0, () => {
+          const pts = crack(A, M, E, 3.5, n01() < 0.5 ? 2 : 3);
+          const life = (4 + n01()) * F;
+          const t = zap(pts, w, life, c, 0);
+          if (!last) return;
+          const m = pts.length;
+          const F2 = on(Math.max(u0 + 0.08, u1 - 0.1 - 0.08 * n01()));
+          const q = [pts[m - 6], pts[m - 5], (pts[m - 6] + F2[0]) / 2 + nrm[0] * 2 + sgn(), (pts[m - 5] + F2[1]) / 2 + nrm[1] * 2 + sgn(), F2[0], F2[1]];
+          later(t, () => bent(q, 2.4, '', { body: liteOf(c), life: life * 0.8, dry: 0.15, pr: P_FLICK, gr: 0.3 }));
+        });
+        t0 += (1.6 + 0.6 * n01()) * F;
       }
-      const w = j ? 5 + 0.8 * n01() : 6 + n01();
-      const life = 0.26 + 0.08 * n01();
-      later(t0 + j * (3 + n01() * 3) * F, () => {
-        bent(q.slice(0, 8), w * 1.1, '', { body: c, life: life * 0.8, dry: 0.08, pr: P_BRUSH, gr: 0.12, vy: -8 });
-        later(life * 0.06, () => bent(q.slice(6), w, PAPER, { body: liteOf(c), life, dry: 0.12, pr: P_CUT, gr: 0.3, hold: 0.6, vy: -8 }));
-      });
-    }
-    later(t0 + 7 * F, () => fork([hx, hy, tx, ty], 22 + 8 * n01(), 3.2, 0.22, c, -8)); // 칼끝 두 갈래
+    };
+    small();
+    if (n01() < 0.4) later((3 + n01()) * F, small);
+    // 큰 아크 — 다섯 번에 두 번(12~20프레임 남짓 · 어긋나게)
+    if (n % 5 === 0 || n % 5 === 3) later(n01() * 3 * F, () => leap(on(0.4 + 0.4 * n01()), nrm, c));
   },
-  every: 0.24,
+  every: 0.09, // 0.1이면 1/60초 여섯 번을 더한 값이 0.1에 못 미쳐 일곱 프레임마다 불렸다
   tint: true,
   waza: {
     // 필살 큰 획을 따라 — 획 옆(위쪽)에 붙어 아크가 마디마다 건너뛰며 기어간다(둘에 하나 마디가 부푼다) → 끝에서 두 갈래 → 끝 두 마디가 한 번 더 붙는다(k 1에서 20 안)
