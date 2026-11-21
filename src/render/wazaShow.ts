@@ -2,17 +2,18 @@
 // config WAZA_RUN · sim triggerSpecial이 정본이고, 여기선 그 박자(special · wazaSwing · wazaBurst)에 그림 · 반전 · 흔들림 · 무기 이펙트를 맞춘다.
 // 층 셋: drawWazaMid(건물 위 · 졸라맨 아래 — 갈라진 건물 · 월하난무의 밤 · 달) · drawWazaWorld(졸라맨 위 — 획 · 피 · 무음일섬 암전) · drawWazaTitle(이름).
 // 문법은 docs/INK_FX_2026-11-01.md §2 · §5 · §8: 획은 움직임에서 · 먹 + 무기 포인트 색(벤 순간 획 속) + 인주(SEAL_INK — 피 · 도장) ·
-// 획은 알파로 지우지 않는다(꼬리부터 깎기 · 줄이기). 박자마다 반전(screenfx.inkFrame) · 흔들림(takeWazaJolt) · 무기 이펙트(bladeFx.weaponBurst)가 함께 친다.
+// 획은 알파로 지우지 않는다(꼬리부터 깎기 · 줄이기). 박자마다 반전(screenfx.inkFrame) · 흔들림(takeWazaJolt)이 치고, 반전이 끝난 다음 프레임부터
+// 그 무기의 속성이 큰 획을 타고 번진다(bladeFx.weaponAlong) · 마무리 한 번(weaponBloom). 전설은 큰 획 몸도 한 붓에 먹과 색(strokeTone).
 // 박자: stepWazaShow는 consumeEvents(시뮬 advance 한 번)마다 한 칸 — 히트스톱 동안에도 흐른다.
 
 import type { FallingStack, GameState, JuiceEvent, WazaId, WeaponId } from '../core/types';
 import { JUICE, PALETTE, PLAYER, SEAL_INK, VIEW, WAZA_RUN } from '../config';
 import { WAZA_COPY } from '../content';
-import { brushArc, brushLine, brushPath, enso, hotCore, inkBlot, inkDrop, inkDust, PRESS, spatter } from './ink';
+import { brushArc, brushLine, brushPath, enso, hotCore, inkBlot, inkDrop, inkDust, PRESS, spatter, type Tone } from './ink';
 import { drawPlayer, drawStack, floorTile, greatLook, liveBlade, setLiveBody } from './sprites';
 import { makeFloor, makeStack } from '../core/building';
 import { pointInk, spawnStackShatter } from './effects';
-import { bloodSpray, weaponBurst } from './bladeFx';
+import { bloodSpray, strokeTone, weaponAlong, weaponBloom } from './bladeFx';
 import { flashK, inkFrame } from './screenfx';
 import { kitOf } from './moveBody';
 import { MUKJUL_STAR, wazaBodyAt, type WazaShowView } from './wazaBody';
@@ -60,9 +61,13 @@ interface Show {
   weapon: WeaponId; ink: string;
   /** 필살 자세가 풀린 뒤 졸라맨이 딴 동작을 했다 — 몸 연기(wazaBody)를 거둔다 */
   free: boolean;
+  /** 프레임 f에 시작할 번짐 · 마무리(반전이 끝난 다음 프레임에 시작한다) */
+  todo: { f: number; run: () => void }[];
 }
 
 let show: Show | null = null;
+/** 지금 화면 위끝(월드 y = FIELD_TOP − cam) — 박자 함수는 cam을 몰라 그리기(drawWazaMid)가 적어 둔 값을 쓴다(한 프레임 늦어도 된다) */
+let viewTop: number = VIEW.FIELD_TOP;
 /** 터지며 갈라진 건물 — 반쪽씩 미끄러지다가 조각난다. 다음 필살과 따로 논다 */
 let split: { st: FallingStack; t: number; cut: Cut; gimmick: GameState['gimmick'] } | null = null;
 let seedN = 1;
@@ -89,28 +94,46 @@ function hz(seed: number, k: number): number {
  */
 function cutLine(
   ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number,
-  w: number, s0: number, s1: number, dry: number, seed: number, age: number, core: string, bend = 0, pr = PRESS.cut,
+  w: number, s0: number, s1: number, dry: number, seed: number, age: number, core: string, bend = 0, pr = PRESS.cut, tone?: Tone,
 ): void {
   ctx.fillStyle = INK;
-  brushLine(ctx, x0, y0, x1, y1, w, s0, s1, dry, seed, bend, pr);
+  brushLine(ctx, x0, y0, x1, y1, w, s0, s1, dry, seed, bend, pr, tone);
   const k = age < 0 ? 0 : 1 - age / 5;
   if (k <= 0) return;
+  const inner = (h: number): void => brushLine(ctx, x0, y0, x1, y1, w * 0.42 * k * h, s0, s1, 0, seed, bend, pr);
+  if (tone) { hotCore(ctx, age / 5, inner); return; } // 전설 — 몸이 이미 먹과 색이라 속에 색을 심지 않는다. 달군 속만
   ctx.fillStyle = core;
-  brushLine(ctx, x0, y0, x1, y1, w * 0.42 * k, s0, s1, 0, seed, bend, pr);
-  if (core !== SEAL_INK) hotCore(ctx, age / 5, (h) => brushLine(ctx, x0, y0, x1, y1, w * 0.42 * k * h, s0, s1, 0, seed, bend, pr));
+  inner(1);
+  if (core !== SEAL_INK) hotCore(ctx, age / 5, inner);
 }
 
 function cutPath(
   ctx: CanvasRenderingContext2D, pts: readonly number[], w: number, s0: number, s1: number,
-  dry: number, seed: number, age: number, core: string, pr = PRESS.flick,
+  dry: number, seed: number, age: number, core: string, pr = PRESS.flick, tone?: Tone,
 ): void {
   ctx.fillStyle = INK;
-  brushPath(ctx, pts, w, s0, s1, dry, seed, pr);
+  brushPath(ctx, pts, w, s0, s1, dry, seed, pr, tone);
   const k = age < 0 ? 0 : 1 - age / 5;
   if (k <= 0) return;
+  const inner = (h: number): void => brushPath(ctx, pts, w * 0.4 * k * h, s0, s1, 0, seed, pr);
+  if (tone) { hotCore(ctx, age / 5, inner); return; }
   ctx.fillStyle = core;
-  brushPath(ctx, pts, w * 0.4 * k, s0, s1, 0, seed, pr);
-  if (core !== SEAL_INK) hotCore(ctx, age / 5, (h) => brushPath(ctx, pts, w * 0.4 * k * h, s0, s1, 0, seed, pr));
+  inner(1);
+  if (core !== SEAL_INK) hotCore(ctx, age / 5, inner);
+}
+
+/** brushLine(bend)이 지나는 길을 꺾은선으로 — 번짐(weaponAlong)이 그린 획 위를 타게 */
+function bentPts(x0: number, y0: number, x1: number, y1: number, bend: number, n = 12): number[] {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const L = Math.hypot(dx, dy) || 1;
+  const out: number[] = [];
+  for (let i = 0; i <= n; i++) {
+    const s = i / n;
+    const b = bend * Math.sin(Math.PI * s);
+    out.push(x0 + dx * s - (dy / L) * b, y0 + dy * s + (dx / L) * b);
+  }
+  return out;
 }
 
 /**
@@ -315,6 +338,38 @@ function slashAt(sh: Show, i: number): { cx: number; cy: number; a: number; sg: 
 
 const sealY = (sh: Show): number => sh.bottom - Math.min(sh.h, 220) * 0.45;
 
+/** 십이연참 i번째 획의 댄 곳 → 뗀 곳 · 휨(그리기와 번짐이 같이 쓴다) */
+const NAK_L = 120;
+function slashEnds(sh: Show, i: number): { x0: number; y0: number; x1: number; y1: number; bend: number } {
+  const { cx, cy, a, sg } = slashAt(sh, i);
+  const dx = Math.cos(a) * NAK_L * sg;
+  const dy = Math.sin(a) * NAK_L * sg;
+  return { x0: cx - dx, y0: cy - dy, x1: cx + dx, y1: cy + dy, bend: sg * 8 };
+}
+
+/** 천지개벽 벼락 셋의 뿌리 x(가운데 · 왼 · 오른) · 마지막 쌍벼락 x */
+const tenchiX = (sh: Show): number[] => [sh.x + 4, sh.x - 92, sh.x + 88];
+const twinX = (sh: Show, i: number): number => sh.x + (i ? 50 : -46);
+/** 올려베기 큰 현 꼭대기 — 화면 위끝에서 잘린다 */
+const agebaTop = (sh: Show, top: number): number => Math.max(top + 6, sh.foot - PLAYER.H - VIEW.FLOOR_H * 5);
+/** 월하난무 칼 i(둘째부터)의 피 튐 자리 — 세로선 위 y */
+const dalSpot = (sh: Show, i: number, top: number): number => top - 10 + 70 + (sh.foot - top + 10 - 160) * hz(sh.seed, i + 90);
+/** 용오름 검풍 꼭대기(by = 그때 노린 건물 밑면) */
+const gustTop = (foot: number, by: number): number => Math.min(foot - 130, by - 8);
+
+/** 용오름 검풍 i의 나선 — 발에서 꼭대기까지 세 바퀴, 고리처럼 위로 갈수록 넓고 납작하다(번짐이 탄다) */
+function gustSpiral(x: number, foot: number, by: number, i: number, seed: number): number[] {
+  const H = foot - 8 - gustTop(foot, by);
+  const out: number[] = [];
+  for (let j = 0; j <= 36; j++) {
+    const v = j / 36;
+    const a = v * 3 * TAU + seed;
+    const r = 14 + v * (40 + 12 * i);
+    out.push(x + Math.cos(a) * r, foot - 8 - H * v + Math.sin(a) * r * 0.3);
+  }
+  return out;
+}
+
 // ── 들머리 ───────────────────────────────────────────────────
 
 /** 필살 발동 프레임 — renderer.beginPrelude가 부른다. st = 방금 그린 건물(천지개벽이면 곧 유령이 된다) */
@@ -331,7 +386,7 @@ export function startWazaShow(s: GameState, st: FallingStack | null): void {
   const fixed: Partial<Record<WazaId, number>> = { tenchi: P + 46, ageba: P + 28 };
   show = {
     id: s.waza, f: 0, seed: seedN, x: VIEW.LANE_X[s.player.lane], foot, bottom, h, hits: [], burst: -1,
-    end: fixed[s.waza] ?? CAP, weapon: s.weapon, ink: pointInk(s.weapon), free: false,
+    end: fixed[s.waza] ?? CAP, weapon: s.weapon, ink: pointInk(s.weapon), free: false, todo: [],
   };
 }
 
@@ -358,36 +413,51 @@ export function wazaShowEvent(s: GameState, e: JuiceEvent, st: FallingStack | nu
   split = { st, t: 0, cut, gimmick: s.gimmick };
 }
 
-/** 정해진 프레임의 박자 — 천지개벽 벼락 · 올려베기 · 무음일섬 휘두르기 · 월하난무 팔 벌리기 */
+/**
+ * 정해진 프레임의 박자 — 천지개벽 벼락 · 올려베기 · 무음일섬 휘두르기 · 월하난무 팔 벌리기 + 반전 뒤에 시작할 번짐(todo).
+ * 무기는 친 순간(반전 · 흔들림)엔 나오지 않고 반전이 끝난 다음 프레임부터 큰 획을 타고 번진다(DESIGN §2 · §4)
+ */
 function fixedBeats(sh: Show): void {
   const f = sh.f;
-  const cy = sh.bottom - sh.h * 0.5;
   const w = sh.weapon;
+  if (sh.todo.length) {
+    const due = sh.todo.filter((t) => t.f <= f);
+    sh.todo = sh.todo.filter((t) => t.f > f);
+    for (const t of due) t.run();
+  }
+  const g = VIEW.GROUND_Y;
   switch (sh.id) {
-    case 'tenchi':
-      if (f === P) {
-        beat(20, 10, 3);
-        weaponBurst(w, sh.x, cy, 'destroy');
-        weaponBurst(w, sh.x, sh.foot - 6, 'floor');
-      } else if (f === P + 3 || f === P + 6) {
+    case 'tenchi': {
+      const X = tenchiX(sh);
+      if (f === P) beat(20, 10, 3);
+      else if (f === P + 3 || f === P + 6) {
         beat(9, 5);
-        weaponBurst(w, sh.x + (f === P + 3 ? -92 : 88), sh.foot - 40, 'hit');
-      } else if (f === TENCHI_LAST) {
-        beat(14, 8, 2);
-        weaponBurst(w, sh.x, cy - 30, 'floor');
+        if (f === P + 3) {
+          // 반전 셋이 끝난 프레임 — 가운데 벼락 뿌리 → 하늘 · 뿌리 땅 자국
+          weaponAlong(w, boltUp(X[0], g, viewTop, 26, sh.seed), 1.3, 0.35);
+          weaponBloom(w, X[0], g - 2, -Math.PI / 2, 1);
+        }
+        const i = f === P + 3 ? 1 : 2; // 곁 벼락이 솟는 프레임
+        weaponAlong(w, boltUp(X[i], g, viewTop, 16, sh.seed + i * 13), 0.9, 0.25);
+      } else if (f === TENCHI_LAST) beat(14, 8, 2);
+      else if (f === TENCHI_LAST + 2) {
+        for (let i = 0; i < 2; i++) weaponAlong(w, boltUp(twinX(sh, i), g, viewTop, 18, sh.seed + 90 + i), 1.1, 0.3);
       } else if (f >= P + 8 && f <= P + 22 && (f - P) % 2 === 0) beat(3, 1);
       return;
+    }
     case 'ageba': {
+      const x = sh.x;
+      const yTop = agebaTop(sh, viewTop);
       if (f === P) beat(14, 9, 2);
-      const k = [P, P + 2, P + 4].indexOf(f);
-      if (k < 0) return;
-      const u = [0.35, 0.68, 1][k];
-      const yTop = sh.foot - PLAYER.H - VIEW.FLOOR_H * 5;
-      weaponBurst(w, sh.x - 8 + 22 * u, sh.foot - 10 + (yTop - sh.foot + 10) * u, k === 2 ? 'destroy' : 'floor');
+      else if (f === P + 2) weaponAlong(w, bentPts(x - 8, sh.foot - 10, x + 14, yTop, 26), 1.3, 0.22); // 큰 현 발 → 꼭대기
+      else if (f === P + 4) {
+        weaponAlong(w, bentPts(x + 24, sh.foot - 30, x + 40, yTop + 40, 20), 0.8, 0.2); // 메아리 현
+        weaponBloom(w, x + 14, yTop, -Math.PI / 2, 1.4);
+      }
       return;
     }
     case 'mukjul':
-      // 무기 그림을 줄 위에 겹치지 않는다 — 한 줄만 남기는 게 이 필살이다(포인트 색은 줄 속으로).
+      // 정적 동안 무기 그림을 줄 위에 겹치지 않는다 — 한 줄만 남기는 게 이 필살이다(무기는 터진 뒤 줄을 따라 번진다, burstBeat).
       // 휘두르는 순간은 반전하지 않는다 — 검은 화면에 흰 줄(레퍼런스)이 뒤집히면 밝은 화면에 검은 줄이 된다
       if (f === P) beat(10, 6);
       return;
@@ -404,46 +474,76 @@ function swingBeat(sh: Show, s: GameState, i: number, y: number): void {
   const w = sh.weapon;
   switch (sh.id) {
     case 'nakgwan': {
-      const { cx, cy } = slashAt(sh, i);
       beat(5, 3); // 전화면 반전은 도장(터짐)에만 — 열두 타마다 뒤집으면 초당 3번을 넘는다
-      weaponBurst(w, cx, cy, 'hit');
+      // 획 끝에 작은 마무리 — 친 쪽으로. 두 획에 하나(0 · 3 · 4 · 7 · 8 · 11 — 끝이 좌우로 번갈고 마지막 획은 든다).
+      // 열두 획 모두 치면 무거운 완파 그림(황금 · 화염 · 서리)이 풀 192를 필살 조각으로 채운다(11-21 실측 황금 192 · 여섯이면 절반)
+      if (i % 4 === 1 || i % 4 === 2) return;
+      const e = slashEnds(sh, i);
+      weaponBloom(w, e.x1, e.y1, Math.atan2(e.y1 - e.y0, e.x1 - e.x0), 0.55);
       return;
     }
     case 'dalmuri':
-      // 세로선 번쩍임(그리기)과 흔들림만 — 무기 그림은 터질 때 한 번(첫 칼에 치면 보름달 · 붉은 선 위를 가린다. 영상엔 선 하나뿐)
+      // 세로선 번쩍임(그리기)과 흔들림 — 첫 칼은 보름달 · 붉은 선 하나뿐(영상). 칼 2~5는 피 튐 자리에 작은 마무리(밤 위라 색 조각만 보인다)
       if (i === 0) beat(14, 7);
-      else beat(6, 3);
+      else {
+        beat(6, 3);
+        weaponBloom(w, sh.x, dalSpot(sh, i, viewTop), i % 2 ? 0 : Math.PI, 0.5);
+      }
       return;
     case 'baram': {
       const foot = VIEW.GROUND_Y - s.player.y;
-      beat(7 + 3 * i, 5, i === WAZA_RUN.baram.hits.length - 1 ? 2 : 0);
-      weaponBurst(w, VIEW.LANE_X[s.player.lane], Math.min(foot - 130, y - 8), 'floor');
+      const x = VIEW.LANE_X[s.player.lane];
+      const last = i === WAZA_RUN.baram.hits.length - 1;
+      beat(7 + 3 * i, 5, last ? 2 : 0);
+      const go = (): void => {
+        weaponAlong(w, gustSpiral(x, foot, y, i, sh.seed + i), 0.9, 0.3); // 발 → 꼭대기 나선
+        if (last) weaponBloom(w, x, gustTop(foot, y), -Math.PI / 2, 1.2);
+      };
+      if (last) sh.todo.push({ f: sh.f + 2, run: go }); // 마지막 검풍은 반전 둘 뒤
+      else go();
       return;
     }
     default:
   }
 }
 
-/** 터지는 박자 — 가장 큰 반전 · 흔들림 · 무기 완파 그림 · 피 */
+/** 터지는 박자 — 가장 큰 반전 · 흔들림 · 피. 무기 번짐 · 마무리는 반전이 끝난 뒤(todo) */
 function burstBeat(sh: Show): void {
   const w = sh.weapon;
+  const B = sh.f;
+  const at = (f: number, run: () => void): void => { sh.todo.push({ f, run }); };
   switch (sh.id) {
     case 'mukjul': {
       // 피는 그리는 피줄기(trickle · gush)만 — 판 풀 피 방울은 마르면 먹 덩이 · 검은 낙수로 남아 줄을 더럽힌다
       beat(22, 12, 4);
+      // 반전 넷 뒤 — 벤 자리에서 줄을 따라 양 끝으로
+      const y = cutOf(sh)!.y;
+      at(B + 4, () => {
+        weaponAlong(w, [sh.x, y, VIEW.W + 24, y], 1.2, 0.3);
+        weaponAlong(w, [sh.x, y, -24, y], 1.2, 0.3);
+      });
       return;
     }
     case 'dalmuri': {
       // 보름달 + 반전 넷(검은 원판) — 건물이 세로로 갈라지며 가운데서 피가 양옆 위로
       const c = cutOf(sh)!;
       beat(24, 12, 4);
-      weaponBurst(w, c.x, c.y, 'destroy');
       for (const d of [-1, 1]) bloodSpray(c.x + d * 8, c.y, -Math.PI / 2 + d * 0.9, 0.7, 14, 540);
+      // 밤이 갈라지기 시작할 때 — 세로선 위 → 아래
+      at(B + 4, () => weaponAlong(w, [sh.x, viewTop + 20, sh.x, sh.foot], 1.2, 0.35));
       return;
     }
     case 'nakgwan':
       beat(18, 10, 3);
-      weaponBurst(w, sh.x, sealY(sh), 'destroy');
+      // 인주로 다시 열린 열두 획 가운데 넷을 따라 · 도장 자리 마무리
+      at(B + 4, () => {
+        for (const i of [2, 5, 8, 11]) {
+          if (i >= sh.hits.length) continue;
+          const e = slashEnds(sh, i);
+          weaponAlong(w, bentPts(e.x0, e.y0, e.x1, e.y1, e.bend, 6), 0.8, 0.2);
+        }
+      });
+      at(B + 6, () => weaponBloom(w, sh.x, sealY(sh), -Math.PI / 2, 1.1));
       return;
     default:
   }
@@ -486,6 +586,7 @@ export function wazaShowState(): WazaShowView | null {
 
 export function drawWazaMid(ctx: CanvasRenderingContext2D, cam: number): void {
   titleNight.length = 0;
+  viewTop = VIEW.FIELD_TOP - cam;
   if (split) drawSplit(ctx, VIEW.GROUND_Y);
   const sh = show;
   if (sh?.id === 'dalmuri') dalNight(ctx, sh, VIEW.FIELD_TOP - cam);
@@ -571,7 +672,7 @@ export function drawWazaShot(ctx: CanvasRenderingContext2D, id: WazaId, x: numbe
   const h = st.floors.reduce((a, fl) => a + fl.h, 0);
   const sh: Show = {
     id, f, seed: 5, x: VIEW.LANE_X[0], foot: g, bottom, h, hits: hits.map((t) => ({ f: t, y: bottom })), burst, end: CAP,
-    weapon, ink: pointInk(weapon), free: false, // 상점 칸도 장착한 무기의 포인트 색(판과 같은 모습)
+    weapon, ink: pointInk(weapon), free: false, todo: [], // 상점 칸도 장착한 무기의 포인트 색(판과 같은 모습)
   };
   const s = { player: { lane: 0, y: 0 } } as unknown as GameState;
   ctx.save();
@@ -631,7 +732,7 @@ function drawHalves(ctx: CanvasRenderingContext2D, st: FallingStack, c: Cut, t: 
  */
 function tenchi(ctx: CanvasRenderingContext2D, sh: Show, top: number, g: number): void {
   const f = sh.f;
-  const X = [sh.x + 4, sh.x - 92, sh.x + 88];
+  const X = tenchiX(sh);
   // 땅 금 · 고인 먹 — 벼락이 솟을 자리 예고
   if (f < P + 10) {
     const gone = eat(f, P + 2, 8);
@@ -659,7 +760,8 @@ function tenchi(ctx: CanvasRenderingContext2D, sh: Show, top: number, g: number)
     const pts = boltUp(X[i], g, top, i === 0 ? 26 : 16, sh.seed + i * 13);
     const s0 = eat(f, at[i] + (i === 0 ? 10 : 6), i === 0 ? 14 : 10);
     const s1 = grow(f, at[i], 2);
-    cutPath(ctx, pts, W[i], s0, s1, 0.25, sh.seed + i * 13, age, sh.ink);
+    // 전설은 벼락 몸이 한 붓에 먹과 색 — 땅(댄 곳) 먹 → 하늘 색
+    cutPath(ctx, pts, W[i], s0, s1, 0.25, sh.seed + i * 13, age, sh.ink, PRESS.flick, strokeTone(ctx, sh.weapon, X[i], g, X[i], top, sh.seed + i * 13));
     // 가지 — 마디에서 위로 갈라져 뻗는다
     for (let b = 0; b < 2; b++) {
       const j = 2 + b * 3;
@@ -687,9 +789,10 @@ function tenchi(ctx: CanvasRenderingContext2D, sh: Show, top: number, g: number)
   // 마지막 쌍벼락
   if (f >= TENCHI_LAST) {
     for (let i = 0; i < 2; i++) {
-      const x = sh.x + (i ? 50 : -46);
+      const x = twinX(sh, i);
       const pts = boltUp(x, g, top, 18, sh.seed + 90 + i);
-      cutPath(ctx, pts, 24, eat(f, TENCHI_LAST + 8, 12), grow(f, TENCHI_LAST, 2), 0.25, sh.seed + 90 + i, f - TENCHI_LAST, sh.ink);
+      const tone = strokeTone(ctx, sh.weapon, x, g, x, top, sh.seed + 90 + i);
+      cutPath(ctx, pts, 24, eat(f, TENCHI_LAST + 8, 12), grow(f, TENCHI_LAST, 2), 0.25, sh.seed + 90 + i, f - TENCHI_LAST, sh.ink, PRESS.flick, tone);
       ctx.fillStyle = INK;
       spatter(ctx, x, g - 3, 20 * (1 - eat(f, TENCHI_LAST + 4, 12)), -Math.PI / 2, sh.seed + 70 + i, 8);
     }
@@ -712,9 +815,14 @@ function ageba(ctx: CanvasRenderingContext2D, sh: Show, top: number): void {
     inkDust(ctx, x, sh.foot - 10, 50 * (1 - grow(f, 0, P)), 1, sh.seed + 3, 12); // 모여드는 먼지
     return;
   }
-  const yTop = Math.max(top + 6, sh.foot - PLAYER.H - VIEW.FLOOR_H * 5);
-  cutLine(ctx, x - 8, sh.foot - 10, x + 14, yTop, 36, eat(f, P + 7, 14), grow(f, P, 2), 0.3, sh.seed + 3, f - P, sh.ink, 26, PRESS.flick);
-  if (f >= P + 2) cutLine(ctx, x + 24, sh.foot - 30, x + 40, yTop + 40, 11, eat(f, P + 8, 12), grow(f, P + 2, 3), 0.5, sh.seed + 4, f - P - 2, sh.ink, 20, PRESS.flick);
+  const yTop = agebaTop(sh, top);
+  const w = sh.weapon;
+  cutLine(ctx, x - 8, sh.foot - 10, x + 14, yTop, 36, eat(f, P + 7, 14), grow(f, P, 2), 0.3, sh.seed + 3, f - P, sh.ink, 26, PRESS.flick,
+    strokeTone(ctx, w, x - 8, sh.foot - 10, x + 14, yTop, sh.seed + 3));
+  if (f >= P + 2) {
+    cutLine(ctx, x + 24, sh.foot - 30, x + 40, yTop + 40, 11, eat(f, P + 8, 12), grow(f, P + 2, 3), 0.5, sh.seed + 4, f - P - 2, sh.ink, 20, PRESS.flick,
+      strokeTone(ctx, w, x + 24, sh.foot - 30, x + 40, yTop + 40, sh.seed + 4));
+  }
   if (f >= P + 2) {
     ctx.fillStyle = INK;
     spatter(ctx, x + 14, yTop, 22 * (1 - eat(f, P + 6, 14)), -Math.PI / 2, sh.seed + 5, 9);
@@ -933,7 +1041,7 @@ function dalNight(ctx: CanvasRenderingContext2D, sh: Show, top: number, night = 
   ctx.fillStyle = SEAL_INK;
   for (let i = 1; i < hit.length; i++) {
     if (f - hit[i] > 10) continue;
-    const yy = y0 + 70 + (y1 - y0 - 160) * hz(sh.seed, i + 90);
+    const yy = dalSpot(sh, i, top);
     spatter(ctx, x, yy, 7 * (1 - eat(f, hit[i] + 2, 8)), i % 2 ? 0 : Math.PI, sh.seed + i * 3, 4);
   }
 }
@@ -942,14 +1050,14 @@ function dalNight(ctx: CanvasRenderingContext2D, sh: Show, top: number, night = 
 function nakgwan(ctx: CanvasRenderingContext2D, sh: Show): void {
   const f = sh.f;
   const B = sh.burst;
-  const L = 120;
   const open = B >= 0 && f - B < 6;
   sh.hits.forEach(({ f: h0 }, i) => {
-    const { cx, cy, a, sg } = slashAt(sh, i);
-    const dx = Math.cos(a) * L * sg;
-    const dy = Math.sin(a) * L * sg;
-    if (open) cutLine(ctx, cx - dx, cy - dy, cx + dx, cy + dy, 9, 0, 1, 0.2, sh.seed + i * 7, f - B, SEAL_INK, sg * 8);
-    else if (f <= h0 + 16) cutLine(ctx, cx - dx, cy - dy, cx + dx, cy + dy, 11, eat(f, h0 + 6, 9), grow(f, h0, 2), 0.35, sh.seed + i * 7, f - h0, sh.ink, sg * 8);
+    const { x0, y0, x1, y1, bend } = slashEnds(sh, i);
+    if (open) cutLine(ctx, x0, y0, x1, y1, 9, 0, 1, 0.2, sh.seed + i * 7, f - B, SEAL_INK, bend);
+    else if (f <= h0 + 16) {
+      cutLine(ctx, x0, y0, x1, y1, 11, eat(f, h0 + 6, 9), grow(f, h0, 2), 0.35, sh.seed + i * 7, f - h0, sh.ink, bend, PRESS.cut,
+        strokeTone(ctx, sh.weapon, x0, y0, x1, y1, sh.seed + i * 7));
+    }
   });
   if (B < 0) return;
   const t = f - B;
@@ -980,8 +1088,10 @@ function baram(ctx: CanvasRenderingContext2D, sh: Show, s: GameState): void {
   sh.hits.forEach(({ f: h0, y: by }, i) => {
     const age = f - h0;
     if (age > 26) return;
-    const yTop = Math.min(foot - 130, by - 8);
+    const yTop = gustTop(foot, by);
     const H = foot - 8 - yTop;
+    // 전설은 위쪽 고리 넷(j 4~7)이 한 붓에 먹과 색 — 회오리 허리 먹 → 꼭대기 색(아래 고리 넷은 먹 그대로)
+    const tone = strokeTone(ctx, sh.weapon, x, foot - 8 - H * 0.45, x, yTop - 10, sh.seed + i);
     for (let j = 0; j < 8; j++) {
       const born = j * 0.7;
       if (age < born) break;
@@ -994,8 +1104,8 @@ function baram(ctx: CanvasRenderingContext2D, sh: Show, s: GameState): void {
       const w = 4 + 3 * v + i;
       const s1 = grow(age, born, 3);
       ctx.fillStyle = INK;
-      brushArc(ctx, x + sway, foot - 8 - H * v, r, a0, 4.4, w, s0, s1, 0.65, sh.seed + j * 5 + i, 0.3, PRESS.cut);
-      if (j === 4 && age < 6) {
+      brushArc(ctx, x + sway, foot - 8 - H * v, r, a0, 4.4, w, s0, s1, 0.65, sh.seed + j * 5 + i, 0.3, PRESS.cut, j >= 4 ? tone : undefined);
+      if (j === 4 && age < 6 && !tone) {
         ctx.fillStyle = sh.ink;
         brushArc(ctx, x + sway, foot - 8 - H * v, r, a0, 4.4, w * 0.45, s0, s1, 0, sh.seed + j * 5 + i, 0.3, PRESS.cut);
       }
