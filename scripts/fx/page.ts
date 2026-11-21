@@ -221,6 +221,17 @@ function measure(): { area: number; w: number; h: number } {
   return { area, w: x1 < 0 ? 0 : x1 - x0 + 1, h: y1 < 0 ? 0 : y1 - y0 + 1 };
 }
 
+/** 다시 켜진 번수 — 넓이가 그때까지 정점의 반 아래로 꺼졌다가 전체 정점의 5분의 1 넘게 되살아난 횟수. 사건 이펙트(타격 · 층 깨기 · 완파)는 0이어야 한다(깜빡임 금지 — 눈이 아프다). 늦게 오는 작은 층은 안 센다 */
+function relit(frames: MotionFrame[], peak: number): number {
+  let hi = 0, low = Infinity, n = 0;
+  for (const f of frames) {
+    hi = Math.max(hi, f.area);
+    if (f.area < hi * 0.5) low = Math.min(low, f.area);
+    if (f.area > low + peak * 0.2) { n++; hi = f.area; low = Infinity; }
+  }
+  return n;
+}
+
 function summary(frames: MotionFrame[]) {
   let peak = frames[0];
   for (const f of frames) if (f.area > peak.area) peak = f;
@@ -233,6 +244,7 @@ function summary(frames: MotionFrame[]) {
     cut: frames[frames.length - 1].area > floor,
     peakFrame: peak.t,
     peakArea: peak.area,
+    relit: relit(frames, peak.area),
     /** 창 안에서 가장 넓었던 상자 폭 · 높이(px) — 「둘레는 그대로」를 지금 줄과 견준다 */
     maxBox: [Math.max(...frames.map((f) => f.w)), Math.max(...frames.map((f) => f.h))],
     peakFrac: last && last.t > 0 ? +(peak.t / last.t).toFixed(3) : null,

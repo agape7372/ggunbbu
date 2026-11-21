@@ -120,7 +120,12 @@ try {
       const r = await page.evaluate((a) => window.__fx.stripPng(...a), [weapons, sc, names, opts]);
       png(`strip-${sc}.png`, r.png);
       motion.push(...r.motion);
-      for (const m of r.motion) console.log(`strip ${sc} ${m.row} ${JSON.stringify(m.summary)}${m.summary?.cut ? ' ← 창 안에서 안 끝남(peakFrac은 창 안 값, --frames를 늘려 끝까지)' : ''}`);
+      for (const m of r.motion) {
+        const notes = [];
+        if (m.summary?.cut) notes.push(' ← 창 안에서 안 끝남(peakFrac은 창 안 값, --frames를 늘려 끝까지)');
+        if (m.summary?.relit && ['hit', 'floor', 'destroy'].includes(sc)) notes.push(` ← 깜빡임 ${m.summary.relit}번: 꺼졌다 다시 켜진다(금지 — 눈이 아프다)`);
+        console.log(`strip ${sc} ${m.row} ${JSON.stringify(m.summary)}${notes.join('')}`);
+      }
       console.log(`strip-${sc}.png ${ms(t1)}`);
     }
     writeFileSync(path.join(out, 'motion.json'), JSON.stringify(motion.length === 1 ? motion[0] : motion, null, 1) + '\n');
