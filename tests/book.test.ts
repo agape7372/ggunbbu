@@ -19,10 +19,10 @@ describe('도감', () => {
   it('모은 수 = 가진 칸 / 전체 칸, 산 것이 늘린다', () => {
     const base = bookCount(bookGroups(new Set()));
     expect(base.have).toBe(9);
-    expect(base.total).toBe(63); // 11-01 시간차 필살 넷 · (5) 철벽 뺌 · 11-02 메타 2차 칸 · 11-20 무기 다섯 → 맨홀 빼고 여섯 → 전설 넷
+    expect(base.total).toBe(68); // 11-01 시간차 필살 넷 · (5) 철벽 뺌 · 11-02 메타 2차 칸 · 11-20 무기 다섯 → 맨홀 빼고 여섯 → 전설 넷 → 11-21 원소 대검 다섯
     const more = bookCount(bookGroups(new Set(['iron', 'ageba', 'mask'])));
     expect(more.have).toBe(12);
-    expect(more.total).toBe(63);
+    expect(more.total).toBe(68);
   });
 
   it('모든 무기 id가 한 번씩, 상점 순서대로', () => {
@@ -43,15 +43,15 @@ describe('도감', () => {
     expect(masks.every((e) => e.has)).toBe(true);
   });
 
-  it('46칸 · 전체 63면 완성 표시가 아니다', () => {
+  it('46칸 · 전체 68면 완성 표시가 아니다', () => {
     const bk = ACHIEVES.find((d) => d.id === 'ach_bk46')!;
     expect(bk.goal).toBe(46);
     expect(bk.desc).toBe('마흔여섯 칸을 채웠다.');
     expect(TITLES.find((t) => t.id === 'ach_bk46')!.name).toBe('대수집가');
-    const short = goalHtml(46, 63);
+    const short = goalHtml(46, 68);
     expect(short).not.toContain('도감 완성');
     expect(short).toContain('남은 칸');
-    expect(short).toMatch(/<b>17</);
-    expect(goalHtml(63, 63)).toContain('도감 완성');
+    expect(short).toMatch(/<b>22</);
+    expect(goalHtml(68, 68)).toContain('도감 완성');
   });
 });

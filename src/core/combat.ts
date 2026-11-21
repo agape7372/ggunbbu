@@ -11,8 +11,8 @@
 //   유지: 헛스윙 / 점프 가드 / 점프 / 시간 경과 / 1막→2막 / 필살기 발동·터짐 / 가드 브레이크
 //         / 안전모가 대신 받은 깔림(items.ts absorbWithHat — ②에서 빠진다).
 
-import type { GameState, Lane } from './types';
-import { damageStack } from './building';
+import type { FallingStack, GameState, Lane } from './types';
+import { arcadeRule, damageStack } from './building';
 import { DEBRIS, GIMMICK, GUARD_GAUGE, HAT, MAT_LIFT, STAGE, WAZA_GAUGE, PLAYER, SCORE, STACK, WEAPON } from '../config';
 import { VIEW } from '../config';
 import { rand } from './rng';
@@ -35,7 +35,11 @@ export function addCombo(s: GameState): void {
 }
 
 export function breakCombo(s: GameState): void {
-  if (s.combo > 0) s.events.push({ kind: 'comboBreak', combo: s.combo });
+  if (s.combo > 0) {
+    s.events.push({ kind: 'comboBreak', combo: s.combo });
+    const g = WEAPON[s.weapon].breakGauge; // 불새 대검: 끊길 때마다 필살 게이지(재에서 다시 일어난다 · 튜토리얼은 없음)
+    if (g && s.mode !== 'training') addGauge(s, g);
+  }
   if (s.combo > s.peakCombo) s.peakCombo = s.combo;   // 0으로 만들기 전에 봉인
   s.combo = 0;
   if (s.mode === 'act2') s.fullCombo = false;
@@ -43,8 +47,9 @@ export function breakCombo(s: GameState): void {
 
 /** 가드가 튕겼다(땅 · 공중 · 종탑 막기). 무기 guardGauge(철근)만큼 필살 게이지를 그대로 더한다 */
 export function guardBounced(s: GameState, ground: boolean): void {
-  const g = WEAPON[s.weapon].guardGauge;
-  if (g) addGauge(s, g);
+  const w = WEAPON[s.weapon];
+  if (w.guardGauge) addGauge(s, w.guardGauge);
+  if (w.guardFreeze && s.stack && arcadeRule(s)) s.stack.chill = w.guardFreeze; // 고드름 대검: 튕긴 건물이 얼어 멈춘다(sim 스택 물리가 센다)
   if (ground) groundGuardCombo(s);
 }
 
@@ -106,8 +111,9 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   const [lo, hi] = attackRange(footY, reachOf(s));
   const mat = stack.floors.length > 0 ? stack.floors[0].mat : 'weak';
   const yHit = stack.y;
-  const res = damageStack(stack, lane, lo, hi, 1);
+  const res = damageStack(stack, lane, lo, hi, hitDamage(s));
   if (res === 'miss') return false;
+  s.hitAt = s.tick;
 
   // 종은 세게 밀린다(저글링) · 바람탑 들숨은 두 배 — 아케이드 재질은 배율 1
   stack.vy = Math.max(stack.vy, liftOf(s) * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
@@ -115,21 +121,52 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
 
   if (res === 'collapse') {
     const isButter = mat === 'butter';
+    const chain = stack.floors.length > 0 && chainDue(s);
     s.events.push({
       kind: isButter ? 'butterCollapse' : 'floorCollapse',
       lane, y: yHit, mat, combo: Math.min(SCORE.COMBO_CAP, s.combo + 1 + (WEAPON[s.weapon].collapseCombo ?? 0)),
       ...(stack.floors.length === 0 ? { last: true } : {}),
+      ...(chain ? { chain: true } : {}),
     });
     registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, collapse: true });
     spawnFloorDebris(s, yHit);
     if (stack.floors.length === 0) {
       destroyStack(s);
-    }
+    } else if (chain) chainHit(s, stack);
   } else {
     s.events.push({ kind: 'hit', lane, y: yHit, mat, combo: s.combo + 1 });
     registerHit(s);
   }
   return true;
+}
+
+/** 베기 한 번의 층 대미지 — 1. 원소 대검 둘만 1막 · 토코톤에서 늘린다:
+ *  그림자 restBreak = 베기가 그 틱 넘게 안 닿았으면 맨 아래층 통째로 · 해일 comboDouble = 콤보가 그 배수가 되는 베기는 2 */
+function hitDamage(s: GameState): number {
+  const w = WEAPON[s.weapon];
+  if (!arcadeRule(s)) return 1;
+  if (w.restBreak !== undefined && s.tick - s.hitAt > w.restBreak) return 1e9;
+  return w.comboDouble && (s.combo + 1) % w.comboDouble === 0 ? 2 : 1;
+}
+
+/** 고압선 대검: 위층이 남은 층 깨기를 세어 collapseChain 번마다 true(1막 · 토코톤) */
+function chainDue(s: GameState): boolean {
+  const n = WEAPON[s.weapon].collapseChain;
+  if (!n || !arcadeRule(s)) return false;
+  s.chainN += 1;
+  return s.chainN % n === 0;
+}
+
+/** 전류가 남은 맨 아래층으로 번진다 — 대미지 1. 무너지면 콤보 · 게이지 없이 층 깨기(필살 붕괴와 같은 꼴 · 이벤트 하나) */
+function chainHit(s: GameState, stack: FallingStack): void {
+  const f = stack.floors[0];
+  if (f.mat === 'bell') return;
+  f.segs[0].hp -= 1;
+  if (f.segs[0].hp > 0) return;
+  stack.floors.shift();
+  s.events.push({ kind: 'floorCollapse', lane: s.player.lane, y: stack.y, mat: f.mat, ...(stack.floors.length === 0 ? { last: true } : {}) });
+  addScore(s, SCORE.FLOOR_BONUS);
+  if (stack.floors.length === 0) destroyStack(s);
 }
 
 /** spawnFloorDebris 한 번이 뽑는 난수 수(조각 셋 × 다섯). 작업 지시서 집행기 난수가 이 값으로 대본 잔해를 건너뛴다(stage.ts finishScript) */

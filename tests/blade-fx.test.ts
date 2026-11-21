@@ -1,4 +1,4 @@
-// 대검 이펙트(bladeFx) — 열네 칼이 서로 다르게 터지고, 다 터진 뒤엔 하나도 안 남는다(이펙트는 제자리로 돌아온다).
+// 대검 이펙트(bladeFx) — 열아홉 칼이 서로 다르게 터지고, 다 터진 뒤엔 하나도 안 남는다(이펙트는 제자리로 돌아온다).
 // 색만으로는 못 가른다 — 그리기 묶음(선·원·타원·사각형…)까지 같이 본다.
 import { describe, expect, it } from 'vitest';
 import { WEAPON_INK } from '../src/config';
@@ -40,7 +40,7 @@ function burst(w: WeaponId): void {
 }
 
 describe('대검 이펙트', () => {
-  it('열네 칼의 타격·층 깨기·완파가 서로 다르게 그려진다', () => {
+  it('열아홉 칼의 타격·층 깨기·완파가 서로 다르게 그려진다', () => {
     const sigs = GREATSWORD_IDS.map((w) => {
       burst(w);
       return drawn();

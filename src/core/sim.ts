@@ -55,6 +55,8 @@ export function makeState(opts?: { seed?: number; mode?: GameState['mode'] }): G
     hat: false,
     pinSaved: 0,
     pinDowns: 0,
+    chainN: 0,
+    hitAt: -1e9,
     tokotonCycle: 0,
     stage: null,
     lm: null,
@@ -148,7 +150,9 @@ export function advance(s: GameState, input: InputFrame): void {
 
   // ── 스택 물리 + 접지 ── 시간차 필살이 벤 건물은 터질 때까지 멈춘다(물리 · 가드 바운스 없음)
   const stack = s.stack;
-  const frozen = stack !== null && isFrozen(s, stack);
+  const chilled = (stack?.chill ?? 0) > 0; // 고드름 대검이 튕긴 건물 — 녹을 때까지 떨어지지 않고 가드에 안 튕긴다(벨 수는 있다)
+  if (chilled) stack!.chill! -= 1;
+  const frozen = stack !== null && (chilled || isFrozen(s, stack));
   let prevStackY = 0;
   if (stack && !frozen) {
     prevStackY = stack.y;

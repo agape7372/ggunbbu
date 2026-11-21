@@ -41,6 +41,9 @@ export function makeStack(o: StackOpts): FallingStack {
   };
 }
 
+/** 1막 · 토코톤(구역 작전 포함) — 대미지 · 낙하를 바꾸는 무기 칸(서리 fallMul · 원소 대검 넷)이 먹는 판. 2막 · 지시서 · 튜토리얼 · 버터바는 아니다 */
+export const arcadeRule = (s: GameState): boolean => s.mode === 'act1' || s.mode === 'tokoton';
+
 /** 페이즈별 낙하 물리 파라미터 */
 export function stackPhysics(s: GameState): { g: number; vterm: number } {
   if (s.mode === 'bonus') return { g: STACK.BUTTER_G, vterm: STACK.BUTTER_VTERM };
@@ -54,7 +57,7 @@ export function stackPhysics(s: GameState): { g: number; vterm: number } {
   const v = s.stack?.vary;
   const p = v?.fast ? s.p + STAGE.FAST_SPEED_ADD : s.p;
   // 서리 대검 fallMul: 1막 · 토코톤(구역 작전은 1막)만. 튜토리얼 · 2막 · 지시서 · 버터바는 위에서 갈렸거나 여기서 뺀다
-  const fm = s.mode === 'act1' || s.mode === 'tokoton' ? WEAPON[s.weapon].fallMul ?? 1 : 1;
+  const fm = arcadeRule(s) ? WEAPON[s.weapon].fallMul ?? 1 : 1;
   const m = (v ? v.fall : 1) * fm;
   if (p <= 1) {
     const g = STACK.ACT1_G[0] + (STACK.ACT1_G[1] - STACK.ACT1_G[0]) * p;

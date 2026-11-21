@@ -171,8 +171,9 @@ export const STACK = {
 // 프레임을 무기마다 바꾸면 3f 입력 버퍼 안에서 탭이 버려진다(10-25 반론 실측: 8탭/s에 오함마 50% 유실).
 // 그래서 무기는 세 칸을 바꾼다: 사거리(건물 판정창 위끝) · 띄우기(타격 밀어올림) · 필살 게이지 배율.
 // 11-20 연장 여덟(삽 · 비계 파이프 · 전동 드릴 · 곡괭이 · 코어 드릴 · 굴착 드릴 · 착암기 · 다이아 드릴)과 대검 다섯(벽돌 · 철근 · 번개 · 크레인 · 먹)은
-// 세 칸에 고유 규칙 하나를 더한다(아래 선택 칸). 무기는 모두 스물여섯 자루다.
+// 세 칸에 고유 규칙 하나를 더한다(아래 선택 칸). 11-21 원소 대검 다섯(불새 · 해일 · 고압선 · 고드름 · 그림자)도 하나씩. 무기는 모두 서른한 자루다.
 // 고유 규칙도 대미지 · 프레임 · 띄우기 상한 · 층 HP를 건드리지 않는다(2막 30/138타는 그대로 · tests/weapons.test.ts).
+// 예외 = 원소 대검 셋(해일 · 고압선 · 그림자)이 베기 대미지를 늘리는 것 — 1막 · 토코톤만이라 2막 · 지시서 셈은 그대로다.
 // core는 무기 id로 가르지 않고 이 칸만 읽는다. 칸 값은 봇 비교(tests/weapon-measure.test.ts · DEVLOG 11-20)로 맞췄다.
 //   ⚠ 띄우기 상한: 연타 1주기(7f) 동안 건물이 **1막 어디서든 가라앉아야** 한다 — 안 그러면
 //   "연타만으로는 못 버틴다"(STACK.HIT_LIFT_V 주석)가 깨진다. 조건 lift < ACT1_G[0]·8/120 ≈ 102.
@@ -224,6 +225,17 @@ export interface WeaponSpec {
   destroyMul?: number;
   /** 스스로 채운 게이지로 필살을 쓰면 게이지가 바로 한 번 다시 찬다(그 두 번째는 다시 채우지 않는다) */
   wazaEcho?: boolean;
+  // ── 11-21 새 전설 다섯. 아래 넷(대미지 · 낙하를 바꾸는 칸)은 1막 · 토코톤만 — 2막 30/138타 · 지시서 기록 · 튜토리얼은 그대로(building arcadeRule)
+  /** 콤보가 끊길 때마다(끊긴 콤보가 1 이상) 필살 게이지 +이 값(배율 안 곱함 · 튜토리얼 없음) */
+  breakGauge?: number;
+  /** 콤보가 이 수의 배수가 되는 베기는 같은 층을 한 번 더 깎는다(대미지 2) */
+  comboDouble?: number;
+  /** 베기로 층을 이 번 무너뜨릴 때마다 한 번, 남은 맨 아래층에 대미지 1(그 층이 무너지면 콤보 없이 층 깨기) */
+  collapseChain?: number;
+  /** 가드로 튕긴 건물이 이 틱 동안 얼어 멈춘다(그동안 벨 수 있다) */
+  guardFreeze?: number;
+  /** 베기가 건물에 이 틱 넘게 안 닿았다가 닿은 첫 베기는 맨 아래층을 통째로 깬다 */
+  restBreak?: number;
 }
 export const WEAPON: Record<WeaponId, WeaponSpec> = {
   sword: { reach: PLAYER.ATTACK_REACH, lift: STACK.HIT_LIFT_V, gauge: 1, shake: 1 },
@@ -254,6 +266,12 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   thunder: { reach: 82, lift: 72, gauge: 1, shake: 1.3, gaugeKeep: 20 },  // 필살 뒤 게이지가 남는다 / 띄우기 ↓
   crane: { reach: 78, lift: 62, gauge: 1, shake: 1.6, comboLift: 36 },     // 콤보가 쌓일수록 띄우기 ↑ / 처음엔 띄우기 ↓↓
   brush: { reach: 74, lift: 86, gauge: 0.7, shake: 1.1, wazaEcho: true },   // 필살을 바로 한 번 더 / 필살 ↓↓
+  // 11-21 원소 다섯(사용자 영상 「이펙트 생긴게 다르잖아」). 값은 봇 비교로 맞췄다(DEVLOG 11-21 · 기존 전설 점수대 안 · 흑철 아래)
+  phoenix: { reach: 74, lift: 80, gauge: 0.9, shake: 1.3, breakGauge: 8 },   // 콤보가 끊기면 필살이 찬다 / 필살 ↓
+  tide: { reach: 76, lift: 78, gauge: 0.95, shake: 1.4, comboDouble: 10 },   // 콤보 10마다 두 번 깎는다 / 띄우기 · 필살 ↓
+  volt: { reach: 80, lift: 74, gauge: 1, shake: 1.2, collapseChain: 2 },     // 층 둘을 깰 때마다 위층에 전류 / 띄우기 ↓
+  icicle: { reach: 84, lift: 70, gauge: 0.95, shake: 1, guardFreeze: 18 },   // 가드로 튕긴 건물이 얼어 멈춘다 / 띄우기 ↓
+  shade: { reach: 70, lift: 86, gauge: 0.9, shake: 1.4, restBreak: 90 },     // 쉬었다 친 첫 베기는 층째 / 필살 ↓
 };
 
 // ── 보급 상자 [튜닝] ─────────────────────────────────────────────
@@ -859,15 +877,18 @@ export const WEAPON_INK = {
   brick: '#A84846', rod: '#86642C', glass: '#3E9E6A',
   flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
   diadrill: '#20A7B6', thunder: '#7766CC', crane: '#74B654', brush: '#4D8AE6',
+  // 11-21 원소 다섯 — 영상 색조(불 주황 · 물 파랑 · 전기 노랑 · 얼음 하늘 · 어둠 남보라) 안에서 기존 스물여섯과 OKLab 거리가 가장 먼 색(DEVLOG 11-21 표)
+  phoenix: '#FE946A', tide: '#0072CD', volt: '#C8C832', icicle: '#4FC8F0', shade: '#5E46B3',
 } as const;
 /**
- * 전설 여덟의 밝은 짝 — 같은 색의 한 단 밝은 붓 색(2026-11-21).
+ * 전설 열셋의 밝은 짝 — 같은 색의 한 단 밝은 붓 색(2026-11-21 여덟 · 같은 날 원소 대검 다섯).
  * 전설 이펙트는 먹 붓 화법 그대로 한 붓에 먹과 시그니처 색(WEAPON_INK)을 머금고, 이 색은 그 획의 꼬리 끝과 곁 조각(덧 혀 · 불티 · 얼음 조각 · 금박 · 오르는 방울 · 나란한 금 획)에 쓴다.
  * 형광 · 순백이 아니다. effects.isLegend도 이 표로 전설을 가린다.
  */
 export const WEAPON_LITE = {
   flame: '#F2A03C', frost: '#A3D6EA', thunder: '#CDC6F4', onyx: '#B27DBE',
   crane: '#C2E39A', brush: '#A8C6F4', gold: '#EECF72', diadrill: '#8FE0C8',
+  phoenix: '#FDC680', tide: '#559FEF', volt: '#D7D866', icicle: '#8ADFFE', shade: '#8476D5',
 } as const;
 /** 옛 칼빛 설정값(저장값은 그대로) → 먹에 맞는 포인트 색. 철거칼 획 속(effects · weaponFx · sprites 참격 호) */
 export const SLASH_INK: Readonly<Record<string, string>> = {

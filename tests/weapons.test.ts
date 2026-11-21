@@ -5,9 +5,9 @@ import { makeState, advance, applyStartKit } from '../src/core/sim';
 import { liftOf } from '../src/core/perks';
 import { continueFromCheckpoint, enterAct2, enterAct2Phase } from '../src/core/act2';
 import { makeFloor, makeStack, stackPhysics } from '../src/core/building';
-import { addGauge, attackRange, destroyStack, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
+import { addGauge, attackRange, breakCombo, destroyStack, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type PerkId, type WeaponId } from '../src/core/types';
-import { GUARD_GAUGE, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
+import { GUARD_GAUGE, MAT_HP, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
 import { BLADE_IDS, BODY_IDS, DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, LETTERS_IDS, MASK_IDS, slotOf, validateLoadout, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { WEAPON_DUST_COST } from '../src/meta/economy';
 
@@ -183,7 +183,7 @@ describe('대검', () => {
 
 // ── 고유 규칙 무기(11-20) — 세 칸 + 고유 규칙 하나(WeaponSpec 선택 칸). core에 무기 id 분기는 없다 ──
 const RULED: WeaponId[] = ['shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'diadrill',
-  'brick', 'saw', 'hazard', 'rod', 'beam', 'flame', 'frost', 'thunder', 'onyx', 'crane', 'brush', 'gold'];
+  'brick', 'saw', 'hazard', 'rod', 'beam', 'flame', 'frost', 'thunder', 'tide', 'icicle', 'onyx', 'volt', 'crane', 'phoenix', 'shade', 'brush', 'gold'];
 
 describe('고유 규칙', () => {
   /** 떨어지는 건물을 땅 · 공중 가드로 받는다 */
@@ -667,5 +667,80 @@ describe('대검 규칙', () => {
     // 2막에서 스스로 채운 첫 필살은 다시 덤을 받는다
     addGauge(s, 100);
     expect(s.wazaFree).toBe(false);
+  });
+});
+
+describe('원소 대검 다섯(11-21)', () => {
+  /** 층 재질 mats인 건물을 발밑 30에 붙잡아 두고 at 틱마다 한 번씩 벤다 */
+  function chop(w: WeaponId, mats: Parameters<typeof makeFloor>[0][], at: number[], mode: GameState['mode'] = 'act1', combo = 0): GameState {
+    const s = makeState({ mode });
+    s.weapon = w; s.combo = combo; s.lives = 99;
+    s.stack = makeStack({ variant: 'building', theme: 'europe', floors: mats.map((m) => makeFloor(m)), y: 30, vy: 0 });
+    const end = Math.max(...at) + 8;
+    for (let t = 0; t <= end && s.stack; t++) {
+      s.stack.y = 30; s.stack.vy = 0;
+      advance(s, { ...EMPTY_INPUT, attack: at.includes(t) });
+    }
+    return s;
+  }
+  const hp = (s: GameState): number => s.stack!.floors[0].segs[0].hp;
+
+  it('불새: 콤보가 끊길 때마다 게이지 +breakGauge · 콤보 0이면 없음 · 튜토리얼은 없음', () => {
+    const cut = (w: WeaponId, combo: number, mode: GameState['mode'] = 'act1'): number => {
+      const s = makeState({ mode }); s.weapon = w; s.combo = combo; breakCombo(s); return s.wazaGauge;
+    };
+    expect(cut('phoenix', 12)).toBe(WEAPON.phoenix.breakGauge);
+    expect(cut('phoenix', 0)).toBe(0);
+    expect(cut('phoenix', 12, 'training')).toBe(0);
+    expect(cut('sword', 12)).toBe(0);
+  });
+
+  it('해일: 콤보가 comboDouble 배수가 되는 베기는 두 번 깎는다 · 1막 · 토코톤만', () => {
+    const n = WEAPON.tide.comboDouble!;
+    expect(hp(chop('tide', ['hard'], [0], 'act1', n - 1))).toBe(1);
+    expect(hp(chop('tide', ['hard'], [0], 'tokoton', n - 1))).toBe(1);
+    expect(hp(chop('tide', ['hard'], [0], 'act1', n))).toBe(2);
+    expect(hp(chop('tide', ['hard'], [0], 'training', n - 1))).toBe(2);
+    expect(hp(chop('sword', ['hard'], [0], 'act1', n - 1))).toBe(2);
+  });
+
+  it('고압선: 층을 collapseChain 번 깰 때마다 위층도 한 번 깎인다(이벤트 chain) · 1막 · 토코톤만', () => {
+    const two = [0, CYCLE + 2];
+    const v = chop('volt', ['weak', 'weak', 'weak', 'weak'], two);
+    expect(v.stack!.floors).toHaveLength(1);
+    expect(v.events.filter((e) => e.kind === 'floorCollapse' && e.chain)).toHaveLength(1);
+    expect(chop('sword', ['weak', 'weak', 'weak', 'weak'], two).stack!.floors).toHaveLength(2);
+    expect(chop('volt', ['weak', 'weak', 'weak', 'weak'], two, 'training').stack!.floors).toHaveLength(2);
+    // 번진 전류가 남은 한 층까지 깨면 완파
+    const last = chop('volt', ['weak', 'weak', 'weak'], two);
+    expect(last.stack).toBeNull();
+  });
+
+  it('고드름: 가드로 튕긴 건물이 guardFreeze 틱 동안 멈춘다 · 1막 · 토코톤만', () => {
+    const frozenFor = (w: WeaponId, mode: GameState['mode'] = 'act1'): number => {
+      const s = makeState({ mode }); s.weapon = w;
+      withStack(s, 40); s.stack!.vy = -300;
+      expect(tryGuardBounce(s, 'ground', 0)).toBe(true);
+      const y = s.stack!.y;
+      let n = 0;
+      for (let t = 0; t < 60 && s.stack && s.stack.y === y; t++) { advance(s, EMPTY_INPUT); if (s.stack?.y === y) n++; }
+      return n;
+    };
+    expect(frozenFor('icicle')).toBe(WEAPON.icicle.guardFreeze);
+    expect(frozenFor('icicle', 'tokoton')).toBe(WEAPON.icicle.guardFreeze);
+    expect(frozenFor('icicle', 'training')).toBe(0);
+    expect(frozenFor('sword')).toBe(0);
+  });
+
+  it('그림자: restBreak 틱 넘게 쉬었다 벤 첫 베기는 맨 아래층을 통째로 · 바로 이어 벤 건 1 · 1막 · 토코톤만', () => {
+    const s = chop('shade', ['hard', 'hard'], [0]);
+    expect(s.stack!.floors).toHaveLength(1);
+    expect(hp(s)).toBe(MAT_HP.hard); // 윗층은 그대로
+    const again = chop('shade', ['hard', 'hard'], [0, CYCLE + 2]);
+    expect(hp(again)).toBe(MAT_HP.hard - 1);
+    const rested = chop('shade', ['hard', 'hard', 'hard'], [0, WEAPON.shade.restBreak! + 2]);
+    expect(rested.stack!.floors).toHaveLength(1);
+    expect(hp(chop('shade', ['hard'], [0], 'training'))).toBe(MAT_HP.hard - 1);
+    expect(hp(chop('sword', ['hard'], [0]))).toBe(MAT_HP.hard - 1);
   });
 });

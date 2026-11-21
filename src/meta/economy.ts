@@ -40,8 +40,13 @@ export const WEAPON_DUST_COST: Readonly<Record<string, number>> = {
   flame: 1200,
   frost: 1200,
   thunder: 1400,
+  tide: 1400, // 11-21 원소 다섯(해일 · 고드름 · 고압선 · 불새 · 그림자)도 전설 값 1400~2000 안
+  icicle: 1500,
   onyx: 1600,
+  volt: 1600,
   crane: 1800,
+  phoenix: 1800,
+  shade: 1900,
   brush: 2000,
   gold: 2400,
 };

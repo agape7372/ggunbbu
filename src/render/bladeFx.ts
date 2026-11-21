@@ -23,6 +23,11 @@ import { comboMilestone } from '../audio/consume';
 import { brushArc, brushLine, brushPath, hotCore, hs, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter, type Tone } from './ink';
 import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites';
 import { TOOL_RECIPES, drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
+import { phoenix } from './legend5/phoenix';
+import { tide } from './legend5/tide';
+import { volt } from './legend5/volt';
+import { icicle } from './legend5/icicle';
+import { shade } from './legend5/shade';
 
 /** 먹 조각: stroke 곧은 붓 획 · sweep 호 붓 획 · zig 꺾은 획(철골 · 지그재그 · 얼음 금) · dots 리벳 점 줄 · spat 먹 튐 · drop 먹 방울(땅에 닿으면 번짐) ·
  *  dust 마른 가루 · leaf 금박
@@ -242,7 +247,7 @@ export function sweep(cx: number, cy: number, r: number, a0: number, sw: number,
 }
 
 /** 칼이 지나간 길 — 대검 참격 호(세 점을 지나는 원)를 따라 그은 붓 획. turn · grow = 연타 줄 박자 */
-function trail(footX: number, footY: number, w: number, core: string, o: StrokeOpt, turn = 0, grow = 1): void {
+export function trail(footX: number, footY: number, w: number, core: string, o: StrokeOpt, turn = 0, grow = 1): void {
   const [ax, ay] = greatArcPoint(1, 0, turn, grow);
   const [bx, by] = greatArcPoint(0.5, 0, turn, grow);
   const [cx, cy] = greatArcPoint(0, 0, turn, grow);
@@ -493,7 +498,7 @@ function zig(x: number, y: number, ang: number, len: number, w: number, n: numbe
 
 // ── 칼마다 ───────────────────────────────────────────────────
 
-interface Recipe {
+export interface Recipe {
   /** 붓 잔상 굵기 · 마름 */
   trail: { w: number; dry: number };
   /** 타격 · 층 깨기 · 완파 — (x, y) = 친 자리, k = 콤보 단, c = 포인트 색 */
@@ -1001,6 +1006,12 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     every: 0.15,
     tint: true,
   },
+  // 11-21 원소 다섯 — 레시피는 무기마다 파일 하나(render/legend5/<무기 id>.ts, 2단계 담당이 그 파일만 고친다). 여기선 이어 붙이기만
+  wing: phoenix,
+  surf: tide,
+  volt,
+  icicle,
+  smoke: shade,
 };
 
 const inkOf = (w: WeaponId): string => (WEAPON_INK as Record<string, string>)[w] ?? PALETTE.YELLOW_DEEP;

@@ -60,6 +60,8 @@ export interface FallingStack {
   totalFloors: number;
   /** 아케이드 변종(config ARCADE_VARY) — 없으면 보통 건물 */
   vary?: StackVary;
+  /** 얼어 멈춘 남은 틱(고드름 guardFreeze) — 그동안 떨어지지 않고 가드에 튕기지 않는다 */
+  chill?: number;
 }
 
 /** 아케이드 변종 건물 — 지시서 대본 「!」 · 「~」 · 「>」와 같은 동작. 건물과 함께 사라진다 */
@@ -333,7 +335,7 @@ export type WeaponId = 'sword' | 'hammer' | 'crowbar' | 'grinder' | ToolId | Gre
 export type ToolId = 'shovel' | 'pickaxe' | 'jackhammer' | 'pipe' | 'drill' | 'coredrill' | 'auger' | 'diadrill';
 
 /** 대검 — 칼날 모양·색(render/sprites)과 세 칸(config WEAPON)만 다르다. 쥐는 자세는 하나 */
-export type GreatswordId = 'iron' | 'brick' | 'saw' | 'hazard' | 'rod' | 'beam' | 'glass' | 'flame' | 'frost' | 'thunder' | 'onyx' | 'crane' | 'brush' | 'gold';
+export type GreatswordId = 'iron' | 'brick' | 'saw' | 'hazard' | 'rod' | 'beam' | 'glass' | 'flame' | 'frost' | 'thunder' | 'tide' | 'icicle' | 'onyx' | 'volt' | 'crane' | 'phoenix' | 'shade' | 'brush' | 'gold';
 
 /** 보급품. 상자는 고정 순서로 돈다(config SUPPLY.ROTATION) — 확률 없음. 안전모(hat)는 상자 밖, 콤보로 번다(HAT). */
 export type ItemId = 'gloves' | 'coffee' | 'hat' | 'dust';
@@ -362,6 +364,8 @@ export interface JuiceEvent {
   last?: boolean;
   /** floorCollapse: 필살 올려베기가 한 틱에 여러 층을 깬다(전설 층 깨기 그림은 건너뛴다 · 필살 그림이 맡는다) */
   waza?: boolean;
+  /** floorCollapse: 고압선 대검 전류가 같은 틱에 남은 맨 아래층으로 번진다(그 층이 무너지면 combo 없는 floorCollapse가 하나 더) */
+  chain?: boolean;
   /** stackDestroy: 받은 완파 점수(황금 destroyMul을 탄 값 · 자막이 그대로 쓴다) */
   pts?: number;
   /** supply: 상자에서 나온 것 */
@@ -450,6 +454,10 @@ export interface GameState {
   pinSaved: number;
   /** 굴착 드릴을 쓴 뒤 부순 건물 수(pinSaveEvery에서 다시 찬다) */
   pinDowns: number;
+  /** 베기로 층을 무너뜨린 수(고압선 collapseChain이 센다) */
+  chainN: number;
+  /** 베기가 건물에 마지막으로 닿은 틱(그림자 restBreak가 잰다 · 판 시작 = 쉰 채) */
+  hitAt: number;
   /** 토코톤 버터바 사이클 진입 인덱스 — 히트스톱이 경계 틱을 삼켜도 소실 없게 (08-30 검증) */
   tokotonCycle: number;
   /** 작업 지시서 진행 (mode 'stage'일 때만) */

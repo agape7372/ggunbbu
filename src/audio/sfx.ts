@@ -3,6 +3,7 @@
 
 export type SfxName =
   | 'hitFlame' | 'hitFrost' | 'hitOnyx' | 'hitGold' | 'hitThunder' | 'hitCraneArm' | 'hitSumi' | 'hitDiamond'
+  | 'hitPhoenix' | 'hitTide' | 'hitVolt' | 'hitIcicle' | 'hitShade'
   | 'hit' | 'hitStrong' | 'whiff' | 'floorCollapse' | 'destroy' | 'gorogoro' | 'butterPop'
   | 'guardGround' | 'guardAir' | 'guardBreak' | 'gaugeWarn' | 'comboDrop'
   | 'jump' | 'land' | 'gaugeFull' | 'special'
@@ -732,6 +733,41 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
     playOsc(ctx, dest, t, 'square', 1760, 0.09, 0.05, rate, { freqEnd: 1480, attack: 0.002 });
     playOsc(ctx, dest, t + 0.006, 'sine', 3136, 0.12, 0.08, rate, { attack: 0.001 });
     playNoise(ctx, dest, t, 0.1, 0.12, { filterType: 'bandpass', freqStart: 3000 * rate, freqEnd: 6000 * rate });
+  },
+
+  // ── 11-21 원소 전설 다섯의 제 소리 ──
+  // 불새 — 낮은 퍽 위로 길게 타오르는 화르륵(넓은 대역이 위로 열린다) + 불티 타닥 셋(화염보다 길고 넓다)
+  hitPhoenix: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 120, 0.12, 0.32, rate, { freqEnd: 52, attack: 0.001 });
+    playNoise(ctx, dest, t, 0.32, 0.26, { filterType: 'bandpass', freqStart: 400 * rate, freqEnd: 3600 * rate, attack: 0.02 });
+    for (let i = 0; i < 3; i++) playNoise(ctx, dest, t + 0.07 + i * 0.06, 0.02, 0.12 - i * 0.03, { filterType: 'highpass', freqStart: 4200 + i * 700 });
+  },
+
+  // 해일 — 휙 들이치는 바람(위로) + 가운데 대역 거품 촤아(길게 내려간다) + 둔한 물 퉁
+  hitTide: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.08, 0.16, { filterType: 'bandpass', freqStart: 500 * rate, freqEnd: 1800 * rate });
+    playNoise(ctx, dest, t + 0.04, 0.3, 0.24, { filterType: 'bandpass', freqStart: 1600 * rate, freqEnd: 600 * rate, q: 0.8 });
+    playOsc(ctx, dest, t, 'sine', 150, 0.12, 0.28, rate, { freqEnd: 64, attack: 0.004 });
+  },
+
+  // 고압선 — 짧은 딱 셋(넓은 대역, 간격이 좁아진다) + 높게 떠는 지지직(번개보다 높고 짧다 · 낮은 울림 없음)
+  hitVolt: (ctx, dest, t, rate) => {
+    [0, 0.03, 0.05].forEach((d, i) => playNoise(ctx, dest, t + d, 0.012, 0.3 - i * 0.07, { filterType: 'highpass', freqStart: 1200 }));
+    playZap(ctx, dest, t + 0.006, rate, 620, 160, 700, 0.12, 0.12);
+  },
+
+  // 고드름 — 맑은 딩(안 맞는 배음 셋이 길게 가라앉는다) + 짧은 얼음 틱(서리보다 높고 길다)
+  hitIcicle: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 140, 0.06, 0.2, rate, { freqEnd: 80, attack: 0.001 });
+    [[1, 0.14, 0.5], [2.7, 0.07, 0.34], [5.1, 0.04, 0.22]].forEach(([k, a, d]) => playOsc(ctx, dest, t, 'sine', 1568 * k, d, a, rate, { attack: 0.001 }));
+    playNoise(ctx, dest, t, 0.03, 0.14, { filterType: 'highpass', freqStart: 6000 });
+  },
+
+  // 그림자 — 소리 죽인 낮은 휙(둔한 대역) + 끝에서 위로 빨려 오르는 음 + 먹먹한 퉁
+  hitShade: (ctx, dest, t, rate) => {
+    playNoise(ctx, dest, t, 0.16, 0.22, { filterType: 'lowpass', freqStart: 900 * rate, freqEnd: 260 * rate });
+    playOsc(ctx, dest, t + 0.06, 'triangle', 180, 0.16, 0.12, rate, { freqEnd: 720, attack: 0.03 });
+    playOsc(ctx, dest, t, 'sine', 100, 0.14, 0.3, rate, { freqEnd: 44, attack: 0.004 });
   },
 
   // ── 명물 보스 ──

@@ -1,6 +1,6 @@
 // 무기 비교 측정(11-20 고유 규칙 무기). 평소엔 건너뛴다(arcade-measure와 같은 꼴):
 //   WMEASURE=1 [SEEDS=1,2,3,4,5,6] [MIN=8] [IDS=sword,shovel] [TUNE=shovel.gauge=0.6] [OUT=<파일>] npx vitest run --no-cache tests/weapon-measure.test.ts
-// 아케이드 1막을 같은 시드로 무기만 바꿔 MIN분씩 돌린다(목숨 99). 잰 것: 점수 · 분당 목숨 손실 · 필살 횟수 + 고유 규칙이 판에서 작동한 횟수.
+// 아케이드 1막을 같은 시드로 무기만 바꿔 MIN분씩 돌린다(목숨 99). 잰 것: 점수 · 분당 목숨 손실 · 필살 횟수 + 고유 규칙이 판에서 작동한 횟수(11-21 원소 다섯 포함).
 // 봇 둘: 사용자 대역(userBot 지연 10 · 베기 7 · J 5) · 숙련(expertBot, 뛰어 마중 나가 공중에서 벤다).
 // 둘 다 게이지가 차면 필살을 쓰고, 착암기는 막거나 뛰지 않을 때 공격 키를 쥐고 있다(holdRepeat).
 import { describe, it } from 'vitest';
@@ -58,6 +58,8 @@ interface Run {
   collapses: number;
   /** 공중 타격 · 그중 땅 사거리 밖이라 airReach가 닿게 한 것(파이프) */
   airHits: number; airOnly: number;
+  /** 11-21 원소 다섯이 판에서 작동한 수 — 콤보 끊김(불새) · 두 번 깎은 베기(해일) · 위층 전류(고압선) · 얼린 건물(고드름) · 쉬었다 층째(그림자) */
+  breaks: number; doubles: number; chains: number; chills: number; rests: number;
 }
 
 function run(who: string, weapon: WeaponId, seed: number): Run {
@@ -66,12 +68,20 @@ function run(who: string, weapon: WeaponId, seed: number): Run {
   applyStartKit(s, 0, 0); // 실제 판 시작과 같게
   s.lives = 99;
   const bot = hand(BOTS[who]());
-  const r: Run = { score: 0, lost: 0, specials: 0, hits: 0, peak: 0, gBounce: 0, gKept: 0, aBounce: 0, saves: 0, hats: 0, razed: 0, firstSp: -1, liftSum: 0, collapses: 0, airHits: 0, airOnly: 0 };
+  const r: Run = { score: 0, lost: 0, specials: 0, hits: 0, peak: 0, gBounce: 0, gKept: 0, aBounce: 0, saves: 0, hats: 0, razed: 0, firstSp: -1, liftSum: 0, collapses: 0, airHits: 0, airOnly: 0, breaks: 0, doubles: 0, chains: 0, chills: 0, rests: 0 };
+  const w = WEAPON[weapon];
   for (let t = 0; t < MIN * 3600 && !s.over; t++) {
     const combo0 = s.combo;
+    const hitAt0 = s.hitAt;
     advance(s, bot(s));
+    if (s.hitAt !== hitAt0) { // 이번 틱 베기가 건물에 닿았다
+      if (w.restBreak && s.hitAt - hitAt0 > w.restBreak) r.rests += 1;
+      else if (w.comboDouble && s.combo > 0 && s.combo % w.comboDouble === 0) r.doubles += 1;
+    }
+    if (w.guardFreeze && s.stack?.chill === w.guardFreeze) r.chills += 1;
     for (const e of s.events) {
       if (e.kind === 'lifeLost') r.lost += 1;
+      else if (e.kind === 'comboBreak') r.breaks += 1;
       else if (e.kind === 'special') { r.specials += 1; if (r.firstSp < 0) r.firstSp = s.tick; }
       else if (e.kind === 'guardBounce') { r.gBounce += 1; if (combo0 > 0 && s.combo > 0) r.gKept += 1; }
       else if (e.kind === 'guardAirBounce') r.aBounce += 1;
@@ -83,6 +93,7 @@ function run(who: string, weapon: WeaponId, seed: number): Run {
         r.hits += 1;
         r.liftSum += liftOf(s);
         if (e.kind === 'floorCollapse') r.collapses += 1;
+        if (e.chain) r.chains += 1;
         if (s.player.y > 0) {
           r.airHits += 1;
           if (('y' in e ? e.y ?? 0 : 0) > s.player.y + WEAPON[weapon].reach) r.airOnly += 1;
@@ -109,7 +120,8 @@ describe.skipIf(!process.env.WMEASURE)('무기 비교 측정', () => {
           + ` · 땅 가드 ${avg('gBounce').toFixed(1)}(콤보 남음 ${pct(sum('gKept'), sum('gBounce'))}) · 층 붕괴 ${avg('collapses').toFixed(0)}`
           + ` · 공중 타격 ${pct(sum('airHits'), sum('hits'))}(땅 사거리 밖 ${pct(sum('airOnly'), sum('hits'))})`
           + ` · 공중 가드 ${avg('aBounce').toFixed(1)} · 깔림 구제 ${avg('saves').toFixed(2)} · 안전모 ${avg('hats').toFixed(1)} · 건물 ${avg('razed').toFixed(1)}채`
-          + ` · 첫 필살 ${(avg('firstSp') / 60).toFixed(1)}초 · 평균 띄우기 ${(sum('liftSum') / Math.max(1, sum('hits'))).toFixed(1)}`);
+          + ` · 첫 필살 ${(avg('firstSp') / 60).toFixed(1)}초 · 평균 띄우기 ${(sum('liftSum') / Math.max(1, sum('hits'))).toFixed(1)}`
+          + ` · 끊김 ${avg('breaks').toFixed(0)} · 두 번 깎음 ${avg('doubles').toFixed(0)} · 전류 ${avg('chains').toFixed(0)} · 얼림 ${avg('chills').toFixed(0)} · 층째 ${avg('rests').toFixed(0)}`);
       }
     }
   });

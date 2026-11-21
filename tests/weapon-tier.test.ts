@@ -42,10 +42,10 @@ describe('무기 등급', () => {
     }
   });
 
-  it('전설 여덟 = 대검 일곱 + 연장 하나(다이아 드릴)', () => {
+  it('전설 열셋 = 대검 열둘 + 연장 하나(다이아 드릴)', () => {
     const legend = ids.filter((id) => WEAPON_TIER[id] === 'legend');
     expect(legend.filter((id) => !(GREATSWORD_IDS as readonly string[]).includes(id))).toEqual(['diadrill']);
-    expect(legend.length).toBe(8);
+    expect(legend.length).toBe(13);
   });
 
   it('등급이 오를수록 찬 칸 수가 줄지 않는다', () => {

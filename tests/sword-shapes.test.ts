@@ -6,8 +6,8 @@ import { SWORD_HOLD, SWORDS, parseShape } from '../src/render/swordShapes';
 import { swordSvg } from '../src/ui/ink';
 
 describe('sword shapes', () => {
-  it('스물여섯 무기 모두 모양 · 쥐는 법이 있다', () => {
-    expect(WEAPON_IDS).toHaveLength(26);
+  it('서른한 무기 모두 모양 · 쥐는 법이 있다', () => {
+    expect(WEAPON_IDS).toHaveLength(31);
     for (const id of WEAPON_IDS) {
       expect(SWORDS[id], id).toBeTruthy();
       const hold = SWORD_HOLD[id];

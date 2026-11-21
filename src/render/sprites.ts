@@ -562,7 +562,8 @@ function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, 
 // ── 대검 ─────────────────────────────────────────────────────
 // 종마다 칼날 모양·색만 다르고 쥐는 자세는 하나(포즈마다 weapon()의 great 좌표). 칼은 졸라맨 키의 절반을 넘는다 —
 // 가는 선 졸라맨이 굵은 칼날을 든 대비가 대검의 맛. 테두리는 몸 색(LINE)이 아니라 잉크: 칼은 따로 선 물건이다.
-type GreatShape = 'plain' | 'saw' | 'stripe' | 'beam' | 'block' | 'strand' | 'pane' | 'wave' | 'crystal' | 'bolt' | 'jag' | 'truss' | 'sumi' | 'royal';
+type GreatShape = 'plain' | 'saw' | 'stripe' | 'beam' | 'block' | 'strand' | 'pane' | 'wave' | 'crystal' | 'bolt' | 'jag' | 'truss' | 'sumi' | 'royal'
+  | 'wing' | 'surf' | 'volt' | 'icicle' | 'smoke'; // 11-21 원소 다섯(불새 · 해일 · 고압선 · 고드름 · 그림자) — 레시피는 render/legend5/<무기 id>.ts
 export interface GreatLook {
   shape: GreatShape;
   blade: string;  // 칼날
@@ -586,6 +587,11 @@ const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
   crane: { shape: 'truss', blade: '#74B654', hi: '#CFE6C0', guard: '#2C4A1E', w: 3 },
   brush: { shape: 'sumi', blade: PALETTE.INK, hi: '#4D8AE6', guard: '#5A4630', w: 3.4 },
   gold: { shape: 'royal', blade: '#E2B43A', hi: '#FFF1B8', guard: '#8A5A12', w: 3.2, edge: PALETTE.RED },
+  phoenix: { shape: 'wing', blade: '#FE946A', hi: '#FDC680', guard: '#5A2A14', w: 3 },
+  tide: { shape: 'surf', blade: '#0072CD', hi: '#559FEF', guard: '#0E2C4E', w: 3 },
+  volt: { shape: 'volt', blade: '#C8C832', hi: '#D7D866', guard: '#3E3E12', w: 2.8 },
+  icicle: { shape: 'icicle', blade: '#4FC8F0', hi: '#8ADFFE', guard: '#1E4E60', w: 2.6 },
+  shade: { shape: 'smoke', blade: '#5E46B3', hi: '#8476D5', guard: PALETTE.INK, w: 3.2 },
 };
 
 /** 대검이면 그 모양·색 — 베기 파편(effects)도 같은 색을 쓴다 */

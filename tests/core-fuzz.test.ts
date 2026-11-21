@@ -12,7 +12,7 @@ import { ACT1, GIMMICK, SCORE, WAZA_GAUGE, GUARD_GAUGE } from '../src/config';
 
 const WAZAS: WazaId[] = ['tenchi', 'ageba', 'mukjul', 'dalmuri', 'nakgwan', 'baram'];
 const WEAPONS: WeaponId[] = ['sword', 'hammer', 'crowbar', 'grinder', 'shovel', 'pipe', 'drill', 'pickaxe', 'coredrill', 'auger', 'jackhammer', 'diadrill',
-  'iron', 'brick', 'saw', 'hazard', 'rod', 'beam', 'glass', 'flame', 'frost', 'thunder', 'onyx', 'crane', 'brush', 'gold'];
+  'iron', 'brick', 'saw', 'hazard', 'rod', 'beam', 'glass', 'flame', 'frost', 'thunder', 'tide', 'icicle', 'onyx', 'volt', 'crane', 'phoenix', 'shade', 'brush', 'gold'];
 
 function mk(seed: number): () => number {
   let a = seed >>> 0;

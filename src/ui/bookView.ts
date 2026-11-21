@@ -339,7 +339,7 @@ export function paintBook(
       top = headHtml('h3', 'bk-grp', g.title, g.entries);
     }
     head = g.head ?? g.title;
-    const cols = g.id === 'greats' || g.id === 'item' || g.id === 'tools' ? ' c4' : ''; // 무기 열둘 = 4 · 4 · 4, 대검 열넷 = 4 · 4 · 4 · 2
+    const cols = g.id === 'greats' || g.id === 'item' || g.id === 'tools' ? ' c4' : ''; // 무기 열둘 = 4 · 4 · 4, 대검 열아홉 = 4 · 4 · 4 · 4 · 3
     return `<section class="bk-set">${top}<div class="bk-grid${cols}">${g.entries.map((e) => cellHtml(e, ctx)).join('')}</div></section>`;
   }).join('');
   root.innerHTML = `<div class="bk">
