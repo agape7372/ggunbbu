@@ -191,7 +191,7 @@ export const WEAPON_COPY: Record<WeaponId, WeaponCopy> = {
   thunder: { name: '번개 대검', desc: '필살을 써도 게이지가 조금 남는다. 덜 띄운다.' },
   crane: { name: '크레인 대검', desc: '콤보가 쌓일수록 건물을 더 높이 띄운다. 처음엔 거의 못 띄운다.' },
   brush: { name: '먹 대검', desc: '필살을 쓰면 바로 한 번 더 쓸 수 있다. 필살이 느리게 찬다.' },
-  phoenix: { name: '불새 대검', desc: '콤보가 끊길 때마다 필살이 찬다. 평소엔 필살이 조금 느리다.' },
+  phoenix: { name: '불새 대검', desc: '콤보가 쌓일수록 불길이 길어져 멀리 닿는다. 필살이 조금 느리다.' },
   tide: { name: '해일 대검', desc: '콤보 10마다 한 번은 두 배로 깎는다. 조금 덜 띄운다.' },
   volt: { name: '고압선 대검', desc: '층을 두 번 깰 때마다 위층도 한 번 깎인다. 덜 띄운다.' },
   icicle: { name: '고드름 대검', desc: '가드로 튕긴 건물이 잠깐 얼어 멈춘다. 덜 띄운다.' },

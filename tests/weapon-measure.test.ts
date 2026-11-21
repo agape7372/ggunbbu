@@ -8,7 +8,7 @@ import { describe, it } from 'vitest';
 import { appendFileSync } from 'node:fs';
 declare const process: { env: Record<string, string | undefined> };
 import { makeState, advance, applyStartKit } from '../src/core/sim';
-import { liftOf } from '../src/core/perks';
+import { liftOf, reachOf } from '../src/core/perks';
 import { EMPTY_INPUT, type GameState, type InputFrame, type WeaponId } from '../src/core/types';
 import { WAZA_GAUGE, WEAPON } from '../src/config';
 import { expertBot, userBot } from './stageBot';
@@ -52,13 +52,13 @@ interface Run {
   aBounce: number; saves: number; hats: number;
   /** 부순 건물 수(버터바 빼고) */
   razed: number;
-  /** 첫 필살까지 틱 · 베기 타격 때 띄우기 합(크레인 comboLift) */
-  firstSp: number; liftSum: number;
+  /** 첫 필살까지 틱 · 베기 타격 때 띄우기 합(크레인 comboLift) · 사거리 합(불새 comboReach) */
+  firstSp: number; liftSum: number; reachSum: number;
   /** 층 붕괴 타격 수(곡괭이 +collapseGauge) */
   collapses: number;
   /** 공중 타격 · 그중 땅 사거리 밖이라 airReach가 닿게 한 것(파이프) */
   airHits: number; airOnly: number;
-  /** 11-21 원소 다섯이 판에서 작동한 수 — 콤보 끊김(불새) · 두 번 깎은 베기(해일) · 위층 전류(고압선) · 얼린 건물(고드름) · 쉬었다 층째(그림자) */
+  /** 11-21 원소 다섯이 판에서 작동한 수 — 콤보 끊김(불새 사거리가 처음으로) · 두 번 깎은 베기(해일) · 위층 전류(고압선) · 얼린 건물(고드름) · 쉬었다 층째(그림자) */
   breaks: number; doubles: number; chains: number; chills: number; rests: number;
 }
 
@@ -68,7 +68,7 @@ function run(who: string, weapon: WeaponId, seed: number): Run {
   applyStartKit(s, 0, 0); // 실제 판 시작과 같게
   s.lives = 99;
   const bot = hand(BOTS[who]());
-  const r: Run = { score: 0, lost: 0, specials: 0, hits: 0, peak: 0, gBounce: 0, gKept: 0, aBounce: 0, saves: 0, hats: 0, razed: 0, firstSp: -1, liftSum: 0, collapses: 0, airHits: 0, airOnly: 0, breaks: 0, doubles: 0, chains: 0, chills: 0, rests: 0 };
+  const r: Run = { score: 0, lost: 0, specials: 0, hits: 0, peak: 0, gBounce: 0, gKept: 0, aBounce: 0, saves: 0, hats: 0, razed: 0, firstSp: -1, liftSum: 0, reachSum: 0, collapses: 0, airHits: 0, airOnly: 0, breaks: 0, doubles: 0, chains: 0, chills: 0, rests: 0 };
   const w = WEAPON[weapon];
   for (let t = 0; t < MIN * 3600 && !s.over; t++) {
     const combo0 = s.combo;
@@ -92,6 +92,7 @@ function run(who: string, weapon: WeaponId, seed: number): Run {
         // 필살 · 더미 붕괴는 combo 칸이 없다(베기 타격만 센다)
         r.hits += 1;
         r.liftSum += liftOf(s);
+        r.reachSum += reachOf(s);
         if (e.kind === 'floorCollapse') r.collapses += 1;
         if (e.chain) r.chains += 1;
         if (s.player.y > 0) {
@@ -120,7 +121,7 @@ describe.skipIf(!process.env.WMEASURE)('무기 비교 측정', () => {
           + ` · 땅 가드 ${avg('gBounce').toFixed(1)}(콤보 남음 ${pct(sum('gKept'), sum('gBounce'))}) · 층 붕괴 ${avg('collapses').toFixed(0)}`
           + ` · 공중 타격 ${pct(sum('airHits'), sum('hits'))}(땅 사거리 밖 ${pct(sum('airOnly'), sum('hits'))})`
           + ` · 공중 가드 ${avg('aBounce').toFixed(1)} · 깔림 구제 ${avg('saves').toFixed(2)} · 안전모 ${avg('hats').toFixed(1)} · 건물 ${avg('razed').toFixed(1)}채`
-          + ` · 첫 필살 ${(avg('firstSp') / 60).toFixed(1)}초 · 평균 띄우기 ${(sum('liftSum') / Math.max(1, sum('hits'))).toFixed(1)}`
+          + ` · 첫 필살 ${(avg('firstSp') / 60).toFixed(1)}초 · 평균 띄우기 ${(sum('liftSum') / Math.max(1, sum('hits'))).toFixed(1)} · 평균 사거리 ${(sum('reachSum') / Math.max(1, sum('hits'))).toFixed(1)}`
           + ` · 끊김 ${avg('breaks').toFixed(0)} · 두 번 깎음 ${avg('doubles').toFixed(0)} · 전류 ${avg('chains').toFixed(0)} · 얼림 ${avg('chills').toFixed(0)} · 층째 ${avg('rests').toFixed(0)}`);
       }
     }

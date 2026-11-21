@@ -212,6 +212,8 @@ export interface WeaponSpec {
   gaugeKeep?: number;
   /** 콤보 100까지 띄우기에 곧게 더한다: lift + comboLift × min(콤보, 100)/100. 합은 PERK_RUN.LIFT_MAX에서 자른다(perks liftOf) */
   comboLift?: number;
+  /** 콤보 100까지 사거리에 곧게 더한다: reach + comboReach × min(콤보, 100)/100(크레인 comboLift와 같은 꼴). 끊기면 처음 길이. 합은 PERK_RUN.REACH_MAX에서 자른다(perks reachOf) */
+  comboReach?: number;
   /** 층을 무너뜨린 타격은 콤보가 이 값만큼 더 오른다 */
   collapseCombo?: number;
   /** 깔려서 목숨을 잃고 판이 이어지면 필살 게이지 +이 값(안전모 · 굴착 드릴 구제 · 마지막 깔림 · 튜토리얼은 없음) */
@@ -228,9 +230,7 @@ export interface WeaponSpec {
   destroyMul?: number;
   /** 스스로 채운 게이지로 필살을 쓰면 게이지가 바로 한 번 다시 찬다(그 두 번째는 다시 채우지 않는다) */
   wazaEcho?: boolean;
-  // ── 11-21 새 전설 다섯. 아래 넷(대미지 · 낙하를 바꾸는 칸)은 1막 · 토코톤만 — 2막 30/138타 · 지시서 기록 · 튜토리얼은 그대로(building arcadeRule)
-  /** 콤보가 끊길 때마다(끊긴 콤보가 1 이상) 필살 게이지 +이 값(배율 안 곱함 · 튜토리얼 없음) */
-  breakGauge?: number;
+  // ── 11-21 새 전설 다섯(불새는 위 comboReach). 아래 넷(대미지 · 낙하를 바꾸는 칸)은 1막 · 토코톤만 — 2막 30/138타 · 지시서 기록 · 튜토리얼은 그대로(building arcadeRule)
   /** 콤보가 이 수의 배수가 되는 베기는 같은 층을 한 번 더 깎는다(대미지 2) */
   comboDouble?: number;
   /** 베기로 층을 이 번 무너뜨릴 때마다 한 번, 남은 맨 아래층에 대미지 1(그 층이 무너지면 콤보 없이 층 깨기) */
@@ -270,7 +270,7 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   crane: { reach: 78, lift: 62, gauge: 1, shake: 1.6, comboLift: 36 },     // 콤보가 쌓일수록 띄우기 ↑ / 처음엔 띄우기 ↓↓
   brush: { reach: 74, lift: 86, gauge: 0.7, shake: 1.1, wazaEcho: true },   // 필살을 바로 한 번 더 / 필살 ↓↓
   // 11-21 원소 다섯(사용자 영상 「이펙트 생긴게 다르잖아」). 값은 봇 비교로 맞췄다(DEVLOG 11-21 · 기존 전설 점수대 안 · 흑철 아래)
-  phoenix: { reach: 74, lift: 80, gauge: 0.9, shake: 1.3, breakGauge: 8 },   // 콤보가 끊기면 필살이 찬다 / 필살 ↓
+  phoenix: { reach: 68, lift: 84, gauge: 0.9, shake: 1.3, comboReach: 16 },  // 콤보가 쌓일수록 사거리 ↑(콤보 100에서 84) · 띄우기 ↑ / 처음엔 철거칼만큼 · 필살 ↓
   tide: { reach: 76, lift: 78, gauge: 0.95, shake: 1.4, comboDouble: 10 },   // 콤보 10마다 두 번 깎는다 / 띄우기 · 필살 ↓
   volt: { reach: 80, lift: 74, gauge: 1, shake: 1.2, collapseChain: 2 },     // 층 둘을 깰 때마다 위층에 전류 / 띄우기 ↓
   icicle: { reach: 84, lift: 70, gauge: 0.95, shake: 1, guardFreeze: 18 },   // 가드로 튕긴 건물이 얼어 멈춘다 / 띄우기 ↓
@@ -391,6 +391,8 @@ export const PERK_RUN = {
   CALM: 15,
   /** 띄우기 상한 — WEAPON 주석의 lift < ACT1_G[0]·8/120 ≈ 102(tests/weapons.test.ts) */
   LIFT_MAX: 101,
+  /** 사거리 상한 = 흑철 92 + 긴 자루 10(지금 가장 긴 사거리). 불새 comboReach에 퍽을 더해도 이보다 길어지지 않는다 */
+  REACH_MAX: 102,
 } as const;
 
 // ── 게이지 경제 [획득식만 정본 제약] ────────────────────────────
