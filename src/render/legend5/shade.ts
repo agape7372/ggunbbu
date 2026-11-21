@@ -32,14 +32,14 @@ const DESTROY: readonly Slot[] = [
 ];
 
 /**
- * 크기(키우기 전 px — 사건 그림은 scaled 1.6배). 화면 px로 완파 웅덩이 양쪽 173 · 촉수 키 170까지.
+ * 크기(키우기 전 px — 사건 그림은 scaled 1.6배). 화면 px로 완파 웅덩이 양쪽 173 · 촉수 키 224까지(키 4배).
  * L / R = 웅덩이 왼쪽 · 오른쪽 끝 · th = 웅덩이 두께 · h = 가장 큰 촉수 키 · back / front = 굵은 · 가는 가닥 뿌리 굵기 ·
  * dots = 먹 점 · bits = 오르는 조각 · sweep = 바닥 쓸기 가닥 길이(0 = 없음) · life = 촉수가 사는 초 · slots = 촉수 자리
  */
 const SIZE = {
   hit: { L: 50, R: 28, th: 8, h: 62, back: 7.6, front: 5.2, dots: 4, bits: 1, sweep: 0, life: 0.66, slots: HIT },
-  floor: { L: 76, R: 44, th: 10, h: 78, back: 8.2, front: 4.6, dots: 6, bits: 2, sweep: 0, life: 0.8, slots: FLOOR },
-  destroy: { L: 108, R: 108, th: 12, h: 104, back: 8.6, front: 4.6, dots: 6, bits: 2, sweep: 92, life: 0.95, slots: DESTROY },
+  floor: { L: 76, R: 44, th: 10, h: 88, back: 8.2, front: 4.6, dots: 6, bits: 2, sweep: 0, life: 0.8, slots: FLOOR },
+  destroy: { L: 108, R: 108, th: 12, h: 140, back: 8.6, front: 4.6, dots: 6, bits: 2, sweep: 92, life: 0.95, slots: DESTROY },
 } as const;
 type Size = (typeof SIZE)[keyof typeof SIZE];
 /** 친 자리 → 발 높이(키우기 전 거리). scaled 1.6배면 서 있는 졸라맨 발이 된다 */
