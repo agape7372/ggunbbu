@@ -68,13 +68,17 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
     const gap = w.holdMin ? Math.max(w.holdMin, rep - p.holdN) : rep;
     if (p.holdTick > gap) {
       p.holdTick = 1; p.holdN += 1; p.bufAttack = PLAYER.INPUT_BUFFER;
-      // 이 반복 타격은 나가고, 열이 다 차면 다음 틱부터 멈춘다
-      if (h && (p.heat += h.cool) >= h.max * h.cool) { p.stall = h.stall; s.events.push({ kind: 'overheat' }); }
     }
     p.holdTick += 1;
   }
 
   const airborne = p.y > 0;
+  // 열은 반복이 버퍼를 채울 때가 아니라 그 버퍼로 실제로 벨 때 오른다(가드 · 필살 중에 쥐고만 있으면 안 달아오른다).
+  // 누름 엣지가 holdN을 0으로 여니 「쥔 채 holdN > 0」인 타격 = 반복 타격. 이 타격은 나가고, 열이 다 차면 다음 틱부터 멈춘다
+  const swing = (fromAir: boolean): void => {
+    if (h && input.attackHeld && p.holdN > 0 && (p.heat += h.cool) >= h.max * h.cool) { p.stall = h.stall; s.events.push({ kind: 'overheat' }); }
+    startAttack(p, fromAir);
+  };
 
   // ── 상태별 진행 ──
   switch (p.pose) {
@@ -89,12 +93,12 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
         s.events.push({ kind: 'jump' });
         break;
       }
-      if (p.bufAttack > 0) { startAttack(p, false); break; }
+      if (p.bufAttack > 0) { swing(false); break; }
       if (input.guard) tryEnterGuard(s, false);
       break;
     }
     case 'jump': {
-      if (p.bufAttack > 0) { startAttack(p, true); break; }
+      if (p.bufAttack > 0) { swing(true); break; }
       if (input.guard) tryEnterGuard(s, true);
       break;
     }

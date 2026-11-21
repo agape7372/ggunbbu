@@ -601,6 +601,20 @@ describe('과열 — 바닥에서 쥐고만 있으면 버티지 못한다', () =
     expect(s.player.pose).toBe('attack'); // 다시 벤다
   });
 
+  it('가드 중에 공격을 쥐고 있으면 안 베었으니 열도 안 오른다', () => {
+    const s = makeState({ seed: 3 }); s.weapon = 'diadrill'; s.lives = 99;
+    const kinds: string[] = [];
+    const step = (f: InputFrame): void => { advance(s, f); for (const e of s.events) kinds.push(e.kind); s.events.length = 0; };
+    for (let i = 0; i < 6; i++) step({ ...EMPTY_INPUT, guard: true });
+    expect(s.player.pose).toBe('guardG');
+    for (let i = 0; i < 150; i++) {
+      step({ ...EMPTY_INPUT, guard: true, attack: i === 0, attackHeld: true });
+      expect(s.player.pose).not.toBe('attack');
+    }
+    expect(s.player.heat).toBe(0);
+    expect(kinds).not.toContain('overheat');
+  });
+
   it('떼고 있으면 cool틱마다 열 1씩 식는다 · 탭은 달아오르지 않는다', () => {
     const w = 'jackhammer';
     const h = WEAPON[w].heat!;
