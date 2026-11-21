@@ -177,13 +177,20 @@ interface Opt {
   dry?: number; pr?: number; sw?: number; gr?: number; st?: number; hold?: number; pts?: readonly number[];
 }
 
+/** 필살 그림이 비워 둘 자리(월드 네모 [x0, y0, x1, y1]) — 「끝」 도장 · 철거 띠. 이 안에서 나는 필살 조각은 뿌리지 않는다(wazaShow가 건다) */
+let holes: readonly (readonly [number, number, number, number])[] = [];
+export function setWazaHoles(h: readonly (readonly [number, number, number, number])[]): void {
+  holes = h;
+}
+
 export function put(k: Kind, x: number, y: number, o: Opt): void {
-  const p = take();
   const K = big ? big.k : 1;
   if (big && K !== 1) {
     x = big.x + (x - big.x) * K;
     y = Math.min(GROUND - 1, big.y + (y - big.y) * K);
   }
+  if (keeping && holes.some((r) => x > r[0] && x < r[2] && y > r[1] && y < r[3])) return;
+  const p = take();
   p.k = k;
   p.x = x;
   p.y = y;
@@ -1514,7 +1521,7 @@ export function weaponAlong(w: WeaponId, pts: readonly number[], k: number, dur:
   const c = inkOf(w);
   keepBits(() => {
     if (art) {
-      art.along(pts, k, c, dur);
+      art.along(pts, k * legendK(w, LEGEND_ALONG_K), c, dur);
       return;
     }
     walk(pts, 1, dur, ALONG_MAX, (s) => { // 긴 획은 같은 간격으로 솎는다
@@ -1530,10 +1537,32 @@ export function weaponBloom(w: WeaponId, x: number, y: number, ang: number, k: n
   const art = g ? RECIPES[g.shape].waza : TOOL_RECIPES[w]?.waza;
   const c = inkOf(w);
   keepBits(() => {
-    if (art) art.bloom(x, y, ang, k, c);
+    if (art) art.bloom(x, y, ang, k * legendK(w, LEGEND_BLOOM_K), c);
     else if (g) RECIPES[g.shape].destroy(x, y, k, c);
     else toolPiece(w, 'destroy', x, y, k);
   });
+}
+
+/**
+ * 값 순서(11-21 밀도 심사: 싼 연장 뒤끝이 전설보다 더 크게 남았다) — 연장 번짐은 weaponFx가 ALONG_K 1.45 · BLOOM_K 1.2로 키우는데
+ * 대검 전설 레시피는 k 그대로였다. 전설(WEAPON_LITE에 있는 무기, 다이아 드릴 빼고 — 연장 틀이 이미 키운다)은 여기서 한 번 더 키운다
+ */
+const LEGEND_ALONG_K = 1.7;
+const LEGEND_BLOOM_K = 1.4;
+const legendK = (w: WeaponId, k: number): number => (w in WEAPON_LITE && greatLook(w) ? k : 1);
+
+/**
+ * 필살이 끝났다(wazaShow) — 남은 필살 조각은 tick틱 안에 사라진다. 떨어지던 먹 방울 비가 다음 박자(평타 복귀)를 덮지 않게(11-21 밀도 심사).
+ * 아직 안 뿌린 필살 둘째 박자는 버린다
+ */
+export function endWazaBits(ticks: number): void {
+  const cap = ticks * TICK;
+  for (const p of pool) {
+    if (!p.alive || !p.keep || p.life <= cap) continue;
+    p.max = (cap * p.max) / p.life; // 나이(1 − life/max)는 그대로 두고 남은 길을 tick틱으로 — 마름 · 깎임이 되돌지 않고 끝까지 간다
+    p.life = cap;
+  }
+  for (let i = queue.length - 1; i >= 0; i--) if (queue[i].keep) queue.splice(i, 1);
 }
 
 /** 피 — 인주 방울 부채(땅에 닿으면 번진다) + 터진 자리 인주 튐. wazaShow가 부른다(무음일섬 · 월하난무) */
@@ -1634,16 +1663,44 @@ export function drawBladeFx(ctx: CanvasRenderingContext2D, cam = 0): void {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  const pc = nightTest ? paperInk(ctx) : ctx;
   for (let layer = 0; layer < 3; layer++) {
     for (let i = 0; i < POOL; i++) {
       const p = pool[i];
       if (p.alive && LAYER[p.k] === layer) {
         ctx.globalAlpha = 1;
-        drawBit(ctx, p, p.y + cam);
+        drawBit(nightTest?.(p.x, p.y) ? pc : ctx, p, p.y + cam);
       }
     }
   }
   ctx.restore();
+}
+
+/** 밤 면(월하난무 달 바깥 남색) 판정 — 월드 좌표. wazaShow가 밤이 선 동안 건다 */
+let nightTest: ((x: number, y: number) => boolean) | null = null;
+export function setNightTest(f: ((x: number, y: number) => boolean) | null): void {
+  nightTest = f;
+}
+
+/**
+ * 밤 면 위 먹은 한지색 — 반전 프레임(screenfx 차이 반전)과 같은 규칙. 먹(INK)을 칠하려는 순간만 한지색으로 바꾸고 포인트 색 · 인주는 그대로 둔다.
+ * 그리는 함수는 손대지 않고 ctx를 감싸 fillStyle · strokeStyle 넣기만 가로챈다(전설 먹 → 색 그라데이션의 먹 머리는 그대로)
+ */
+const PAPER = PALETTE.BG;
+let paperOf: { base: CanvasRenderingContext2D; wrap: CanvasRenderingContext2D } | null = null;
+export function paperInk(ctx: CanvasRenderingContext2D): CanvasRenderingContext2D {
+  if (paperOf?.base === ctx) return paperOf.wrap;
+  const wrap = new Proxy(ctx, {
+    get(t, k) {
+      const v = Reflect.get(t, k, t);
+      return typeof v === 'function' ? v.bind(t) : v;
+    },
+    set(t, k, v) {
+      return Reflect.set(t, k, (k === 'fillStyle' || k === 'strokeStyle') && v === INK ? PAPER : v, t);
+    },
+  });
+  paperOf = { base: ctx, wrap };
+  return wrap;
 }
 
 // ── 그리기 ───────────────────────────────────────────────────

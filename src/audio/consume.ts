@@ -1,7 +1,7 @@
 // GameState.events → SFX. core는 이벤트만 발행, 이 모듈이 프레임마다 소비(클리어는 씬).
 // boltCue/land 등은 kind 재사용 — 페이즈·보스 상태로 전용 프리셋을 고른다.
 import type { GameState, JuiceEvent, JuiceKind, Material, WeaponId } from '../core/types';
-import { AUDIO, BOSS, HAT_FX, JUICE, STACK, TPS, WAZA_RUN } from '../config';
+import { AUDIO, BOSS, HAT_FX, JUICE, STACK, TPS, WAZA_RUN, WEAPON } from '../config';
 import { playSfx, pulseDuckBgm, setComboLayer } from './audio';
 import type { SfxName } from './sfx';
 import { landmarkSounds, snapOf, type LmSnap } from './landmarkSfx';
@@ -94,7 +94,22 @@ export function consumeAudio(s: GameState): void {
   if (cue && !incomingFired) playSfx('incoming');
   incomingFired = cue;
 
+  // 드릴류 과열 예고 — 열이 한 단 오를 때마다 한 번, 단이 높을수록 높은 음
+  const hs = heatStep(s);
+  if (hs > heatPrev) playSfx('heatRise', { pitchSemitones: (hs - 1) * 4 });
+  heatPrev = hs;
+
   playLandmark(s);
+}
+
+/** 과열 예고 단 — 열이 HEAT_STEPS를 몇 개 넘었나(멈춘 동안 · 과열 없는 무기는 0) */
+export const HEAT_STEPS = [0.6, 0.75, 0.9] as const;
+let heatPrev = 0;
+export function heatStep(s: GameState): number {
+  const h = WEAPON[s.weapon]?.heat;
+  if (!h || !s.player || s.player.stall > 0) return 0;
+  const f = s.player.heat / (h.max * h.cool);
+  return HEAT_STEPS.filter((t) => f >= t).length;
 }
 
 // 명물 소리 — 이벤트가 없는 것(똑딱 · 댕 · 휘파람 · 풍경 · 끼릭 · 철컥)은 직전 틱과의 차이로 낸다.

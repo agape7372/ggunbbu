@@ -164,7 +164,7 @@ export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number,
       bloom: burst((x, y, ang) => {
         stroke(...fwd(x, y, ang, 50), ang, 140, 11, CUT, 0.42, swordInk);
         stroke(...fwd(x, y, ang - 0.75, 34), ang - 0.75, 90, 6, CUT, 0.34, swordInk); // 엇갈려 X
-        drops(...fwd(x, y, ang, 90), 5, ang - 0.6, ang + 0.6, 180, 320, 3.4, swordInk, 900);
+        drops(...fwd(x, y, ang, 90), 3, ang - 0.6, ang + 0.6, 180, 320, 3, swordInk, 900); // 싼 무기 — 전설보다 적게
       }),
     },
   },
@@ -174,15 +174,16 @@ export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number,
       along: walk((x, y, a, o, _up, i) => {
         crackAt(...fwd(x, y, o, 10), lean(o, a, 0.6), 34 + n01() * 10, 3.8, 0.46, WEAPON_INK.hammer);
         if (i % 3 === 1) crackAt(...fwd(x, y, o + Math.PI, 10), lean(o + Math.PI, a, 0.7), 24, 3, 0.42);
-        drops(...fwd(x, y, o, 12), 1, o - 0.4, o + 0.4, 90, 180, 3.6, INK, 900);
+        if (i % 2 === 0) drops(...fwd(x, y, o, 12), 1, o - 0.4, o + 0.4, 90, 180, 3.2, INK, 900); // 싼 무기 — 방울 비는 두 자리에 하나
       }),
       bloom: burst((x, y, ang) => {
-        splash(x, y, 18, ang, 0.42, WEAPON_INK.hammer, 0.5, 7);
-        for (const [t, len] of [[0.05, 70], [0.25, 50], [0.5, 34]] as const) {
+        // 먹 튐은 작게 · 다리 넷(11-21 심사: 다리 일곱 큰 덩이가 「끝」 도장 · 철거 띠를 벌레처럼 덮었다)
+        splash(x, y, 10, ang, 0.36, WEAPON_INK.hammer, 0.5, 4);
+        for (const [t, len] of [[0.05, 56], [0.35, 34]] as const) { // 금은 양옆 둘씩 — 셋이면 다리 달린 덩이로 읽혔다
           crackAt(x, y, ang + Math.PI / 2 + t, len, 3.8, 0.46); // 친 방향의 양옆으로 — 땅을 치면 땅을 따라
           crackAt(x, y, ang - Math.PI / 2 - t, len, 3.8, 0.46);
         }
-        drops(x, y, 5, ang - 0.7, ang + 0.7, 200, 340, 3.8, INK, 900);
+        drops(x, y, 3, ang - 0.7, ang + 0.7, 200, 340, 3.4, INK, 900);
       }),
     },
   },
@@ -1081,15 +1082,16 @@ export function drawHeatTip(ctx: CanvasRenderingContext2D, s: GameState, footX: 
   ctx.fillStyle = WEAPON_INK[s.weapon];
   tipBar(ctx, tx, ty, ang, 3 + 11 * f, 2.2 + 2.2 * f);
   if (f > 0.5) hotCore(ctx, (1 - (f - 0.5) * 2) * JUICE_SYS.HOT_U, (k) => tipBar(ctx, tx, ty, ang, 2 + 7 * f, k));
-  if (f > 0.75) {
-    ctx.fillStyle = GRAY;
-    for (let i = 0; i < 2; i++) {
-      const a = ((s.tick + i * 17) % 34) / 34;
-      const r = (1 + 2.4 * a) * (a < 0.7 ? 1 : (1 - a) / 0.3);
-      if (r < 0.4) continue;
-      ctx.beginPath();
-      ctx.ellipse(tx + Math.sin(a * 5 + i * 2) * 3, ty - 4 - a * 20, r * 1.3, r, -0.3, 0, TAU);
-      ctx.fill();
+  // 김 — 반을 넘으면 끝에서 먹 증기 획이 피어오른다. 과열에 가까울수록 가닥이 늘고(1 → 4) 굵고 길어지며, 70%부터는 짙은 먹이다(폰 1배에서 읽히게)
+  if (f > 0.5) {
+    ctx.fillStyle = f > 0.7 ? INK : GRAY;
+    const n = Math.min(4, 1 + Math.floor((f - 0.5) * 8));
+    const P = 30;
+    for (let i = 0; i < n; i++) {
+      const a = ((s.tick + i * Math.round(P / n)) % P) / P;
+      const x = tx + (i - (n - 1) / 2) * 5 + Math.sin(a * 5 + i * 2) * 4;
+      const y0 = ty - 4 - a * 44;
+      brushLine(ctx, x, y0, x + Math.sin(a * 6 + i) * 8, y0 - 16 - 20 * f, 3 + 4.5 * f, a < 0.55 ? 0 : (a - 0.55) / 0.45, Math.min(1, a * 4), 0.4, i * 7 + 3, 4, PRESS.flick);
     }
   }
   ctx.restore();

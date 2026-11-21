@@ -54,7 +54,7 @@ function run(waza: WazaId): typeof log {
 const P = JUICE.special.hitstop;
 // [번짐 수, 마무리 수] — 표 §4 그대로
 const COUNT: Record<WazaId, [number, number]> = {
-  tenchi: [5, 1], ageba: [2, 1], mukjul: [2, 0], dalmuri: [1, 4], nakgwan: [4, 7], baram: [3, 1],
+  tenchi: [5, 1], ageba: [2, 1], mukjul: [2, 0], dalmuri: [1, 4], nakgwan: [4, 8], baram: [3, 1],
 };
 
 describe('필살 × 무기 — 번짐 · 마무리 안무', () => {
