@@ -1,68 +1,58 @@
-// 원소 다섯 공통 초승달(crescent.ts) + 본보기 불새 — 달 기하 · 바뀌는 박자 · 조각 상한.
+// 불새 3판 — 친 자리 위 V자 날개 한 쌍(펼침 → 퍼덕) · 떨어지는 불티 · 공통 초승달 없음 · 조각 상한.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RECIPES, pool, resetBladeFx, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
 import { liveBits } from '../src/render/weaponFx';
-import { WEAPON_INK, WEAPON_LITE } from '../src/config';
-import { greatArcPoint } from '../src/render/sprites';
-import { moonAt, moonPoint, moonPts, moonsFor, swingMoon } from '../src/render/legend5/crescent';
+import { WEAPON_INK } from '../src/config';
 
 const c = WEAPON_INK.phoenix;
-const alive = (): number => pool.filter((p) => p.alive).length;
+const live = () => pool.filter((p) => p.alive);
 const step = (n: number): void => { for (let i = 0; i < n; i++) updateBladeFx(1 / 60); };
+const tip = (p: { x: number; y: number; rot: number; size: number }): [number, number] => [p.x + Math.cos(p.rot) * p.size, p.y + Math.sin(p.rot) * p.size];
 
 beforeEach(() => resetBladeFx());
 
-describe('공통 초승달 기하', () => {
-  it('moonAt — 친 자리가 호 한가운데, 양 끝은 반지름 위', () => {
-    const m = moonAt(100, 200, 40, -Math.PI / 2, 2.4, 1);
-    const [x, y] = moonPoint(m, 0.5);
-    expect(x).toBeCloseTo(100);
-    expect(y).toBeCloseTo(200);
-    for (const u of [0, 1]) {
-      const [px, py] = moonPoint(m, u);
-      expect(Math.hypot(px - m.cx, py - m.cy)).toBeCloseTo(40);
-    }
-    expect(moonPts(m, 12)).toHaveLength(24);
-  });
-
-  it('swingMoon — 참격 호의 시작(꼬리) · 칼끝(앞날)을 지난다', () => {
-    const m = swingMoon(200, 600);
-    const [ax, ay] = greatArcPoint(1);
-    const [cx, cy] = greatArcPoint(0);
-    const [t0x, t0y] = moonPoint(m, 0);
-    const [t1x, t1y] = moonPoint(m, 1);
-    expect(Math.hypot(t0x - (200 + ax), t0y - (600 + ay))).toBeLessThan(0.5);
-    expect(Math.hypot(t1x - (200 + cx), t1y - (600 + cy))).toBeLessThan(0.5);
-  });
-
-  it('완파는 두 겹 — 뒤(위쪽으로 볼록) · 앞(아래쪽으로 볼록) 납작한 반 타원', () => {
-    const [back, front] = moonsFor('destroy', 300, 400, 1);
-    expect(moonPoint(back, 0.5)[1]).toBeLessThan(400);
-    expect(moonPoint(front, 0.5)[1]).toBeGreaterThan(400);
-    expect(back.f).toBeLessThan(1);
-    expect(front.f).toBeLessThan(1);
-  });
-});
-
-describe('불새 — 달 → 불 날개 → 불티', () => {
-  it('타격: 즉시는 달 둘(몸 + 달군 앞날), 2~3프레임 뒤 날개가 붙고, 2초 뒤 0', () => {
+describe('불새 — 날개 한 쌍 → 퍼덕 → 불티', () => {
+  it('타격: 3프레임 안에 한쪽 셋씩 깃이 펼쳐져 친 자리 위로 V자, 0.1초에 접힌 깃이 더 나오고, 2초 뒤 0', () => {
     RECIPES.wing.hit(300, 400, 1, c);
-    expect(alive()).toBe(2);
-    expect(pool.filter((p) => p.alive).map((p) => p.c1).sort()).toEqual([c, WEAPON_LITE.phoenix].sort());
-    step(2);
-    expect(alive()).toBe(2); // 0.033초 — 아직 달만
-    step(2);
-    expect(alive()).toBeGreaterThan(2); // 0.067초 — 날개가 솟기 시작
+    step(3);
+    const a = live();
+    expect(a).toHaveLength(6);
+    for (const p of a) expect(tip(p)[1]).toBeLessThan(400); // 깃 끝은 모두 위
+    expect(a.filter((p) => tip(p)[0] < 290)).toHaveLength(3); // 왼쪽 부채
+    expect(a.filter((p) => tip(p)[0] > 310)).toHaveLength(3); // 오른쪽 부채
+    step(5);
+    expect(live().filter((p) => p.k === 'stroke').length).toBeGreaterThan(6); // 퍼덕 — 접힌 깃이 나와 다시 펴진다
     step(125);
     expect(liveBits()).toHaveLength(0);
+  });
+
+  it('완파: 불티는 금박보다 크고 많으며 아래로 떨어진다 · 어느 사건도 초승달(sweep)을 긋지 않는다', () => {
+    RECIPES.wing.destroy(300, 300, 1.25, c);
+    let leaves = 0;
+    for (let i = 0; i < 40; i++) {
+      step(1);
+      leaves = Math.max(leaves, live().filter((p) => p.k === 'leaf').length);
+    }
+    expect(leaves).toBeGreaterThanOrEqual(14);
+    const ls = live().filter((p) => p.k === 'leaf');
+    expect(Math.min(...ls.map((p) => p.size))).toBeGreaterThan(3.8);
+    expect(ls.filter((p) => p.vy > 0).length).toBeGreaterThan(ls.length / 2);
+    resetBladeFx();
+    const r = RECIPES.wing;
+    r.hit(300, 400, 1, c); r.floor(300, 400, 1, c); r.destroy(300, 300, 1, c); r.whiff?.(300, 400, c);
+    r.swing?.(300, 600, 12, 0.26, c, 0, 1); r.waza?.bloom(300, 300, -1, 1, c);
+    for (let i = 0; i < 40; i++) {
+      expect(live().some((p) => p.k === 'sweep')).toBe(false);
+      step(1);
+    }
   });
 
   it('필살 along · bloom — 상한(24 · 48) 안 · 전부 keep · 2초 뒤 0', () => {
     let born = 0;
     weaponAlong('phoenix', [0, 600, 300, 200, 700, 100], 1.3, 0.35);
     for (let i = 0; i < 130; i++) {
-      born = Math.max(born, alive());
+      born = Math.max(born, live().length);
       expect(liveBits().every((p) => p.keep)).toBe(true);
       updateBladeFx(1 / 60);
     }
@@ -71,7 +61,7 @@ describe('불새 — 달 → 불 날개 → 불티', () => {
     expect(liveBits()).toHaveLength(0);
     weaponBloom('phoenix', 300, 300, -Math.PI / 2, 1.4);
     let peak = 0;
-    for (let i = 0; i < 130; i++) { peak = Math.max(peak, alive()); updateBladeFx(1 / 60); }
+    for (let i = 0; i < 130; i++) { peak = Math.max(peak, live().length); updateBladeFx(1 / 60); }
     expect(peak).toBeGreaterThan(5);
     expect(peak).toBeLessThanOrEqual(48);
     expect(liveBits()).toHaveLength(0);
