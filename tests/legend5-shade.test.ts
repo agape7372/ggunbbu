@@ -1,6 +1,6 @@
 // 그림자 대검 5판 — 바닥 촉수 무리: 땅 웅덩이(화면 폭 8할 넘게)에서 S자로 굽고 끝이 말린 촉수가 양쪽으로 기울어 솟는다 ·
 // 가닥마다 먹 뿌리(아래 붓) → 보라 꼬리(위 붓, 땅에서 떨어진 자리부터) · 크기 순서 헛스윙 < 타격 < 층 깨기 < 완파 ·
-// 몸 상자 · 콤보 도장 자리 비움 · 사건 조각 40 안 · 달(sweep) 없음 · 칼 기운 꼬리는 칼끝 너머로 · 필살 상한 · keep.
+// 몸 상자 · 콤보 도장 자리 비움 · 사건 조각 40 안 · 달(sweep) 없음 · 칼 기운은 칼에 감기고 칼날 35 · 칼끝 너머 20 안 · 필살 상한 · keep.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RECIPES, pool, resetBladeFx, scaled, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
@@ -156,22 +156,66 @@ describe('그림자 — 바닥 촉수 무리', () => {
     expect(f[1]).toBeLessThan(d[1]);
   });
 
-  it('칼길 · 칼 기운도 달 없이 꺾은 획 — 칼 기운은 먹 붓이 칼을 감고, 보라 꼬리가 칼끝 너머로 칼 길이 넘게 나간다', () => {
+  // 서 있을 때 칼(손 → 칼끝, 칼끝이 땅에 묻힌다)과 든 칼
+  const STAND = [189, 580, 205, 609] as const;
+  const RAISED = [170, 560, 200, 520] as const;
+  /** 칼날 선분에서의 거리 · 칼끝 너머(칼 축으로 칼끝을 지난 길이) · 칼끝 거리 */
+  const toBlade = ([hx, hy, tx, ty]: readonly number[], x: number, y: number): { d: number; over: number; tip: number } => {
+    const L = Math.hypot(tx - hx, ty - hy);
+    const [ux, uy] = [(tx - hx) / L, (ty - hy) / L];
+    const u = (x - hx) * ux + (y - hy) * uy;
+    const uc = Math.max(0, Math.min(L, u));
+    return { d: Math.hypot(x - hx - ux * uc, y - hy - uy * uc), over: u - L, tip: Math.hypot(x - tx, y - ty) };
+  };
+
+  it('칼길 · 칼 기운도 달 없이 꺾은 획 — 칼 기운은 가는 먹 붓이 칼에 붙어 감기고(8px 남짓), 보라 꼬리는 칼끝 20px 안에서 말린다', () => {
     r.swing?.(180, 610, 12, 0.26, c, 0, 1);
-    for (let n = 0; n < 8; n++) r.aura?.([170, 560, 200, 520], n, c);
+    for (let n = 0; n < 8; n++) r.aura?.([...RAISED], n, c);
     const peak = run((bits) => expect(bits.some((p) => p.k === 'sweep')).toBe(false));
     expect(peak).toBeGreaterThan(4);
-    resetBladeFx();
-    r.aura?.([170, 560, 200, 520], 0, c);
-    step(8);
-    const wrap = alive().find((p) => p.k === 'zig' && p.c1 === PALETTE.INK);
-    const tail = alive().find((p) => p.k === 'zig' && p.c1 === c);
-    expect(wrap).toBeDefined();
-    expect(tail).toBeDefined();
-    const far = (p: Bit): number => Math.max(...ptsOf(p).map(([x, y]) => Math.hypot(x - 170, y - 560)));
-    expect(far(wrap as Bit)).toBeLessThan(50 * 1.35);
-    expect(far(tail as Bit)).toBeGreaterThan(50 * 1.3);
-    expect(far(tail as Bit)).toBeLessThan(50 * 2.8);
+    for (const b of [STAND, RAISED]) {
+      for (let n = 0; n < 6; n += 2) {
+        resetBladeFx();
+        r.aura?.([...b], n, c);
+        step(8);
+        const wrap = alive().find((p) => p.k === 'zig' && p.c1 === PALETTE.INK);
+        const tail = alive().find((p) => p.k === 'zig' && p.c1 === c);
+        expect(wrap).toBeDefined();
+        expect(tail).toBeDefined();
+        const wp = ptsOf(wrap as Bit).map(([x, y]) => toBlade(b, x, y));
+        expect(Math.max(...wp.map((q) => q.d))).toBeLessThan(10); // 칼에 붙어 감긴다
+        expect(Math.max(...wp.map((q) => q.d))).toBeGreaterThan(4); // 칼 밖으로 굽이가 드러난다
+        // 보라 붓 — 감긴 가닥 위(칼에서 10px 안)이거나, 칼 밖으로 말린 꼬리면 칼끝 20px 안
+        expect(ptsOf(tail as Bit).map(([x, y]) => toBlade(b, x, y)).filter((q) => q.d >= 10 && q.tip >= 20)).toEqual([]);
+      }
+    }
+  });
+
+  it('칼 기운 상한(다섯 공통) — 서 있기 · 든 칼 모두 조각 전부가 칼날에서 35px 안 · 칼끝 너머 20px 안, 몸 쪽으로는 칼선에서 3px 안', () => {
+    for (const b of [STAND, RAISED]) {
+      resetBladeFx();
+      const [hx, hy, tx, ty] = b;
+      const L = Math.hypot(tx - hx, ty - hy);
+      const [ox, oy] = [(ty - hy) / L, -(tx - hx) / L]; // 바깥(칼이 오른쪽으로 향할 때 몸 반대쪽)
+      let far = 0;
+      let over = 0;
+      let inner = 0;
+      for (let i = 0; i < 200; i++) {
+        if (i % 6 === 0 && i < 120) r.aura?.([...b], i / 6, c);
+        for (const p of alive()) {
+          for (const [x, y] of ptsOf(p)) {
+            const q = toBlade(b, x, y);
+            far = Math.max(far, q.d);
+            over = Math.max(over, q.over);
+            inner = Math.max(inner, -((x - hx) * ox + (y - hy) * oy));
+          }
+        }
+        updateBladeFx(1 / 60);
+      }
+      expect(far).toBeLessThan(35);
+      expect(over).toBeLessThan(20);
+      expect(inner).toBeLessThan(3);
+    }
   });
 
   it('필살 along · bloom — 상한(24 · 48) 안 · 전부 keep · 2.2초 뒤 0. 공중 마무리엔 웅덩이가 없다', () => {

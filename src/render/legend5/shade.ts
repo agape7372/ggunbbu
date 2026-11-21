@@ -244,9 +244,10 @@ export const shade: Recipe = {
     }
     later(3 / 60, () => dot(x + sgn() * 6, y - 8, 1.4, INK));
   },
-  // 칼 기운 — 손잡이에서 먹 촉수가 칼날을 한 바퀴 남짓 감으며(바깥으로 크게 · 다리 쪽은 작게) 칼끝까지 가고,
-  // 칼끝(땅에 묻히면 땅 5px 위)을 돌아 바깥 위로 칼 길이 남짓 말려 오른다(먹 → 보라 → 밝은 짝 끝). 둘에 하나 · 한 번에 둘 셋이 살아 있다.
-  // 사이사이 먹 점이 칼 바깥에서 천천히 위로(여섯에 하나 보라 · 열에 하나 밝은 짝)
+  // 칼 기운 — 손잡이에서 가는 먹 촉수가 칼날을 나선으로 두 바퀴 남짓 감아 칼끝까지 간다(바깥 굽이 8px 안 · 다리 쪽은 1.5px).
+  // 칼끝 쪽 6할은 보라로 감기고, 칼끝(땅에 묻히면 땅 5px 위)에서 보라 꼬리가 바깥 위로 12~15px 작게 말린다(먹 → 보라 → 밝은 짝 끝). 둘에 하나 · 한 번에 둘 셋이 살아 있고,
+  // 가닥마다 감는 자리를 3분의 1 바퀴씩 엇갈려 가닥 사이에 틈이 난다(덩이로 뭉치지 않게).
+  // 사이사이 먹 점이 칼 바깥에서 조금 위로(여섯에 하나 보라 · 열에 하나 밝은 짝)
   aura(b, n, c) {
     const [hx, hy, tx, ty] = b;
     const L = Math.hypot(tx - hx, ty - hy) || 1;
@@ -255,27 +256,32 @@ export const shade: Recipe = {
     const [ox, oy] = [uy * o, -ux * o]; // 칼 바깥(몸 반대쪽)
     if (n % 2) {
       const v = 0.2 + 0.8 * n01();
-      const d = 3 + 6 * n01();
-      dot(hx + ux * L * v + ox * d, hy + uy * L * v + oy * d, 1 + n01() * 1.4, n % 6 === 3 ? c : n % 10 === 5 ? liteOf(c) : INK, o * (2 + 6 * n01()));
+      const d = 3 + 4 * n01();
+      // dot보다 느리게 · 짧게 — 칼에서 20px 안에서 사라진다
+      put('drop', hx + ux * L * v + ox * d, hy + uy * L * v + oy * d, {
+        vx: o * (2 + 4 * n01()), vy: -10 - n01() * 10, g: -12, drag: 1.4, life: 0.5 + n01() * 0.3, size: 1 + n01() * 1.2,
+        c1: n % 6 === 3 ? c : n % 10 === 5 ? liteOf(c) : INK, hold: n % 6 === 3 || n % 10 === 5 ? 1 : 0,
+      });
       return;
     }
     const vEnd = uy > 0 ? Math.min(1, Math.max(0.5, (VIEW.GROUND_Y - 5 - hy) / (uy * L))) : 1;
-    const turns = 1.1 + 0.5 * n01();
-    const ph = n01() * TAU;
-    const amp = 8.5 + 3 * n01(); // 바깥 굽이 — 칼날(보라) 밖으로 먹 고리가 드러나게(6이면 칼에 묻혔다)
+    const turns = 1.7 + 0.4 * n01();
+    const ph = ((n / 2) % 3) * (TAU / 3) + 0.5 * n01();
+    const amp = 6.5 + 1.5 * n01(); // 바깥 굽이 — 칼에 붙게(8.5~11.5면 칼 밖 먹 덩이로 읽혔다)
     const pts: number[] = [];
-    for (let i = 0; i <= 9; i++) {
-      const v = (vEnd * i) / 9;
-      const s = Math.sin(ph + TAU * turns * v) * Math.min(1, 0.3 + v * 2);
-      const off = s * (s > 0 ? amp : 2);
+    for (let i = 0; i <= 20; i++) {
+      const v = (vEnd * i) / 20;
+      const s = Math.sin(ph + TAU * turns * v) * Math.min(1, 0.3 + v * 2, 0.4 + (vEnd - v) * 6); // 끝에서 칼로 모여 꼬리로 이어진다
+      const off = s * (s > 0 ? amp : 1.5);
       pts.push(hx + ux * L * v + ox * off, hy + uy * L * v + oy * off);
     }
-    // 칼끝 너머 — 바깥 위로 틀어 솟다가(앞 반은 살짝 거꾸로 휘어 S자) 끝 반에서 갈고리로 말린다. 칼 길이의 1.4~1.8배. 칼끝 두 점부터 겹쳐 긋는다
-    const E = L * (1.4 + 0.4 * n01());
-    const spin = -o * (2.3 + 0.6 * n01());
+    // 칼끝 너머 — 바깥 위로 틀어 나가다 끝 반에서 작게 말린다(12~15px · 반지름 5px 남짓 — 칼끝에서 20px 안).
+    // 보라 붓은 감긴 가닥 4할 자리부터 겹쳐 긋는다(먹 붓 머리가 거기 닿을 때) — 칼끝 쪽 굽이가 보라라야 검은 칼날 위에서 감긴 게 읽힌다(먹만이면 칼이 굵어진 것으로 보였다)
+    const E = 12 + 3 * n01();
+    const spin = -o * (2.6 + 0.6 * n01());
     let a = Math.atan2(uy, ux) - o * 1.75;
     let [x, y] = [pts[pts.length - 2], pts[pts.length - 1]];
-    const curl = pts.slice(-4);
+    const curl = pts.slice(16);
     for (let j = 1; j <= 9; j++) {
       x += (Math.cos(a) * E) / 9;
       y += (Math.sin(a) * E) / 9;
@@ -283,8 +289,8 @@ export const shade: Recipe = {
       a += j < 4 ? o * 0.12 : (spin * (j - 3)) / 15; // j 4~8의 (j − 3) 합 = 15
     }
     const life = 0.5 + 0.12 * n01();
-    bent(pts, 4.6, '', { pr: 5, dry: 0.22, gr: 0.3, life, vx: o * 3, vy: -8 });
-    later(0.1, () => bent(curl, 3.8, '', { body: c, pr: 5, dry: 0.2, gr: 0.3, life: life * 0.9, vx: o * 3, vy: -8 }));
+    bent(pts, 2.2, '', { pr: 5, dry: 0.22, gr: 0.3, life, vx: o * 1.5, vy: -3 });
+    later(0.07, () => bent(curl, 2.4, '', { body: c, pr: 5, dry: 0.2, gr: 0.3, life: life * 0.9, vx: o * 1.5, vy: -3 }));
   },
   every: 0.09,
   tint: true,
