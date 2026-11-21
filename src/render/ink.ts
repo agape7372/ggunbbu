@@ -126,10 +126,11 @@ export const PRESS = {
  * s0 ~ s1만 그린다(모양으로 지우기 — 꼬리부터 깎으려면 s0을 올린다). dry = 비백.
  * 비백(11-01 레퍼런스: 실제 마른 붓 · 잉크 슬래시 VFX) — 붓털은 머리에선 먹을 머금어 한 덩이고, 꼬리로 가며
  * 가닥(6~16)으로 풀린다. 가닥마다 굵기 · 끝나는 자리가 달라 틈이 저절로 생기고, 바깥 가닥이 먼저 끊긴다.
+ * tone(k) = 띠를 칠하기 직전에 fillStyle을 정한다(k 0 = 몸통 · 1.. = 가닥). 없으면 지금 fillStyle 하나로.
  */
 function strokeAlong(
   ctx: CanvasRenderingContext2D, at: (s: number, out: number[]) => void, len: number,
-  w: number, s0: number, s1: number, dry: number, seed: number, pr: (s: number) => number,
+  w: number, s0: number, s1: number, dry: number, seed: number, pr: (s: number) => number, tone?: Tone,
 ): void {
   if (s1 - s0 < 0.01 || w < 0.3) return;
   const P = [0, 0];
@@ -168,6 +169,7 @@ function strokeAlong(
       }
     }
     ctx.closePath();
+    tone?.(k);
     ctx.fill();
   };
   if (dry <= 0.04) {
@@ -188,10 +190,13 @@ function strokeAlong(
   }
 }
 
+/** 띠 색 정하기 — strokeAlong 참고 */
+export type Tone = (k: number) => void;
+
 /** 곧은(bend로 살짝 휜) 붓 획 — (x0,y0) = 댄 곳 · (x1,y1) = 뗀 곳. bend = 가운데가 진행 방향 왼쪽으로 부푸는 px */
 export function brushLine(
   ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number,
-  w: number, s0: number, s1: number, dry: number, seed: number, bend = 0, pr: (s: number) => number = PRESS.cut,
+  w: number, s0: number, s1: number, dry: number, seed: number, bend = 0, pr: (s: number) => number = PRESS.cut, tone?: Tone,
 ): void {
   const dx = x1 - x0;
   const dy = y1 - y0;
@@ -202,13 +207,13 @@ export function brushLine(
     const k = bend * Math.sin(Math.PI * s);
     o[0] = x0 + dx * s + nx * k;
     o[1] = y0 + dy * s + ny * k;
-  }, L, w, s0, s1, dry, seed, pr);
+  }, L, w, s0, s1, dry, seed, pr, tone);
 }
 
 /** 꺾인 붓 획 — pts = [x0,y0, x1,y1, …] 꺾은선을 길이 비례로 따라간다(낙뢰 · 지그재그 · 철골 꺾임) */
 export function brushPath(
   ctx: CanvasRenderingContext2D, pts: readonly number[], w: number, s0: number, s1: number,
-  dry: number, seed: number, pr: (s: number) => number = PRESS.cut,
+  dry: number, seed: number, pr: (s: number) => number = PRESS.cut, tone?: Tone,
 ): void {
   const n = pts.length / 2 - 1;
   if (n < 1) return;
@@ -222,19 +227,19 @@ export function brushPath(
     const f = (d - cum[i]) / (cum[i + 1] - cum[i] || 1);
     o[0] = pts[i * 2] + (pts[i * 2 + 2] - pts[i * 2]) * f;
     o[1] = pts[i * 2 + 1] + (pts[i * 2 + 3] - pts[i * 2 + 1]) * f;
-  }, L, w, s0, s1, dry, seed, pr);
+  }, L, w, s0, s1, dry, seed, pr, tone);
 }
 
 /** 호 붓 획 — 중심 (cx,cy) 반지름 r, a0에서 sweep(라디안, 음수면 반대로)만큼. flat = 세로 배율 */
 export function brushArc(
   ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, a0: number, sweep: number,
-  w: number, s0: number, s1: number, dry: number, seed: number, flat = 1, pr: (s: number) => number = PRESS.cut,
+  w: number, s0: number, s1: number, dry: number, seed: number, flat = 1, pr: (s: number) => number = PRESS.cut, tone?: Tone,
 ): void {
   strokeAlong(ctx, (s, o) => {
     const th = a0 + sweep * s;
     o[0] = cx + Math.cos(th) * r;
     o[1] = cy + Math.sin(th) * r * flat;
-  }, Math.abs(sweep) * r, w, s0, s1, dry, seed, pr);
+  }, Math.abs(sweep) * r, w, s0, s1, dry, seed, pr, tone);
 }
 
 /**

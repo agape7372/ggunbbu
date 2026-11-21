@@ -11,7 +11,10 @@ import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx } from '../src/ren
 function drawn(draw = (c: CanvasRenderingContext2D) => drawBladeFx(c, 0)): string {
   const seen = new Set<string>();
   const ctx = new Proxy({} as Record<string, unknown>, {
-    get: (_t, k) => () => seen.add(String(k)),
+    // 그라데이션(전설 먹 + 색)은 쓴 색을 남긴다
+    get: (_t, k) => (/^create\w*Gradient$/.test(String(k))
+      ? () => ({ addColorStop: (_o: number, c: string) => seen.add(c), toString: () => 'grad' })
+      : () => seen.add(String(k))),
     set: (_t, k, v) => {
       if (k === 'fillStyle' || k === 'strokeStyle') seen.add(String(v));
       return true;

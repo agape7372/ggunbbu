@@ -9,7 +9,8 @@
 // 대검은 모양 값이라 비쌀수록 화려하다 — 1200부터 칼 기운과 완파 때 모티프 한 번 더(tint).
 // 콤보 50·100·200에서 한 단씩 커지고(100부터 겹 베기), 고비(50·100·200·500·999)를 넘는 타격은 한 번 크게.
 // 연장 넷·게이지 참·콤보 끊김·깔림 탈출·마스크 도트와 연타 줄 박자는 weaponFx.ts — 이 풀과 뿌리개를 빌려 쓴다.
-// ★전설 여덟(11-21, docs/INK_FX_2026-11-01.md §13)은 먹 붓 화법 그대로 먹 색 자체가 시그니처 색이다(검은 먹 획 속에 색을 심지 않는다).
+// ★전설 여덟(11-21, docs/INK_FX_2026-11-01.md §13 · §14)은 먹 붓 화법 그대로 한 붓에 먹과 시그니처 색을 머금는다 —
+// 댄 머리는 먹, 꼬리로 짙은 색 · 순색 · 밝은 끝(legendTone). 검은 먹 획 속에 색을 심지 않고, 획 전체를 색 하나로 칠하지도 않는다.
 // 공통 먹 베기 획 · 튐을 깔지 않고(own) 무기마다 다른 붓놀림으로 긋는다 — 화염 휘어 오르는 혀 · 서리 날 선 결정 · 번개 꺾인 한 획 ·
 // 흑철 무거운 누름 획과 발묵 · 거꾸로 오르는 방울 · 크레인 갈고리에 걸려 들리는 짐과 탑 크레인 · 먹 붓글씨 · 황금 금 튐과 금박 ·
 // 다이아 드릴 비스듬한 자국이 쌓여 좁아지는 나사 날(weaponFx).
@@ -19,7 +20,7 @@
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
 import { PALETTE, SEAL_INK, TICK, VIEW, WEAPON_FX, WEAPON_INK, WEAPON_LITE } from '../config';
 import { comboMilestone } from '../audio/consume';
-import { brushArc, brushLine, brushPath, hotCore, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter } from './ink';
+import { brushArc, brushLine, brushPath, hotCore, hs, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter, type Tone } from './ink';
 import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites';
 import { TOOL_RECIPES, drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
 
@@ -289,7 +290,8 @@ export function drops(x: number, y: number, n: number, a0: number, a1: number, s
     const a = a0 + (a1 - a0) * (n === 1 ? 0.5 : i / (n - 1)) + sgn() * 0.12;
     put('drop', x + sgn() * 4, y + sgn() * 3, {
       ...vel(a, s0 + n01() * (s1 - s0)), g, drag: g < 0 ? 1.6 : 0,
-      life: g < 0 ? 0.45 + n01() * 0.3 : 0.9, size: r * (0.7 + n01() * 0.6), c1: c, hold: keep ? 1 : 0,
+      life: g < 0 ? 0.45 + n01() * 0.3 : 0.9, size: r * (0.7 + n01() * 0.6), hold: keep ? 1 : 0,
+      c1: keep && LEGEND.has(c) && n01() < 0.35 ? INK : c, // 전설 방울은 셋에 하나 꼴로 먹(불티 사이 재 · 물감 사이 먹물) — 색 점만이면 스티커로 읽혔다
     });
   }
 }
@@ -1233,6 +1235,58 @@ function span(p: Bit, u: number): [number, number] {
   return [u < 0.4 ? 0 : Math.min(1, (u - 0.4) / 0.6), Math.min(1, u / (p.gr || 0.12))];
 }
 
+const LEGEND_IDS = Object.keys(WEAPON_LITE) as (keyof typeof WEAPON_LITE)[];
+/** 같은 색조로 짙게 — 먹에서 순색으로 바로 넘어가면 가운데가 탁한 회색이 된다 */
+const deep = (hex: string): string => {
+  const n = parseInt(hex.slice(1), 16);
+  const d = (v: number): string => Math.round(v * 0.42).toString(16).padStart(2, '0');
+  return `#${d(n >> 16)}${d((n >> 8) & 255)}${d(n & 255)}`;
+};
+/** 전설 시그니처 색 → [짙은 색, 밝은 짝] · 밝은 짝 → 시그니처 색 */
+const LEGEND = new Map<string, readonly [string, string]>(LEGEND_IDS.map((w) => [WEAPON_INK[w], [deep(WEAPON_INK[w]), WEAPON_LITE[w]]]));
+const LITE_OF = new Map<string, string>(LEGEND_IDS.map((w) => [WEAPON_LITE[w], WEAPON_INK[w]]));
+
+/**
+ * 전설 획 — 먹과 시그니처 색을 한 붓에 머금게 한다(11-21 사용자 「먹을 다 바꾸진 말고 검정과 색을 섞거나 그라데이션」).
+ * 댄 머리는 먹 → 같은 색조의 짙은 색 → 순색 → 끝 1할 남짓은 밝은 짝. 몸통은 먹 머리가 1.5할이고, 가닥은 전환 자리를
+ * 0.04~0.34로 흩는다(한 자리에서 다 같이 바뀌면 디지털 그라데이션 띠로 읽힌다). 밝은 짝 획은 먹 없이 시그니처 색 → 밝은 짝.
+ * 시안 다섯(머리 먹 → 꼬리 색 · 먹 몸 + 색 가닥 · 색 몸 + 먹 테 · 한쪽 먹 한쪽 색 · 가닥 엇갈림)을 심사 세 시각에 붙여 고른 판.
+ */
+function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: readonly number[]): Tone | undefined {
+  const pair = LEGEND.get(p.c1);
+  const sig = pair ? p.c1 : LITE_OF.get(p.c1);
+  if (!sig) return undefined;
+  let x0: number; let y0: number; let x1: number; let y1: number;
+  if (p.k === 'zig') {
+    [x0, y0, x1, y1] = [pts[0], pts[1], pts[pts.length - 2], pts[pts.length - 1]];
+  } else if (p.k === 'sweep') {
+    const f = p.a || 1;
+    const e = p.rot + (Math.abs(p.sw) > Math.PI * 1.3 ? p.sw * 0.5 : p.sw); // 거의 한 바퀴면 끝이 머리에 붙는다 — 반 바퀴 자리로
+    [x0, y0, x1, y1] = [p.x + Math.cos(p.rot) * p.size, py + Math.sin(p.rot) * p.size * f, p.x + Math.cos(e) * p.size, py + Math.sin(e) * p.size * f];
+  } else {
+    [x0, y0, x1, y1] = [p.x, py, p.x + Math.cos(p.rot) * p.size, py + Math.sin(p.rot) * p.size];
+  }
+  if (!pair) {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, sig);
+    g.addColorStop(0.45, p.c1);
+    return () => { ctx.fillStyle = g; };
+  }
+  const [dark, lite] = pair;
+  const at = (a: number): CanvasGradient => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, INK);
+    g.addColorStop(a, INK);
+    g.addColorStop(a + 0.16, dark);
+    g.addColorStop(a + 0.32, p.c1);
+    g.addColorStop(0.86, p.c1);
+    g.addColorStop(1, lite);
+    return g;
+  };
+  const tones = [at(0.14), at(0.04 + 0.3 * hs(p.seed, 1)), at(0.04 + 0.3 * hs(p.seed, 2)), at(0.04 + 0.3 * hs(p.seed, 3))];
+  return (k) => { ctx.fillStyle = tones[k ? 1 + Math.floor(hs(p.seed, k + 30) * 3) : 0]; };
+}
+
 /** 붓 획 하나(stroke · sweep · zig) — 먹 획 + 벤 순간 속 색 + 공사중 빗금 */
 function drawBrush(ctx: CanvasRenderingContext2D, p: Bit, py: number, u: number): void {
   const [s0, s1] = span(p, u);
@@ -1240,13 +1294,13 @@ function drawBrush(ctx: CanvasRenderingContext2D, p: Bit, py: number, u: number)
   const dry = Math.min(1, p.dry + u * 0.7);
   const pr = PRESSES[p.pr] ?? PRESS.cut;
   const pts = p.k === 'zig' ? p.pts.map((q, i) => q + (i % 2 ? py : p.x)) : NO_PTS;
-  const paint = (w: number, a: number, b: number, d: number): void => {
-    if (p.k === 'sweep') brushArc(ctx, p.x, py, p.size, p.rot, p.sw, w, a, b, d, p.seed, p.a || 1, pr);
-    else if (p.k === 'zig') brushPath(ctx, pts, w, a, b, d, p.seed, pr);
-    else brushLine(ctx, p.x, py, p.x + Math.cos(p.rot) * p.size, py + Math.sin(p.rot) * p.size, w, a, b, d, p.seed, p.a, pr);
+  const paint = (w: number, a: number, b: number, d: number, tone?: Tone): void => {
+    if (p.k === 'sweep') brushArc(ctx, p.x, py, p.size, p.rot, p.sw, w, a, b, d, p.seed, p.a || 1, pr, tone);
+    else if (p.k === 'zig') brushPath(ctx, pts, w, a, b, d, p.seed, pr, tone);
+    else brushLine(ctx, p.x, py, p.x + Math.cos(p.rot) * p.size, py + Math.sin(p.rot) * p.size, w, a, b, d, p.seed, p.a, pr, tone);
   };
   ctx.fillStyle = p.c1;
-  paint(p.v, s0, s1, dry);
+  paint(p.v, s0, s1, dry, legendTone(ctx, p, py, pts));
   const hold = p.hold || (p.st ? 0.55 : 0.4);
   if (!p.c2 || p.c2 === p.c1 || u >= hold) return;
   const c0 = Math.max(s0, 0.06);
@@ -1321,7 +1375,16 @@ function drawBit(ctx: CanvasRenderingContext2D, p: Bit, py: number): void {
       const R = p.gr
         ? p.size * (0.55 + 0.65 * Math.min(1, u / 0.6)) * (u > 0.75 ? (1 - u) / 0.25 : 1)
         : p.size * popScale(u);
-      ctx.fillStyle = dried(p, u);
+      const col = dried(p, u);
+      if (LEGEND.has(col)) {
+        // 전설 물감 — 먹 뿌리에서 색이 친 쪽으로 빠져나온다(획처럼 먹 머리 → 색 꼬리). 색 얼룩 하나는 스티커, 먹 테를 두르면 테두리로 읽혔다
+        ctx.fillStyle = INK;
+        spatter(ctx, p.x, py, R, p.rot, p.seed, p.v);
+        ctx.fillStyle = col;
+        spatter(ctx, p.x + Math.cos(p.rot) * R * 0.7, py + Math.sin(p.rot) * R * 0.7, R * 0.78, p.rot, p.seed + 1, 0);
+        return;
+      }
+      ctx.fillStyle = col;
       spatter(ctx, p.x, py, R, p.rot, p.seed, p.v);
       if (p.c2 && p.c2 !== p.c1 && u < 0.2) {
         ctx.fillStyle = p.c2;

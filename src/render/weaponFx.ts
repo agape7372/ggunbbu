@@ -296,7 +296,7 @@ const TOOLS: Partial<Record<WeaponId, Tool>> = {
       const [bx, by] = [x + 4, y - 30];
       const [tx, ty] = [bx + Math.cos(ang) * L, by + Math.sin(ang) * L];
       drillCoil(bx, by, ang, L, 19, 0.4, 28);
-      later(0.12, () => sweep(tx, ty, 42, ang - Math.PI / 2, Math.PI * 1.15, 9, '', { body: WEAPON_INK.diadrill, pr: 1, life: 0.3, dry: 0.4, gr: 0.12 }));
+      later(0.12, () => sweep(tx, ty, 42, ang - Math.PI / 2, Math.PI * 1.15, 13, '', { body: WEAPON_INK.diadrill, pr: 1, life: 0.3, dry: 0.4, gr: 0.12 }));
       curls(tx, ty, N(5, k), 7, 0.32, WEAPON_INK.diadrill);
       later(0.08, () => curls(tx, ty - 6, N(4, k), 7, 0.3, WEAPON_INK.diadrill));
     },
