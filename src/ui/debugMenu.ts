@@ -7,11 +7,25 @@ import { enterBonus } from '../core/sim';
 import { enterAct2Phase } from '../core/act2';
 import { GUARD_GAUGE, PLAYER, SCORE, TICK, WAZA_GAUGE } from '../config';
 import { freezeSaves, loadSave, saveSave } from '../storage';
-import { WAZA_IDS, WEAPON_IDS } from '../meta/loadout';
+import { BLADE_IDS, BODY_IDS, LETTERS_IDS, MASK_IDS, WAZA_IDS, WEAPON_IDS } from '../meta/loadout';
 import { phaseName } from '../content';
 import { playSfx } from '../audio/audio';
 
 export const DEBUG_TITLE_TAPS = 7;
+
+/** 시험판 · 전해금: 상점 목록 전부를 갖고(손으로 적은 목록 말고 loadout 목록 그대로 — 새 상품이 저절로 따라온다) 재화를 채운다. 저장만 고친다 */
+export function unlockAllSave(): void {
+  const sv = loadSave();
+  sv.unlockedChapters = 3;
+  sv.act2Cleared = true;
+  sv.butterTierReached = 3;
+  sv.owned = [...new Set([...sv.owned, ...WEAPON_IDS, ...WAZA_IDS, ...BODY_IDS, ...BLADE_IDS, ...LETTERS_IDS, ...MASK_IDS])];
+  sv.dust = Math.max(sv.dust, 99_999);
+  sv.orbit = Math.max(sv.orbit, 99_999);
+  sv.blanks = Math.max(sv.blanks, 20);
+  saveSave(sv);
+  try { localStorage.setItem('gunbbu.devUnlock', '1'); } catch {}
+}
 
 export type ScoreMul = 1 | 10 | 100;
 export type FallMul = 1 | 2 | 4;
@@ -154,17 +168,8 @@ export function mountDebugMenu(getState: () => GameState | null, open = true): v
   mk('버터3', withState((s) => enterBonus(s, 3)));
 
   mk('전해금', () => {
-    const sv = loadSave();
-    sv.unlockedChapters = 3;
-    sv.act2Cleared = true;
-    sv.butterTierReached = 3;
-    // 무기 열둘까지 전부 — 시험판에서 상점 · 도감을 끝까지 보려고(10-31 사용자 「내 계정은 테스트용, 다 풀어줘」)
-    sv.owned = [...new Set([...sv.owned, ...WEAPON_IDS, ...WAZA_IDS, 'ink', 'amber', 'slate', 'wire', 'rebar', 'crescent', 'flyer', 'stamp', 'orbit', 'mask'])];
-    sv.dust = Math.max(sv.dust, 999);
-    sv.orbit = Math.max(sv.orbit, 999);
-    sv.blanks = Math.max(sv.blanks, 20);
-    saveSave(sv);
-    try { localStorage.setItem('gunbbu.devUnlock', '1'); } catch {}
+    // 시험판에서 상점 · 도감을 끝까지 보려고(10-31 사용자 「내 계정은 테스트용, 다 풀어줘」 · 11-21 「모든상점템 뚫어줘」)
+    unlockAllSave();
     // 새로고침하며 페이지가 숨겨질 때 앱이 든 옛 저장을 쓴다(scenes onLifecycle) — 얼리지 않으면 방금 푼 게 그걸로 덮였다(10-31 시험판 실측)
     freezeSaves();
     location.reload(); // 앱이 들고 있는 저장을 새로 읽는다 — 그대로 두면 판을 시작할 때 옛 소유 목록으로 덮는다
