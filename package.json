@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "ota:release": "node scripts/ota-release.mjs",
     "check:budget": "node scripts/check-budget.mjs",
-    "version:native": "node scripts/version-native.mjs"
+    "version:native": "node scripts/version-native.mjs",
+    "fx": "node scripts/fx/fx.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

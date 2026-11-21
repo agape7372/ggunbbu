@@ -599,6 +599,7 @@ export function stepWazaShow(s: GameState): void {
 const END_BITS = 9;
 
 export function resetWazaShow(): void {
+  seedN = 1;
   show = null;
   setWazaHoles([]);
   setNightTest(null);

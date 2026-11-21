@@ -131,6 +131,8 @@ function resetRunState(): void {
   resetBossFx();
   resetLandmarkFx();
   resetWazaShow();
+  shakeT = 0;
+  popupSeed = 0;
   trauma = 0;
   kickY = 0;
   kickV = 0;

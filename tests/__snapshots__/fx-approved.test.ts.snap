@@ -2,130 +2,130 @@
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > brush 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "e4863031896a",
-  "hit": "892c8ed0dd4d",
-  "slash": "8bd412d468dd",
-  "stackDestroy": "cc81f98931c6",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "1d57ee579aa907ca",
+  "hit": "64ca58a31a2aac23",
+  "slash": "f2eb1aae6c461a16",
+  "stackDestroy": "26aa0741efd4f069",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > crane 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "6881872175b0",
-  "hit": "87154ad1e4ef",
-  "slash": "f337fd0eadbd",
-  "stackDestroy": "7a1eae1dee4b",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "e6b113d5e93dbc2f",
+  "hit": "a5ea1f95d618e823",
+  "slash": "8bd8f769b7ce3b30",
+  "stackDestroy": "e4da80df8951a993",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > diadrill 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "28df1f0873e2",
-  "hit": "96b948b92a8c",
-  "slash": "8f4fae77e12d",
-  "stackDestroy": "631e79e0e332",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "f504300f2b5b6933",
+  "hit": "e33b84a2ba11f8ba",
+  "slash": "55fea03ec9e87615",
+  "stackDestroy": "f5951a4e034bb498",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > flame 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "bec338b9a20b",
-  "hit": "a12c079c928e",
-  "slash": "f543bc7ecbd1",
-  "stackDestroy": "a3dc52b3b06d",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "c2e9988afce6e296",
+  "hit": "fdb1c9ffab856bb5",
+  "slash": "a864a91f1b76c343",
+  "stackDestroy": "21c89aa55b3e38b5",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > frost 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "a1790285a060",
-  "hit": "c20babffb645",
-  "slash": "a9ad5c8eaaec",
-  "stackDestroy": "d9d09f962769",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "7f1639245edb9bb4",
+  "hit": "739232791f64eb66",
+  "slash": "e16308a47b11ee2d",
+  "stackDestroy": "a3912cea68a8b3f9",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > gold 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "1beba2a29027",
-  "hit": "d054a41911f8",
-  "slash": "e0e645f472d0",
-  "stackDestroy": "4eb05dab631f",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "84aaaf17cfcd5c2e",
+  "hit": "345fcebf3b9776bd",
+  "slash": "f8c8918390e1368e",
+  "stackDestroy": "7ae6888012e788ba",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > icicle 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "d7d594f01b76",
-  "hit": "605e88c1012e",
-  "slash": "dedbb7211473",
-  "stackDestroy": "aab54a678721",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "90165ed0111cf651",
+  "hit": "eceebb906390e998",
+  "slash": "f6203f292c70a5dd",
+  "stackDestroy": "4406f192a4c99b59",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > onyx 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "7ef1334a9ea4",
-  "hit": "90d21d93d610",
-  "slash": "f68267995c6d",
-  "stackDestroy": "83cc4583e1e4",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "467bc4c716c43a10",
+  "hit": "8dd2629294a072a5",
+  "slash": "93cf5707e1f388d1",
+  "stackDestroy": "562d84c53e85a3b7",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > phoenix 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "6bd9f3048729",
-  "hit": "258b49d2961c",
-  "slash": "013f596296d5",
-  "stackDestroy": "51ed0c86042a",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "6aa1f6beb3f789e1",
+  "hit": "301f7c52615503b8",
+  "slash": "cd5f788e81c9cd4c",
+  "stackDestroy": "b4f9f80010ea30f0",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > shade 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "8b4a2084f942",
-  "hit": "2c27f2897582",
-  "slash": "459698388a7c",
-  "stackDestroy": "8d997fd12418",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "6272452a853db040",
+  "hit": "30ca416c4b08e6ff",
+  "slash": "6114c568dc8f0ab1",
+  "stackDestroy": "4ec8d42574b90bfd",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > thunder 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "a2eb28af35ee",
-  "hit": "c218bb2012da",
-  "slash": "d3f1aaaa8332",
-  "stackDestroy": "94d3993e5e21",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "66f594e194f90161",
+  "hit": "840825aaa6a90846",
+  "slash": "3975143f9abb35ab",
+  "stackDestroy": "88b1cc743f07c20b",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > tide 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "2085998f558b",
-  "hit": "4b9b41dbf341",
-  "slash": "50d9f7298dc2",
-  "stackDestroy": "8831a9103fdc",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "ab0301f61ae5917b",
+  "hit": "addb0f5102b555fe",
+  "slash": "cc5f0bd9cdfc600f",
+  "stackDestroy": "30c98a659d06c1a2",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > volt 1`] = `
 {
-  "aura": "500fdcc0491c",
-  "floorCollapse": "eb39f4c36b25",
-  "hit": "cf9e7188eb05",
-  "slash": "d5df8f896b91",
-  "stackDestroy": "7295f297d93d",
+  "aura": "c035bdc59ccd80e3",
+  "floorCollapse": "dd10cd2da157e73d",
+  "hit": "87a0b7aefb20ac00",
+  "slash": "63d45eec7486a4c5",
+  "stackDestroy": "2af893754d081bcb",
 }
 `;

@@ -350,6 +350,7 @@ export function drawScreenOverlay(ctx: CanvasRenderingContext2D): void {
 }
 
 export function resetScreenFx(): void {
+  impactSeed = 1;
   stages = [];
   stageT = 0;
   tapeT = 0;

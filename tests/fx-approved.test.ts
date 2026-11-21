@@ -4,7 +4,6 @@
 //           사용자가 새 안을 고른 뒤에만 `npx vitest run tests/fx-approved.test.ts -u`로 갱신한다(docs/FX_HARNESS.md).
 // 범위: bladeReact · bladeAura가 뿌려 drawBladeFx가 그리는 층만. 공통 주스(effects.ts) · 필살 몸통(wazaShow)은 안 묶는다.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { bladeAura, bladeReact, drawBladeFx, resetBladeFx, seedBladeFx, updateBladeFx } from '../src/render/bladeFx';
 import { WEAPON_LITE } from '../src/config';
@@ -42,7 +41,16 @@ function state(w: WeaponId): GameState {
   return s;
 }
 
-const sha = (t: string): string => createHash('sha1').update(t).digest('hex').slice(0, 12);
+/** 짧은 지문(FNV-1a + 섞음 한 겹) — 호출열이 한 글자만 달라도 바뀐다 */
+function sha(t: string): string {
+  let a = 0x811c9dc5;
+  let b = 0x9e3779b9;
+  for (let i = 0; i < t.length; i++) {
+    a = Math.imul(a ^ t.charCodeAt(i), 0x01000193);
+    b = Math.imul(b + t.charCodeAt(i), 0x85ebca6b) ^ (b >>> 13);
+  }
+  return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
+}
 
 /** 한 사건을 처음 상태에서 돌려 AT 프레임들의 그림을 한 줄로 */
 function shot(w: WeaponId, fire: (s: GameState) => void, each?: (s: GameState) => void): string {
