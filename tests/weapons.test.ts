@@ -2,7 +2,7 @@
 // 어느 무기든 2막 필요 타격 수(층 HP 합)는 그대로고, 1막 연타로 건물을 띄워 둘 수 없다.
 import { describe, it, expect } from 'vitest';
 import { makeState, advance, applyStartKit } from '../src/core/sim';
-import { liftOf } from '../src/core/perks';
+import { comboReachK, liftOf, reachOf } from '../src/core/perks';
 import { continueFromCheckpoint, enterAct2, enterAct2Phase } from '../src/core/act2';
 import { makeFloor, makeStack, stackPhysics } from '../src/core/building';
 import { addGauge, attackRange, breakCombo, destroyStack, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
@@ -801,14 +801,34 @@ describe('원소 대검 다섯(11-21)', () => {
   }
   const hp = (s: GameState): number => s.stack!.floors[0].segs[0].hp;
 
-  it('불새: 콤보가 끊길 때마다 게이지 +breakGauge · 콤보 0이면 없음 · 튜토리얼은 없음', () => {
-    const cut = (w: WeaponId, combo: number, mode: GameState['mode'] = 'act1'): number => {
-      const s = makeState({ mode }); s.weapon = w; s.combo = combo; breakCombo(s); return s.wazaGauge;
+  it('불새: 콤보 100까지 사거리가 곧게 늘고, 끊기면 처음 길이 · 퍽을 더해도 REACH_MAX를 안 넘는다', () => {
+    const at = (w: WeaponId, combo: number, perks: PerkId[] = []): GameState => {
+      const s = makeState(); s.weapon = w; s.combo = combo;
+      if (perks.length) s.perk = { picked: perks, seen: [], offer: null };
+      return s;
     };
-    expect(cut('phoenix', 12)).toBe(WEAPON.phoenix.breakGauge);
-    expect(cut('phoenix', 0)).toBe(0);
-    expect(cut('phoenix', 12, 'training')).toBe(0);
-    expect(cut('sword', 12)).toBe(0);
+    const { reach, comboReach } = WEAPON.phoenix;
+    expect(reachOf(at('phoenix', 0))).toBe(reach);
+    expect(reachOf(at('phoenix', 50))).toBeCloseTo(reach + comboReach! / 2);
+    expect(reachOf(at('phoenix', 100))).toBeCloseTo(reach + comboReach!);
+    expect(reachOf(at('phoenix', 200))).toBeCloseTo(reach + comboReach!);
+    expect([0, 50, 100, 200].map((c) => comboReachK(at('phoenix', c)))).toEqual([0, 0.5, 1, 1]);
+    expect(reachOf(at('phoenix', 100, ['reach']))).toBeCloseTo(Math.min(PERK_RUN.REACH_MAX, reach + comboReach! + PERK.reach.reach!));
+    const s = at('phoenix', 120);
+    breakCombo(s);
+    expect(reachOf(s)).toBe(reach);
+    expect(comboReachK(s)).toBe(0);
+    // 다른 무기는 콤보와 상관없다
+    for (const w of ['sword', 'crane', 'onyx'] as WeaponId[]) {
+      expect(reachOf(at(w, 100)), w).toBe(WEAPON[w].reach);
+      expect(comboReachK(at(w, 100)), w).toBe(0);
+    }
+    // 어느 무기든 콤보 999 · 긴 자루 · 공중에서도 REACH_MAX 이하 — 지금 가장 긴 것(흑철 + 긴 자루)이 상한 그대로
+    for (const w of IDS) {
+      const air = at(w, 999, ['reach']); air.player.y = 40;
+      expect(reachOf(air), w).toBeLessThanOrEqual(PERK_RUN.REACH_MAX);
+    }
+    expect(reachOf(at('onyx', 0, ['reach']))).toBe(PERK_RUN.REACH_MAX);
   });
 
   it('해일: 콤보가 comboDouble 배수가 되는 베기는 두 번 깎는다 · 1막 · 토코톤만', () => {

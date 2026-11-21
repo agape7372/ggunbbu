@@ -25,9 +25,15 @@ function mul(s: Pick<GameState, 'perk'>, k: MulKey): number {
   return m;
 }
 
-/** 건물 사거리. 발이 땅에서 떨어져 있으면 무기 airReach를 더한다(비계 파이프) */
-export const reachOf = (s: GameState): number =>
-  WEAPON[s.weapon].reach + (s.player.y > 0 ? WEAPON[s.weapon].airReach ?? 0 : 0) + add(s, 'reach');
+/** 콤보 사거리(불새 comboReach)가 자란 몫 0~1 — 콤보 100까지 곧게, 끊기면 0. 없는 무기는 0. 렌더가 칼끝 불길 길이로 읽는다 */
+export const comboReachK = (s: GameState): number =>
+  WEAPON[s.weapon].comboReach ? Math.min(s.combo, 100) / 100 : 0;
+/** 건물 사거리. 발이 땅에서 떨어져 있으면 무기 airReach를 더한다(비계 파이프). 콤보 사거리 · 퍽을 더한 값은 여기 한 곳에서 REACH_MAX로 자른다 */
+export function reachOf(s: GameState): number {
+  const w = WEAPON[s.weapon];
+  const air = s.player.y > 0 ? w.airReach ?? 0 : 0;
+  return Math.min(PERK_RUN.REACH_MAX, w.reach + air + (w.comboReach ?? 0) * comboReachK(s) + add(s, 'reach'));
+}
 /** 베기 띄우기 — 콤보 띄우기(크레인 comboLift)와 퍽을 더한 값은 여기 한 곳에서 LIFT_MAX로 자른다(연타만으로 못 버틴다) */
 export function liftOf(s: GameState): number {
   const w = WEAPON[s.weapon];

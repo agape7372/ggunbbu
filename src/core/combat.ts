@@ -35,11 +35,7 @@ export function addCombo(s: GameState): void {
 }
 
 export function breakCombo(s: GameState): void {
-  if (s.combo > 0) {
-    s.events.push({ kind: 'comboBreak', combo: s.combo });
-    const g = WEAPON[s.weapon].breakGauge; // 불새 대검: 끊길 때마다 필살 게이지(재에서 다시 일어난다 · 튜토리얼은 없음)
-    if (g && s.mode !== 'training') addGauge(s, g);
-  }
+  if (s.combo > 0) s.events.push({ kind: 'comboBreak', combo: s.combo });
   if (s.combo > s.peakCombo) s.peakCombo = s.combo;   // 0으로 만들기 전에 봉인
   s.combo = 0;
   if (s.mode === 'act2') s.fullCombo = false;
