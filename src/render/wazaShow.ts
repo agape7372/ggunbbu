@@ -13,7 +13,7 @@ import { brushArc, brushLine, brushPath, enso, hotCore, inkBlot, inkDrop, inkDus
 import { drawPlayer, drawStack, floorTile, greatLook, liveBlade, setLiveBody } from './sprites';
 import { makeFloor, makeStack } from '../core/building';
 import { pointInk, spawnStackShatter } from './effects';
-import { bloodSpray, strokeTone, weaponAlong, weaponBloom } from './bladeFx';
+import { bloodSpray, endWazaBits, paperInk, setNightTest, setWazaHoles, strokeTone, weaponAlong, weaponBloom } from './bladeFx';
 import { flashK, inkFrame } from './screenfx';
 import { kitOf } from './moveBody';
 import { MUKJUL_STAR, wazaBodyAt, type WazaShowView } from './wazaBody';
@@ -38,6 +38,21 @@ const TAU = Math.PI * 2;
 const CAP = 200;
 /** 천지개벽 마지막 쌍벼락 프레임 */
 const TENCHI_LAST = P + 26;
+/** 완파 자막 판 「N층 철거!」 + 점수 칩의 아래 가장자리(화면 위끝 FIELD_TOP에서 px, screenfx drawCaption: 가운데 92 · 판 46 · 칩 26 · 기울기) · 반폭 */
+const BAND_Y = 150;
+const BAND_HALF = 130;
+/** 「끝」 도장(86) 반 + 여백 */
+const SEAL_HOLE = 43 + 16;
+/** 필살 조각이 비워 둘 자리를 박자마다 다시 건다 — 올려베기 · 십이연참의 철거 띠, 십이연참 「끝」 도장 둘레 */
+function holesOf(sh: Show): void {
+  const hs: [number, number, number, number][] = [];
+  if (sh.id === 'ageba' || sh.id === 'nakgwan') hs.push([VIEW.W / 2 - BAND_HALF, viewTop - 60, VIEW.W / 2 + BAND_HALF, viewTop + BAND_Y]);
+  if (sh.id === 'nakgwan' && sh.burst >= 0) {
+    const y = sealY(sh);
+    hs.push([sh.x - SEAL_HOLE, y - SEAL_HOLE, sh.x + SEAL_HOLE, y + SEAL_HOLE]);
+  }
+  setWazaHoles(hs);
+}
 /** 월하난무 — 졸라맨을 감싸는 밤의 구(땅에 앉는다) · 그 뒤에 뜨는 보름달(아래 끝이 땅에 잘린다) 반지름 */
 const DOME_R = 66;
 const MOON_R = 168;
@@ -351,7 +366,9 @@ function slashEnds(sh: Show, i: number): { x0: number; y0: number; x1: number; y
 const tenchiX = (sh: Show): number[] => [sh.x + 4, sh.x - 92, sh.x + 88];
 const twinX = (sh: Show, i: number): number => sh.x + (i ? 50 : -46);
 /** 올려베기 큰 현 꼭대기 — 화면 위끝에서 잘린다 */
-const agebaTop = (sh: Show, top: number): number => Math.max(top + 6, sh.foot - PLAYER.H - VIEW.FLOOR_H * 5);
+const agebaTop = (sh: Show, top: number): number => Math.max(top + BAND_Y + 40, sh.foot - PLAYER.H - VIEW.FLOOR_H * 5);
+/** 올려베기 끝 먹 덩어리 — 철거 띠 아래 40px 밖(11-21 심사: 덩어리가 +점수 칩에 닿았다) */
+const agebaBlob = (sh: Show, top: number): number => agebaTop(sh, top) + 16; // 덩어리 반지름만큼 아래 — 윗가장자리가 띠에서 40px
 /** 월하난무 칼 i(둘째부터)의 피 튐 자리 — 세로선 위 y */
 const dalSpot = (sh: Show, i: number, top: number): number => top - 10 + 70 + (sh.foot - top + 10 - 160) * hz(sh.seed, i + 90);
 /** 용오름 검풍 꼭대기(by = 그때 노린 건물 밑면) */
@@ -452,7 +469,7 @@ function fixedBeats(sh: Show): void {
       else if (f === P + 2) weaponAlong(w, bentPts(x - 8, sh.foot - 10, x + 14, yTop, 26), 1.3, 0.22); // 큰 현 발 → 꼭대기
       else if (f === P + 4) {
         weaponAlong(w, bentPts(x + 24, sh.foot - 30, x + 40, yTop + 40, 20), 0.8, 0.2); // 메아리 현
-        weaponBloom(w, x + 14, yTop, -Math.PI / 2, 1.4);
+        weaponBloom(w, x + 14, agebaBlob(sh, viewTop), -Math.PI / 2, 1.4);
       }
       return;
     }
@@ -543,7 +560,10 @@ function burstBeat(sh: Show): void {
           weaponAlong(w, bentPts(e.x0, e.y0, e.x1, e.y1, e.bend, 6), 0.8, 0.2);
         }
       });
-      at(B + 6, () => weaponBloom(w, sh.x, sealY(sh), -Math.PI / 2, 1.1));
+      // 마무리는 도장 양옆 바깥에 둘로 나눠 — 도장 위에 앉으면 「끝」이 가려진다(11-21 심사)
+      at(B + 6, () => {
+        for (const d of [-1, 1]) weaponBloom(w, sh.x + d * (SEAL_HOLE + 30), sealY(sh), d > 0 ? 0 : Math.PI, 0.75);
+      });
       return;
     default:
   }
@@ -563,15 +583,25 @@ export function stepWazaShow(s: GameState): void {
   if (!show) return;
   show.f += 1;
   if (s.player.pose !== 'special' && s.player.pose !== 'idle') show.free = true;
+  holesOf(show);
   fixedBeats(show);
   // 시간차 필살이 터짐 없이 끝났으면(디버그로 지움 등) 거둔다 — 터지는 틱엔 wazaRun이 먼저 비고 이벤트는 이 뒤에 오니 그 틱은 빼고
   const lost = expectedBurst(show.id) > 0 && show.burst < 0 && show.f > P + 1 && !s.wazaRun
     && !s.events.some((e) => e.kind === 'wazaBurst');
-  if (show.f > show.end || lost) show = null;
+  if (show.f > show.end || lost) {
+    show = null;
+    setWazaHoles([]);
+    endWazaBits(END_BITS);
+  }
 }
+
+/** 필살이 끝난 뒤 남은 필살 조각(먹 방울 비 · 금박)이 사라지기까지 틱(11-21 밀도 심사 8~10) */
+const END_BITS = 9;
 
 export function resetWazaShow(): void {
   show = null;
+  setWazaHoles([]);
+  setNightTest(null);
   split = null;
   jolt = 0;
   kick = 0;
@@ -589,7 +619,10 @@ export function drawWazaMid(ctx: CanvasRenderingContext2D, cam: number): void {
   viewTop = VIEW.FIELD_TOP - cam;
   if (split) drawSplit(ctx, VIEW.GROUND_Y);
   const sh = show;
-  if (sh?.id === 'dalmuri') dalNight(ctx, sh, VIEW.FIELD_TOP - cam);
+  if (sh?.id === 'dalmuri') {
+    dalNight(ctx, sh, VIEW.FIELD_TOP - cam);
+    setNightTest((x, y) => nightAt(sh, x, y));
+  } else setNightTest(null);
   if (sh) tipTrail(ctx, sh);
 }
 
@@ -627,7 +660,8 @@ function tipTrail(ctx: CanvasRenderingContext2D, sh: Show): void {
     q.push(p[p.length - 2], p[p.length - 1]);
     p = q;
   }
-  cutPath(ctx, p, Math.min(8, 2 + len * 0.04), 0, 1, 0.55, sh.seed + 61, 3, sh.ink); // 속은 식어 가는 가는 줄(age 3)
+  const c = sh.id === 'dalmuri' && nightAt(sh, pts[0], pts[1]) ? paperInk(ctx) : ctx; // 밤 면 위 먹은 한지색
+  cutPath(c, p, Math.min(8, 2 + len * 0.04), 0, 1, 0.55, sh.seed + 61, 3, sh.ink); // 속은 식어 가는 가는 줄(age 3)
 }
 
 // ── 그리기 — 월드 좌표(renderer가 카메라를 건 안쪽, 졸라맨 위) ──────────
@@ -825,7 +859,7 @@ function ageba(ctx: CanvasRenderingContext2D, sh: Show, top: number): void {
   }
   if (f >= P + 2) {
     ctx.fillStyle = INK;
-    spatter(ctx, x + 14, yTop, 22 * (1 - eat(f, P + 6, 14)), -Math.PI / 2, sh.seed + 5, 9);
+    spatter(ctx, x + 14, agebaBlob(sh, top), 16 * (1 - eat(f, P + 6, 14)), -Math.PI / 2, sh.seed + 5, 6);
   }
 }
 
@@ -943,11 +977,40 @@ function mukjul(ctx: CanvasRenderingContext2D, sh: Show, s: GameState, top: numb
  * 세로선만 남아 칼마다 번쩍이고 붉은 방울이 튄다 → 마지막 칼에 초승달이 나와 차오르고, 터지는 순간 보름달(반전 넷 = 검은 원판) →
  * 달과 밤이 세로선을 따라 반으로 갈라져 벌어지며 걷힌다. 선은 건물 위에 남아 위부터 깎인다. night = false(상점 칸)면 밤을 빼고 달에 먹 테를 두른다.
  */
-function dalNight(ctx: CanvasRenderingContext2D, sh: Show, top: number, night = true): void {
+/** 월하난무 박자의 기하 — 첫 칼 · 밤이 갈라진 정도(open) · 벌어진 반폭(D) · 달 가림 원판 자리(cover, 달 반지름 배) · 달 크기(k). 그리기와 밤 면 판정이 같이 쓴다 */
+function dalGeo(sh: Show, night = true): { hit: number[]; h1: number; open: number; D: number; cover: number; k: number } {
   const f = sh.f;
   const B = sh.burst;
   const hit = sh.hits.map((h) => h.f);
   const h1 = hit[0] ?? P - 1 + WAZA_RUN.dalmuri.hits[0]; // 첫 칼은 앞에 히트스톱이 없어 미리 안다
+  const open = B < 0 ? 0 : eat(f, B + 4, 16);
+  const h5 = hit[WAZA_RUN.dalmuri.hits.length - 1];
+  const cover = B >= 0 || !night ? -2.2 : h5 !== undefined ? -2.2 * grow(f, h5, 10) : -2.2 + 2.2 * grow(f, h1 + 9, 5);
+  return { hit, h1, open, D: (VIEW.W / 2 + 60) * open, cover, k: B < 0 ? 1 : 1 - eat(f, B + 8, 14) };
+}
+
+/** (x, y)(월드)가 지금 밤 면인가 — 밤의 구 안 · 달 바깥 남색(달을 가린 원판 포함). 갈라져 벌어진 틈과 달 위는 아니다 */
+function nightAt(sh: Show, x: number, y: number): boolean {
+  const f = sh.f;
+  const g = dalGeo(sh);
+  if (f < g.h1) {
+    if (f < 3) return false;
+    const r = 8 + (DOME_R - 8) * grow(f, 3, g.h1 - 3);
+    return Math.hypot(x - sh.x, y - (sh.foot - r)) < r;
+  }
+  if (g.open >= 1 || Math.abs(x - sh.x) < g.D) return false;
+  if (g.cover > -0.02 || g.k <= 0.03) return true;
+  const m = moonAt(sh);
+  const lx = (x - m.x - (x >= sh.x ? 1 : -1) * g.D) / g.k;
+  const ly = (y - m.y) / g.k;
+  if (lx * lx + ly * ly >= MOON_R * MOON_R) return true;
+  return g.cover > -2.1 && (lx - g.cover * MOON_R) ** 2 + ly * ly < (MOON_R * 1.03) ** 2;
+}
+
+function dalNight(ctx: CanvasRenderingContext2D, sh: Show, top: number, night = true): void {
+  const f = sh.f;
+  const B = sh.burst;
+  const { hit, h1, open, D, cover, k } = dalGeo(sh, night);
   const x = sh.x;
   // 밤의 구 — 첫 칼 전. 졸라맨 몸 가운데서 커지며 땅에 앉는다
   if (f < h1) {
@@ -967,8 +1030,6 @@ function dalNight(ctx: CanvasRenderingContext2D, sh: Show, top: number, night = 
     return;
   }
   // 밤 — 첫 칼부터 화면 전체. 터지고 네 틱 뒤 세로선을 따라 반으로 갈라져 양옆으로 벌어진다
-  const open = B < 0 ? 0 : eat(f, B + 4, 16);
-  const D = (VIEW.W / 2 + 60) * open;
   if (night && open < 1) {
     ctx.fillStyle = NIGHT;
     ctx.fillRect(-48, top - 48, x - D + 48, VIEW.H + 96);
@@ -976,9 +1037,6 @@ function dalNight(ctx: CanvasRenderingContext2D, sh: Show, top: number, night = 
     if (x - D > TITLE_X) titleNight.push([-1e4, 1e4]);
   }
   // 달 — 가림 원판(밤)이 왼쪽에서 와 덮었다가(첫 칼 9틱 뒤) 마지막 칼에 왼쪽으로 물러나 초승달 → 보름달. 터지면 반쪽씩 밤을 타고 벌어지며 오그라든다
-  const h5 = hit[WAZA_RUN.dalmuri.hits.length - 1];
-  const cover = B >= 0 || !night ? -2.2 : h5 !== undefined ? -2.2 * grow(f, h5, 10) : -2.2 + 2.2 * grow(f, h1 + 9, 5);
-  const k = B < 0 ? 1 : 1 - eat(f, B + 8, 14);
   const m = moonAt(sh);
   if (cover > -0.02) {
     // 다 가려진 동안 — 구의 테만 한지색으로 남는다

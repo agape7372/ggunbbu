@@ -252,9 +252,13 @@ describe('과열 — 무기 끝', () => {
     const low = tip(full * 0.3);
     expect(low).toContain(WEAPON_INK.diadrill);
     expect(low).not.toContain(PALETTE.BG);
+    expect(low).not.toContain(PALETTE.RUBBLE); // 반 아래엔 김이 없다
+    const warm = tip(full * 0.6);
+    expect(warm).toContain(PALETTE.RUBBLE); // 김 — 반을 넘으면 옅은 먹 증기
     const hot = tip(full * 0.9);
     expect(hot).toContain(PALETTE.BG); // hotCore
-    expect(hot).toContain(PALETTE.RUBBLE); // 김
+    expect(hot).toContain(PALETTE.INK); // 70%부터 김이 짙은 먹
+    expect(hot.split('fill()').length).toBeGreaterThan(warm.split('fill()').length); // 과열에 가까울수록 가닥이 많다
     expect(hot).not.toContain('shadowBlur');
     expect(tip(full, 30)).toBe('');
     bladeReact(s, { kind: 'overheat' });

@@ -17,8 +17,8 @@ export type SfxName =
   | 'clockTick' | 'bellToss' | 'bellBody' | 'bellClang' | 'bellThud' | 'windIn' | 'windOut' | 'chime' | 'craneRatchet' | 'craneClunk'
   // 2판 기믹 예고 — 댕댕(공중 가드 2점) · 쾅(시보) · 맑은 종(13시) · 나무 소리(구층탑) · 탁(줄 끊김)
   | 'bellTwin' | 'bellBoom' | 'bellClear' | 'pagodaCreak' | 'craneSnap'
-  // 드릴류 과열 — 김 빠지는 칙(멈춤) · 작은 철컥(다 식음)
-  | 'overheat' | 'cooled';
+  // 드릴류 과열 — 김 빠지는 칙(멈춤) · 작은 철컥(다 식음) · 과열 예고(열이 차오를 때 음이 오르는 짧은 소리)
+  | 'overheat' | 'cooled' | 'heatRise';
 
 export type BgmTrack = 'title' | 'act1' | 'act2a' | 'butter' | 'bolt' | 'boss' | 'ending';
 
@@ -347,6 +347,11 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
   overheat: (ctx, dest, t, rate) => {
     playNoise(ctx, dest, t, 0.32, 0.22, { filterType: 'bandpass', freqStart: 5200, freqEnd: 1400, q: 3, attack: 0.004 });
     playOsc(ctx, dest, t + 0.02, 'sine', 880, 0.34, 0.2, rate, { freqEnd: 140, attack: 0.01 });
+  },
+  // 과열 예고 — 짧게 올라가는 사인 음 + 오르는 김 소리. 열이 한 단 오를 때마다 음높이를 올려 낸다(consume.heatStep)
+  heatRise: (ctx, dest, t, rate) => {
+    playOsc(ctx, dest, t, 'sine', 520, 0.14, 0.16, rate, { freqEnd: 1040, attack: 0.01 });
+    playNoise(ctx, dest, t, 0.12, 0.08, { filterType: 'bandpass', freqStart: 1800, freqEnd: 4200, q: 2, attack: 0.01 });
   },
   // 다 식었다 — 작은 철컥 두 번(스위치가 돌아온다)
   cooled: (ctx, dest, t, rate) => {

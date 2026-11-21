@@ -1,0 +1,55 @@
+// 필살 손질(11-21 심사) — 도장 · 철거 띠 비우기, 필살 끝 뒤 남은 조각 수명, 밤 면 위 먹 = 한지색, 드릴 과열 예고 단
+import { describe, expect, it } from 'vitest';
+import { PALETTE, WEAPON } from '../src/config';
+import { makeState } from '../src/core/sim';
+import { endWazaBits, paperInk, resetBladeFx, setWazaHoles, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
+import { liveBits } from '../src/render/weaponFx';
+import { HEAT_STEPS, heatStep } from '../src/audio/consume';
+
+describe('필살 손질', () => {
+  it('비울 자리 안에서는 필살 조각을 뿌리지 않는다', () => {
+    resetBladeFx();
+    setWazaHoles([[-1e4, -1e4, 1e4, 1e4]]);
+    weaponBloom('hammer', 180, 300, -Math.PI / 2, 1.4);
+    expect(liveBits().length).toBe(0);
+    setWazaHoles([]);
+    weaponBloom('hammer', 180, 300, -Math.PI / 2, 1.4);
+    expect(liveBits().length).toBeGreaterThan(0);
+    resetBladeFx();
+  });
+
+  it('필살이 끝나면 남은 필살 조각은 9틱 안에 사라진다 · 안 뿌린 둘째 박자도 버린다', () => {
+    resetBladeFx();
+    weaponAlong('sword', [60, 500, 300, 200], 1.3, 0.3);
+    weaponBloom('sword', 180, 200, -Math.PI / 2, 1.1);
+    updateBladeFx(1 / 60);
+    expect(liveBits().length).toBeGreaterThan(0);
+    endWazaBits(9);
+    for (let i = 0; i < 10; i++) updateBladeFx(1 / 60);
+    expect(liveBits().length).toBe(0);
+    resetBladeFx();
+  });
+
+  it('밤 면 ctx는 먹만 한지색으로 바꾼다(포인트 색 · 인주는 그대로)', () => {
+    const set: string[] = [];
+    const base = { set fillStyle(v: string) { set.push(v); }, fill() {} } as unknown as CanvasRenderingContext2D;
+    const c = paperInk(base);
+    c.fillStyle = PALETTE.INK;
+    c.fillStyle = '#C4301E';
+    c.fill();
+    expect(set).toEqual([PALETTE.BG, '#C4301E']);
+  });
+
+  it('과열 예고 단 — 열이 오를수록 0 → 3, 멈춘 동안 · 과열 없는 무기는 0', () => {
+    const s = makeState();
+    s.weapon = 'diadrill';
+    const full = WEAPON.diadrill.heat!.max * WEAPON.diadrill.heat!.cool;
+    const at = (f: number): number => { s.player.heat = full * f; return heatStep(s); };
+    expect([at(0.3), at(HEAT_STEPS[0]), at(HEAT_STEPS[1]), at(0.95)]).toEqual([0, 1, 2, 3]);
+    s.player.stall = 10;
+    expect(heatStep(s)).toBe(0);
+    s.weapon = 'sword';
+    s.player.stall = 0;
+    expect(heatStep(s)).toBe(0);
+  });
+});
