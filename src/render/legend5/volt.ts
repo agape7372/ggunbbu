@@ -23,16 +23,20 @@ const P_CUT = 0;
 const P_FLICK = 1;
 const P_LINE = 2;
 const P_SWELL = 3;
+const P_BRUSH = 5; // 붓 — 붓머리를 눌러 대고(1.3배) 끝으로 빠진다
 
 /**
  * 사건마다 크기(키우기 전 px · 사건 그림은 scaled 1.6배, 완파는 k 1.25 이상이라 2배 남짓).
  * H = 아크 높이들(줄 수 = 길이) · reach = 밑동이 옆으로 퍼지는 폭 · sway = S자 흔들림 폭 · w = 실 굵기(부푼 마디는 3~4배) ·
- * crawl = 다 오르는 프레임 · re = 다시 붙는 줄 수 · hop = 조각 사이 짧은 아크 수 · sky = 짧은 아크가 튀는 높이 [아래, 위]
+ * crawl = 다 오르는 프레임 · re = 다시 붙는 줄 수 · hop = 조각 사이 짧은 아크 수 · sky = 짧은 아크가 튀는 높이 [아래, 위] ·
+ * bulge = 한 줄에 부푼 마디 상한(다시 붙는 줄은 0) · fat = 부푼 마디 굵기 배율(실의 몇 배).
+ * 타격은 두 줄이 키운 뒤 160 · 144(주인공 키 3배 남짓)까지 오르고 떠 있는 조각은 마디 둘뿐이다(독립 검수 10회차 「흩어진 노랑 조각 대여섯」).
+ * 실이 굵고 마디가 1.8배 남짓 — 3배 렌즈는 건물 벽 위에서 풀 조각으로 읽혔다(고침 회차)
  */
 const SIZE = {
-  hit: { H: [88, 60], reach: 16, sway: 14, w: 1.9, crawl: 7, re: 1, hop: 1, sky: [30, 70] },
-  floor: { H: [128, 98, 70], reach: 30, sway: 18, w: 2.2, crawl: 8, re: 1, hop: 3, sky: [25, 95] },
-  destroy: { H: [176, 144, 110], reach: 46, sway: 24, w: 2.9, crawl: 9, re: 2, hop: 5, sky: [30, 120] },
+  hit: { H: [100, 90], reach: 16, sway: 15, w: 3, crawl: 7, re: 1, hop: 0, sky: [30, 70], bulge: 1, fat: 1.8 },
+  floor: { H: [128, 98, 70], reach: 30, sway: 18, w: 2.2, crawl: 8, re: 1, hop: 3, sky: [25, 95], bulge: 2, fat: 2.4 },
+  destroy: { H: [176, 144, 110], reach: 46, sway: 24, w: 2.9, crawl: 9, re: 2, hop: 5, sky: [30, 120], bulge: 3, fat: 2.4 },
 } as const;
 type Size = (typeof SIZE)[keyof typeof SIZE];
 
@@ -40,7 +44,7 @@ type Size = (typeof SIZE)[keyof typeof SIZE];
  * 한 줄 아크의 박자 · 굵기 — crawl · life는 초. bulge = 부푼 마디 수(0~3) · fork = 꼭대기 갈래 길이(0 = 없음) · dot = 점화 먹 점 ·
  * lite = 실을 먹 머리 없이 노랑 몸으로(칼 기운 — 먹은 점화 점이 맡는다)
  */
-interface Arc { w: number; crawl: number; life: number; vy: number; bulge: number; fork: number; dot: boolean; lite?: boolean }
+interface Arc { w: number; crawl: number; life: number; vy: number; bulge: number; fork: number; dot: boolean; lite?: boolean; fat?: number }
 
 /**
  * 밑동 (bx, by) → 꼭대기 (tx, ty) S자 아크 점열. sway = 옆 흔들림 폭(위로 갈수록 커진다) · 한쪽으로 휜 몸 ·
@@ -106,6 +110,12 @@ function climb(pts: number[], o: Arc, c: string): void {
   };
   if (head) line(0, head, c);
   if (head < n - 1) line(head, n - 1, liteOf(c));
+  // 실의 i번째 점이 깎여 없어지는 때(초) — 부푼 마디는 제 밑동 밑 실이 깎이기 전에 가라앉는다. 실보다 오래 살면 허공에 뜬 노랑 풀 조각으로 읽혔다(10회차)
+  const gone = (i: number): number => {
+    const [a, b] = i <= head ? [0, head] : [head, n - 1];
+    const t0 = (a / (n - 1)) * o.crawl;
+    return t0 + (o.life - t0) * (0.4 + (0.6 * (i - a)) / Math.max(1, b - a));
+  };
   // 부푼 마디 — 밑동 틈(1.5할)을 비우고 그 위로 길게(실의 2~4할씩) o.bulge곳, 사이는 가는 목. 위로 갈수록 굵다. 노랑 몸 속에 종이색 줄.
   // 짧은 마디는 끝이 뾰족한 렌즈라 속줄과 겹쳐 덩굴에 달린 풀 조각으로 읽혔다(6회차) — 길게 늘여 S를 따라 휘는 관으로.
   // 밝은 짝 몸은 종이 위에서 옅었다(8회차 · 흑백에서 거의 사라짐) — 시그니처 색 붓으로: 가는 먹 목 → 짙은 올리브 → 굵은 노랑(속 종이색) → 밝은 끝.
@@ -117,8 +127,8 @@ function climb(pts: number[], o: Arc, c: string): void {
     at += 0.05 + 0.1 * n01();
     if (i1 - i0 < 2) continue;
     const t0 = (i0 / (n - 1)) * o.crawl;
-    const life = Math.max(0.1, (o.life - t0) * 0.92);
-    later(t0, () => bent(pts.slice(i0 * 2, i1 * 2 + 2), o.w * (2.4 + 0.8 * (j / Math.max(1, o.bulge - 1)) + 0.4 * n01()), PAPER, {
+    const life = Math.max(0.1, gone(i0) - t0);
+    later(t0, () => bent(pts.slice(i0 * 2, i1 * 2 + 2), o.w * ((o.fat ?? 2.4) + 0.8 * (j / Math.max(1, o.bulge - 1)) + 0.4 * n01()), PAPER, {
       body: c, life, dry: 0.15, pr: P_SWELL, hold: 0.7, vy: o.vy,
       gr: Math.min(0.4, Math.max(0.05, (o.crawl * (i1 - i0)) / (n - 1) / life)),
     }));
@@ -151,12 +161,12 @@ function surge(x: number, y: number, S: Size, k: number, c: string): void {
     const by = y - n01() * 8 * kk;
     const lean = (side * 0.14 + sgn() * 0.2) * H;
     const crawl = S.crawl * F * (i === 0 ? 0.75 : 0.95 + 0.5 * n01());
-    const start = i === 0 ? 0 : (i + n01() * 2) * F; // 거의 같이 선다 — 한 줄씩 차례로 서면 한 순간엔 한 줄뿐이라 성겼다(2회차)
-    const one = (h: number, dx: number, dot: boolean): void => climb(arcPts(bx + dx, by, bx + dx + lean * (h / H), by - h, S.sway * kk), {
-      w: S.w * kk, crawl, life: crawl * (2.3 + 0.4 * n01()), vy: -18, bulge: h > 140 ? 3 : h > 60 ? 2 : 1, fork: h * (0.12 + 0.06 * n01()), dot,
+    const start = i === 0 ? 0 : (i * 0.6 + n01()) * F; // 거의 같이 선다 — 한 줄씩 차례로 서면 한 순간엔 한 줄뿐이라 성겼다(2회차 · 고침 회차에 1~3 → 0.6~2.2프레임)
+    const one = (h: number, dx: number, bulge: number): void => climb(arcPts(bx + dx, by, bx + dx + lean * (h / H), by - h, S.sway * kk), {
+      w: S.w * kk, crawl, life: crawl * (2.3 + 0.4 * n01()), vy: -18, bulge: Math.min(bulge, h > 140 ? 3 : h > 60 ? 2 : 1), fork: h * (0.12 + 0.06 * n01()), dot: true, fat: S.fat,
     }, c);
-    later(start, () => one(H, 0, true));
-    if (i < S.re) later(start + (13 + n01() * 8) * F, () => one(H * (0.65 + 0.3 * n01()), sgn() * 5 * kk, true));
+    later(start, () => one(H, 0, S.bulge));
+    if (i < S.re) later(start + (13 + n01() * 8) * F, () => one(H * (0.65 + 0.3 * n01()), sgn() * 5 * kk, 0)); // 다시 붙는 줄은 맨 실 — 마디까지 달면 완파 끝(+24 뒤)에 노랑 덩이가 뭉쳤다
   });
   // 조각 사이 — 위쪽 공중에서 시작해 이어 튄다(앞 아크 끝에서 조금 떨어진 자리에서 다음 아크가 붙는다)
   if (!S.hop) return;
@@ -205,11 +215,14 @@ export const volt: Recipe = {
     const H = 26 + 8 * n01();
     climb(arcPts(x, y, x + sgn() * 8, y - H, 6), { w: 1.6, crawl: 5 * F, life: 0.2, vy: -20, bulge: 1, fork: 7, dot: true }, c);
   },
-  // 칼 기운 — 칼날을 막대 삼아 고리 아크가 손잡이 쪽에서 칼끝으로 건너뛰며 기어간다(자료 aura 8 막대 위 반고리 · 귀멸 aura 6 칼 몸 둘레).
-  // 고리마다 날에서 떠나 10~16px 바깥으로 휘었다 조금 앞 날로 돌아온다(가운데가 굵고 두 끝은 날에 붙어 가늘다). 거의 위쪽 한편으로 쏠리고
-  // 가끔 하나만 아래로 감는다. 고리는 시그니처 색 붓이라 먹 머리가 검은 날 위에서 떠나 짙은 올리브 → 노랑으로 종이에 나온다.
-  // 마지막 고리 끝(칼끝)에서 두 갈래로 끊긴다. 부르는 틈 0.24초 + 0~5프레임 · 사는 0.3초 남짓이라 고리가 늘 두셋 떠 있다.
-  // 8회차 = 날 위쪽 가는 실 하나(칼끝 노랑 몇 가닥으로만 보였다) · 9회차 = 날을 넘나드는 굵은 실 + 부푼 마디(짧은 날 위에서 노랑 얼룩으로 읽혔다)
+  // 칼 기운 — 칼날을 막대 삼아 고리 아크가 손잡이 쪽에서 떠나 하늘 쪽으로 솟았다 칼끝 쪽 날로 내려앉는다(자료 aura 8 막대 위 반고리 · 귀멸 aura 6 칼 몸 둘레).
+  // 한 번에 고리 둘(큰 것 27~34 · 작은 것 20~26, 자리 · 각 · 굵기가 다르다) + 날 위를 기는 노랑 실 + 칼끝 두 갈래.
+  // 고리 하나 = 두 획. 목 = 시그니처 색 붓(붓머리를 눌러 댄 굵은 먹 3~5px → 짙은 올리브 → 노랑, 앞 4점만) ·
+  // 몸 = 밝은 짝 획에 종이색 속줄(목 끝에서 가늘게 이어 한 번 부풀었다 날에 뾰족하게 닿는다). 먹 테는 두르지 않는다.
+  // 한 획으로 그으면 그라데이션 축(머리 → 꼬리 곧은 줄)이 고리와 어긋나 먹 · 올리브가 나가는 다리를 다 덮어 먹 혀로 읽혔고,
+  // 꼭대기를 칼끝 너머로 밀면 몸 전체가 밝은 짝이라 종이 위에서 사라졌다(4판 고침 회차 시안 다섯).
+  // 몸 쪽(날 아래)으로는 감지 않는다 — 주인공 다리를 덮는다. 부르는 틈 0.24초 · 사는 0.3초 남짓이라 고리가 늘 하나둘 떠 있다.
+  // 앞 회차: 8 = 날 위쪽 가는 실 하나 · 9 = 날을 넘나드는 굵은 실 + 부푼 마디(노랑 얼룩) · 10 = 반경 15~23 · 굵기 4.5(폰 1배 노랑 낙서)
   aura(b, _n, c) {
     const [hx, hy, tx, ty] = b;
     const L = Math.hypot(tx - hx, ty - hy) || 1;
@@ -217,38 +230,40 @@ export const volt: Recipe = {
     const [nx, ny] = ux > 0 ? [uy, -ux] : [-uy, ux]; // 칼날의 위쪽 법선
     const on = (u: number): [number, number] => [hx + ux * L * u, hy + uy * L * u];
     const t0 = n01() * 5 * F;
-    put('spat', hx + ux * L * 0.08, hy + uy * L * 0.08, { life: 0.07, size: 2.6, rot: Math.atan2(ny, nx), v: 2, c1: INK }); // 점화
-    // 날 위 실 — 검은 날 위를 손잡이에서 칼끝으로 기는 가는 노랑(날이 전기를 머금었다). 종이 위 노랑보다 검은 날 위 노랑이 또렷하다
+    put('spat', hx + ux * L * 0.08, hy + uy * L * 0.08, { life: 0.08, size: 3.4, rot: Math.atan2(ny, nx), v: 2, c1: INK }); // 점화
+    // 날 위 실 — 검은 날 위를 손잡이에서 칼끝으로 기는 노랑(날이 전기를 머금었다). 종이 위 노랑보다 검은 날 위 노랑이 또렷하다
     const run: number[] = [];
     for (let i = 0; i < 8; i++) {
       const [x, y] = on(0.1 + 0.85 * (i / 7));
-      const o = i && i < 7 ? sgn() * 1.6 : 0;
+      const o = i && i < 7 ? sgn() * 1.8 : 0;
       run.push(x + nx * o, y + ny * o);
     }
-    later(t0, () => bent(run, 1.5, '', { body: liteOf(c), life: 0.26, dry: 0.1, pr: P_LINE, gr: 0.5 }));
-    const flip = Math.floor(n01() * 4); // 0~2 = 그 고리 하나만 아래로 감는다 · 3 = 모두 위
-    let u0 = 0.04 + 0.08 * n01();
-    for (let j = 0; j < 3; j++) {
-      const u1 = Math.min(1.06, u0 + 0.28 + 0.16 * n01());
-      const R = (15 + 8 * n01()) * (j === flip ? -0.7 : 1);
-      const lean = (0.1 + 0.25 * n01()) * L; // 고리 꼭대기가 칼끝 쪽으로 쏠린다
+    later(t0, () => bent(run, 2.2, '', { body: liteOf(c), life: 0.26, dry: 0.1, pr: P_LINE, gr: 0.5 }));
+    for (let j = 0; j < 2; j++) {
+      const u0 = j ? 0.35 + 0.25 * n01() : 0.06 + 0.2 * n01();
+      const u1 = Math.min(1, u0 + 0.3 + 0.15 * n01());
+      const R = j ? 20 + 6 * n01() : 27 + 7 * n01();
+      const a = Math.atan2(ny, nx) - (ux > 0 ? 1 : -1) * (0.15 + 0.2 * n01()) + sgn() * 0.2; // 법선에서 조금 하늘 쪽으로 · 고리마다 다르게
+      const [dx, dy] = [Math.cos(a), Math.sin(a)];
       const [ax, ay] = on(u0);
       const [bx, by] = on(u1);
-      const pts: number[] = [];
-      // 매끈한 반달이면 리본 · 초승달로 읽혔다(9회차) — 마디마다 1.5px 남짓 떨린다
-      for (let i = 0; i < 12; i++) {
-        const t = i / 11;
-        const h = R * Math.sin(Math.PI * t) ** 0.8 + (i && i < 11 ? sgn() * 1.6 : 0);
-        const f = lean * Math.sin(Math.PI * t) * 0.4 + (i && i < 11 ? sgn() * 1.2 : 0);
-        pts.push(ax + (bx - ax) * t + nx * h + ux * f, Math.min(GROUND - 4, ay + (by - ay) * t + ny * h + uy * f));
+      const lean = (0.15 + 0.2 * n01()) * (u1 - u0) * L; // 꼭대기가 칼끝 쪽으로 조금 쏠린다
+      const q: number[] = [];
+      for (let i = 0; i < 14; i++) {
+        const t = i / 13;
+        const e = i && i < 13 ? 1 : 0;
+        const h = R * Math.sin(Math.PI * t) + e * sgn() * 1.6;
+        const f = lean * Math.sin(Math.PI * t) + e * sgn() * 1.2;
+        q.push(ax + (bx - ax) * t + dx * h + ux * f, Math.min(GROUND - 4, ay + (by - ay) * t + dy * h + uy * f));
       }
-      const last = j === 2;
-      later(t0 + (j * 3 + n01() * 2) * F, () => {
-        bent(pts, 3.4 + 1.1 * n01(), PAPER, { body: c, life: 0.26 + 0.08 * n01(), dry: 0.15, pr: P_CUT, gr: 0.3, hold: 0.55, vy: -8 });
-        if (last) later(4 * F, () => fork(pts, 18 + 8 * n01(), 2.4, 0.22, c, -8));
+      const w = j ? 5 + 0.8 * n01() : 6 + n01();
+      const life = 0.26 + 0.08 * n01();
+      later(t0 + j * (3 + n01() * 3) * F, () => {
+        bent(q.slice(0, 8), w * 1.1, '', { body: c, life: life * 0.8, dry: 0.08, pr: P_BRUSH, gr: 0.12, vy: -8 });
+        later(life * 0.06, () => bent(q.slice(6), w, PAPER, { body: liteOf(c), life, dry: 0.12, pr: P_CUT, gr: 0.3, hold: 0.6, vy: -8 }));
       });
-      u0 = u1 - 0.04 - 0.06 * n01(); // 다음 고리는 이 고리 발 조금 뒤에서 붙는다
     }
+    later(t0 + 7 * F, () => fork([hx, hy, tx, ty], 22 + 8 * n01(), 3.2, 0.22, c, -8)); // 칼끝 두 갈래
   },
   every: 0.24,
   tint: true,
