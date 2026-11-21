@@ -5,7 +5,9 @@ import { WEAPON_INK } from '../src/config';
 import { makeState } from '../src/core/sim';
 import type { JuiceEvent, WeaponId } from '../src/core/types';
 import { GREATSWORD_IDS, WEAPON_IDS } from '../src/meta/loadout';
-import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx } from '../src/render/bladeFx';
+import { RECIPES, bladeReact, drawBladeFx, resetBladeFx, updateBladeFx, weaponAlong } from '../src/render/bladeFx';
+import { greatLook } from '../src/render/sprites';
+import { liveBits } from '../src/render/weaponFx';
 
 /** 그릴 때 고른 색과 부른 그리기를 모으는 ctx */
 function drawn(draw = (c: CanvasRenderingContext2D) => drawBladeFx(c, 0)): string {
@@ -87,5 +89,37 @@ describe('대검 이펙트', () => {
     bladeReact(s, { kind: 'floorCollapse', lane: 0, y: 120, combo: 11, last: true });
     for (let i = 0; i < 12; i++) updateBladeFx(1 / 60);
     expect(drawn(), 'iron last').not.toBe('');
+  });
+});
+
+describe('필살 × 대검 — 큰 획을 따라 번짐(waza.along)', () => {
+  const ELEMENT5 = ['phoenix', 'tide', 'volt', 'icicle', 'shade'];
+  const OLD = GREATSWORD_IDS.filter((w) => !ELEMENT5.includes(w));
+  const PATH = [60, 600, 140, 470, 200, 400, 300, 230]; // 사선 꺾은선(약 430px) — 필살 큰 획 꼴
+
+  it('기존 대검 열넷은 제 waza가 있고, 값싼 칼도 한 번에 6조각 넘게 동시에 보이며, 뿌리부터 번진다', () => {
+    expect(OLD).toHaveLength(14);
+    for (const w of OLD) {
+      expect(RECIPES[greatLook(w)!.shape].waza, w).toBeDefined();
+      resetBladeFx();
+      weaponAlong(w, PATH, 1, 0.3);
+      expect(Math.min(...liveBits().map((p) => p.y)), `${w} 뿌리부터`).toBeGreaterThan(470); // 아직 위쪽 끝은 안 나왔다
+      let peak = 0;
+      for (let i = 0; i < 40; i++) {
+        updateBladeFx(1 / 60);
+        peak = Math.max(peak, liveBits().length);
+      }
+      expect(peak, w).toBeGreaterThanOrEqual(6);
+    }
+  });
+
+  it('열넷의 번짐이 서로 다르게 그려진다', () => {
+    const sigs = OLD.map((w) => {
+      resetBladeFx();
+      weaponAlong(w, PATH, 1, 0.3);
+      for (let i = 0; i < 14; i++) updateBladeFx(1 / 60);
+      return drawn();
+    });
+    expect(new Set(sigs).size).toBe(OLD.length);
   });
 });
