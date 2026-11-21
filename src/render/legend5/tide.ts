@@ -1,10 +1,11 @@
 // 해일 대검(물) 레시피 — 4판(11-21 방향표 「해일」 절). bladeFx RECIPES(surf)가 이어 붙이기만 한다.
-// 꼴: 왼쪽 땅에서 솟아 오른쪽 위로 크게 말리는 호쿠사이 마루 한 덩이(자료 S1 S2 S4). 등은 밑동(먹)에서 가파르게 솟아 마루를 넘고,
+// 꼴: 왼쪽 땅에서 솟아 오른쪽 위로 크게 말리는 갈고리 마루 한 덩이. 등은 밑동(먹)에서 가파르게 솟아 마루를 넘고,
 // 말림은 가는 붓 두 가닥(입술 · 속 말림)이 먹 머리 → 파랑 꼬리로 앞 → 아래 → 안으로 감긴다. 마루 앞끝은 길이 · 간격 · 휨이 제각각인 갈퀴 손가락으로 갈라진다(손가락마다 제 갈고리).
 // 몸 안쪽엔 마른 붓 결 줄이 겉선을 따라 겹으로 감기고, 가장 안쪽 줄은 더 감겨 작은 마루가 된다. 갈퀴 끝에서 물방울 덩이
 // (큰 것 · 중간 · 가루 3단)가 끊겨 포물선으로 떨어진다. 완파는 앞에 작은 마루가 먼저 일어난다(예비).
-// 칼길 · 칼 기운 · 필살 번짐 = 히노카미 물 띠(자료 S5 S6 S10 S12): 굵기가 머리 → 꼬리로 바뀌는 띠 두셋이 서로 다른 주기 ·
+// 칼길 · 필살 번짐 = 물 띠: 굵기가 머리 → 꼬리로 바뀌는 띠 두셋이 서로 다른 주기 ·
 // 다른 속도로 꼬이며 칼길을 감고, 띠 바깥으로 물방울 덩이가 튄다.
+// 칼 기운 = 칼을 감아 오르는 띠 둘이 날 바깥 · 하늘 쪽으로 서는 작은 갈퀴 마루로 말려 무너졌다 다시 솟는다.
 // 박자: 솟음 4프레임 → 말림 4 → 갈퀴가 앞 · 아래로 처지며 물방울 덩이가 떨어지고 몸은 밑동부터 깎인다(무너짐).
 // 자리: 주인공 몸 상자(발 위 0~60 · 좌우 ±18)와 오른쪽 아래 「콤보」 도장 자리를 비운다 — 땅 파도는 왼쪽 땅에서 솟고
 // 말림은 주인공 머리 위 높이에서 끝난다(3판은 파도가 도장에 닿았다).
@@ -98,7 +99,7 @@ function fingerPts(cr: Crest, th: number, out: number, len: number, bend: number
 
 /**
  * 결 줄 꺾은선(월드) — 몸 안쪽 d만큼 들어가 등을 따라 t0 → t1로 가다가 끝에서 제 작은 마루로 감긴다(반지름 r · 로컬).
- * 큰 마루 안에 작은 마루가 겹으로 서는 꼴(자료 S1)
+ * 큰 마루 안에 작은 마루가 겹으로 서는 꼴
  */
 function grainPts(cr: Crest, t0: number, t1: number, d: number, r: number): number[] {
   const pts: number[] = [];
@@ -163,7 +164,7 @@ function surge(cr: Crest, L: Look, c: string): void {
   const tips: [number, number, number, number][] = [];
   const sag = 20 * Math.min(L.k, 1.1) * (cr.H / 100); // 갈퀴는 몸보다 앞 · 아래(−U)로 처진다
   ths.forEach((th, i) => {
-    // 입술 아래로 갈수록 짧다(자료 S1 — 긴 갈퀴는 마루 위 앞). 맨 아래 갈퀴가 길게 처지면 「콤보」 도장까지 내려왔다
+    // 입술 아래로 갈수록 짧다(긴 갈퀴는 마루 위 앞). 맨 아래 갈퀴가 길게 처지면 「콤보」 도장까지 내려왔다
     const low = (th - L.fan[0]) / (L.fan[1] - L.fan[0] || 1);
     const len = L.len * (0.65 + 0.5 * n01()) * (i === 1 || i === L.nf - 2 ? 1.2 : 1) * (1 - 0.35 * low);
     const pts = fingerPts(cr, th, half * 0.7, len, 1.9 + 1.3 * n01());
@@ -189,7 +190,14 @@ function groundCrest(x: number, y: number, wx: number, Hw: number, ca: number, r
 /** 꼴을 조금씩 흔든다 — 같은 파도가 두 번 나오지 않게 */
 const jit = (v: number, r: number): number => v * (1 + r * sgn());
 
-/** 히노카미 물 띠 셋 — 굵기 · 시작 자리 · 꼬임 주기 · 그어지는 빠르기가 다 다르다(같은 간격 반복 금지) */
+/** 칼 기운 마루 — 한 주기에 부르는 횟수(고르지 않게) · 그 주기 마루 높이(px) */
+const AURA_CYC = [9, 7, 11, 8, 10] as const;
+const AURA_SUM = AURA_CYC.reduce((a, v) => a + v, 0);
+const AURA_H = [54, 45, 60, 49, 57] as const;
+/** 칼 기운 갈퀴 손가락 — 말림 위 자리(× π) · 길이(마루 높이 1 기준) · 끝 감김. 간격 · 길이 · 감김이 다 다르다 */
+const AURA_FING = [[0.02, 0.5, 1.6], [0.17, 0.3, 2.4], [0.3, 0.6, 2.0], [0.44, 0.26, 2.8]] as const;
+
+/** 물 띠 셋 — 굵기 · 시작 자리 · 꼬임 주기 · 그어지는 빠르기가 다 다르다(같은 간격 반복 금지) */
 const BANDS = [
   { u0: 0, u1: 1.07, amp: 0.14, cyc: 1.15, ph: 0.4, w: 1, gr: 0.14, pr: 3, life: 1 },
   { u0: 0.16, u1: 1.13, amp: 0.26, cyc: 1.75, ph: 2.6, w: 0.55, gr: 0.24, pr: 0, life: 0.9 },
@@ -252,40 +260,75 @@ export const tide: Recipe = {
     const cr: Crest = { ox: x - 0.55 * H, oy: y + 0.4 * H, F: RIGHT, U: UP, H, ca: jit(0.5, 0.1), ra: 0.45, rb: 0.3, sy: 0.8 };
     surge(cr, { w: 3.8, life: 0.28, nf: 1, ng: 0, nd: 1, t0: 0.3, fan: [0.15 * PI, 0.35 * PI], len: 0.45, k: 0.6 }, c);
   },
-  // 칼 기운 — 칼을 감는 물 띠 한 줄(히노카미 링 띠): 손잡이에서 칼끝까지 한 번 남짓 꼬여 흐르다 칼끝 너머 10~14px로 흘러내리고
-  // (부를 때마다 꼬임이 조금씩 돈다), 칼끝에서 물방울 덩이(큰 것 · 중간 · 가루)가 떨어진다. 굵기는 머리 3px → 꼬리 1px(누름 BRUSH).
-  // r6은 칼 길이의 3할만 감고 굵기가 고르게 가늘어 폰 1배에서 파란 점 몇 개로만 보였다(11-22 검수).
-  // 검은 칼날 위라 먹 머리 없이 시그니처 색 → 밝은 짝(곁 획)
+  // 칼 기운 — 물을 두른 칼. 굵기 · 빠르기가 다른 띠 둘이 손잡이에서 칼을 감아 가다 날 가운데 ~ 칼끝 쪽에서 떨어져 나와
+  // 몸 바깥 · 하늘 쪽으로 서는 작은 마루(높이 40~60px)로 말려 오르고, 마루 앞끝은 길이 제각각인 갈퀴 손가락 3~4로 갈라진다.
+  // 한 주기(부르는 횟수 7~11, 고르지 않게) = 솟음 → 말림 → 무너짐: 무너질 때 마루가 앞으로 눕고 손가락이 처지며 긴 손가락 끝에서
+  // 물방울 덩이(큰 것 · 중간 · 가루)가 포물선으로 떨어진 뒤 다시 솟는다. 마루 등은 먹 · 입술은 먹 → 파랑 · 손가락 끝은 밝은 짝.
+  // 흑백에서 위로 곧게 선 불 혀와 갈리게 — 감아 오르다 옆으로 말리는 띠. 마루 밑동은 날 바깥(위쪽 옆)이라 몸 상자를 덮지 않는다
   aura(b, n, c) {
     const [hx, hy, tx, ty] = b;
     const L = Math.hypot(tx - hx, ty - hy) || 1;
     const [ux, uy] = [(tx - hx) / L, (ty - hy) / L];
-    const [nx, ny] = [-uy, ux];
-    const ph = n * 0.32;
-    // 감는 굽이 — 몸 반대쪽(바깥)은 크게(6~9px), 다리 쪽은 작게(다리를 덮지 않게). 바깥 = 칼 방향을 위로 돌린 쪽
-    const sw = ux >= 0 ? -1 : 1; // 위로 도는 쪽
-    const outA = 7.5 + 1.5 * Math.sin(n * 0.37);
-    // 서 있을 때 칼끝은 땅선 아래에 묻힌다 — 곧은 띠는 땅 4px 위에서 끊고 거기서 갈고리를 올린다(안 그러면 칼끝 너머가 땅 띠에 잘렸다)
+    const out = tx >= hx ? 1 : -1; // 몸 바깥 쪽
+    const [nx, ny] = ux >= 0 ? [uy, -ux] : [-uy, ux]; // 날의 위쪽 옆
+    // 서 있을 때 칼끝은 땅선 아래에 묻힌다 — 띠는 땅 4px 위에서 끊는다
     const uEnd = uy > 0 ? Math.min(1, Math.max(0.5, (VIEW.GROUND_Y - 4 - hy) / (uy * L))) : 1;
-    const pts: number[] = [];
-    for (let i = 0; i <= 12; i++) {
-      const u = (uEnd * i) / 12;
-      const s = Math.sin(TAU * 1.2 * u + ph) * Math.min(1, u / 0.2 + 0.4);
-      const off = s * (s * sw > 0 ? outA : 2.5);
-      pts.push(hx + ux * u * L + nx * off, hy + uy * u * L + ny * off);
+    /** 칼을 감는 띠(월드) — 손잡이 → u1. 날 위쪽 옆으로는 amp만큼 크게, 몸 쪽으로는 inn만큼 작게(다리를 덮지 않게) */
+    const wind = (u1: number, f: number, ph: number, amp: number, inn: number): number[] => {
+      const pts: number[] = [];
+      for (let i = 0; i <= 9; i++) {
+        const u = (u1 * i) / 9;
+        const s = Math.sin(TAU * f * u + ph) * Math.min(1, u / 0.2 + 0.4);
+        const off = s * (s > 0 ? amp : inn);
+        pts.push(hx + ux * u * L + nx * off, hy + uy * u * L + ny * off);
+      }
+      return pts;
+    };
+    // 주기 안 자리 p(0 → 1)
+    let r = n % AURA_SUM;
+    let i = 0;
+    while (r >= AURA_CYC[i]) r -= AURA_CYC[i++];
+    const p = r / AURA_CYC[i];
+    const rise = Math.min(1, p / 0.35);
+    const curl = Math.min(1, Math.max(0, (p - 0.35) / 0.35));
+    const fall = Math.max(0, (p - 0.7) / 0.3);
+    const tilt = 0.55 * fall; // 무너질 때 앞으로 눕는다
+    // 마루 밑동 — 칼이 누운 막기 자세(머리 위 가로)면 0.72 자리가 몸 상자 위 모서리에 걸린다 — 칼끝 쪽으로 더 민다
+    const ub = Math.min(Math.abs(uy) < 0.35 ? 0.86 : 0.72, uEnd - 0.1);
+    const cr: Crest = {
+      ox: hx + ux * ub * L + nx * 1.5, oy: hy + uy * ub * L + ny * 1.5,
+      F: [out * Math.cos(tilt), Math.sin(tilt)], U: [out * Math.sin(tilt), -Math.cos(tilt)],
+      H: AURA_H[i] * (0.55 + 0.45 * rise - 0.4 * fall), ca: 0.3, ra: 0.5, rb: 0.26,
+    };
+    // 말림은 앞 · 아래까지만(닫힌 고리는 글자로 읽혔다)
+    const th1 = PI * (0.45 + 0.4 * rise + 0.15 * curl);
+    const [vx, vy] = [out * 8, fall ? 26 * fall : -8];
+    // 띠 둘 — 칼만 감는다(먹 손잡이 → 파랑 → 밝은 짝 칼끝). 마루까지 한 획으로 이으면 칼 위가 통째로 먹이 됐다.
+    // 굵은 띠는 천천히 칼끝 가까이까지, 가는 띠는 거꾸로 더 빨리 감아 날 가운데 너머에서 마루 밑동 쪽으로 빠진다
+    bent(wind(uEnd - 0.04, 1.15, n * 0.3, 6.5 + 1.5 * Math.sin(n * 0.37), 2.2), 4.2, '', { body: c, pr: 5, dry: 0.16, gr: 0.42, life: 0.34, vx, vy });
+    const thin = wind(0.62, 1.9, 1.3 - n * 0.62, 5, 1.8);
+    thin.push(...toW(cr, ...backAt(cr, 0.12, 0.08)), ...toW(cr, ...backAt(cr, 0.4, 0.12)));
+    bent(thin, 2.4, '', { body: c, pr: 1, dry: 0.28, gr: 0.2, life: 0.26, vx, vy });
+    // 마루 — 칼 바깥 밑동에서 한 붓으로 등을 타고 솟아 꼭대기를 넘어 앞 · 아래로 말린다(먹 밑동 → 파랑 등 → 밝은 짝 입술).
+    // 등과 입술을 따로 그으면 꼭대기만 떠서 칼과 떨어진 새 꼴로 읽혔다. 누름은 붓머리를 눌러 대 밑동이 칼에 붙는다
+    // (밑동이 가는 누름은 마루가 실에 매달려 떴고, 꼭대기에 먹 획을 얹으면 새 눈으로 읽혔다). 솟을수록 굵어진다
+    bent(ridge(cr, 0, th1, 0, 6, 6), 5 + 1.8 * rise - 1.2 * fall, '', { body: c, pr: 5, dry: 0.24, gr: 0.36, life: 0.34, vx, vy });
+    // 등 먹 — 마루 등 바깥 테를 따라 밑동 → 꼭대기를 넘어 말림 어귀까지 가는 먹 줄(흑백에서 마루가 옅은 회색으로 빠졌다)
+    const back: number[] = [];
+    for (let k = 0; k <= 6; k++) back.push(...toW(cr, ...backAt(cr, 0.04 + 0.96 * (k / 6), -0.045)));
+    back.push(...toW(cr, ...curlAt(cr, 0.1 * PI, -0.045)), ...toW(cr, ...curlAt(cr, 0.22 * PI, -0.04)));
+    bent(back, 2.2 + 1.3 * rise, '', { pr: 0, dry: 0.3, gr: 0.36, life: 0.32, vx, vy });
+    // 갈퀴 손가락 3~4 — 솟는 동안 자라고, 무너질 때 더 감겨 처진다. 밝은 짝 손가락과 파랑 손가락이 엇갈린다
+    const tips: [number, number, number][] = [];
+    AURA_FING.slice(0, i % 2 ? 3 : 4).forEach(([th, len, bend], j) => {
+      const pts = fingerPts(cr, PI * (th + 0.03 * sgn()), 0.05, len * (0.4 + 0.6 * rise) * (0.85 + 0.3 * n01()), bend + 1.2 * fall);
+      tips.push(tipOf(pts));
+      later(0.05 + 0.015 * j, () => bent(pts, 3 + 4 * len, '', { body: j % 2 ? c : liteOf(c), pr: 1, dry: 0.26, gr: 0.3, life: 0.28 + 0.08 * n01(), vx: vx * 1.3, vy: vy + 14 * fall }));
+    });
+    // 무너지기 시작할 때 긴 손가락 둘 끝에서 물방울 덩이가 끊겨 앞으로 포물선을 그리며 떨어진다
+    if (r === Math.round(AURA_CYC[i] * 0.72)) {
+      [tips[2], tips[0]].forEach(([x, y], j) => clump(x, y, (out > 0 ? -0.45 : PI + 0.45) + 0.3 * sgn(), 95 + 30 * n01(), 4 - j, 0.95, c));
     }
-    // 칼끝 너머 — 칼끝(또는 땅에 닿는 자리)을 돌아 바깥 위로 갈고리처럼 감겨 오른다(칼 밖 10~14px)
-    const E = 15 + 5 * Math.abs(Math.sin(n * 0.71));
-    let [ex, ey] = [pts[pts.length - 2], pts[pts.length - 1]];
-    for (let j = 1; j <= 5; j++) {
-      const a = sw * 2.1 * (j / 5) ** 0.8;
-      ex += ((ux * Math.cos(a) - uy * Math.sin(a)) * E) / 5;
-      ey += ((ux * Math.sin(a) + uy * Math.cos(a)) * E) / 5;
-      pts.push(ex, ey);
-    }
-    bent(pts, 2.6, '', { body: liteOf(c), pr: 5, dry: 0.06, gr: 0.28, life: 0.3 });
-    // 갈고리 끝에서 떨어져 나가는 물방울 덩이 — 바깥 위로 튀어 포물선으로
-    if (n % 3 === 0) clump(ex, ey, Math.atan2(ey - pts[pts.length - 3], ex - pts[pts.length - 4]) + 0.3 * sgn(), 70, 3, 1, c);
   },
   every: 0.1,
   tint: true,
