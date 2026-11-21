@@ -69,12 +69,16 @@ function wing(f: Frame, s: number, a0: number, b0: number, th: number, len: numb
     // 뼈에서 바깥 아래로 눕는 각 — 어깨 쪽일수록 많이. 많이 처지면 야자수로 읽혀 끝 쪽은 뼈를 따라 뻗는다
     const lay = Math.min(1.05, 0.06 + 0.7 * (1 - t) ** 1.2 + 0.12 * n01());
     const rot = f.dir(s * (th + lay));
-    const L = len * (0.34 + 0.55 * t ** 1.3) * (0.75 + 0.5 * n01());
-    const w = len * (0.1 + 0.06 * t) * (0.8 + 0.4 * n01());
-    const q: Quill = { life, bend: s * L * (0.1 + 0.14 * n01()), dry: 0.32 + 0.3 * n01(), pr: j === n - 1 ? BRUSH : CUT };
+    // 끝 두 깃은 굵기 · 길이를 갈라 놓는다 — 맨 끝은 가늘고 길게 마른 붓으로 갈라지고 그 앞은 짧고 굵다(같은 꼴 먹 덩이 둘이 나란히 서면 블록으로 읽혔다)
+    const end = j === n - 1 ? 1 : j === n - 2 ? 2 : 0;
+    const L = len * (0.34 + 0.55 * t ** 1.3) * (0.75 + 0.5 * n01()) * (end === 1 ? 1.15 : end === 2 ? 0.78 : 1);
+    const w = len * (0.1 + 0.06 * t) * (0.8 + 0.4 * n01()) * (end === 1 ? 0.45 : 1);
+    const q: Quill = { life, bend: s * L * (0.1 + 0.14 * n01()), dry: end === 1 ? 0.78 : 0.32 + 0.3 * n01(), pr: CUT };
     const beat = flap && j >= n / 2; // 퍼덕은 바깥 반(첫째 깃)만 — 다 접었다 펴면 덤불로 읽힌다
-    later(0.012 * j, () => quill(rx, ry, rot, L, w, c, beat ? { ...q, life: life * 0.55 } : q));
-    if (beat) later(0.16 + 0.01 * j, () => quill(rx, ry, rot + s * FOLD, L * 0.95, w, c, { ...q, spin: (-s * FOLD * 1.3) / life, gr: 0.12 }));
+    // 깃은 어깨부터 한 프레임에 하나씩 — 한꺼번에 나오면 펼침 첫 프레임들이 덤불로 읽혔다(뼈가 먼저, 깃은 그다음 프레임부터)
+    const at = (j + 0.9) / 60;
+    later(at, () => quill(rx, ry, rot, L, w, c, beat ? { ...q, life: life * 0.55 } : q));
+    if (beat) later(0.16 + at, () => quill(rx, ry, rot + s * FOLD, L * 0.95, w, c, { ...q, spin: (-s * FOLD * 1.3) / life, gr: 0.12 }));
   }
   return [tipX, tipY];
 }
@@ -109,14 +113,10 @@ function bird(x: number, y: number, H: number, wings: readonly [number, number],
     lick(hx, hy, f.dir(-s * 0.35), H * 0.3, H * 0.06, c, { life, sway: s * H * 0.05, gr: 0.18, vy: -50 });
     lick(hx, hy, f.dir(s * 0.12), H * 0.2, H * 0.045, liteOf(c), { life: life * 0.9, sway: -s * H * 0.04, gr: 0.2, vy: -60 });
   });
-  // 날개 — 기둥 허리(5할)에서 2프레임 늦게. 긴 쪽은 위로 30° · 짧은 쪽은 옆으로 65°
-  let tips: [number, number][] = [];
-  later(0.085, () => {
-    tips = [
-      wing(f, s, H * 0.5, H * 0.03, 0.52, H * 0.62, wings[0], c, life, flap),
-      wing(f, -s, H * 0.44, H * 0.04, 1.12, H * 0.4, wings[1], c, life * 0.9, flap),
-    ];
-  });
+  // 날개 — 기둥 허리(5할)에서 2프레임 늦게. 긴 쪽은 위로 30° · 짧은 쪽은 옆으로 65°(한 프레임 더 늦게 — 두 날개 깃이 같은 프레임에 겹쳐 나오지 않게)
+  const tips: [number, number][] = [];
+  later(0.085, () => { tips[0] = wing(f, s, H * 0.5, H * 0.03, 0.52, H * 0.62, wings[0], c, life, flap); });
+  later(0.085 + 1 / 60, () => { tips[1] = wing(f, -s, H * 0.44, H * 0.04, 1.12, H * 0.4, wings[1], c, life * 0.9, flap); });
   // 불 혀 — 날개 끝 · 기둥 꼭대기에서 떨어져 나가 S자로 꼬며 위로 떠오른다
   for (let i = 0; i < tongues; i++) {
     later(0.24 + 0.05 * i + 0.03 * n01(), () => {
@@ -154,24 +154,36 @@ export const phoenix: Recipe = {
       });
     }
   },
-  // 타격 — 친 자리에서 위로 솟는 넓은 불길 하나 + 한쪽으로 쏠린 불 혀 넷(길이 제각각, 끝 갈라짐) + 위로 뜨는 불티
+  // 타격 — 친 자리 위로 솟는 불길(외곽이 위로 좁아지는 세모): 밑변에 뿌리를 옆으로 벌린 혀 넷(가운데가 가장 길다)이 위로 서고,
+  // 가운데 혀 끝은 두 갈래 밝은 혀로 갈라져 솟는다. 뿌리를 한 점에 모으고 위를 벌리면 거꾸로 매달린 다발로 읽혔다.
+  // 몸은 첫 프레임에 다 그어(gr) 먹 뿌리만 검은 덩이로 남는 프레임이 없다. 곁 혀는 가운데 혀 밑동을 감싸 한 불길로 붙고(따로 서면 방추 셋으로 읽혔다),
+  // 먹 머리는 가운데 혀와 바깥 짧은 혀 하나뿐 — 감싸는 혀는 밝은 짝이라 먹 밑동이 덩이로 커지지 않는다
   hit(x, y, k, c) {
-    const H = size(100, k);
+    const H = size(120, k);
     const f = frame(x, y, UP);
     const s = sgn() > 0 ? 1 : -1;
-    const [rx, ry] = f.at(8, 0); // 뿌리는 친 자리보다 조금 위 — 먹 뿌리가 주인공 머리에 닿지 않게
-    lick(rx, ry, f.dir(s * 0.08), H * 0.92, H * 0.24, c, { life: 0.34, sway: -s * H * 0.12, dry: 0.38, gr: 0.12, vy: -40 });
-    const T: readonly [number, number, number, number][] = [ // [기둥 위 자리, 쪽, 기울기, 길이] — 위로 서서 벗겨져 오른다
-      [0.32, s, 0.42, 0.66], [0.55, s, 0.62, 0.4], [0.4, -s, 0.3, 0.42], [0.68, -s, 0.5, 0.24],
+    const [rx, ry] = f.at(10, 0); // 뿌리는 친 자리보다 10 위 — 맞은 층 밑변은 주인공 머리 높이다
+    // 가운데 혀는 7할 남짓만 — 먹 밑동 길이가 혀 길이를 따라 는다. 나머지 키는 먹 없는 갈라진 끝이 잇는다
+    lick(rx, ry, f.dir(s * 0.04), H * 0.72, H * 0.14, c, { life: 0.36, sway: -s * H * 0.08, dry: 0.45, gr: 0.045, vy: -40 });
+    // 곁 혀 [밑동 벌림, 기울기, 길이, 굵기, 밝은 짝] — 한쪽에 둘 · 다른 쪽에 하나(좌우가 다르다). 바깥으로 휘었다 끝이 안으로 말려 외곽이 위로 좁아진다
+    const B: readonly [number, number, number, number, boolean][] = [
+      [s * 0.08, s * 0.14, 0.62, 0.12, true], [s * 0.2, s * 0.3, 0.3, 0.08, false], [-s * 0.09, -s * 0.12, 0.48, 0.1, true],
     ];
-    T.forEach(([a, side, tilt, len], i) => later(0.02 + 0.015 * i, () => {
-      const [px, py] = f.at(H * a, side * H * 0.05);
+    B.forEach(([b, tilt, len, w, lite], i) => later((i + 0.9) / 60, () => {
+      const [px, py] = f.at(12 + 8 * n01(), b * H);
       const L = H * len * (0.85 + 0.3 * n01());
-      lick(px, py, f.dir(side * tilt), L, H * 0.075, i === 3 ? liteOf(c) : c, { life: 0.3, sway: side * L * 0.25, gr: 0.18, vy: -60 });
+      lick(px, py, f.dir(tilt), L, H * w, lite ? liteOf(c) : c, { life: 0.32, sway: Math.sign(b) * L * (0.18 + 0.1 * n01()), dry: 0.45, gr: 0.1, vy: -55 });
     }));
+    // 갈라진 끝 — 가운데 혀 8할 자리에서 두 갈래 밝은 혀가 벌어져 솟는다(길이 · 굵기가 다르다)
+    later(1.9 / 60, () => {
+      const [px, py] = f.at(10 + H * 0.58, s * H * 0.04);
+      lick(px, py, f.dir(s * 0.22), H * 0.44, H * 0.075, liteOf(c), { life: 0.3, sway: -s * H * 0.06, dry: 0.45, gr: 0.16, vy: -70 });
+      lick(px, py, f.dir(-s * 0.2), H * 0.28, H * 0.05, liteOf(c), { life: 0.26, sway: s * H * 0.05, gr: 0.18, vy: -80 });
+    });
+    // 떨어져 나가는 혀 — 꼭대기에서 끊겨 위로 뜬다
     later(0.16, () => {
-      const [tx, ty] = f.at(H * 0.85, 0);
-      lick(tx, ty, f.dir(sgn() * 0.3), H * 0.22, H * 0.05, liteOf(c), { life: 0.32, sway: sgn() * H * 0.06, gr: 0.22, vy: -160 });
+      const [tx, ty] = f.at(H * 0.95, s * H * 0.06);
+      lick(tx, ty, f.dir(sgn() * 0.3), H * 0.2, H * 0.05, liteOf(c), { life: 0.32, sway: sgn() * H * 0.06, gr: 0.22, vy: -160 });
     });
     scatter(0.08, 4, (i) => { const [ex, ey] = f.at(H * (0.3 + 0.5 * n01()), sgn() * H * 0.3); ember(ex, ey, Math.sqrt(k), c, i, i === 3); }, 10);
   },
@@ -188,7 +200,8 @@ export const phoenix: Recipe = {
     lick(x, y, UP + 0.2, 24, 4.4, c, { life: 0.22, sway: 6, vy: -50 });
     lick(x - 5, y + 3, UP - 0.35, 15, 3, liteOf(c), { life: 0.2, sway: -4, vy: -60 });
   },
-  // 칼 기운 — 칼날 바깥 반에서 불 혀가 위로 말려 오른다(한 번에 둘 · 셋이 살아 있다). 깜빡임은 고르지 않게 건너뛴다.
+  // 칼 기운 — 칼날 바깥 반에서 칼날보다 긴 불 혀가 위로 말려 오른다(한 번에 둘 · 셋이 살아 있다). 깜빡임은 고르지 않게 건너뛴다.
+  // 혀는 몸 바깥으로 휘었다 끝만 안으로 말린다 — 길어져도 머리 · 몸을 덮지 않게.
   // cr = 콤보 비율(0~1) — 콤보가 쌓일수록 혀가 길어진다(불새 = 콤보가 쌓일수록 사거리가 는다)
   aura(b, n, c, cr = 0) {
     if (n01() < 0.18) return;
@@ -196,11 +209,11 @@ export const phoenix: Recipe = {
     const x = b[0] + (b[2] - b[0]) * u;
     const y = b[1] + (b[3] - b[1]) * u;
     const out = b[2] >= b[0] ? 1 : -1; // 몸 바깥 쪽
-    const L = (22 + 16 * n01()) * (1 + 1.4 * cr);
-    lick(x, y, UP + out * (0.1 + 0.3 * n01()), L, 5.2 + 1.6 * cr, n % 3 === 2 ? liteOf(c) : c, { life: 0.3 + 0.22 * n01(), sway: sgn() * L * 0.3, vy: -40 - 30 * cr });
+    const L = (60 + 20 * n01()) * (1 + 1.1 * cr); // 콤보 100에서 2.1배 — 2.4배는 혀가 180을 넘어 먹 줄기만 길게 남았다
+    lick(x, y, UP + out * (0.1 + 0.3 * n01()), L, 7.8 + 2.4 * cr, n % 3 === 2 ? liteOf(c) : c, { life: 0.3 + 0.22 * n01(), sway: L * (out * 0.18 + sgn() * 0.1), vy: -40 - 30 * cr });
     if (n % 3 === 0) { // 셋에 하나는 곁에 짧은 혀 하나 더 — 한 번에 둘 · 셋이 겹쳐 탄다
       const v = 0.3 + n01() * 0.5;
-      lick(b[0] + (b[2] - b[0]) * v, b[1] + (b[3] - b[1]) * v, UP - out * 0.15, L * 0.6, 3.6 + cr, c, { life: 0.26 + 0.14 * n01(), sway: sgn() * L * 0.2, vy: -50 - 30 * cr });
+      lick(b[0] + (b[2] - b[0]) * v, b[1] + (b[3] - b[1]) * v, UP + out * 0.05, L * 0.6, 5.4 + 1.5 * cr, c, { life: 0.26 + 0.14 * n01(), sway: L * (out * 0.14 + sgn() * 0.06), vy: -50 - 30 * cr });
     }
     if (n % 4 === 0) ember(x, y - 4, 0.7 + 0.3 * cr, c, n, n % 8 === 0);
   },

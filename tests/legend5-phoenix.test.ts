@@ -41,15 +41,18 @@ const area = (b: readonly number[]): number => (b[2] - b[0]) * (b[3] - b[1]);
 beforeEach(() => resetBladeFx());
 
 describe('불새 — 불기둥 → 비대칭 날개 → 위로 떨어져 나가는 불', () => {
-  it('타격: 3프레임 안에 넓은 불길이 위로 솟고 불 혀 넷이 따라 서며, 모든 획이 친 자리 위에 있다 · 2초 뒤 0', () => {
+  it('타격: 첫 프레임에 불길 몸이 다 그어지고 곁 혀 셋 · 갈라진 끝 둘이 따라 서며, 뿌리는 옆으로 벌어져 있고 모든 획이 친 자리 위 · 2초 뒤 0', () => {
     r.hit(180, 500, 1, c);
     const body = live().filter((p) => p.k === 'zig');
     expect(body).toHaveLength(1); // 불길 몸이 먼저, 혀는 1~3프레임 뒤
-    expect(Math.min(...pts(body[0]).map(([, y]) => y))).toBeLessThan(500 - 80); // 높이 ~0.9H
-    expect(body[0].gr * body[0].max).toBeLessThanOrEqual(3 / 60 + 1e-9); // 3프레임 안에 다 그어진다
+    expect(Math.min(...pts(body[0]).map(([, y]) => y))).toBeLessThan(500 - 80); // 높이 ~0.95H
+    expect(body[0].gr * body[0].max).toBeLessThanOrEqual(1 / 60 + 1e-9); // 첫 프레임에 다 그어진다 — 먹 뿌리만 덩이로 남는 프레임이 없다
     step(6);
-    expect(live().filter((p) => p.k === 'zig').length).toBeGreaterThanOrEqual(5);
-    for (const p of live().filter((b) => b.k === 'zig')) for (const [, y] of pts(p)) expect(y).toBeLessThan(500);
+    const zs = live().filter((p) => p.k === 'zig');
+    expect(zs.length).toBeGreaterThanOrEqual(6);
+    const roots = zs.map((p) => p.x); // 뿌리가 한 점에 모이면 거꾸로 매달린 다발로 읽혔다
+    expect(Math.max(...roots) - Math.min(...roots)).toBeGreaterThan(25);
+    for (const p of zs) for (const [, y] of pts(p)) expect(y).toBeLessThan(500);
     step(125);
     expect(liveBits()).toHaveLength(0);
   });
@@ -66,6 +69,17 @@ describe('불새 — 불기둥 → 비대칭 날개 → 위로 떨어져 나가�
     expect(Math.abs(top(L) - top(R))).toBeGreaterThan(30); // 한쪽은 위로 길게 · 한쪽은 옆으로 짧게
     const pillar = Math.min(...live().filter((p) => p.k === 'zig').flatMap((p) => pts(p).map(([, y]) => y)));
     expect(pillar).toBeLessThan(500 - 120);
+  });
+
+  it('완파 펼침: 깃은 한꺼번에 나오지 않는다 — 한 프레임에 새 깃 둘 이하(날개마다 하나)', () => {
+    r.destroy(180, 500, 1.25, c);
+    let prev = new Set<Bit>();
+    for (let i = 0; i < 40; i++) {
+      const now = live().filter((p) => p.k === 'stroke');
+      expect(now.filter((p) => !prev.has(p)).length).toBeLessThanOrEqual(2);
+      prev = new Set(now);
+      step(1);
+    }
   });
 
   it('크기 순서 헛스윙 < 타격 < 층 깨기 < 완파 · 한 사건 획 40 안 · 어느 사건도 초승달(sweep)을 긋지 않는다', () => {
