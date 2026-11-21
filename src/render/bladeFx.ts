@@ -10,7 +10,7 @@
 // 콤보 50·100·200에서 한 단씩 커지고(100부터 겹 베기), 고비(50·100·200·500·999)를 넘는 타격은 한 번 크게.
 // 연장 넷·게이지 참·콤보 끊김·깔림 탈출·마스크 도트와 연타 줄 박자는 weaponFx.ts — 이 풀과 뿌리개를 빌려 쓴다.
 // ★전설 여덟(11-21, docs/INK_FX_2026-11-01.md §13 · §14)은 먹 붓 화법 그대로 한 붓에 먹과 시그니처 색을 머금는다 —
-// 댄 머리는 먹, 꼬리로 짙은 색 · 순색 · 밝은 끝(legendTone). 검은 먹 획 속에 색을 심지 않고, 획 전체를 색 하나로 칠하지도 않는다.
+// 댄 머리는 먹, 꼬리로 짙은 색 · 순색 · 밝은 끝(legendTone. 화염만 거꾸로 밑동 빨강 → 끝 먹). 검은 먹 획 속에 색을 심지 않고, 획 전체를 색 하나로 칠하지도 않는다.
 // 공통 먹 베기 획 · 튐을 깔지 않고(own) 무기마다 다른 붓놀림으로 긋는다 — 화염 휘어 오르는 혀 · 서리 날 선 결정 · 번개 꺾인 한 획 ·
 // 흑철 무거운 누름 획과 발묵 · 거꾸로 오르는 방울 · 크레인 갈고리에 걸려 들리는 짐과 탑 크레인 · 먹 붓글씨 · 황금 금 튐과 금박 ·
 // 다이아 드릴 비스듬한 자국이 쌓여 좁아지는 나사 날(weaponFx).
@@ -658,7 +658,7 @@ export const RECIPES: Record<GreatLook['shape'], Recipe> = {
     },
   },
   // ★전설 일곱(아래 · 먹 포함)은 own — 공통 먹 베기 획 · 튐 없이 제 붓놀림만 긋는다. 먹 붓 화법 그대로, 먹 색 자체가 시그니처 색이다(속 색을 심지 않는다)
-  // 화염 — 불 그림 붓놀림: 밑동이 굵고 끝이 갈라지며 휘어 오르는 주홍 붓 혀가 겹겹이 솟고(안쪽 혀는 밝은 짝), 주홍 불티가 오른다.
+  // 화염 — 불 그림 붓놀림: 밑동이 굵고 끝이 갈라지며 휘어 오르는 붓 혀가 겹겹이 솟고(밑동 빨강 → 끝 먹, 안쪽 혀는 밑동이 밝은 짝), 주홍 불티가 오른다.
   // 칼길은 주홍 마른 붓 획 바깥에서 혀가 말려 오른다. 층 깨기 · 완파는 가운데부터 바깥으로 번져 붙는다(같은 크기 혀 줄은 초 · 화구 — 크기 · 기울기를 고르지 않게)
   wave: {
     trail: { w: 11, dry: 0.35 },
@@ -1251,6 +1251,8 @@ const LITE_OF = new Map<string, string>(LEGEND_IDS.map((w) => [WEAPON_LITE[w], W
  * 댄 머리는 먹 → 같은 색조의 짙은 색 → 순색 → 끝 1할 남짓은 밝은 짝. 몸통은 먹 머리가 1.5할이고, 가닥은 전환 자리를
  * 0.04~0.34로 흩는다(한 자리에서 다 같이 바뀌면 디지털 그라데이션 띠로 읽힌다). 밝은 짝 획은 먹 없이 시그니처 색 → 밝은 짝.
  * 시안 다섯(머리 먹 → 꼬리 색 · 먹 몸 + 색 가닥 · 색 몸 + 먹 테 · 한쪽 먹 한쪽 색 · 가닥 엇갈림)을 심사 세 시각에 붙여 고른 판.
+ * ★화염만 거꾸로: 밑동 빨강 → 3할쯤부터 먹(11-21 사용자 「빨강이 안쪽 검정이 바깥쪽」 → 「3할쯤부터 먹으로 채택」).
+ * 먹 테(빨강 속 + 먹 테두리)는 먹이 적어 티가 안 난다고 반려됐다. §14-6.
  */
 function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: readonly number[]): Tone | undefined {
   const pair = LEGEND.get(p.c1);
@@ -1266,6 +1268,23 @@ function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: read
   } else {
     [x0, y0, x1, y1] = [p.x, py, p.x + Math.cos(p.rot) * p.size, py + Math.sin(p.rot) * p.size];
   }
+  // 몸통 · 가닥 셋의 그라데이션. 가닥은 전환 자리를 lo~lo+spread로 엇갈린다
+  const tones = (grad: (a: number) => CanvasGradient, body: number, lo: number, spread: number): Tone => {
+    const g = [grad(body), grad(lo + spread * hs(p.seed, 1)), grad(lo + spread * hs(p.seed, 2)), grad(lo + spread * hs(p.seed, 3))];
+    return (k) => { ctx.fillStyle = g[k ? 1 + Math.floor(hs(p.seed, k + 30) * 3) : 0]; };
+  };
+  if (sig === WEAPON_INK.flame) {
+    // 화염만 거꾸로 — 밑동(안)은 빨강, 3할쯤부터 짙어져 끝(밖) 7할이 먹. 주황 혀도 밑동만 주황이다
+    const fd = LEGEND.get(sig)?.[0] ?? INK;
+    return tones((a) => {
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, p.c1);
+      g.addColorStop(a, sig);
+      g.addColorStop(a + 0.12, fd);
+      g.addColorStop(a + 0.24, INK);
+      return g;
+    }, 0.06, 0.02, 0.12);
+  }
   if (!pair) {
     const g = ctx.createLinearGradient(x0, y0, x1, y1);
     g.addColorStop(0, sig);
@@ -1273,7 +1292,7 @@ function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: read
     return () => { ctx.fillStyle = g; };
   }
   const [dark, lite] = pair;
-  const at = (a: number): CanvasGradient => {
+  return tones((a) => {
     const g = ctx.createLinearGradient(x0, y0, x1, y1);
     g.addColorStop(0, INK);
     g.addColorStop(a, INK);
@@ -1282,9 +1301,7 @@ function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: read
     g.addColorStop(0.86, p.c1);
     g.addColorStop(1, lite);
     return g;
-  };
-  const tones = [at(0.14), at(0.04 + 0.3 * hs(p.seed, 1)), at(0.04 + 0.3 * hs(p.seed, 2)), at(0.04 + 0.3 * hs(p.seed, 3))];
-  return (k) => { ctx.fillStyle = tones[k ? 1 + Math.floor(hs(p.seed, k + 30) * 3) : 0]; };
+  }, 0.14, 0.04, 0.3);
 }
 
 /** 붓 획 하나(stroke · sweep · zig) — 먹 획 + 벤 순간 속 색 + 공사중 빗금 */
