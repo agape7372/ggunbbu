@@ -83,10 +83,10 @@ function wing(f: Frame, s: number, a0: number, b0: number, th: number, len: numb
   return [tipX, tipY];
 }
 
-/** 불티 · 재 — 찢긴 조각이 흔들리며 위로 뜬다(leaf가 좌우로 흔든다). ash = 먹 재(조금 크다) */
-function ember(x: number, y: number, q: number, c: string, i: number, ash = false): void {
+/** 불티 · 재 — 찢긴 조각이 흔들리며 위로 뜬다(leaf가 좌우로 흔든다). ash = 먹 재(조금 크다) · rise = 빠르기(크기와 따로) */
+function ember(x: number, y: number, q: number, c: string, i: number, ash = false, rise = q): void {
   put('leaf', x, y, {
-    vx: sgn() * 40 * q, vy: (-50 - n01() * 80) * q, g: -50 * q, drag: 1.4,
+    vx: sgn() * 40 * rise, vy: (-50 - n01() * 80) * rise, g: -50 * rise, drag: 1.4,
     life: 0.8 + n01() * 0.5, size: (ash ? 4.6 : 3.4) * q * (0.8 + 0.6 * n01()), rot: n01() * TAU, spin: sgn() * 4,
     c1: ash ? PALETTE.INK : i % 2 ? liteOf(c) : c,
   });
@@ -200,22 +200,28 @@ export const phoenix: Recipe = {
     lick(x, y, UP + 0.2, 24, 4.4, c, { life: 0.22, sway: 6, vy: -50 });
     lick(x - 5, y + 3, UP - 0.35, 15, 3, liteOf(c), { life: 0.2, sway: -4, vy: -60 });
   },
-  // 칼 기운 — 칼날 바깥 반에서 칼날보다 긴 불 혀가 위로 말려 오른다(한 번에 둘 · 셋이 살아 있다). 깜빡임은 고르지 않게 건너뛴다.
-  // 혀는 몸 바깥으로 휘었다 끝만 안으로 말린다 — 길어져도 머리 · 몸을 덮지 않게.
-  // cr = 콤보 비율(0~1) — 콤보가 쌓일수록 혀가 길어진다(불새 = 콤보가 쌓일수록 사거리가 는다)
+  // 칼 기운 — 칼날 칼끝 쪽 3할에서 칼 길이만 한 불 혀가 피어올라 칼을 감는다(한 번에 둘 · 셋이 살아 있다). 깜빡임은 고르지 않게 건너뛴다.
+  // 큰 혀는 번갈아 — 짝 번은 바깥으로 휘었다 끝이 칼 쪽으로 말려 들고, 홀 번은 조금 짧게, 밑동이 칼날을 넘어 안으로 휘었다 끝이 바깥으로 빠진다(두 끝이 같은 높이에서 엇갈리면 가는 끝 둘이 X로 읽혔다).
+  // 곁 혀는 칼날을 따라 손 쪽으로 기며 날을 한 번 넘나든다 — 셋이 엇갈려 칼을 감싼다(한쪽으로만 휘면 칼 곁에 선 괄호 하나로 읽혔다).
+  // 위로 거의 뜨지 않는다 — 칼에서 떨어져 하늘로 서면 크게 읽혔다. 외곽은 칼날에서 35 안 · 몸(발 위 0~60 · 좌우 ±18)을 덮지 않는다.
+  // cr = 콤보 비율(0~1) — 콤보가 쌓일수록 혀가 길어진다(콤보 100에서 1.3배 · 앞 판 2.1배는 혀가 170까지 서서 「너무 크다」)
   aura(b, n, c, cr = 0) {
     if (n01() < 0.18) return;
-    const u = 0.45 + n01() * 0.55;
+    const r = n01(); // 뿌리 자리와 길이를 같이 — 칼끝 쪽 뿌리일수록 길다(손보다 높이 뿌리 둔 긴 혀는 손 위로 솟아 칼에서 멀어졌다)
+    const u = 0.72 + r * 0.28;
     const x = b[0] + (b[2] - b[0]) * u;
     const y = b[1] + (b[3] - b[1]) * u;
     const out = b[2] >= b[0] ? 1 : -1; // 몸 바깥 쪽
-    const L = (60 + 20 * n01()) * (1 + 1.1 * cr); // 콤보 100에서 2.1배 — 2.4배는 혀가 180을 넘어 먹 줄기만 길게 남았다
-    lick(x, y, UP + out * (0.1 + 0.3 * n01()), L, 7.8 + 2.4 * cr, n % 3 === 2 ? liteOf(c) : c, { life: 0.3 + 0.22 * n01(), sway: L * (out * 0.18 + sgn() * 0.1), vy: -40 - 30 * cr });
+    const L = (30 + 8 * r) * (1 + 0.3 * cr);
+    const cup = n % 2 === 0;
+    const lean = cup ? 0.14 + 0.1 * n01() : -0.08 + 0.06 * n01();
+    const sway = cup ? 0.15 + 0.08 * n01() : -0.24 - 0.04 * n01();
+    lick(x, y, UP + out * lean, cup ? L : L * 0.8, 4.8 + 1.4 * cr, n % 3 === 2 ? liteOf(c) : c, { life: 0.3 + 0.22 * n01(), sway: out * L * sway, vy: -4 - 2 * cr });
     if (n % 3 === 0) { // 셋에 하나는 곁에 짧은 혀 하나 더 — 한 번에 둘 · 셋이 겹쳐 탄다
-      const v = 0.3 + n01() * 0.5;
-      lick(b[0] + (b[2] - b[0]) * v, b[1] + (b[3] - b[1]) * v, UP + out * 0.05, L * 0.6, 5.4 + 1.5 * cr, c, { life: 0.26 + 0.14 * n01(), sway: L * (out * 0.14 + sgn() * 0.06), vy: -50 - 30 * cr });
+      const v = 0.7 + n01() * 0.25;
+      lick(b[0] + (b[2] - b[0]) * v, b[1] + (b[3] - b[1]) * v, UP - out * 0.4, L * 0.5, 3.4 + cr, c, { life: 0.26 + 0.14 * n01(), sway: -out * L * 0.13, vy: -4 - 2 * cr });
     }
-    if (n % 4 === 0) ember(x, y - 4, 0.7 + 0.3 * cr, c, n, n % 8 === 0);
+    if (n % 4 === 0) ember(x, y - 4, 0.7 + 0.3 * cr, c, n, n % 8 === 0, 0.3); // 불티는 천천히 — 칼 곁에서 꺼진다
   },
   every: 0.1,
   tint: true,
