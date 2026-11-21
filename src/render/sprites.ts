@@ -591,7 +591,7 @@ const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
   tide: { shape: 'surf', blade: '#0072CD', hi: '#559FEF', guard: '#0E2C4E', w: 3 },
   volt: { shape: 'volt', blade: '#C8C832', hi: '#D7D866', guard: '#3E3E12', w: 2.8 },
   icicle: { shape: 'icicle', blade: '#4FC8F0', hi: '#C4E6F2', guard: '#1E4E60', w: 2.6 },
-  shade: { shape: 'smoke', blade: '#5E46B3', hi: '#8476D5', guard: PALETTE.INK, w: 3.2 },
+  shade: { shape: 'smoke', blade: '#9048E8', hi: '#B286F2', guard: PALETTE.INK, w: 3.2 },
 };
 
 /** 대검이면 그 모양·색 — 베기 파편(effects)도 같은 색을 쓴다 */
