@@ -6,10 +6,7 @@ import { makeState } from '../src/core/sim';
 import type { GameState, JuiceEvent, JuiceKind, WazaId, WeaponId } from '../src/core/types';
 import { GREATSWORD_IDS, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { bladeReact, drawBladeFx, pool, resetBladeFx, updateBladeFx, weaponAlong, weaponBloom, type Bit } from '../src/render/bladeFx';
-import { TOOL_RECIPES, drawHeatTip, liveBits, setFxMask } from '../src/render/weaponFx';
-import { setLiveBody, setPlayerWeapon } from '../src/render/sprites';
-import { moveBody } from '../src/render/moveBody';
-import { PALETTE, WEAPON, WEAPON_INK } from '../src/config';
+import { TOOL_RECIPES, liveBits, setFxMask } from '../src/render/weaponFx';
 import { drawWazaShot } from '../src/render/wazaShow';
 
 /** 연장 열둘(철거칼 · 오함마 · 빠루 · 그라인더 + 11-20 일곱 + 다이아 드릴) — 대검이 아닌 무기 */
@@ -230,39 +227,6 @@ describe('연장·필살 이펙트', () => {
     expect(liveBits().filter((p) => p.k !== 'drop').length).toBeGreaterThanOrEqual(2); // 나선 획 둘(bent)
     expect(pieces()).toBeLessThanOrEqual(10);
     expect(liveBits().some((p) => p.k === 'drop')).toBe(true);
-    settle();
-    expect(pieces()).toBe(0);
-  });
-});
-
-// 드릴류 과열(11-21) — 무기 끝이 포인트 색으로 달아오르고(반을 넘으면 종이빛 속 · 4분의 3을 넘으면 김), 멈춘 동안은 식은 먹. 멈추는 순간 먹 연기 한 번
-describe('과열 — 무기 끝', () => {
-  it('열 0은 안 그린다 · 오를수록 포인트 색 · 반 넘으면 종이빛 속 · 멈춘 동안은 안 달아오른다 · 멈춤 = 먹 연기', () => {
-    const s = makeState();
-    s.weapon = 'diadrill';
-    const h = WEAPON.diadrill.heat!;
-    setPlayerWeapon(s.weapon);
-    const tip = (heat: number, stall = 0): string => {
-      s.player.heat = heat; s.player.stall = stall;
-      setLiveBody(moveBody(s));
-      try { return traced((c) => drawHeatTip(c, s, 100, 500)); } finally { setLiveBody(null); }
-    };
-    const full = h.max * h.cool;
-    expect(tip(0)).toBe('');
-    const low = tip(full * 0.3);
-    expect(low).toContain(WEAPON_INK.diadrill);
-    expect(low).not.toContain(PALETTE.BG);
-    expect(low).not.toContain(PALETTE.RUBBLE); // 반 아래엔 김이 없다
-    const warm = tip(full * 0.6);
-    expect(warm).toContain(PALETTE.RUBBLE); // 김 — 반을 넘으면 옅은 먹 증기
-    const hot = tip(full * 0.9);
-    expect(hot).toContain(PALETTE.BG); // hotCore
-    expect(hot).toContain(PALETTE.INK); // 70%부터 김이 짙은 먹
-    expect(hot.split('fill()').length).toBeGreaterThan(warm.split('fill()').length); // 과열에 가까울수록 가닥이 많다
-    expect(hot).not.toContain('shadowBlur');
-    expect(tip(full, 30)).toBe('');
-    bladeReact(s, { kind: 'overheat' });
-    expect(liveBits().some((p) => p.k === 'dust')).toBe(true);
     settle();
     expect(pieces()).toBe(0);
   });

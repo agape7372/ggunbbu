@@ -115,9 +115,12 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   if (res === 'miss') return false;
   s.hitAt = s.tick;
 
-  // 종은 세게 밀린다(저글링) · 바람탑 들숨은 두 배 — 아케이드 재질은 배율 1
-  stack.vy = Math.max(stack.vy, liftOf(s) * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
-  stack.resting = false;
+  // 종은 세게 밀린다(저글링) · 바람탑 들숨은 두 배 — 아케이드 재질은 배율 1.
+  // 쥔 채 반복 타격(드릴류)은 밀지 않는다: 쥐고만 있으면 건물이 내려와 깔린다(player.ts swing · tests/weapons.test.ts)
+  if (!s.player.attackHold) {
+    stack.vy = Math.max(stack.vy, liftOf(s) * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
+    stack.resting = false;
+  }
 
   if (res === 'collapse') {
     const isButter = mat === 'butter';
