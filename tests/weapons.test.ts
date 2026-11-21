@@ -7,9 +7,10 @@ import { continueFromCheckpoint, enterAct2, enterAct2Phase } from '../src/core/a
 import { makeFloor, makeStack, stackPhysics } from '../src/core/building';
 import { addGauge, attackRange, breakCombo, destroyStack, gaugePerHit, tryGuardBounce, weaponGaugeMul } from '../src/core/combat';
 import { EMPTY_INPUT, type GameState, type InputFrame, type PerkId, type WeaponId } from '../src/core/types';
-import { GUARD_GAUGE, MAT_HP, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
+import { GUARD_GAUGE, JUICE, MAT_HP, PERK, PERK_RUN, PLAYER, SCORE, STACK, WEAPON } from '../src/config';
 import { BLADE_IDS, BODY_IDS, DEFAULT_LOADOUT, equip, GREATSWORD_IDS, isOwned, LETTERS_IDS, MASK_IDS, slotOf, validateLoadout, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
 import { WEAPON_DUST_COST } from '../src/meta/economy';
+import { runStage } from './stageBot';
 
 const IDS = Object.keys(WEAPON) as WeaponId[];
 /** 연타 1주기 = 공격 6f(예열·타격·여운) + 다음 누름까지 1f */
@@ -31,7 +32,7 @@ describe('무기 표', () => {
 
   it('1막 어디서든 연타만으로는 건물이 떠 있지 못한다 (띄우기 상한)', () => {
     // 타격이 vy를 lift로 올리고 다음 타격까지 CYCLE틱 중력을 받는다 — 주기당 변위가 음수여야 한다
-    // ⚠ 이것만으로는 「못 버틴다」가 아니다(다이아 드릴 −1.2px면 깔리기 전 35~45타 > 건물 HP 6.5). 쥐고 있기는 아래 「과열」이 봇으로 잰다
+    // ⚠ 이것만으로는 「못 버틴다」가 아니다(다이아 드릴 −1.2px면 깔리기 전 35~45타 > 건물 HP 6.5). 쥐고 있기는 아래 「쥔 채 반복 타격」이 봇으로 잰다
     const g = STACK.ACT1_G[0];
     for (const id of IDS) {
       const top = WEAPON[id].lift + (WEAPON[id].comboLift ?? 0); // 크레인은 콤보 100에서 가장 높다
@@ -515,12 +516,15 @@ it('철거칼은 쥐고 있어도 첫 누름 한 번뿐', () => {
   expect(swings(s, held(60, { attack: true }))).toBe(1);
 });
 
-// ── 과열(11-21) — 쥐고만 있으면 사람 손이 못 내는 틀 완벽 박자(7~8틱)가 공짜라 1막 저속 판을 가드 없이 넘었다.
-// 「연타만으로는 못 버틴다」의 실제 조건은 주기당 변위가 아니라 「깔리기 전 벨 수 < 건물 HP」다. 그래서 봇으로 직접 잰다
+// ── 쥔 채 반복 타격(11-21) — 쥐고만 있으면 사람 손이 못 내는 틀 완벽 박자(7~8틱)로 건물을 띄워 1막 저속 판을 가드 없이 넘었다.
+// 과열(멈춤)로 막았다가 걷고(사용자 「과열은 눈이아프니까 빼고」), 반복 타격은 밀어 올리지 않고 끌어내리게 바꿨다(WeaponSpec.holdPull).
+// 안 띄우기만으로는 느린 구층탑(끝속도 6.9)을 쥐고만 있어도 깼다. 다시 누르면 반복 휘두름을 끊고 바로 띄우고, 손을 떼면 바로 멈춘다(막을 수 있다).
+// 「연타만으로는 못 버틴다」의 실제 조건은 주기당 변위가 아니라 「깔리기 전 벨 수 < 건물 HP」라서 봇으로 직접 잰다
 const HOLD_IDS = IDS.filter((id) => WEAPON[id].holdRepeat);
 
-/** 가드 · 점프 없이 바닥에서 쥐고만 있다. 누름 셈이 닫히면(판 처음 · 멈춤 뒤 · 쪽지) 다시 누르고, 깔리면 10틱 뒤부터 눌러 빠진다 */
-function holdOnly(s: GameState, ticks: number): void {
+/** 가드 · 점프 없이 바닥에서 쥐고만 있다. 누름 셈이 닫히면(판 처음 · 깔림 뒤 · 쪽지) 다시 누르고, 깔리면 10틱 뒤부터 눌러 빠진다.
+ *  liftAll = 반복 타격도 밀어 올리게(휘두름이 나간 다음 틱부터 맞으니 advance 앞에서 끄면 그 휘두름 전체에 먹는다) */
+function holdOnly(s: GameState, ticks: number, liftAll = false): void {
   let pinAt = -1;
   for (let t = 0; t < ticks && !s.over; t++) {
     const p = s.player;
@@ -533,6 +537,7 @@ function holdOnly(s: GameState, ticks: number): void {
       pinAt = -1;
       f = { ...EMPTY_INPUT, attackHeld: true, attack: p.holdTick === 0 || !!s.perk?.offer };
     }
+    if (liftAll) p.attackHold = false;
     advance(s, f);
     s.events.length = 0;
   }
@@ -544,10 +549,82 @@ const arcadeRun = (w: WeaponId, seed: number): GameState => {
   return s;
 };
 
-describe('과열 — 바닥에서 쥐고만 있으면 버티지 못한다', () => {
-  it('누르고 있기 무기는 모두 과열이 있다', () => {
+describe('쥔 채 반복 타격은 끌어내린다', () => {
+  it('누르고 있기 무기는 셋 · 모두 끌어내린다(당김이 없으면 느린 건물을 쥐고만 있어도 깬다)', () => {
     expect([...HOLD_IDS].sort()).toEqual(['diadrill', 'drill', 'jackhammer']);
-    for (const id of HOLD_IDS) expect(WEAPON[id].heat, id).toBeDefined();
+    for (const w of HOLD_IDS) expect(WEAPON[w].holdPull, w).toBeGreaterThan(0);
+  });
+
+  const PRESS: InputFrame = { ...EMPTY_INPUT, attack: true, attackHeld: true };
+  const HELD: InputFrame = { ...EMPTY_INPUT, attackHeld: true };
+  /** 머리 위 단단한 세 층 건물 앞에서 쥔다. 타격마다 [반복?, Δvy, vy, Δy, 깎은 HP, 갈기 표식, 누른 뒤 틱] */
+  function grindRig(w: WeaponId) {
+    const s = makeState({ seed: 3 }); s.weapon = w; s.lives = 99;
+    s.stack = makeStack({ variant: 'building', theme: 'europe', floors: [makeFloor('hard'), makeFloor('hard'), makeFloor('hard')], y: WEAPON[w].reach - 2 });
+    const hits: { hold: boolean; dvy: number; vy: number; dy: number; hp: number; grind: boolean; since: number }[] = [];
+    const hpOf = (): number => s.stack!.floors.reduce((a, f) => a + f.segs[0].hp, 0);
+    let pressAt = 0;
+    const step = (f: InputFrame): void => {
+      if (f.attack) pressAt = s.tick;
+      const vy = s.stack!.vy, y = s.stack!.y, hp = hpOf();
+      advance(s, f);
+      const e = s.events.find((v) => v.kind === 'hit' || v.kind === 'floorCollapse');
+      if (e) hits.push({ hold: s.player.attackHold, dvy: s.stack!.vy - vy, vy: s.stack!.vy, dy: s.stack!.y - y, hp: hp - hpOf(), grind: !!e.grind, since: s.tick - pressAt });
+      s.events.length = 0;
+    };
+    return { s, hits, step };
+  }
+
+  it('첫 누름 타격은 건물을 띄우고, 쥔 채 반복 타격은 끌어내린다 · 쥔 채 다시 누르면 다시 띄운다', () => {
+    for (const w of HOLD_IDS) {
+      const { s, hits, step } = grindRig(w);
+      step(PRESS);
+      while (hits.length < 2) step(HELD);
+      while (s.player.pose === 'attack') step(HELD); // 반복 휘두름이 끝난 뒤에 누른다
+      step(PRESS); // 쥔 채 다시 누른다
+      while (hits.length < 3) step(HELD);
+      const [press, rep, again] = hits;
+      expect(press.hold, w).toBe(false);
+      expect(press.grind, w).toBe(false);
+      expect(press.vy, w).toBe(liftOf(s));
+      expect(press.dy, w).toBeGreaterThan(-WEAPON[w].holdPull!);
+      expect(rep.hold, w).toBe(true);
+      expect(rep.grind, w).toBe(true); // 렌더가 작게 갈아 내는 표식
+      expect(rep.dvy, w).toBeLessThanOrEqual(0); // 밀어 올리지 않는다
+      expect(rep.dy, w).toBeLessThanOrEqual(-WEAPON[w].holdPull!); // 중력에 더해 끌어내린다
+      expect(rep.hp, w).toBe(1); // 층은 그대로 깎는다
+      expect(again.hold, w).toBe(false);
+      expect(again.vy, w).toBe(liftOf(s));
+    }
+  });
+
+  it('반복 휘두름 도중에 다시 누르면 그 휘두름을 끊고 바로 띄우며 벤다(누름이 먹히지 않는다)', () => {
+    for (const w of HOLD_IDS) {
+      const { s, hits, step } = grindRig(w);
+      step(PRESS);
+      while (hits.length < 2) step(HELD); // 반복 타격이 막 닿았다 — 휘두름은 아직 남았다
+      expect(s.player.pose, w).toBe('attack');
+      step(PRESS);
+      while (hits.length < 3) step(HELD);
+      const again = hits[2];
+      expect(again.hold, w).toBe(false);
+      expect(again.grind, w).toBe(false);
+      expect(again.vy, w).toBe(liftOf(s));
+      // 히트스톱 + 예열 한 틱 안에 닿는다(휘두름이 끝날 때까지 기다리면 그보다 네 틱 넘게 늦다)
+      expect(again.since, w).toBeLessThanOrEqual(JUICE.hit.hitstop + PLAYER.ATTACK_PRE + 1);
+    }
+  });
+
+  it('반복 휘두름 도중에 손을 떼면 바로 멈추고 막는다(막으려고 뗀 손이 남은 휘두름에 막히지 않는다)', () => {
+    for (const w of HOLD_IDS) {
+      const { s, hits, step } = grindRig(w);
+      step(PRESS);
+      while (hits.length < 2) step(HELD);
+      let n = 0;
+      while (s.player.pose === 'attack' && n < 20) { step({ ...EMPTY_INPUT, guard: true }); n++; }
+      expect(s.player.pose, w).toBe('guardG');
+      expect(n, w).toBeLessThanOrEqual(JUICE.hit.hitstop + 1); // 히트스톱만 기다린다
+    }
   });
 
   it('가드 없이 쥐고만 있으면 1분 안에 목숨 셋을 다 잃는다(아케이드 · 고정 시드)', () => {
@@ -558,75 +635,33 @@ describe('과열 — 바닥에서 쥐고만 있으면 버티지 못한다', () =
     }
   });
 
-  it('과열을 빼면 같은 손이 1분 동안 목숨을 하나도 안 잃는다 — 위 시험이 그 구멍을 잡는다', () => {
+  it('작업 지시서 구층탑(정규)도 쥐고만 있으면 못 깬다 — 탑이 느려 안 띄우기만으로는 깼다', () => {
     for (const w of HOLD_IDS) {
-      const was = WEAPON[w].heat;
-      delete WEAPON[w].heat;
-      try {
-        const s = arcadeRun(w, 1);
-        const lives = s.lives;
-        holdOnly(s, 3600);
-        expect(s.lives, w).toBe(lives);
-      } finally {
-        WEAPON[w].heat = was;
-      }
+      let pinAt = -1;
+      const r = runStage('3-B', 1, {
+        weapon: w, maxTicks: 36000,
+        policy: (s) => {
+          const p = s.player;
+          if (p.pose === 'pinned') {
+            if (pinAt < 0) pinAt = s.tick;
+            const k = s.tick - pinAt - 10;
+            return { ...EMPTY_INPUT, attackHeld: true, attack: k >= 0 && k % 10 === 0 };
+          }
+          pinAt = -1;
+          return { ...EMPTY_INPUT, attackHeld: true, attack: p.holdTick === 0 };
+        },
+      });
+      expect(r.result.cleared, w).toBe(false);
     }
   });
 
-  it('첫 누름은 열이 없다 · 반복 max번째에 멈춘다 · 멈춘 동안 탭은 안 받고 가드는 된다 · 끝나면 열 0', () => {
-    const w = 'diadrill';
-    const h = WEAPON[w].heat!;
-    const s = makeState({ seed: 3 }); s.weapon = w; s.lives = 99;
-    const kinds: string[] = [];
-    const step = (f: InputFrame): void => { advance(s, f); for (const e of s.events) kinds.push(e.kind); s.events.length = 0; };
-    step({ ...EMPTY_INPUT, attack: true, attackHeld: true });
-    expect(s.player.heat).toBe(0);
-    let n = 1;
-    while (s.player.stall === 0 && n < 99) {
-      const before = s.player.pose === 'attack' ? s.player.poseTick : -1;
-      step({ ...EMPTY_INPUT, attackHeld: true });
-      if (s.player.pose === 'attack' && (before < 0 || s.player.poseTick <= before)) n += 1;
+  it('반복 타격도 밀어 올리면 같은 손이 1분 동안 목숨을 하나도 안 잃는다 — 위 시험이 그 구멍을 잡는다', () => {
+    for (const w of HOLD_IDS) {
+      const s = arcadeRun(w, 1);
+      const lives = s.lives;
+      holdOnly(s, 3600, true);
+      expect(s.lives, w).toBe(lives);
     }
-    expect(n).toBe(1 + h.max); // 첫 누름 + 반복 max번(열이 차는 마지막 반복도 나간다)
-    expect(kinds.filter((k) => k === 'overheat')).toHaveLength(1);
-    for (let i = 0; i < 12; i++) step({ ...EMPTY_INPUT, attack: true, attackHeld: true }); // 멈춘 동안 탭 — 마지막 반복이 끝나면 다시 안 선다
-    expect(s.player.pose).toBe('idle');
-    step({ ...EMPTY_INPUT, guard: true });
-    expect(s.player.pose).toBe('guardG');
-    while (s.player.stall > 0) step(EMPTY_INPUT);
-    expect(s.player.heat).toBe(0);
-    expect(kinds.filter((k) => k === 'cooled')).toHaveLength(1);
-    step(EMPTY_INPUT);
-    step({ ...EMPTY_INPUT, attack: true });
-    expect(s.player.pose).toBe('attack'); // 다시 벤다
-  });
-
-  it('가드 중에 공격을 쥐고 있으면 안 베었으니 열도 안 오른다', () => {
-    const s = makeState({ seed: 3 }); s.weapon = 'diadrill'; s.lives = 99;
-    const kinds: string[] = [];
-    const step = (f: InputFrame): void => { advance(s, f); for (const e of s.events) kinds.push(e.kind); s.events.length = 0; };
-    for (let i = 0; i < 6; i++) step({ ...EMPTY_INPUT, guard: true });
-    expect(s.player.pose).toBe('guardG');
-    for (let i = 0; i < 150; i++) {
-      step({ ...EMPTY_INPUT, guard: true, attack: i === 0, attackHeld: true });
-      expect(s.player.pose).not.toBe('attack');
-    }
-    expect(s.player.heat).toBe(0);
-    expect(kinds).not.toContain('overheat');
-  });
-
-  it('떼고 있으면 cool틱마다 열 1씩 식는다 · 탭은 달아오르지 않는다', () => {
-    const w = 'jackhammer';
-    const h = WEAPON[w].heat!;
-    const s = makeState({ seed: 3 }); s.weapon = w; s.lives = 99;
-    swingTicks(s, held(3 * WEAPON[w].holdRepeat! + 2, { attack: true })); // 첫 누름 + 반복 셋
-    expect(s.player.heat).toBe(3 * h.cool);
-    swingTicks(s, Array.from({ length: h.cool }, () => EMPTY_INPUT));
-    expect(s.player.heat).toBe(2 * h.cool);
-    const t = makeState({ seed: 3 }); t.weapon = w; t.lives = 99;
-    swingTicks(t, Array.from({ length: 140 }, (_, i) => ({ ...EMPTY_INPUT, attack: i % 7 === 0, attackHeld: i % 7 < 2 })));
-    expect(t.player.heat).toBe(0);
-    expect(t.player.stall).toBe(0);
   });
 });
 

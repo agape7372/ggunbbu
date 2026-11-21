@@ -10,13 +10,13 @@ import {
   AUDIO, BOSS, CAMERA, COMBO_MARK, COSMETIC_COLORS, DEBRIS, HAT_FX, JUICE, JUICE_SYS, PALETTE, PLAYER, SCORE, SEAL_INK, STACK, VIEW, WEAPON,
 } from '../config';
 import { brushLine, enso, inkDrop, PRESS } from './ink';
-import { onomatoFor, ITEM_COPY, CAPTIONS, destroyedCaption } from '../content';
+import { onomatoFor, ITEM_COPY, destroyedCaption } from '../content';
 import {
   initSprites, drawPlayer, drawHat, drawMask, drawStack, drawBoss, drawEntity, hardHat, hatSpot,
   drawGroundRocks, drawStackShadow, floorTile, setLiveBody, setPlayerCosmetics, setPlayerMask, setPlayerWeapon,
 } from './sprites';
 import { maskColors, wornMask } from '../meta/mask';
-import { drawHeatTip, setFxMask } from './weaponFx';
+import { setFxMask } from './weaponFx';
 import { backdropKey, drawChapterBackdrop, type BackdropInput } from './background';
 import { drawRubbleHeaps, drawSceneLive } from './scenery';
 import { backdropPaper } from './assets';
@@ -347,7 +347,6 @@ function react(s: GameState, e: JuiceEvent): void {
   // 상자는 뭘 받았는지가 정보다
   const supply = e.kind === 'supply';
   if (supply && e.item) word = ITEM_COPY[e.item].pop;
-  if (e.kind === 'overheat') word = CAPTIONS.overheat;
   if (word) {
     // 같은 말이 아직 떠 있으면 그 자리에서 다시 튀운다 — 13px 어긋나 겹치면 「우우르르」로 읽힌다
     const same = popups.findIndex((p) => p.text === word);
@@ -360,7 +359,7 @@ function react(s: GameState, e: JuiceEvent): void {
       y: VIEW.GROUND_Y - (e.y ?? s.player.y + PLAYER.H + 20) - 30,
       ticks: 40,
       life: 40,
-      px: JUICE_SYS.ONOMATO_PX * (supply || e.kind === 'overheat' ? 1.6 : 2.6), // 붓글씨는 25px 이상(상자 · 과열은 작게)
+      px: JUICE_SYS.ONOMATO_PX * (supply ? 1.6 : 2.6), // 붓글씨는 25px 이상
       rot: -0.08 + scatter() * 0.12,
     });
   }
@@ -591,7 +590,6 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
       ctx.translate(-px, -footY);
     }
     drawPlayer(ctx, s.player.pose, s.player.poseTick, px, footY);
-    drawHeatTip(ctx, s, px, footY); // 드릴류 과열 — 무기 끝이 달아오른다
     drawMask(ctx, s.player.pose, s.player.poseTick, px, footY);
     if (s.hat && !hatFlying()) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY); // 받는 중엔 날아오는 쪽이 그린다
     if (squash) ctx.restore();

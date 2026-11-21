@@ -189,13 +189,13 @@ export interface WeaponSpec {
   keepCombo?: number;
   /** 층이 무너질 때마다 필살 게이지 +이 값(무기 배율 안 곱함 · 상한 100) */
   collapseGauge?: number;
-  /** 공격 키를 누르고 있으면 이 틱마다 벤다(탭은 그대로) */
+  /** 공격 키를 누르고 있으면 이 틱마다 벤다(탭은 그대로). 쥔 채 나간 반복 타격은 건물을 밀어 올리지 않고 holdPull만큼 끌어내린다(combat.tryHitStack) */
   holdRepeat?: number;
+  /** 쥔 채 반복 타격 한 번에 건물을 끌어내리는 높이(px) — 끝속도에 안 막히게 높이를 바로 깎는다. 구층탑(끝속도 6.9)도 쥐고만 있으면 금방 깔린다.
+   *  2막은 끌어내리지 않는다. 무기마다 다르다: 쥐고 갈다가 다시 누르는 손이 탭보다 낫되 철거칼 사용자 × 1.25를 넘지 않게(tests/weapons.test.ts · 11-22 봇 실측) */
+  holdPull?: number;
   /** 있으면 누르고 있는 동안 벨 때마다 holdRepeat 간격이 1틱씩 줄어 이 값까지 빨라진다. 떼면 처음으로 */
   holdMin?: number;
-  /** 과열(holdRepeat 무기): 쥔 채 반복으로 벨 때마다 열 +1(첫 누름은 0) · 공격 키를 떼고 있으면 cool틱마다 −1.
-   *  max에 닿으면 stall틱 동안 공격을 못 한다(탭도) · 끝나면 열 0. 가드 · 점프는 그대로(11-21 바닥 홀드 고침) */
-  heat?: { max: number; cool: number; stall: number };
   /** 콤보가 높을수록 필살 게이지 배율에 더한다: 콤보 100에서 +이 값(그 위는 같다) */
   comboGauge?: number;
   /** 이 횟수만큼 깔려도 목숨을 안 잃고 빠져나온다(판 시작에 든다) */
@@ -248,12 +248,12 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   // 연장 일곱(11-20 다섯 → 맨홀 뚜껑 빼고 드릴 셋). 세 칸 + 고유 규칙 하나
   shovel: { reach: 66, lift: 82, gauge: 0.8, shake: 1.1, keepCombo: 0.5 },
   pickaxe: { reach: 72, lift: 78, gauge: 0.8, shake: 1.2, collapseGauge: 2 },
-  jackhammer: { reach: 64, lift: 76, gauge: 0.95, shake: 1.5, holdRepeat: 8, heat: { max: 10, cool: 11, stall: 48 } },
+  jackhammer: { reach: 64, lift: 76, gauge: 0.95, shake: 1.5, holdRepeat: 8, holdPull: 4 },
   pipe: { reach: 62, lift: 80, gauge: 1, shake: 1, airReach: 26 },
-  drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 11, holdMin: 7, heat: { max: 9, cool: 13, stall: 54 } },
+  drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 10, holdMin: 7, holdPull: 6 },
   coredrill: { reach: 70, lift: 76, gauge: 0.85, shake: 1, comboGauge: 0.5 },
   auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1, pinSaveEvery: 25 },
-  diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7, heat: { max: 9, cool: 12, stall: 54 } }, // 전설 · 처음부터 전동 드릴의 끝 간격
+  diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7, holdPull: 7 }, // 전설 · 처음부터 전동 드릴의 끝 간격
   // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 무쇠 · 유리 말고는 고유 규칙이 하나씩 있다(11-20)
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
   brick: { reach: 62, lift: 92, gauge: 0.95, shake: 1.5, guardLift: 1.2 }, // 띄우기 ↑ · 가드 튕김 ↑ / 사거리 ↓
@@ -774,6 +774,8 @@ export const JUICE_SYS = {
   SHAKE_STACK: 0.35, SHAKE_ROT_MAX: 0.035,
   // 방향 킥(px) — 아래에서 위로 베니 화면이 위로 툭 튀었다 용수철로 돌아온다
   KICK_PX: { hit: 3, floorCollapse: 5, stackDestroy: 7, butterCollapse: 3, bossHit: 2 } as Record<string, number>,
+  // 쥔 채 반복 타격(드릴류 · 이벤트 grind) — 흔들림 · 킥과 타격 그림 크기에 곱한다(갈아 내는 작은 먹 튐)
+  GRIND: 0.4,
   KICK_SPRING: 0.3, KICK_DAMP: 0.45,
   // 맞은 층 하얗게 번쩍(틱 · 알파) — 화면 전체가 아니라 그 층만
   HIT_FLASH_TICKS: 3, HIT_FLASH_A: 0.75,

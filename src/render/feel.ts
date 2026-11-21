@@ -25,7 +25,7 @@ export function shakePx(e: JuiceEvent, weaponShake = 1): number {
   let px: number;
   switch (e.kind) {
     case 'hit':
-    case 'floorCollapse': px = JUICE[e.kind].shake * weaponShake; break;
+    case 'floorCollapse': px = JUICE[e.kind].shake * weaponShake * (e.grind ? JUICE_SYS.GRIND : 1); break;
     case 'stackDestroy': px = JUICE.stackDestroy.shake * stackScale(e.n); break;
     case 'phaseClear': px = (e.n ?? 0) >= 100 ? JUICE.bossRoar.shake : 0; break;
     default: px = JUICE[e.kind]?.shake ?? 0;
@@ -47,7 +47,7 @@ export function addTrauma(cur: number, px: number): number {
 /** 방향 킥(px) — 타격·붕괴·완파만. 무기 배율은 타격·층붕괴만, 완파는 층수 규모를 살짝 탄다. */
 export function kickPx(e: JuiceEvent, weaponShake = 1): number {
   const base = JUICE_SYS.KICK_PX[e.kind] ?? 0;
-  if (e.kind === 'hit' || e.kind === 'floorCollapse') return base * weaponShake;
+  if (e.kind === 'hit' || e.kind === 'floorCollapse') return base * weaponShake * (e.grind ? JUICE_SYS.GRIND : 1);
   if (e.kind === 'stackDestroy') return base * Math.min(1.4, stackScale(e.n));
   return base;
 }

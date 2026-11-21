@@ -1,10 +1,8 @@
-// 필살 손질(11-21 심사) — 도장 · 철거 띠 비우기, 필살 끝 뒤 남은 조각 수명, 밤 면 위 먹 = 한지색, 드릴 과열 예고 단
+// 필살 손질(11-21 심사) — 도장 · 철거 띠 비우기, 필살 끝 뒤 남은 조각 수명, 밤 면 위 먹 = 한지색
 import { describe, expect, it } from 'vitest';
-import { PALETTE, WEAPON } from '../src/config';
-import { makeState } from '../src/core/sim';
+import { PALETTE } from '../src/config';
 import { bent, endWazaBits, keepBits, line, paperInk, resetBladeFx, setWazaHoles, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
 import { liveBits } from '../src/render/weaponFx';
-import { HEAT_STEPS, heatStep } from '../src/audio/consume';
 
 describe('필살 손질', () => {
   it('비울 자리 안에서는 필살 조각을 뿌리지 않는다', () => {
@@ -51,18 +49,5 @@ describe('필살 손질', () => {
     c.fillStyle = '#C4301E';
     c.fill();
     expect(set).toEqual([PALETTE.BG, '#C4301E']);
-  });
-
-  it('과열 예고 단 — 열이 오를수록 0 → 3, 멈춘 동안 · 과열 없는 무기는 0', () => {
-    const s = makeState();
-    s.weapon = 'diadrill';
-    const full = WEAPON.diadrill.heat!.max * WEAPON.diadrill.heat!.cool;
-    const at = (f: number): number => { s.player.heat = full * f; return heatStep(s); };
-    expect([at(0.3), at(HEAT_STEPS[0]), at(HEAT_STEPS[1]), at(0.95)]).toEqual([0, 1, 2, 3]);
-    s.player.stall = 10;
-    expect(heatStep(s)).toBe(0);
-    s.weapon = 'sword';
-    s.player.stall = 0;
-    expect(heatStep(s)).toBe(0);
   });
 });

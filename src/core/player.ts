@@ -12,7 +12,7 @@ export function makePlayer(): PlayerState {
     invulnTicks: 0,
     bufAttack: 0, bufJump: 0, bufGuard: 0, bufSpecial: 0,
     pinTick: 0,
-    attackHit: false, attackFromAir: false, holdTick: 0, holdN: 0, heat: 0, stall: 0,
+    attackHit: false, attackFromAir: false, attackHold: false, holdTick: 0, holdN: 0,
   };
 }
 
@@ -54,14 +54,6 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   // 쥔 채 새 판이 열리거나 깔림 · 판 세우기에서 풀려도 새로 누르기 전엔 저절로 베지 않는다
   // holdMin이 있으면(전동 드릴) 반복할 때마다 간격이 1틱씩 줄어 holdMin까지 빨라진다. 떼면 엣지부터 다시
   const w = WEAPON[s.weapon];
-  // 과열(heat): 멈춘 동안은 공격 입력을 버리고 누름 셈도 닫는다(다시 누르면 첫 간격부터) · 떼고 있으면 식는다
-  const h = w.heat;
-  if (p.stall > 0) {
-    p.stall -= 1;
-    p.bufAttack = 0;
-    p.holdTick = 0;
-    if (p.stall === 0) { p.heat = 0; s.events.push({ kind: 'cooled' }); }
-  } else if (p.heat > 0 && !input.attackHeld) p.heat -= 1;
   const rep = w.holdRepeat;
   if (!rep || !input.attackHeld || p.holdTick === 0) p.holdTick = 0;
   else {
@@ -73,12 +65,6 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   }
 
   const airborne = p.y > 0;
-  // 열은 반복이 버퍼를 채울 때가 아니라 그 버퍼로 실제로 벨 때 오른다(가드 · 필살 중에 쥐고만 있으면 안 달아오른다).
-  // 누름 엣지가 holdN을 0으로 여니 「쥔 채 holdN > 0」인 타격 = 반복 타격. 이 타격은 나가고, 열이 다 차면 다음 틱부터 멈춘다
-  const swing = (fromAir: boolean): void => {
-    if (h && input.attackHeld && p.holdN > 0 && (p.heat += h.cool) >= h.max * h.cool) { p.stall = h.stall; s.events.push({ kind: 'overheat' }); }
-    startAttack(p, fromAir);
-  };
 
   // ── 상태별 진행 ──
   switch (p.pose) {
@@ -93,12 +79,12 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
         s.events.push({ kind: 'jump' });
         break;
       }
-      if (p.bufAttack > 0) { swing(false); break; }
+      if (p.bufAttack > 0) { startAttack(p, false); break; }
       if (input.guard) tryEnterGuard(s, false);
       break;
     }
     case 'jump': {
-      if (p.bufAttack > 0) { swing(true); break; }
+      if (p.bufAttack > 0) { startAttack(p, true); break; }
       if (input.guard) tryEnterGuard(s, true);
       break;
     }
@@ -131,6 +117,16 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
       break;
     }
     case 'attack': {
+      // 쥔 채 반복 휘두름 도중에 다시 누르면 그 휘두름을 끊고 바로 띄우며 벤다(누름 엣지가 holdN을 0으로 연다).
+      // 끝날 때까지 기다리게 하면 반복 휘두름이 누를 자리를 먹어 쥐고 갈다가 다시 누르는 손이 그냥 탭보다 못했다(11-21 봇 실측)
+      if (p.attackHold && p.holdN === 0 && p.bufAttack > 0) { startAttack(p, airborne); break; }
+      // 손을 떼면 갈던 휘두름은 바로 멈춘다(그 틱에 가드도 된다). 안 멈추면 막으려고 뗀 손이 남은 휘두름에 막혀 쥐는 손이 탭보다 못했다(11-22 봇 실측)
+      if (p.attackHold && !input.attackHeld) {
+        p.pose = airborne ? 'jump' : 'idle';
+        p.poseTick = 0;
+        if (input.guard) tryEnterGuard(s, airborne);
+        break;
+      }
       p.poseTick += 1;
       if (p.poseTick >= ATTACK_TOTAL) {
         p.pose = p.y > 0 ? 'jump' : 'idle';
@@ -174,6 +170,9 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
   p.poseTick = 0;
   p.attackHit = false;
   p.attackFromAir = fromAir;
+  // 공격 버퍼를 채우는 건 누름 엣지(holdN = 0으로 연다)와 위 반복(holdN + 1) 둘뿐이라 휘두를 때 holdN > 0 = 반복 타격.
+  // 반복 타격은 건물을 밀어 올리지 않고 끌어내린다(combat.tryHitStack) — 드릴은 박혀서 갈아 내고, 띄우려면 다시 눌러야 한다(11-21 과열을 걷고 바꿈)
+  p.attackHold = p.holdN > 0;
 }
 
 /**

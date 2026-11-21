@@ -166,10 +166,8 @@ export interface PlayerState {
   holdTick: number;
   /** 이번 누름에서 반복으로 벤 횟수(WeaponSpec.holdMin 가속). 공격 엣지가 0으로 */
   holdN: number;
-  /** 과열(WeaponSpec.heat) — 반복 타격마다 +cool, 떼고 있는 틱마다 −1(그래서 max × cool에 닿으면 멈춘다) */
-  heat: number;
-  /** 과열로 멈춘 남은 틱(공격을 안 받는다). 0 = 아님 */
-  stall: number;
+  /** 이번 휘두름이 쥔 채 반복(holdRepeat)으로 나갔다 — 건물을 밀어 올리지 않고 끌어내린다(combat.tryHitStack) · 다시 누르거나 떼면 끊긴다(stepPlayer). 누름 엣지로 나가면 false */
+  attackHold: boolean;
 }
 
 export type Act2Phase = 'cathedral' | 'tower' | 'bolt' | 'rock' | 'moon';
@@ -351,7 +349,7 @@ export type JuiceKind =
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
-  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape' | 'pinSave' | 'pinReady' | 'overheat' | 'cooled'
+  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape' | 'pinSave' | 'pinReady'
   | 'wazaSwing' | 'wazaHit' | 'wazaBurst'
   | 'perkOffer' | 'perkPick';
 
@@ -370,6 +368,8 @@ export interface JuiceEvent {
   waza?: boolean;
   /** floorCollapse: 고압선 대검 전류가 같은 틱에 남은 맨 아래층으로 번진다(그 층이 무너지면 combo 없는 floorCollapse가 하나 더) */
   chain?: boolean;
+  /** hit · floorCollapse: 쥔 채 반복 타격(드릴류)이 갈아 낸 것 — 렌더가 먹 튐을 작게 · 흔들림을 덜 준다 */
+  grind?: boolean;
   /** stackDestroy: 받은 완파 점수(황금 destroyMul을 탄 값 · 자막이 그대로 쓴다) */
   pts?: number;
   /** supply: 상자에서 나온 것 */
