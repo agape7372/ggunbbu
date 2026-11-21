@@ -8,9 +8,9 @@
 // tap = 잘게 떠는 획(착암기) · ring = 고리(파이프 단면 · 코어 드릴 구멍) · pix = 네모 토막(마스크 도트 · 빠진 원기둥 · 벽돌 조각 · a 4면 다이아 드릴 마름모). 연장 열둘은 저마다 다른 조각 묶음으로 터진다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
-import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
+import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK, WEAPON_LITE } from '../config';
 import {
-  N, bent, drops, keepBits, later, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
+  CEL, N, bent, cel, drops, keepBits, later, n01, pool, put, scaled, sgn, tierK, vel, type Bit,
 } from './bladeFx';
 import { PRESS, brushArc, brushLine, enso, hotCore, hs, inkDrop, inkSplat, popScale, spatter } from './ink';
 
@@ -112,41 +112,34 @@ interface Tool {
   whiff(footX: number, footY: number): void;
 }
 
-/** 마름모 파편 — 각진 마름모가 돌며 튀어 떨어진다. 셋에 하나는 먹, 나머지는 포인트 색 */
-function gems(x: number, y: number, n: number, spd: number, size: number, c: string = WEAPON_INK.diadrill): void {
-  for (let i = 0; i < n; i++) {
-    put('pix', x + sgn() * 5, y + sgn() * 3, {
-      ...vel(-Math.PI / 2 + sgn() * 1.2, spd * (0.5 + n01() * 0.6)), g: 900,
-      life: 0.42 + n01() * 0.16, size: size * (0.8 + n01() * 0.4), v: 1.5, a: 4, rot: n01() * TAU, spin: sgn() * 9, c1: i % 3 === 2 ? INK : c,
-    });
-  }
+/** 드릴 비트 — (x, y)에서 ang 쪽을 가리키는 오거(끝까지 좁아지는 청록 원추 + 끝으로 갈수록 조밀한 짙은 청록 나선 띠가 흘러 돈다). 밑에서 뚫고 올라오는 꼴이라 자루는 없다. 박히며 앞으로 밀리다 멈춘다 */
+function drillCone(x: number, y: number, ang: number, len: number, w: number, life = 0.22, push = 160): void {
+  cel(CEL.drill, x, y, { life, size: len, v: w, c1: WEAPON_INK.diadrill, c2: WEAPON_LITE.diadrill, rot: ang, ...vel(ang, push), drag: 5, gr: 0.18, hold: 0.8, dry: 1 });
 }
 
-/** 각진 금 — 맞은 자리에서 위로 뻗다 한 번 꺾이는 곧은 금 n가닥(첫 가닥만 속 색). 다이아 드릴이 깬 자리 */
-function facets(x: number, y: number, n: number, len: number, w: number, life: number, c: string = WEAPON_INK.diadrill): void {
+
+/** 절삭 부스러기 — 얕게 휜 청록 쇳밥 가시가 돌며 옆으로 튀어 떨어진다(마름모 조각은 금박과 겹친다) */
+function chips(x: number, y: number, n: number, spd: number, size: number, a = -Math.PI / 2, fan = 1.3): void {
   for (let i = 0; i < n; i++) {
-    const a = -Math.PI / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * 1.7) + sgn() * 0.15;
-    const L = len * (0.7 + 0.5 * n01());
-    const mx = x + Math.cos(a) * L * 0.55;
-    const my = y + Math.sin(a) * L * 0.55;
-    const a2 = a + (i % 2 ? 1 : -1) * 0.7;
-    bent([x, y, mx, my, mx + Math.cos(a2) * L * 0.45, my + Math.sin(a2) * L * 0.45], w, i === 0 ? c : '', { life, dry: 0.2, pr: 1, gr: 0.2 });
+    cel(CEL.curl, x + sgn() * 4, y + sgn() * 3, {
+      ...vel(a + sgn() * fan, spd * (0.5 + n01() * 0.6)), g: 1400, life: 0.36 + n01() * 0.14, size: size * (0.75 + n01() * 0.5), v: 1.4,
+      c1: WEAPON_INK.diadrill, rot: n01() * TAU, spin: sgn() * 14, gr: 0.1, hold: 0.8, rim: false, // 먹 쇳밥 · 먹 테 쇳밥 · 큰 쇳밥은 하늘의 새와 같은 꼴 — 작은 청록만 · 빨리 떨어진다
+    });
   }
 }
 
 /** 연장 전설의 칼 기운 · 물들임 — 대검 RECIPES의 aura · every · tint와 같은 뜻(bladeFx.bladeAura가 읽는다) */
 export const TOOL_RECIPES: Partial<Record<WeaponId, { aura?(b: readonly [number, number, number, number], n: number, c: string): void; every?: number; tint?: true }>> = {
-  // 다이아 드릴 — 칼끝 둘레를 작은 마름모 조각이 돈다(반짝 별이 아니라 각진 조각)
+  // 다이아 드릴 — 칼끝에 작은 비트가 겹쳐 청록 나선이 돈다(떠다니는 조각 · 반짝이는 없다). 가끔 부스러기 하나가 튄다
   diadrill: {
-    aura(b, n, c) {
-      const a = n * 1.25;
-      const x = b[2] + Math.cos(a) * 11;
-      const y = b[3] + Math.sin(a) * 6; // 비트 둘레를 납작한 길로 돈다(옆에서 본 회전)
-      put('pix', x, y, { ...vel(a + Math.PI / 2, 70), g: 0, life: 0.26, size: 4.2, v: 1.5, a: 4, rot: a, spin: 6, c1: n % 3 ? c : INK });
-      if (n % 6 === 0) gems(b[2], b[3], 1, 150, 3.6, c); // 가끔 한 조각이 튕겨 나간다
+    aura(b, n) {
+      // 번갈아 건너뛰면 청록 · 먹 사이로 깜빡인다 — 겹쳐 이어 그린다
+      const a = Math.atan2(b[3] - b[1], b[2] - b[0]);
+      cel(CEL.drill, b[2] - Math.cos(a) * 8, b[3] - Math.sin(a) * 8, { life: 0.22, size: 18, v: 8, c1: WEAPON_INK.diadrill, c2: WEAPON_LITE.diadrill, rot: a, gr: 0.2, hold: 0.8 });
+      if (n % 6 === 0) chips(b[2], b[3], 1, 140, 5, a, 0.8);
     },
-    every: 0.07,
-    tint: true,
+    every: 0.1,
+    tint: true, // 완파가 시그니처 색 몸의 둘째 박자 마무리(같은 자리에서 큰 비트가 솟는다) — 층 깨기 그림을 덧얹지 않는다
   },
 };
 
@@ -285,35 +278,35 @@ const TOOLS: Partial<Record<WeaponId, Tool>> = {
       taps(footX + 30, footY - 44, 3, 0.12, 9, 2.2, GRAY);
     },
   },
-  // 다이아 드릴 — 각지게 깬다: 맞은 자리에서 위로 짧은 한 획(청록 속) + 도는 마름모 파편 몇. 처음부터 가장 빠른 무기라 조각은 적고 짧게 산다
+  // 다이아 드릴(전설) — 파고든다: 끝으로 갈수록 조밀한 짙은 청록 나선 띠(휜 활꼴)가 흘러 도는 굵은 청록 오거(끝까지 좁아지는 원추 + 밑동 척)가
+  // 맞은 것에 끝을 박고 축을 따라 밀려 들어간다. 타격 · 층 깨기는 머리 옆 허공(층 밑면 높이)에서 45도로 층 아래 모서리에 밀어 넣고,
+  // 완파는 머리 위에서 잔해로 50도 눕혀 내리꽂힌다. 그림은 확대 1.6배로 놓이니 밑동은 맞은 높이 위 · 옆에 둔다(밑에 두면 땅까지 내려가 바닥에서 솟은 고깔이 된다).
+  // 거의 서서 내리꽂히면 회오리 · 깔때기로 읽힌다. 닿은 자리에서 청록 쇳밥이 한쪽으로 튀어 바로 떨어진다. 먹 획 없이 청록이 몸
   diadrill: {
+    // 늘 머리 왼쪽 밑동에서 오른쪽 위로(/) 박는다 — 서리 타격 사슬(\) · 흑철 사선과 축이 갈리고, 완파 끝이 오른쪽 콤보 표시에 꽂히지 않는다
     hit(x, y, b, k) {
-      stroke(x + sgn() * 3, y - 6, -Math.PI / 2 + sgn() * 0.1, 32 * b.k, 4.6 * b.k, CUT, 0.18, WEAPON_INK.diadrill);
-      facets(x, y - 4, 2, 20 * b.k, 2.6, 0.2);
-      gems(x, y, 3 + (k >= 1.5 ? 1 : 0), 300, 4.2);
+      const L = 44 * b.k;
+      drillCone(x - 36, y - 4, -Math.PI / 2 + 0.8, L, 17, 0.11, 40); // 끝이 플레이어 머리 위 층 안에 박힌다(30도로 눕히면 끝이 머리를 겨눈 창으로 읽힌다)
+      chips(x - 4, y - 38, 2 + (k >= 1.5 ? 1 : 0), 260, 6, -Math.PI / 2 - 1.1, 0.5); // 쇳밥은 끝(닿은 자리)에서 — 밑동에서 튀면 로켓 분사로 읽힌다
     },
-    floor(x, y, b, k) {
-      stroke(x, y - 8, -Math.PI / 2 + b.ang * 0.3, 54, 6.5, CUT, 0.26, WEAPON_INK.diadrill);
-      facets(x, y - 4, 3, 30, 3, 0.26);
-      gems(x, y, jn(N(5, k)), 360, 5);
-      // 한 번 더 파고든다
-      later(0.07, () => {
-        stroke(x, y - 44, -Math.PI / 2, 30, 4, CUT, 0.2, WEAPON_INK.diadrill);
-        gems(x, y - 40, 2, 240, 4);
-      });
+    floor(x, y, _b, k) {
+      drillCone(x - 44, y - 6, -Math.PI / 2 + 0.8, 56, 24, 0.22, 60);
+      chips(x - 2, y - 48, jn(N(5, k)), 320, 7, -Math.PI / 2 - 1.1, 0.6);
     },
-    // 밑에서 위로 뚫고 올라간다 — 획이 세 마디로 이어 오르고 마디마다 각진 금과 파편
+    // 완파 — 머리 위에서 왼쪽 잔해 더미로 50도 눕혀 내리꽂혀 파고든다(끝 = 잔해 · 축을 따라 밀린다). 쇳밥은 닿은 자리에서 바깥쪽 위로
     destroy(x, y, k) {
-      for (let i = 0; i < 3; i++) {
-        later(i * 0.06, () => {
-          stroke(x - 6 + i * 4, y - 10 - i * 46, -Math.PI / 2 - 0.12 + i * 0.08, 84 - i * 14, 8.5 - i * 1.6, CUT, 0.32, WEAPON_INK.diadrill);
-          facets(x - 6 + i * 4, y - i * 46, 3 - (i > 1 ? 1 : 0), 40 - i * 8, 3.4 - i * 0.5, 0.3);
-          gems(x, y - i * 46, N(4, k), 420 - i * 60, 5.2 - i * 0.6);
-        });
-      }
+      const s = -1;
+      const L = 60;
+      const ang = Math.PI / 2 - s * 0.9;
+      const [bx, by] = [x - s * 2, y - 22];
+      const [tx, ty] = [bx + Math.cos(ang) * L, by + Math.sin(ang) * L];
+      drillCone(bx, by, ang, L, 30, 0.3, 70); // 다음 층이 떨어지기 전에 거둔다
+      chips(tx, ty, N(5, k), 300, 8, -Math.PI / 2 + s * 1.0, 0.5);
+      later(0.08, () => chips(tx, ty - 6, N(4, k), 260, 8, -Math.PI / 2 + s * 1.2, 0.4)); // 한쪽으로만 — 양쪽으로 엇갈리면 X · 별로 읽힌다
     },
+    // 헛스윙 — 칼끝 자리에서 휜 쇳밥 셋이 한쪽으로 빠르게 튄다(허공에 따로 뜬 비트는 불꽃놀이 · 로켓으로, 느리게 뜬 쇳밥은 새 떼로 읽힌다)
     whiff(footX, footY) {
-      gems(footX + 28, footY - 50, 2, 140, 3.2);
+      chips(footX + 26, footY - 50, 3, 300, 6, -0.5, 0.3);
     },
   },
   // 전동 드릴 — 파고든다: 맞은 자리에서 위로 파고든 짧은 한 획(풀빛 속) + 둘레로 튀는 곱슬 부스러기 몇 가닥. 누르면 빨라지는 무기라 수명이 짧다
@@ -556,15 +549,17 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
     case 'hit':
     case 'bossHit':
     case 'butterCollapse':
+      if (e.kind === 'butterCollapse' && e.last && TOOL_RECIPES[s.weapon]?.tint) break; // 연장 전설 — 버터 마지막 겹도 완파 그림만
       scaled(x, y, WEAPON_FX.SIZE, () => t.hit(x, y, b, k));
       break;
     case 'floorCollapse':
+      if ((e.last || e.waza) && TOOL_RECIPES[s.weapon]?.tint) break; // 연장 전설 — 마지막 층은 완파 그림만(같은 틱에 비트가 두 벌 선다) · 올려베기 층마다는 필살 그림이 맡는다
       scaled(x, y, WEAPON_FX.SIZE, () => t.floor(x, y, b, k));
       break;
     case 'stackDestroy':
       scaled(x, footY - 70, WEAPON_FX.SIZE, () => {
         t.destroy(x, footY - 70, k);
-        if (TOOL_RECIPES[s.weapon]?.tint) t.floor(x + sgn() * 40, footY - 116, b, Math.max(k, 1.25)); // 완파 물들임 — 모티프 한 번 더
+        // 연장 전설의 물들임은 완파(destroy) 안의 둘째 박자다 — 층 깨기 그림을 덧얹지 않는다
       });
       break;
     case 'slash':

@@ -860,6 +860,14 @@ export const WEAPON_INK = {
   flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
   diadrill: '#20A7B6', thunder: '#7766CC', crane: '#74B654', brush: '#4D8AE6',
 } as const;
+/**
+ * 전설 여덟의 밝은 짝 — 같은 색의 한 단 밝은 면(2026-11-21 사용자 「먹 안에 빗금으로 심지 말고 무기 시그니처색 자체로」).
+ * 전설 이펙트는 시그니처 색(WEAPON_INK)이 몸이고, 이 색은 그 몸의 밝은 면(불 속 · 얼음 면 · 금박 뒤 · 결정 면)에만 쓴다. 형광 · 순백이 아니다.
+ */
+export const WEAPON_LITE = {
+  flame: '#F2A03C', frost: '#A3D6EA', thunder: '#CDC6F4', onyx: '#B27DBE',
+  crane: '#C2E39A', brush: '#A8C6F4', gold: '#EECF72', diadrill: '#8FE0C8',
+} as const;
 /** 옛 칼빛 설정값(저장값은 그대로) → 먹에 맞는 포인트 색. 철거칼 획 속(effects · weaponFx · sprites 참격 호) */
 export const SLASH_INK: Readonly<Record<string, string>> = {
   '#FFD200': WEAPON_INK.sword, '#E5302E': WEAPON_INK.flame, '#4FD8E8': WEAPON_INK.frost,

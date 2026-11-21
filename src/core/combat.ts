@@ -118,6 +118,7 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
     s.events.push({
       kind: isButter ? 'butterCollapse' : 'floorCollapse',
       lane, y: yHit, mat, combo: Math.min(SCORE.COMBO_CAP, s.combo + 1 + (WEAPON[s.weapon].collapseCombo ?? 0)),
+      ...(stack.floors.length === 0 ? { last: true } : {}),
     });
     registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, collapse: true });
     spawnFloorDebris(s, yHit);

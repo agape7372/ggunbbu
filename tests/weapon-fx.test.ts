@@ -177,7 +177,8 @@ describe('연장·필살 이펙트', () => {
       const s = state(w, 'ageba');
       bladeReact(s, { kind: 'special', lane: 0 });
       const mine = liveBits().length;
-      for (let i = 0; i < 40; i++) bladeReact(s, { kind: 'floorCollapse', lane: 0, y: 120 + i * 40, combo: 250, n: 4 });
+      // 200번 — 전설은 둘째 박자(later)로 펼쳐져 한 틱에 뿌리는 조각이 적다(11-21). 그래도 풀은 넘쳐야 한다
+      for (let i = 0; i < 200; i++) bladeReact(s, { kind: 'floorCollapse', lane: 0, y: 120 + i * 40, combo: 250, n: 4 });
       bladeReact(s, { kind: 'stackDestroy', lane: 0, combo: 250, n: 4 });
       expect(liveBits().length, w).toBe(192); // 넘쳤다
       expect(liveBits().filter((p) => p.keep).length, w).toBe(mine);

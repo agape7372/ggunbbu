@@ -334,7 +334,7 @@ function wazaHit(s: GameState, r: NonNullable<GameState['wazaRun']>, lift: boole
     st.resting = false;
   }
   if (res === 'collapse') {
-    s.events.push({ kind: 'floorCollapse', lane: s.player.lane, y: yHit, mat, combo: s.combo + 1 });
+    s.events.push({ kind: 'floorCollapse', lane: s.player.lane, y: yHit, mat, combo: s.combo + 1, ...(st.floors.length === 0 ? { last: true } : {}) });
     registerHit(s, { scoreBonus: SCORE.FLOOR_BONUS, noGauge: true });
     if (st.floors.length === 0) destroyStack(s);
   } else {
@@ -384,7 +384,7 @@ function applyAgeba(s: GameState): void {
     if (res === 'miss') break;
     if (res === 'collapse') {
       destroyed += 1;
-      s.events.push({ kind: 'floorCollapse', mat, y: yHit });
+      s.events.push({ kind: 'floorCollapse', mat, y: yHit, waza: true, ...(st.floors.length === 0 ? { last: true } : {}) });
       addScore(s, SCORE.FLOOR_BONUS);
       if (st.floors.length === 0) {
         destroyStack(s);
@@ -413,7 +413,7 @@ function applyImmuneChip(s: GameState): void {
   if (!stack) return;
   const res = damageStack(stack, p.lane, stack.y - 1, stack.y + 1, SPECIAL.IMMUNE_DMG);
   if (res === 'collapse') {
-    s.events.push({ kind: 'floorCollapse', mat: 'cathedral', y: stack.y });
+    s.events.push({ kind: 'floorCollapse', mat: 'cathedral', y: stack.y, ...(stack.floors.length === 0 ? { last: true } : {}) });
     addScore(s, SCORE.FLOOR_BONUS);
     if (stack.floors.length === 0) destroyStack(s);
     else stack.vy = Math.max(stack.vy, STACK.PIN_ESCAPE_V);
@@ -497,7 +497,7 @@ function stepPinned(s: GameState, input: InputFrame): void {
     p.bufAttack = 0;
     const res = damageStack(stack, p.lane, stack.y - 1, stack.y + 1, 5);
     if (res === 'collapse') {
-      s.events.push({ kind: 'floorCollapse', mat: stack.floors[0]?.mat, y: 0 });
+      s.events.push({ kind: 'floorCollapse', mat: stack.floors[0]?.mat, y: 0, ...(stack.floors.length === 0 ? { last: true } : {}) });
       addScore(s, SCORE.FLOOR_BONUS); // 층붕괴 점수만, 타격점수/콤보 없음 [설계]
       if (stack.floors.length === 0) destroyStack(s);
       else { stack.vy = STACK.PIN_ESCAPE_V; stack.resting = false; }

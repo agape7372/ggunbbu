@@ -7,7 +7,7 @@ import type {
   PlayerPose, FallingStack, BossState, Entity, Theme, Material, GimmickId,
   FloorSeg, Bolt, Rock, Shot, Rabbit, Cannon, WeaponId, GreatswordId,
 } from '../core/types';
-import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS, MASK_DRAW, SLASH_INK, WEAPON_INK, JUICE_SYS } from '../config';
+import { VIEW, PALETTE, PLAYER, ACT2, STACK, BOSS, MASK_DRAW, SLASH_INK, WEAPON_INK, WEAPON_LITE, JUICE_SYS } from '../config';
 import { PRESS, brushPath } from './ink';
 import { drawAsset, drawAssetHalo, hasAsset } from './assets';
 import { drawHalo, haloFor } from './halo';
@@ -898,8 +898,10 @@ function greatArc(c: CanvasRenderingContext2D, g: GreatLook): void {
 /** attack 타격 프레임의 참격 호 — 무기별 모양, 호는 하나. */
 function slashArc(c: CanvasRenderingContext2D): void {
   const g = greatLook(playerWeapon);
+  // 전설 여덟(WEAPON_LITE 키) — 먹 띠에 색 속을 심지 않는다. 대검 칼길은 bladeFx swing이 그 칼의 꼴로 긋고, 다이아 드릴은 시그니처 색이 몸인 한 획
+  const legend = playerWeapon in WEAPON_LITE;
   if (g) {
-    greatArc(c, g);
+    if (!legend) greatArc(c, g);
     return;
   }
   // 연장 — 휘두른 자리에서 댄 데가 굵고 끝이 빠지는 먹 한 획 + 앞쪽 획 속만 그 연장 포인트 색(먹 한 획 2판)
@@ -910,9 +912,10 @@ function slashArc(c: CanvasRenderingContext2D): void {
     const u = 1 - t;
     pts.push(WCX + u * u * x0 + 2 * u * t * qx + t * t * x1, u * u * y0 + 2 * u * t * qy + t * t * y1);
   }
-  c.fillStyle = PALETTE.INK;
+  const ink = WEAPON_INK[playerWeapon as keyof typeof WEAPON_INK];
+  c.fillStyle = legend ? ink : PALETTE.INK;
   brushPath(c, pts, w, 0, 1, 0.45, 7, PRESS.flick);
-  c.fillStyle = playerWeapon === 'sword' ? SLASH_INK[ARC.toUpperCase()] ?? ARC : WEAPON_INK[playerWeapon as keyof typeof WEAPON_INK];
+  c.fillStyle = legend ? WEAPON_LITE[playerWeapon as keyof typeof WEAPON_LITE] : playerWeapon === 'sword' ? SLASH_INK[ARC.toUpperCase()] ?? ARC : ink;
   brushPath(c, pts, w * 0.36, 0.04, 0.55, 0, 7, PRESS.flick);
 }
 

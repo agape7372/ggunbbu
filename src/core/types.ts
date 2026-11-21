@@ -358,6 +358,10 @@ export interface JuiceEvent {
   combo?: number;
   /** 부가 수치 (완파 층수 등) */
   n?: number;
+  /** floorCollapse: 그 건물의 마지막 층(같은 틱에 stackDestroy가 나간다 · 전설 그림은 완파만 그린다) */
+  last?: boolean;
+  /** floorCollapse: 필살 올려베기가 한 틱에 여러 층을 깬다(전설 층 깨기 그림은 건너뛴다 · 필살 그림이 맡는다) */
+  waza?: boolean;
   /** stackDestroy: 받은 완파 점수(황금 destroyMul을 탄 값 · 자막이 그대로 쓴다) */
   pts?: number;
   /** supply: 상자에서 나온 것 */

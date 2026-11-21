@@ -9,7 +9,7 @@
 // 월드에 안 붙고 화면에 붙어 따라온다. 화면에 붙는 파티클은 없다(필살 그림은 wazaShow가 맡는다).
 
 import type { FallingStack, GameState, ItemId, JuiceEvent, WeaponId } from '../core/types';
-import { DEBRIS, JUICE, JUICE_SYS, PALETTE, SLASH_INK, TICK, VIEW, WEAPON_INK } from '../config';
+import { DEBRIS, JUICE, JUICE_SYS, PALETTE, SLASH_INK, TICK, VIEW, WEAPON_INK, WEAPON_LITE } from '../config';
 import { drawAsset } from './assets';
 import { bladeReact, resetBladeFx, tierK, updateBladeFx } from './bladeFx';
 import { stackScale } from './feel';
@@ -99,6 +99,9 @@ export function setSlashColor(c: string): void {
   slashInk = SLASH_INK[c.toUpperCase()] ?? c;
   setSwordInk(slashInk);
 }
+
+/** 전설 — 맞은 자리 · 완파를 시그니처 색 몸으로 제 꼴만 그린다(bladeFx · weaponFx). 공통 먹 튐 · 색 속을 얹으면 「먹 안에 색」으로 돌아간다 */
+const isLegend = (w: WeaponId): boolean => w in WEAPON_LITE;
 
 /** 무기의 포인트 색 — 벤 순간 먹 튐 속 · 큰 엔소 속. 철거칼은 칼빛 설정 색 */
 export function pointInk(w: WeaponId): string {
@@ -771,7 +774,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     return;
   }
   if (e.kind === 'stackDestroy') {
-    stackBurst(x, y - 40, e.n, pointInk(s.weapon)); // 이벤트 y가 없어 발 높이다 — 마지막 층이 있던 머리 위로 올린다
+    stackBurst(x, y - 40, e.n, isLegend(s.weapon) ? '' : pointInk(s.weapon)); // 이벤트 y가 없어 발 높이다 — 마지막 층이 있던 머리 위로 올린다
     return;
   }
   if (e.kind === 'bossDefeat') {
@@ -787,7 +790,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     const k = tierK(e.combo ?? s.combo);
     // 오함마는 맞은 자리를 제 발묵으로 누르고, 그라인더는 불티 · 쇳가루로 갈리고, 삽은 흙 덩이 · 곡괭이는 돌 조각이 튄다(weaponFx) — 먹 튐을 겹치지 않는다
     if (e.kind === 'floorCollapse') inkCollapse(x, y, k, e.mat);
-    else inkHit(x, y, k, pointInk(s.weapon), OWN_SPLASH.has(s.weapon));
+    else if (!isLegend(s.weapon)) inkHit(x, y, k, pointInk(s.weapon), OWN_SPLASH.has(s.weapon));
     return;
   }
   if (e.kind === 'gaugeFull') {

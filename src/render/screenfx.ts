@@ -180,7 +180,12 @@ export function startImpact(x: number, y: number, invert: boolean): void {
   }
 }
 
-/** 집중선 — 가운데는 비워 두고 화면 끝에서 안으로 꽂히는 잉크 가시. 옅어지며 바깥으로 물러난다. */
+/**
+ * 집중선 — 가운데는 비워 두고 화면 끝에서 안으로 꽂히는 잉크 가시. 옅어지며 바깥으로 물러난다.
+ * 줄 사이 각과 안쪽 끝 거리를 들쭉날쭉하게 — 고른 각 · 같은 거리면 빈 가운데가 원이 되고 지평선 위 반원 빛살 문양으로 읽힌다.
+ * 머리 위 쪽(위쪽 ±40도)은 비워 줄을 양옆에만 긋는다 — 위쪽 반원을 고르게 채운 부채는 지평선에서 떠오르는 해 문양으로 읽힌다.
+ * 알파로 옅게 하지 않는다 — 줄이 가늘어지며 바깥으로 물러나 모양으로 사라진다.
+ */
 function drawFocusLines(ctx: CanvasRenderingContext2D): void {
   if (impactT <= 0) return;
   const u = impactT / JUICE_SYS.IMPACT_TICKS; // 1 → 0
@@ -190,13 +195,13 @@ function drawFocusLines(ctx: CanvasRenderingContext2D): void {
   const R = 560;
   ctx.save();
   clipField(ctx);
-  ctx.globalAlpha = Math.min(1, u * u * 1.4);
   ctx.fillStyle = PALETTE.INK;
   ctx.beginPath();
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + (rnd() - 0.5) * 0.1;
-    const r0 = 120 + rnd() * 80 + (1 - u) * 90;
-    const half = 0.005 + rnd() * 0.014;
+    const a = (i / n) * Math.PI * 2 + (rnd() - 0.5) * 0.24;
+    const r0 = 90 + rnd() * 170 + (1 - u) * 160;
+    const half = (0.005 + rnd() * 0.014) * Math.min(1, u * 1.6);
+    if (Math.abs(Math.atan2(Math.sin(a + Math.PI / 2), Math.cos(a + Math.PI / 2))) < 0.7) continue;
     ctx.moveTo(impactX + Math.cos(a) * r0, impactY + Math.sin(a) * r0);
     ctx.lineTo(impactX + Math.cos(a - half) * R, impactY + Math.sin(a - half) * R);
     ctx.lineTo(impactX + Math.cos(a + half) * R, impactY + Math.sin(a + half) * R);
