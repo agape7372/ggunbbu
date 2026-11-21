@@ -126,10 +126,10 @@ export const icicle: Recipe = {
     const s = side();
     freeze(x - s * 16, y - 20, 'floor', k, c, UP + s * (TILT + 0.1));
   },
-  // 완파 — 가장 큰 다발. 밑동은 머리 위로 띄운다(주인공 몸을 덮지 않게)
+  // 완파 — 가장 큰 다발. 밑동은 머리 위 40 · 친 쪽으로 띄운다(11-21 폰 1배: y − 6 · 반대쪽 20이면 밑동 먹 덩이가 주인공 몸통을 덮었다)
   destroy(x, y, k, c) {
     const s = side();
-    freeze(x - s * 20, y - 6, 'destroy', k, c, UP + s * (TILT + 0.05));
+    freeze(x + s * 6, y - 40, 'destroy', k, c, UP + s * (TILT + 0.05));
   },
   whiff(x, y, c) {
     const s = side();
