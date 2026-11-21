@@ -32,10 +32,11 @@ function run(ev: 'hit' | 'floor' | 'destroy', k: number, y: number): { pts: P[];
   }
   return { pts, peak };
 }
-const box = (pts: P[]): { w: number; h: number } => {
+const box = (pts: P[]): { w: number; h: number; x0: number; x1: number } => {
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
-  return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+  return { w: x1 - x0, h: Math.max(...ys) - Math.min(...ys), x0, x1 };
 };
 /** 휘어 간 각의 합(라디안, 화면에서 시계 방향 +) — 말림이면 크다 */
 const turning = (p: { pts: readonly number[] }): number => {
@@ -51,14 +52,20 @@ const turning = (p: { pts: readonly number[] }): number => {
 beforeEach(() => resetBladeFx());
 
 describe('해일 — 호쿠사이 마루', () => {
-  it('완파: 등 머리는 왼쪽 땅 · 말림 통은 한 바퀴 넘게 감긴다 · 갈퀴 손가락 다섯 넘게 · 물방울 덩이 크기 3단 · 공통 달(sweep) 없음', () => {
+  it('완파: 등 머리는 왼쪽 땅 · 말림은 가는 두 가닥 · 갈퀴 손가락은 +6에 이미 섰다 · 물방울 덩이 크기 3단 · 공통 달(sweep) 없음', () => {
     const y = G - 70;
     scaled(X, y, WEAPON_FX.SIZE, () => RECIPES.surf.destroy(X, y, 1.25, c));
-    step(14); // 솟음 + 말림 + 갈퀴(키운 그림 1.2배)
+    step(6); // 말리는 때 — r6은 갈퀴가 +10~16에야 보였다
+    const lite = pool.filter((p) => p.alive && p.k === 'zig' && p.c1 === WEAPON_LITE.tide);
+    expect(lite.length).toBeGreaterThanOrEqual(5); // 갈퀴 손가락(밝은 짝)
+    expect(lite.filter((p) => (1 - p.life / p.max) / p.gr >= 0.5).length, '+6에 반 넘게 그어진 갈퀴').toBeGreaterThanOrEqual(4);
+    step(8); // 솟음 + 말림 + 갈퀴(키운 그림 1.2배)
     const zig = pool.filter((p) => p.alive && p.k === 'zig');
     expect(zig.some((p) => p.c1 === c && p.y > G - 6 && p.x < X - 70)).toBe(true); // 큰 마루 밑동 = 왼쪽 땅
-    expect(zig.some((p) => p.c1 === c && turning(p) > Math.PI * 1.1)).toBe(true); // 말림 통
-    expect(zig.filter((p) => p.c1 === WEAPON_LITE.tide).length).toBeGreaterThanOrEqual(5); // 갈퀴 손가락(밝은 짝)
+    // 말림 = 몸 굵기 절반 아래 가닥 둘 넘게가 각각 0.8π 넘게 감긴다. 몸 말고 몸의 3분의 2 넘게 굵은 먹 획은 없다(r6 굵은 먹 통 = 0.9)
+    const body = Math.max(...zig.filter((p) => p.c1 === c).map((p) => p.v));
+    expect(zig.filter((p) => p.c1 === c && p.v <= body * 0.5 && turning(p) > Math.PI * 0.8).length).toBeGreaterThanOrEqual(2);
+    expect(zig.filter((p) => p.c1 === c && p.v < body && p.v > body * 0.66)).toHaveLength(0);
     expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
     step(10);
     const sizes = pool.filter((p) => p.alive && p.k === 'drop').map((p) => p.size);
@@ -83,6 +90,9 @@ describe('해일 — 호쿠사이 마루', () => {
     expect(floor.w).toBeLessThan(destroy.w);
     expect(destroy.w).toBeGreaterThan(VIEW.W * 0.6);
     expect(destroy.w).toBeLessThan(VIEW.W * 0.95);
+    // 밑동은 화면 안(r6은 x −24에서 솟았다) — 폭 상한도 화면 안에서 잰 값
+    expect(destroy.x0).toBeGreaterThanOrEqual(8);
+    expect(destroy.x1).toBeLessThan(VIEW.W);
     expect(destroy.h).toBeGreaterThan(55 * 3);
     expect(hit.w).toBeGreaterThan(destroy.w * 0.3);
   });
@@ -114,8 +124,20 @@ describe('해일 — 호쿠사이 마루', () => {
     expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
     step(125);
     expect(liveBits()).toHaveLength(0);
-    RECIPES.surf.aura!([X, G - 40, X + 30, G - 6], 2, c);
-    expect(pool.filter((p) => p.alive && p.k === 'zig')).toHaveLength(1);
+    // 칼 기운: 띠 하나가 손잡이부터 칼끝을 돌아 칼 밖 10px 넘게까지 감는다(r6 = 칼 길이 3할) · 갈고리 끝 물방울 덩이 크기 3단
+    const [hx, hy, tx, ty] = [X, G - 40, X + 30, G - 6];
+    const L = Math.hypot(tx - hx, ty - hy);
+    RECIPES.surf.aura!([hx, hy, tx, ty], 3, c);
+    const band = pool.filter((p) => p.alive && p.k === 'zig');
+    expect(band).toHaveLength(1);
+    const along = (i: number): number => ((band[0].x + band[0].pts[i] - hx) * (tx - hx) + (band[0].y + band[0].pts[i + 1] - hy) * (ty - hy)) / L;
+    const last = band[0].pts.length - 2;
+    expect(along(0)).toBeLessThan(L * 0.05);
+    expect(along(last)).toBeGreaterThan(L - 2);
+    expect(Math.hypot(band[0].x + band[0].pts[last] - tx, band[0].y + band[0].pts[last + 1] - ty)).toBeGreaterThan(10);
+    const dr = pool.filter((p) => p.alive && p.k === 'drop').map((p) => p.size);
+    expect(dr.length).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...dr) / Math.min(...dr)).toBeGreaterThan(1.8);
     step(125);
     expect(liveBits()).toHaveLength(0);
   });
