@@ -1,9 +1,9 @@
-// 그림자 대검(어둠) 레시피 5판 — 바닥 촉수 무리(자료 1 2 할로우 나이트 순수한 그릇 촉수 · 3 급강하 어둠 가시 · 8, DIRECTIONS 그림자 절).
+// 그림자 대검(어둠) 레시피 5판 — 바닥 촉수 무리(뿌리 굵고 끝 바늘인 휜 촉수 · 땅에서 솟는 가시 다발).
 // bladeFx RECIPES가 이어 붙이기만 한다.
 // 꼴: 땅에 낮게 번지는 먹 웅덩이(화면 폭 9할 남짓 — 오른쪽 아래 콤보 도장 밑으로는 가는 마른 획만 지난다) → 웅덩이에서
 // 휘고 꼬인 촉수가 솟는다. 가닥마다 S자로 두 번 굽고 끝이 갈고리로 말리며, 기울기가 양쪽으로 제각각이라 몇은 서로 엇갈린다.
 // 뿌리는 굵게 눌러 대고(4판의 두 배) 끝은 바늘. 키 큰 가닥 몇은 끝 둘레에서 한 갈래 더 갈라진다.
-// 완파엔 한 가닥이 바닥 위를 가로로 길게 쓸고 가다 끝이 말려 들린다(순수한 그릇). 둘레에 크기 제각각 먹 점 · 찢긴 먹 조각이 늦게 천천히 위로.
+// 완파엔 한 가닥이 바닥 위를 가로로 길게 쓸고 가다 끝이 말려 들린다. 둘레에 크기 제각각 먹 점 · 찢긴 먹 조각이 늦게 천천히 위로.
 // 색: 다른 전설과 같은 규칙 — 가닥마다 먹 뿌리 → 짙은 보라 → 보라 꼬리 → 밝은 짝 끝(legendTone). 웅덩이는 먹. 갈래 · 점 몇 곳만 밝은 짝.
 // 박자: 앞 가닥부터 어긋나게 4프레임에 솟고 → 뿌리부터 풀려 위로 흩어진다(굵은 가닥이 길게 남는다).
 // 다른 넷과 갈린다: 불새 = 위로 큰 면 · 해일 = 옆으로 말린 큰 면 · 고압선 = 공중 가는 선 · 고드름 = 각진 덩이.
@@ -59,7 +59,7 @@ const free = (pts: readonly number[], bx: number, by: number, m: number): boolea
 
 /**
  * 촉수 꼴 — 뿌리 (x, y)에서 a0 쪽으로 길이 h, 점 n개(뿌리 → 끝). 각이 S자로 두 번 굽고(bend · 자리 ph — 뿌리는 덜, 위로 갈수록 크게)
- * 끝 3할에서 hook만큼 말린다(+ 시계 · − 반시계 — 순수한 그릇 촉수의 갈고리 끝)
+ * 끝 3할에서 hook만큼 말린다(+ 시계 · − 반시계 — 갈고리 끝)
  */
 function coil(x: number, y: number, a0: number, h: number, bend: number, ph: number, hook: number, n = 14): number[] {
   const pts = [x, y];
@@ -85,7 +85,7 @@ function tendril(pts: number[], w: number, c: string, life: number, grow: number
   const b = Math.round(k * 0.8);
   const dry = thick ? 0.18 : 0.3;
   bent(pts.slice(0, (b + 1) * 2), w, '', { pr: 1, dry, gr: grIn(grow * (b / k), life), life, vx, vy });
-  // 위 붓은 붓 누름(BRUSH) — 이은 자리에서 한 번 불룩하고(자료 1: 가닥 가운데 한 번 부푼다) 보라 꼬리가 바늘 끝까지 굵기를 지닌다.
+  // 위 붓은 붓 누름(BRUSH) — 이은 자리에서 한 번 불룩하고 보라 꼬리가 바늘 끝까지 굵기를 지닌다.
   // 튕김 누름이면 보라 자리가 2px 남짓으로 가늘어 폰 1배에서 점으로만 보였다(5판 2회차)
   const hi = pts.slice(a * 2);
   later((grow * a) / k / 60, () => bent(hi, w * 0.56, '', { body: c, pr: 5, dry, gr: grIn(grow * (1 - a / k), life), life: life * 1.05, vx, vy }));
@@ -178,7 +178,7 @@ function forest(bx: number, by: number, ang: number, S: Size, z: number, hk: num
       }
     }
   });
-  // 바닥 쓸기(완파) — 한 가닥이 몸 곁 웅덩이 위에서 왼쪽으로 낮게 길게 쓸고 가다 끝이 말려 들린다(순수한 그릇)
+  // 바닥 쓸기(완파) — 한 가닥이 몸 곁 웅덩이 위에서 왼쪽으로 낮게 길게 쓸고 가다 끝이 말려 들린다
   if (S.sweep && ground) {
     const [rx, ry] = P(-m * 15, 9);
     const p = coil(rx, ry, ang - m * (Math.PI / 2 - 0.1), S.sweep * z, 0.16, n01() * TAU, m * (2 + 0.5 * n01()), 14);
