@@ -775,7 +775,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
   }
   if (e.kind === 'stackDestroy') {
     // 전설은 완파를 제 그림(bladeFx · legend5 destroy)으로 한다 — 공통 먹 엔소를 덧그리면 열세 자루가 같은 둥근 고리를 두른다
-    // (2026-11-21 사용자 빨간 선 「왜 모든 스킬에 똑같이 … 일괄적으로」). 연장은 이 엔소가 완파의 대표 그림이라 그대로
+    // (2026-11-21 사용자가 완파 시트의 그 고리를 빨간 선으로 따라 그려 보냄). 연장은 이 엔소가 완파의 대표 그림이라 그대로
     stackBurst(x, y - 40, e.n, pointInk(s.weapon), !isLegend(s.weapon)); // 이벤트 y가 없어 발 높이다 — 마지막 층이 있던 머리 위로 올린다
     return;
   }

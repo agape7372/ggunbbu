@@ -10,7 +10,7 @@
 // ⚠ bladeFx와 순환 import — 최상위에서 bladeFx 값을 부르지 않는다. 시험에서 이 파일을 bladeFx보다 먼저 import하지 않는다.
 import { PALETTE, VIEW, WEAPON_FX } from '../../config';
 import { bent, drops, later, n01, type Recipe } from '../bladeFx';
-import { follow, liteOf, moonPoint, pathLen, swingMoon } from './crescent';
+import { follow, liteOf, moonPoint, pathLen, swingMoon } from './geom';
 
 type V = readonly [number, number];
 const FOAM = PALETTE.BG; // 거품 = 밝은 짝 획 속에 남는 종이빛

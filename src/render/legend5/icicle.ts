@@ -7,7 +7,7 @@
 // ⚠ bladeFx와 순환 import — 최상위에서 bladeFx 값을 부르지 않는다. 시험에서 이 파일을 bladeFx보다 먼저 import하지 않는다.
 import { PALETTE } from '../../config';
 import { bent, later, line, n01, put, scaled, sgn, vel, type Recipe } from '../bladeFx';
-import { follow, liteOf, moonPoint, moonPts, pathLen, swingMoon } from './crescent';
+import { follow, liteOf, moonPoint, moonPts, pathLen, swingMoon } from './geom';
 
 const TAU = Math.PI * 2;
 const UP = -Math.PI / 2;

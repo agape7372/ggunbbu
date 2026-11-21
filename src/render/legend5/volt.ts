@@ -9,7 +9,7 @@
 // ⚠ bladeFx와 순환 import — 최상위에서 bladeFx 값을 부르지 않는다. 시험에서 이 파일을 bladeFx보다 먼저 import하지 않는다.
 import { VIEW } from '../../config';
 import { bent, later, n01, sgn, type Recipe } from '../bladeFx';
-import { follow, liteOf, moonPoint, pathLen, swingMoon } from './crescent';
+import { follow, liteOf, moonPoint, pathLen, swingMoon } from './geom';
 
 const GROUND = VIEW.GROUND_Y;
 
@@ -49,7 +49,7 @@ const shift = (pts: readonly number[], dx: number, dy: number): number[] => pts.
  */
 function pair(pts: readonly number[], w: number, life: number, c: string): void {
   const gap = w * 0.6;
-  // 고른 선 누름(pr 2) — 붓 잔상 누름(3)은 끝이 가늘어 잎사귀 · 띠로 읽혔다(3판 1차 캡처)
+  // 고른 선 누름(pr 2) — 붓 잔상 누름(3)은 끝이 가늘어 풀 · 띠로 읽혔다(3판 1차 캡처)
   bent(shift(pts, 0, -gap), w * 0.36, '', { life, dry: 0.2, pr: 2, gr: 0.03 });
   bent(shift(pts, 0, gap * 0.25), w * 0.5, liteOf(c), { body: c, life: life * 1.1, dry: 0.18, pr: 2, gr: 0.03, hold: 0.55 });
 }
@@ -116,7 +116,7 @@ export const volt: Recipe = {
       pts.push(x + Math.cos(o) * off, y + Math.sin(o) * off);
       u = i === n - 2 ? 1 : Math.min(0.97, u + (1 / (n - 1)) * (0.6 + 0.8 * n01()));
     }
-    pair(pts, w * 0.7, life * 0.6, c); // 가늘게 — 굵으면 친 자리 가로 줄과 엉킨다
+    pair(pts, w * 0.7, life * 0.6, c); // 가늘게 — 굵으면 친 자리 가로 줄과 한 덩어리가 된다
     later(0.05, () => {
       const [x, y, ang] = moonPoint(m, 1);
       for (let i = 0; i < 2; i++) spark(x, y, ang + sgn() * 0.9, Math.max(0.8, w / 12) * 0.8, c, i);
