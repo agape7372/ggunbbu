@@ -164,6 +164,10 @@ export interface PlayerState {
   holdTick: number;
   /** 이번 누름에서 반복으로 벤 횟수(WeaponSpec.holdMin 가속). 공격 엣지가 0으로 */
   holdN: number;
+  /** 과열(WeaponSpec.heat) — 반복 타격마다 +cool, 떼고 있는 틱마다 −1(그래서 max × cool에 닿으면 멈춘다) */
+  heat: number;
+  /** 과열로 멈춘 남은 틱(공격을 안 받는다). 0 = 아님 */
+  stall: number;
 }
 
 export type Act2Phase = 'cathedral' | 'tower' | 'bolt' | 'rock' | 'moon';
@@ -345,7 +349,7 @@ export type JuiceKind =
   | 'boltCue' | 'boltStrike' | 'gaugeFull' | 'comboBreak'
   | 'chapterUnlock' | 'bonusEnter' | 'bonusPerfect' | 'phaseClear'
   | 'jump' | 'land' | 'headBonk' | 'guardDenied' | 'lifeLost' | 'slash'
-  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape' | 'pinSave' | 'pinReady'
+  | 'supply' | 'hatBreak' | 'hatGet' | 'pinEscape' | 'pinSave' | 'pinReady' | 'overheat' | 'cooled'
   | 'wazaSwing' | 'wazaHit' | 'wazaBurst'
   | 'perkOffer' | 'perkPick';
 

@@ -31,6 +31,7 @@ describe('무기 표', () => {
 
   it('1막 어디서든 연타만으로는 건물이 떠 있지 못한다 (띄우기 상한)', () => {
     // 타격이 vy를 lift로 올리고 다음 타격까지 CYCLE틱 중력을 받는다 — 주기당 변위가 음수여야 한다
+    // ⚠ 이것만으로는 「못 버틴다」가 아니다(다이아 드릴 −1.2px면 깔리기 전 35~45타 > 건물 HP 6.5). 쥐고 있기는 아래 「과열」이 봇으로 잰다
     const g = STACK.ACT1_G[0];
     for (const id of IDS) {
       const top = WEAPON[id].lift + (WEAPON[id].comboLift ?? 0); // 크레인은 콤보 100에서 가장 높다
@@ -512,6 +513,107 @@ for (const W of ['jackhammer', 'drill', 'diadrill'] as const) {
 it('철거칼은 쥐고 있어도 첫 누름 한 번뿐', () => {
   const s = makeState({ seed: 3 });
   expect(swings(s, held(60, { attack: true }))).toBe(1);
+});
+
+// ── 과열(11-21) — 쥐고만 있으면 사람 손이 못 내는 틀 완벽 박자(7~8틱)가 공짜라 1막 저속 판을 가드 없이 넘었다.
+// 「연타만으로는 못 버틴다」의 실제 조건은 주기당 변위가 아니라 「깔리기 전 벨 수 < 건물 HP」다. 그래서 봇으로 직접 잰다
+const HOLD_IDS = IDS.filter((id) => WEAPON[id].holdRepeat);
+
+/** 가드 · 점프 없이 바닥에서 쥐고만 있다. 누름 셈이 닫히면(판 처음 · 멈춤 뒤 · 쪽지) 다시 누르고, 깔리면 10틱 뒤부터 눌러 빠진다 */
+function holdOnly(s: GameState, ticks: number): void {
+  let pinAt = -1;
+  for (let t = 0; t < ticks && !s.over; t++) {
+    const p = s.player;
+    let f: InputFrame;
+    if (p.pose === 'pinned') {
+      if (pinAt < 0) pinAt = s.tick;
+      const k = s.tick - pinAt - 10;
+      f = { ...EMPTY_INPUT, attackHeld: true, attack: k >= 0 && k % 10 === 0 };
+    } else {
+      pinAt = -1;
+      f = { ...EMPTY_INPUT, attackHeld: true, attack: p.holdTick === 0 || !!s.perk?.offer };
+    }
+    advance(s, f);
+    s.events.length = 0;
+  }
+}
+const arcadeRun = (w: WeaponId, seed: number): GameState => {
+  const s = makeState({ seed });
+  s.weapon = w;
+  applyStartKit(s, 0, 0);
+  return s;
+};
+
+describe('과열 — 바닥에서 쥐고만 있으면 버티지 못한다', () => {
+  it('누르고 있기 무기는 모두 과열이 있다', () => {
+    expect([...HOLD_IDS].sort()).toEqual(['diadrill', 'drill', 'jackhammer']);
+    for (const id of HOLD_IDS) expect(WEAPON[id].heat, id).toBeDefined();
+  });
+
+  it('가드 없이 쥐고만 있으면 1분 안에 목숨 셋을 다 잃는다(아케이드 · 고정 시드)', () => {
+    for (const w of HOLD_IDS) for (const seed of [1, 2, 3]) {
+      const s = arcadeRun(w, seed);
+      holdOnly(s, 3600);
+      expect(s.over, `${w} 시드 ${seed}`).toBe('gameover');
+    }
+  });
+
+  it('과열을 빼면 같은 손이 1분 동안 목숨을 하나도 안 잃는다 — 위 시험이 그 구멍을 잡는다', () => {
+    for (const w of HOLD_IDS) {
+      const was = WEAPON[w].heat;
+      delete WEAPON[w].heat;
+      try {
+        const s = arcadeRun(w, 1);
+        const lives = s.lives;
+        holdOnly(s, 3600);
+        expect(s.lives, w).toBe(lives);
+      } finally {
+        WEAPON[w].heat = was;
+      }
+    }
+  });
+
+  it('첫 누름은 열이 없다 · 반복 max번째에 멈춘다 · 멈춘 동안 탭은 안 받고 가드는 된다 · 끝나면 열 0', () => {
+    const w = 'diadrill';
+    const h = WEAPON[w].heat!;
+    const s = makeState({ seed: 3 }); s.weapon = w; s.lives = 99;
+    const kinds: string[] = [];
+    const step = (f: InputFrame): void => { advance(s, f); for (const e of s.events) kinds.push(e.kind); s.events.length = 0; };
+    step({ ...EMPTY_INPUT, attack: true, attackHeld: true });
+    expect(s.player.heat).toBe(0);
+    let n = 1;
+    while (s.player.stall === 0 && n < 99) {
+      const before = s.player.pose === 'attack' ? s.player.poseTick : -1;
+      step({ ...EMPTY_INPUT, attackHeld: true });
+      if (s.player.pose === 'attack' && (before < 0 || s.player.poseTick <= before)) n += 1;
+    }
+    expect(n).toBe(1 + h.max); // 첫 누름 + 반복 max번(열이 차는 마지막 반복도 나간다)
+    expect(kinds.filter((k) => k === 'overheat')).toHaveLength(1);
+    for (let i = 0; i < 12; i++) step({ ...EMPTY_INPUT, attack: true, attackHeld: true }); // 멈춘 동안 탭 — 마지막 반복이 끝나면 다시 안 선다
+    expect(s.player.pose).toBe('idle');
+    step({ ...EMPTY_INPUT, guard: true });
+    expect(s.player.pose).toBe('guardG');
+    while (s.player.stall > 0) step(EMPTY_INPUT);
+    expect(s.player.heat).toBe(0);
+    expect(kinds.filter((k) => k === 'cooled')).toHaveLength(1);
+    step(EMPTY_INPUT);
+    step({ ...EMPTY_INPUT, attack: true });
+    expect(s.player.pose).toBe('attack'); // 다시 벤다
+  });
+
+  it('떼고 있으면 cool틱마다 열 1씩 식는다 · 탭은 달아오르지 않는다', () => {
+    const w = 'jackhammer';
+    const h = WEAPON[w].heat!;
+    const s = makeState({ seed: 3 }); s.weapon = w; s.lives = 99;
+    swingTicks(s, held(3 * WEAPON[w].holdRepeat! + 2, { attack: true })); // 첫 누름 + 반복 셋
+    expect(s.player.heat).toBe(3 * h.cool);
+    swingTicks(s, Array.from({ length: h.cool }, () => EMPTY_INPUT));
+    expect(s.player.heat).toBe(2 * h.cool);
+    const t = makeState({ seed: 3 }); t.weapon = w; t.lives = 99;
+    swingTicks(t, Array.from({ length: 140 }, (_, i) => ({ ...EMPTY_INPUT, attack: i % 7 === 0, attackHeld: i % 7 < 2 })));
+    expect(t.player.heat).toBe(0);
+    expect(t.player.stall).toBe(0);
+  });
 });
 
 // ── 대검 규칙(11-20) — 무쇠 · 유리 말고 대검마다 하나씩 ──

@@ -192,6 +192,9 @@ export interface WeaponSpec {
   holdRepeat?: number;
   /** 있으면 누르고 있는 동안 벨 때마다 holdRepeat 간격이 1틱씩 줄어 이 값까지 빨라진다. 떼면 처음으로 */
   holdMin?: number;
+  /** 과열(holdRepeat 무기): 쥔 채 반복으로 벨 때마다 열 +1(첫 누름은 0) · 공격 키를 떼고 있으면 cool틱마다 −1.
+   *  max에 닿으면 stall틱 동안 공격을 못 한다(탭도) · 끝나면 열 0. 가드 · 점프는 그대로(11-21 바닥 홀드 고침) */
+  heat?: { max: number; cool: number; stall: number };
   /** 콤보가 높을수록 필살 게이지 배율에 더한다: 콤보 100에서 +이 값(그 위는 같다) */
   comboGauge?: number;
   /** 이 횟수만큼 깔려도 목숨을 안 잃고 빠져나온다(판 시작에 든다) */
@@ -233,12 +236,12 @@ export const WEAPON: Record<WeaponId, WeaponSpec> = {
   // 연장 일곱(11-20 다섯 → 맨홀 뚜껑 빼고 드릴 셋). 세 칸 + 고유 규칙 하나
   shovel: { reach: 66, lift: 82, gauge: 0.8, shake: 1.1, keepCombo: 0.5 },
   pickaxe: { reach: 72, lift: 78, gauge: 0.8, shake: 1.2, collapseGauge: 2 },
-  jackhammer: { reach: 64, lift: 76, gauge: 0.95, shake: 1.5, holdRepeat: 8 },
+  jackhammer: { reach: 64, lift: 76, gauge: 0.95, shake: 1.5, holdRepeat: 8, heat: { max: 10, cool: 11, stall: 48 } },
   pipe: { reach: 62, lift: 80, gauge: 1, shake: 1, airReach: 26 },
-  drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 11, holdMin: 7 },
+  drill: { reach: 60, lift: 84, gauge: 1.05, shake: 0.9, holdRepeat: 11, holdMin: 7, heat: { max: 9, cool: 13, stall: 54 } },
   coredrill: { reach: 70, lift: 76, gauge: 0.85, shake: 1, comboGauge: 0.5 },
   auger: { reach: 70, lift: 84, gauge: 0.75, shake: 1.5, pinSave: 1, pinSaveEvery: 25 },
-  diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7 }, // 전설 · 처음부터 전동 드릴의 끝 간격
+  diadrill: { reach: 64, lift: 92, gauge: 1.15, shake: 1.2, holdRepeat: 7, heat: { max: 9, cool: 12, stall: 54 } }, // 전설 · 처음부터 전동 드릴의 끝 간격
   // 대검 — 모두 맞교환(철거칼보다 나은 칸과 못한 칸이 함께 있다). 무쇠 · 유리 말고는 고유 규칙이 하나씩 있다(11-20)
   iron: { reach: 78, lift: STACK.HIT_LIFT_V, gauge: 0.9, shake: 1.2 },   // 사거리 ↑ / 필살 ↓
   brick: { reach: 62, lift: 92, gauge: 0.95, shake: 1.5, guardLift: 1.2 }, // 띄우기 ↑ · 가드 튕김 ↑ / 사거리 ↓

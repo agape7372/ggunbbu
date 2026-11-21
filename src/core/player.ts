@@ -12,7 +12,7 @@ export function makePlayer(): PlayerState {
     invulnTicks: 0,
     bufAttack: 0, bufJump: 0, bufGuard: 0, bufSpecial: 0,
     pinTick: 0,
-    attackHit: false, attackFromAir: false, holdTick: 0, holdN: 0,
+    attackHit: false, attackFromAir: false, holdTick: 0, holdN: 0, heat: 0, stall: 0,
   };
 }
 
@@ -54,11 +54,23 @@ export function stepPlayer(s: GameState, input: InputFrame, dt: number): void {
   // 쥔 채 새 판이 열리거나 깔림 · 판 세우기에서 풀려도 새로 누르기 전엔 저절로 베지 않는다
   // holdMin이 있으면(전동 드릴) 반복할 때마다 간격이 1틱씩 줄어 holdMin까지 빨라진다. 떼면 엣지부터 다시
   const w = WEAPON[s.weapon];
+  // 과열(heat): 멈춘 동안은 공격 입력을 버리고 누름 셈도 닫는다(다시 누르면 첫 간격부터) · 떼고 있으면 식는다
+  const h = w.heat;
+  if (p.stall > 0) {
+    p.stall -= 1;
+    p.bufAttack = 0;
+    p.holdTick = 0;
+    if (p.stall === 0) { p.heat = 0; s.events.push({ kind: 'cooled' }); }
+  } else if (p.heat > 0 && !input.attackHeld) p.heat -= 1;
   const rep = w.holdRepeat;
   if (!rep || !input.attackHeld || p.holdTick === 0) p.holdTick = 0;
   else {
     const gap = w.holdMin ? Math.max(w.holdMin, rep - p.holdN) : rep;
-    if (p.holdTick > gap) { p.holdTick = 1; p.holdN += 1; p.bufAttack = PLAYER.INPUT_BUFFER; }
+    if (p.holdTick > gap) {
+      p.holdTick = 1; p.holdN += 1; p.bufAttack = PLAYER.INPUT_BUFFER;
+      // 이 반복 타격은 나가고, 열이 다 차면 다음 틱부터 멈춘다
+      if (h && (p.heat += h.cool) >= h.max * h.cool) { p.stall = h.stall; s.events.push({ kind: 'overheat' }); }
+    }
     p.holdTick += 1;
   }
 

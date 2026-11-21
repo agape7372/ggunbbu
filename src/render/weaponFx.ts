@@ -8,7 +8,8 @@
 // tap = 잘게 떠는 획(착암기) · ring = 고리(파이프 단면 · 코어 드릴 구멍) · pix = 네모 토막(마스크 도트 · 빠진 원기둥 · 벽돌 조각 · a 4면 다이아 드릴 마름모). 연장 열둘은 저마다 다른 조각 묶음으로 터진다.
 
 import type { GameState, JuiceEvent, WeaponId } from '../core/types';
-import { PALETTE, TICK, VIEW, WEAPON_FX, WEAPON_INK } from '../config';
+import { JUICE_SYS, PALETTE, TICK, VIEW, WEAPON, WEAPON_FX, WEAPON_INK } from '../config';
+import { playerBlade } from './sprites';
 import {
   N, bent, drops, keepBits, later, line, n01, pool, put, scaled, sgn, sweep, tierK, vel, type Bit,
 } from './bladeFx';
@@ -526,6 +527,13 @@ export function weaponReact(s: GameState, e: JuiceEvent): Beat {
     case 'pinReady': // 굴착 드릴 구제가 다시 찼다 — pinSave 나선을 작게 한 번
       spiral(footX, footY, 48, 6, 3.5, 0.35);
       return b;
+    case 'overheat': { // 드릴류 과열 — 무기 끝에서 먹 연기가 한 번 피어오른다(글자 「과열」은 렌더러 팝업)
+      const [tx, ty] = heatTipAt ?? [footX + 22, footY - 58];
+      for (let i = 0; i < 4; i++) {
+        put('dust', tx + sgn() * 4, ty - 3 - i * 4, { life: 0.55 + 0.12 * i, size: 5 + i * 2.5, c1: INK, vx: sgn() * 18, vy: -45 - 22 * i, drag: 2.2, v: 9 });
+      }
+      return b;
+    }
     case 'pinSave':
       spiral(footX, footY, 96, 12, 7, 0.5);
       spiral(footX + 4, footY - 20, 80, 8, 3.5, 0.44, INK);
@@ -766,4 +774,54 @@ export function drawWeaponBit(ctx: CanvasRenderingContext2D, p: Bit, py: number)
     }
     default:
   }
+}
+
+// ── 과열(드릴류 WeaponSpec.heat) ─────────────────────────────
+
+/** 지난 프레임 무기 끝(월드 좌표) — 과열 먹 연기가 여기서 피어오른다 */
+let heatTipAt: [number, number] | null = null;
+
+/** 손에 든 무기 끝을 축으로 ang 쪽 len · 굵기 w 네모 하나(채우기는 부르는 쪽 색) */
+function tipBar(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, len: number, w: number): void {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const nx = -s * w * 0.5, ny = c * w * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(x + nx, y + ny);
+  ctx.lineTo(x - c * len + nx, y - s * len + ny);
+  ctx.lineTo(x - c * len - nx, y - s * len - ny);
+  ctx.lineTo(x - nx, y - ny);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * renderer가 졸라맨을 그린 바로 뒤(살아 있는 몸이 걸린 동안) 부른다. 열이 오를수록 무기 끝이 포인트 색으로 길게 달아오르고,
+ * 반을 넘으면 그 속에 종이빛 줄(hotCore)이 선다. 4분의 3을 넘으면 끝에서 김 · 먹 연기 두 가닥이 오른다(커졌다 줄어 사라진다).
+ * 멈춘 동안은 식은 먹 그대로다(달아오름 없음). HUD 막대는 없다 — 무기 끝이 곧 눈금이다
+ */
+export function drawHeatTip(ctx: CanvasRenderingContext2D, s: GameState, footX: number, footY: number): void {
+  const h = WEAPON[s.weapon].heat;
+  const b = h ? playerBlade(s.player.pose, s.player.poseTick) : null;
+  if (!h || !b) { heatTipAt = null; return; }
+  const tx = footX + b[2], ty = footY + b[3];
+  heatTipAt = [tx, ty];
+  const f = s.player.stall > 0 ? 0 : Math.min(1, s.player.heat / (h.max * h.cool));
+  if (f <= 0.05) return;
+  const ang = Math.atan2(b[3] - b[1], b[2] - b[0]);
+  ctx.save();
+  ctx.fillStyle = WEAPON_INK[s.weapon];
+  tipBar(ctx, tx, ty, ang, 3 + 11 * f, 2.2 + 2.2 * f);
+  if (f > 0.5) hotCore(ctx, (1 - (f - 0.5) * 2) * JUICE_SYS.HOT_U, (k) => tipBar(ctx, tx, ty, ang, 2 + 7 * f, k));
+  if (f > 0.75) {
+    ctx.fillStyle = GRAY;
+    for (let i = 0; i < 2; i++) {
+      const a = ((s.tick + i * 17) % 34) / 34;
+      const r = (1 + 2.4 * a) * (a < 0.7 ? 1 : (1 - a) / 0.3);
+      if (r < 0.4) continue;
+      ctx.beginPath();
+      ctx.ellipse(tx + Math.sin(a * 5 + i * 2) * 3, ty - 4 - a * 20, r * 1.3, r, -0.3, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
