@@ -127,7 +127,7 @@ describe('고드름 — 각진 결정 덩이 → 얼어 멈춤 → 쩍 → 왼�
     }
   });
 
-  it('칼 기운: 결정이 칼끝에서 날 중간까지 차례로 타고 올라(한 대각 · 한 번에 획 여섯 안) 키 0.5배를 넘고, 다섯째에 조각 하나가 칼날 옆 공중에서 떨어진다', () => {
+  it('칼 기운: 결정이 칼끝에서 날 중간까지 차례로 타고 올라(한 대각 · 한 번에 획 여섯 안) 칼 길이 반을 넘고, 다섯째에 조각 하나가 칼날 옆 공중에서 떨어진다', () => {
     const b = [180, 560, 205, 606] as const; // 서 있을 때 — 손에서 땅 쪽 칼끝으로
     const roots: number[] = [];
     for (let n = 0; n < 5; n++) {
@@ -140,13 +140,39 @@ describe('고드름 — 각진 결정 덩이 → 얼어 멈춤 → 쩍 → 왼�
       roots.push(Math.min(...xs.map((p) => p.y)));
       if (n >= 3) {
         const ys = xs.flatMap((p) => [p.y, tip(p)[1]]);
-        expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(55 * 0.5);
+        expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(33 * 0.5); // 칼(33) 반 넘게 — 작아도 결정 줄로 읽힌다
         expect(Math.min(...xs.map((p) => p.y))).toBeLessThan((b[1] + b[3]) / 2); // 날 중간 위까지
       }
       if (n === 4) expect(alive().find((p) => p.k === 'leaf')!.y).toBeLessThan(b[3] - 25); // 칼날 옆 공중
     }
     expect(roots).toEqual([...roots].sort((x, y) => y - x)); // 차례로 타고 오른다
     expect(roots[4]).toBeLessThan(roots[0] - 15);
+  });
+
+  it('칼 기운 상한(다섯 공통) — 서 있기 · 든 칼 모두 결정 획 전부가 칼날에서 35px 안 · 칼끝 너머 20px 안(11-22 「검기운들은 전체적으로 너무 안컸으면」)', () => {
+    for (const b of [[189, 580, 205, 609], [170, 560, 200, 520]] as const) {
+      const [hx, hy, tx, ty] = b;
+      const L = Math.hypot(tx - hx, ty - hy);
+      const [ux, uy] = [(tx - hx) / L, (ty - hy) / L];
+      resetBladeFx();
+      let far = 0;
+      let over = 0;
+      for (let i = 0; i < 200; i++) {
+        if (i % 6 === 0 && i < 120) R.aura?.([...b], i / 6, c);
+        expect(alive().filter((p) => p.k === 'leaf' && p.size > 5)).toEqual([]); // 떨어져 나가는 얼음은 작은 조각뿐(땅으로 떨어지는 길은 상한 밖)
+        for (const p of strokes()) {
+          for (const [x, y] of [[p.x, p.y], tip(p)]) {
+            const u = (x - hx) * ux + (y - hy) * uy;
+            const uc = Math.max(0, Math.min(L, u));
+            far = Math.max(far, Math.hypot(x - hx - ux * uc, y - hy - uy * uc));
+            over = Math.max(over, u - L);
+          }
+        }
+        step(1);
+      }
+      expect(far).toBeLessThan(35);
+      expect(over).toBeLessThan(20);
+    }
   });
 
   it('천지개벽 — 땅에서 솟는 큰 획엔 곧은 결정 기둥(높이 · 기울기 제각각 · 모두 왼쪽 위) · 땅 마무리는 주인공 몸을 비운 기둥 둘', () => {
