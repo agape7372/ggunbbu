@@ -1,4 +1,4 @@
-// 해일 대검 4판 — 왼쪽 땅에서 솟아 오른쪽 위로 말리는 호쿠사이 마루(등 · 말림 통 · 결 줄 · 갈퀴 손가락 · 물방울 덩이 3단) ·
+// 해일 대검 4판 — 왼쪽 땅에서 솟아 오른쪽 위로 말리는 갈고리 마루(등 · 말림 통 · 결 줄 · 갈퀴 손가락 · 물방울 덩이 3단) ·
 // 칼길 = 꼬이는 물 띠 셋 · 크기 순서 · 주인공 몸 상자와 「콤보」 도장 자리 비움 · 조각 상한 · 소멸.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -51,7 +51,7 @@ const turning = (p: { pts: readonly number[] }): number => {
 
 beforeEach(() => resetBladeFx());
 
-describe('해일 — 호쿠사이 마루', () => {
+describe('해일 — 갈고리 마루', () => {
   it('완파: 등 머리는 왼쪽 땅 · 말림은 가는 두 가닥 · 갈퀴 손가락은 +6에 이미 섰다 · 물방울 덩이 크기 3단 · 공통 달(sweep) 없음', () => {
     const y = G - 70;
     scaled(X, y, WEAPON_FX.SIZE, () => RECIPES.surf.destroy(X, y, 1.25, c));
@@ -129,7 +129,10 @@ describe('해일 — 호쿠사이 마루', () => {
     resetBladeFx();
     const blade = [X + 9, G - 30, X + 25, G - 1] as const;
     RECIPES.surf.aura!([...blade], 5, c);
-    const [wa, wb, crest] = pool.filter((p) => p.alive && p.k === 'zig');
+    const [wa, wb, crest, back] = pool.filter((p) => p.alive && p.k === 'zig');
+    // 등 먹 — 마루 등을 따라 가는 순먹 줄(전설 색 없이)
+    expect([c, WEAPON_LITE.tide]).not.toContain(back.c1);
+    expect(back.v).toBeLessThan(crest.v);
     for (const w of [wa, wb]) expect(Math.hypot(w.x - blade[0], w.y - blade[1])).toBeLessThan(4); // 머리는 굽이 0.4배만큼 비켜 댄다
     expect(wa.v).toBeGreaterThan(wb.v * 1.5);
     const top = Math.min(...crest.pts.filter((_, i) => i % 2).map((q) => crest.y + q));
@@ -137,11 +140,17 @@ describe('해일 — 호쿠사이 마루', () => {
     expect(crest.y - top).toBeLessThan(66);
     expect(Math.abs(turning(crest))).toBeGreaterThan(2);
     step(6);
-    const fingers = pool.filter((p) => p.alive && p.k === 'zig').slice(3);
+    const fingers = pool.filter((p) => p.alive && p.k === 'zig').slice(4);
     expect(fingers.length).toBeGreaterThanOrEqual(3);
     expect(fingers.some((p) => p.c1 === WEAPON_LITE.tide)).toBe(true);
-    for (const p of [crest, ...fingers]) for (let i = 0; i < p.pts.length; i += 2) expect(p.x + p.pts[i]).toBeGreaterThan(X + 18);
+    for (const p of [crest, back, ...fingers]) for (let i = 0; i < p.pts.length; i += 2) expect(p.x + p.pts[i]).toBeGreaterThan(X + 18);
     expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
+    // 막기 자세(칼이 머리 위 가로 = 손 (−12, −57) → 칼끝 (24, −57)): 마루 · 등 먹 · 손가락이 몸 상자 오른쪽 모서리 밖
+    resetBladeFx();
+    RECIPES.surf.aura!([X - 12, G - 57, X + 24, G - 57], 5, c);
+    step(6);
+    const guard = pool.filter((p) => p.alive && p.k === 'zig').slice(2);
+    for (const p of guard) for (let i = 0; i < p.pts.length; i += 2) expect(p.x + p.pts[i]).toBeGreaterThan(X + 18);
     // 한 바퀴(부르기 45번 · 0.1초마다) — 무너질 때 물방울 덩이 크기 3단 · 조각 상한 · 2초 뒤 0
     let peak = 0;
     const sizes: number[] = [];
