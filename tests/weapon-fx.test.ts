@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { makeState } from '../src/core/sim';
 import type { GameState, JuiceEvent, JuiceKind, WazaId, WeaponId } from '../src/core/types';
 import { GREATSWORD_IDS, WAZA_IDS, WEAPON_IDS } from '../src/meta/loadout';
-import { bladeReact, drawBladeFx, resetBladeFx, updateBladeFx, type Bit } from '../src/render/bladeFx';
-import { drawHeatTip, liveBits, setFxMask } from '../src/render/weaponFx';
+import { bladeReact, drawBladeFx, pool, resetBladeFx, updateBladeFx, weaponAlong, weaponBloom, type Bit } from '../src/render/bladeFx';
+import { TOOL_RECIPES, drawHeatTip, liveBits, setFxMask } from '../src/render/weaponFx';
 import { setLiveBody, setPlayerWeapon } from '../src/render/sprites';
 import { moveBody } from '../src/render/moveBody';
 import { PALETTE, WEAPON, WEAPON_INK } from '../src/config';
@@ -261,5 +261,62 @@ describe('과열 — 무기 끝', () => {
     expect(liveBits().some((p) => p.k === 'dust')).toBe(true);
     settle();
     expect(pieces()).toBe(0);
+  });
+});
+
+// 필살 번짐(11-21 설계서 §5) — 연장 열둘은 제 waza(along · bloom)를 가진다. 값싼 무기도 보이게 한 번 부름에 조각 6~16,
+// 뿌리 → 끝 차례로 번지고, 2초 뒤엔 0. 큰 획 몸 위가 아니라 가장자리 바깥으로 뻗는다(먹 위 먹은 안 보인다)
+describe('필살 번짐 — 연장 열둘', () => {
+  /** 지금까지 태어난 조각 수(덮어쓴 칸 포함) — 즉시 + later 합 */
+  const seen = new Map<Bit, number>();
+  const births = (): number => {
+    let n = 0;
+    for (const p of pool) {
+      if (!p.alive) { seen.delete(p); continue; }
+      if (seen.get(p) !== p.seed) { n++; seen.set(p, p.seed); }
+    }
+    return n;
+  };
+  const run = (f: () => void): number => {
+    resetBladeFx();
+    seen.clear();
+    f();
+    let total = births();
+    for (let i = 0; i < 125; i++) {
+      updateBladeFx(1 / 60);
+      total += births();
+    }
+    return total;
+  };
+  const DIAG = [60, 640, 190, 470, 230, 380, 320, 190]; // 사선 꺾은선 약 500px
+
+  it('모두 waza가 있고, along 6~16 조각(짧은 · 사선 · 긴 획) · bloom 4~24 · 2초 뒤 0', () => {
+    for (const w of TOOL_IDS) {
+      expect(TOOL_RECIPES[w]?.waza, w).toBeDefined();
+      for (const path of [[200, 400, 300, 400], DIAG, [0, 300, 1500, 300]]) {
+        const n = run(() => { weaponAlong(w, path, 1, 0.3); drawBladeFx(sink, 0); });
+        expect(n, `${w} ${path.length}`).toBeGreaterThanOrEqual(6);
+        expect(n, `${w} ${path.length}`).toBeLessThanOrEqual(16);
+        expect(liveBits(), w).toHaveLength(0);
+      }
+      const b = run(() => { weaponBloom(w, 300, 400, -Math.PI / 2, 1.4); drawBladeFx(sink, 0); });
+      expect(b, w).toBeGreaterThanOrEqual(4);
+      expect(b, w).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it('뿌리 → 끝 차례 · 가장자리 바깥으로 — 가로 획 위 조각은 획에서 떨어져 위 · 아래 양쪽에 선다', () => {
+    for (const w of TOOL_IDS) {
+      resetBladeFx();
+      weaponAlong(w, [0, 300, 600, 300], 1, 0.5);
+      expect(Math.max(...liveBits().map((p) => p.x)), w).toBeLessThan(150); // 처음엔 뿌리 쪽만
+      const ys: number[] = [];
+      for (let i = 0; i < 40; i++) {
+        updateBladeFx(1 / 60);
+        ys.push(...liveBits().map((p) => p.y - 300));
+      }
+      expect(ys.some((d) => d < -4), w).toBe(true);
+      expect(ys.some((d) => d > 4), w).toBe(true);
+    }
   });
 });
