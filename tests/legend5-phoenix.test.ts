@@ -115,14 +115,45 @@ describe('불새 — 불기둥 → 비대칭 날개 → 위로 떨어져 나가�
     for (const p of t) { const q = pts(p); expect(q[q.length - 1][1]).toBeLessThan(q[0][1]); } // 끝이 뿌리보다 위
   });
 
-  it('칼 기운: 콤보가 쌓일수록 불 혀가 길다', () => {
+  it('칼 기운: 콤보가 쌓일수록 불 혀가 길다(1.3배 안팎 — 1.5배 안)', () => {
     const len = (cr: number): number => {
       resetBladeFx();
       for (let n = 0; n < 40; n++) r.aura?.([180, 560, 200, 600], n, c, cr);
       const zs = live().filter((p) => p.k === 'zig');
       return zs.reduce((a, p) => { const q = pts(p); return a + Math.hypot(q[q.length - 1][0] - q[0][0], q[q.length - 1][1] - q[0][1]); }, 0) / zs.length;
     };
-    expect(len(1)).toBeGreaterThan(len(0) * 1.8);
+    expect(len(1)).toBeGreaterThan(len(0) * 1.2);
+    expect(len(1)).toBeLessThan(len(0) * 1.5);
+  });
+
+  it('칼 기운 상한: 서 있기 칼날에 붙어 감긴다 — 외곽은 칼날에서 35 안 · 칼끝 너머 20(콤보 100은 30) 안 · 몸 상자 안 획은 칼날에 붙은 것뿐 · 콤보 0 굵기 4.5~5.5', () => {
+    // 서 있기 칼날(발 (180, 610) 기준 손 (9, −30) → 칼끝 (25, −1) · 길이 33)
+    const [hx, hy, tx, ty] = [189, 580, 205, 609];
+    const L = Math.hypot(tx - hx, ty - hy);
+    const [ux, uy] = [(tx - hx) / L, (ty - hy) / L];
+    for (const cr of [0, 1]) {
+      resetBladeFx();
+      let far = 0;
+      let beyond = 0;
+      for (let f = 0; f < 240; f++) {
+        if (f % 5 === 0) r.aura?.([hx, hy, tx, ty], f / 5, c, cr);
+        for (const p of live().filter((b) => b.k === 'zig')) {
+          if (cr === 0) { expect(p.v).toBeLessThanOrEqual(5.5); expect(p.v).toBeGreaterThanOrEqual(3); } // 큰 혀 4.8 · 곁 혀 3.4
+          for (const [x, y] of pts(p)) {
+            const t = (x - hx) * ux + (y - hy) * uy;
+            const tc = Math.max(0, Math.min(L, t));
+            const d = Math.hypot(x - (hx + ux * tc), y - (hy + uy * tc));
+            far = Math.max(far, d + p.v / 2);
+            beyond = Math.max(beyond, t - L + p.v / 2);
+            if (Math.abs(x - 180) <= 18 && 610 - y >= 0 && 610 - y <= 60) expect(d).toBeLessThan(10); // 몸 상자 안이면 칼날 곁
+          }
+        }
+        step(1);
+      }
+      expect(far).toBeGreaterThan(15); // 칼 길이만 한 혀가 실제로 선다
+      expect(far).toBeLessThanOrEqual(35);
+      expect(beyond).toBeLessThanOrEqual(cr ? 30 : 20);
+    }
   });
 
   it('필살 along · bloom — 상한(24 · 48) 안 · 전부 keep · 2초 뒤 0', () => {
