@@ -2300,3 +2300,12 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 시험판: 배포 전 라이브가 11-15 판 `index-DDW7qZlJ.js`(`c376d10`, 이번 머리에 들어 있음)인 걸 확인했다. `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview` 복사 → `vercel deploy --prod`. 라이브 `index-Cs8bWcFE.js`.
 - 앱: 1.0은 OTA가 꺼져 있고(RELEASE §8) Play 출시 전이라 웹 번들을 앱에 밀 길이 없다. 폰에서는 시험판 주소로 본다.
 - 안 합친 것: 결과 화면 시안 `feat/gamey-screen`(`ab37011`). 불변 16을 바꾸는 일이라 판정 뒤에 합친다.
+
+## 2026-11-21 — 필살 × 무기 이펙트 API 뼈대 (`feat/waza-api-1121`)
+
+- 왜: 설계서 §3. 필살 큰 획을 따라 그 무기 속성이 번지는 길(along)과 마무리 한 번(bloom)을 먼저 짓는다. 안무(wazaShow) · 무기별 레시피는 다음 단계다. wazaShow는 안 건드렸다.
+- 한 일: `bladeFx.ts`에 `WazaArt` · `samplePath` · `weaponAlong` · `weaponBloom` · `strokeTone`, `Recipe.waza?` · `TOOL_RECIPES` waza 칸. `legendTone`의 그라데이션 짓기를 기하 · 색 · seed만 받는 `legendGrad`로 뺐다. 연장 그림 한 장은 `weaponFx.toolPiece`로 연다(`toolBurst`는 그 위에 얹었다).
+- 기본 판(waza 없음): 경로 50px당 표본 하나, 한 번에 셋까지 솎아 그 무기 hit를 k × 0.5로 뿌린다(표본 시각 = 진행 × dur, 기존 later 큐). 무기 26 전부 조각 1개 이상, 긴 획 k 1에서 최대 20(상한 24). bloom 기본 = destroy를 k로(최대 gold k 1.4 41).
+- 같음의 증거: 무기 26 × 이벤트 네 + weaponBurst 셋 × 30프레임의 ctx 호출 전체(그라데이션 멈춤점 포함) 해시가 빼기 전후 26개 모두 같다(`tmp/wfx-golden.ts`). `tests/waza-api.test.ts`가 legendTone · strokeTone의 멈춤점이 같음을 지킨다.
+- 시험: waza-api 17 · 전체 83파일 1175 통과 / 12 건너뜀 · tsc 0 · 빌드 OK. 못 본 것: 캡처 · 실기기(그림은 아직 안무가 안 부른다).
+- 알아 둘 것: 대검 레시피 hit는 각 인자가 없어 기본 판의 법선 방향은 연장에서만 쓰인다(다음 단계 waza가 방향을 맡는다).

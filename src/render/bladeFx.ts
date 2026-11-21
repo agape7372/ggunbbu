@@ -22,7 +22,7 @@ import { PALETTE, SEAL_INK, TICK, VIEW, WEAPON_FX, WEAPON_INK, WEAPON_LITE } fro
 import { comboMilestone } from '../audio/consume';
 import { brushArc, brushLine, brushPath, hotCore, hs, inkDrop, inkDust, inkSplat, popScale, PRESS, spatter, type Tone } from './ink';
 import { greatArcPoint, greatLook, playerBlade, type GreatLook } from './sprites';
-import { TOOL_RECIPES, drawWeaponBit, resetWeaponFx, toolBurst, weaponReact } from './weaponFx';
+import { TOOL_RECIPES, drawWeaponBit, resetWeaponFx, toolBurst, toolPiece, weaponReact } from './weaponFx';
 
 /** 먹 조각: stroke 곧은 붓 획 · sweep 호 붓 획 · zig 꺾은 획(철골 · 지그재그 · 얼음 금) · dots 리벳 점 줄 · spat 먹 튐 · drop 먹 방울(땅에 닿으면 번짐) ·
  *  dust 마른 가루 · leaf 금박
@@ -511,6 +511,8 @@ interface Recipe {
   own?: true;
   /** 전설 칼길 — 그 칼의 붓놀림으로(시그니처 색 · fx, fy = 발, turn · grow = 연타 줄 박자) */
   swing?(fx: number, fy: number, w: number, life: number, c: string, turn: number, grow: number): void;
+  /** 필살 큰 획에 얹는 그 칼의 속성(없으면 weaponAlong · weaponBloom 기본 판) */
+  waza?: WazaArt;
 }
 
 /** 톱질 왕복 — 짧은 가로 획이 번갈아 밀고 당긴다(n번), 맞은 벽에 위로 조금씩 올라가며. 뒤 획일수록 늦게 마른다 */
@@ -1118,6 +1120,95 @@ export function weaponBurst(w: WeaponId, x: number, y: number, power: 'hit' | 'f
   }));
 }
 
+/** 필살 × 무기 — 그 무기의 속성이 필살 큰 획에 얹히는 두 가지 꼴(wazaShow가 weaponAlong · weaponBloom으로 부른다) */
+export interface WazaArt {
+  /** 필살 큰 획을 따라 번지는 그 무기의 속성. pts = 월드 좌표 꺾은선 [x0,y0,x1,y1,…] — 앞(시작)에서 뒤(끝)로 dur초에 걸쳐 번진다.
+   *  k = 크기(1 = 보통), c = 포인트 색. 조각 수는 길이 50px당 모티프 하나 꼴, k 1에서 한 번 부름당 즉시 + later 합 ≤ 24 */
+  along(pts: readonly number[], k: number, c: string, dur: number): void;
+  /** 마무리 한 번 — (x, y) 자리, ang = 친 방향(라디안, −π/2 = 위), k = 크기 */
+  bloom(x: number, y: number, ang: number, k: number, c: string): void;
+}
+
+/** 꺾은선을 길이 비례로 표본 — step px마다 하나(양 끝 포함), 진행 방향 각 · 0~1 진행. 점 하나면 표본 하나, 비면 [] */
+export function samplePath(pts: readonly number[], step: number): { x: number; y: number; ang: number; u: number }[] {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const cum: number[] = [];
+  for (let i = 0; i + 1 < pts.length; i += 2) {
+    const n = xs.length;
+    if (n && Math.hypot(pts[i] - xs[n - 1], pts[i + 1] - ys[n - 1]) < 1e-6) continue; // 겹친 점 — 길이 0 마디는 각이 없다
+    cum.push(n ? cum[n - 1] + Math.hypot(pts[i] - xs[n - 1], pts[i + 1] - ys[n - 1]) : 0);
+    xs.push(pts[i]);
+    ys.push(pts[i + 1]);
+  }
+  const n = xs.length;
+  if (n === 0) return [];
+  if (n === 1) return [{ x: xs[0], y: ys[0], ang: 0, u: 0 }];
+  const len = cum[n - 1];
+  const m = Math.max(2, Math.floor(len / Math.max(1, step)) + 1);
+  const out: { x: number; y: number; ang: number; u: number }[] = [];
+  let seg = 1;
+  for (let i = 0; i < m; i++) {
+    const d = (len * i) / (m - 1);
+    while (seg < n - 1 && cum[seg] < d) seg++;
+    const t = (d - cum[seg - 1]) / (cum[seg] - cum[seg - 1]);
+    out.push({
+      x: xs[seg - 1] + (xs[seg] - xs[seg - 1]) * t,
+      y: ys[seg - 1] + (ys[seg] - ys[seg - 1]) * t,
+      ang: Math.atan2(ys[seg] - ys[seg - 1], xs[seg] - xs[seg - 1]),
+      u: i / (m - 1),
+    });
+  }
+  return out;
+}
+
+/** 기본 판 — 길이 50px당 모티프 하나, 한 번 부름의 표본은 이만큼까지(모티프 하나가 조각 여럿이라 즉시 + later 합 24 안) */
+const ALONG_STEP = 50;
+const ALONG_MAX = 3;
+/** 진행 방향의 법선 중 위쪽(−y) — 가로로 가면 위, 세로로 가면 옆 */
+const normalUp = (ang: number): number => {
+  const a = ang - Math.PI / 2;
+  return Math.sin(a) > 0 ? a + Math.PI : a;
+};
+
+/**
+ * 필살 큰 획을 따라 그 무기의 속성을 번지게 한다 — pts 앞 → 뒤로 dur초(박자 함수에서만 부른다. 상점 칸은 조각을 뿌리면 안 된다).
+ * 그 무기에 waza(along · bloom)가 있으면 그것을, 없으면 기본 판: 경로 표본마다 그 무기 hit을 k × 0.5로(법선 방향, 표본 시각 = u × dur).
+ * 필살 그림이라 풀이 넘쳐도 덮이지 않는다(keep)
+ */
+export function weaponAlong(w: WeaponId, pts: readonly number[], k: number, dur: number): void {
+  const g = greatLook(w);
+  const art = g ? RECIPES[g.shape].waza : TOOL_RECIPES[w]?.waza;
+  const c = inkOf(w);
+  keepBits(() => {
+    if (art) {
+      art.along(pts, k, c, dur);
+      return;
+    }
+    const all = samplePath(pts, ALONG_STEP);
+    const n = Math.min(all.length, ALONG_MAX); // 긴 획은 같은 간격으로 솎는다
+    for (let i = 0; i < n; i++) {
+      const s = all[n === all.length ? i : Math.round((i * (all.length - 1)) / (n - 1))];
+      later(s.u * dur, () => {
+        if (g) RECIPES[g.shape].hit(s.x, s.y, k * 0.5, c);
+        else toolPiece(w, 'hit', s.x, s.y, k * 0.5, { n: 1, ang: normalUp(s.ang), k: k * 0.5, turn: 0 });
+      });
+    }
+  });
+}
+
+/** 마무리 한 번 — waza가 있으면 그것, 없으면 그 무기 destroy를 k로. ang = 친 방향(기본 판은 안 쓴다) */
+export function weaponBloom(w: WeaponId, x: number, y: number, ang: number, k: number): void {
+  const g = greatLook(w);
+  const art = g ? RECIPES[g.shape].waza : TOOL_RECIPES[w]?.waza;
+  const c = inkOf(w);
+  keepBits(() => {
+    if (art) art.bloom(x, y, ang, k, c);
+    else if (g) RECIPES[g.shape].destroy(x, y, k, c);
+    else toolPiece(w, 'destroy', x, y, k);
+  });
+}
+
 /** 피 — 인주 방울 부채(땅에 닿으면 번진다) + 터진 자리 인주 튐. wazaShow가 부른다(무음일섬 · 월하난무) */
 export function bloodSpray(x: number, y: number, ang: number, spread: number, n: number, spd = 420): void {
   keepBits(() => {
@@ -1255,9 +1346,7 @@ const LITE_OF = new Map<string, string>(LEGEND_IDS.map((w) => [WEAPON_LITE[w], W
  * 먹 테(빨강 속 + 먹 테두리)는 먹이 적어 티가 안 난다고 반려됐다. §14-6.
  */
 function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: readonly number[]): Tone | undefined {
-  const pair = LEGEND.get(p.c1);
-  const sig = pair ? p.c1 : LITE_OF.get(p.c1);
-  if (!sig) return undefined;
+  if (!LEGEND.has(p.c1) && !LITE_OF.has(p.c1)) return undefined;
   let x0: number; let y0: number; let x1: number; let y1: number;
   if (p.k === 'zig') {
     [x0, y0, x1, y1] = [pts[0], pts[1], pts[pts.length - 2], pts[pts.length - 1]];
@@ -1268,17 +1357,28 @@ function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: read
   } else {
     [x0, y0, x1, y1] = [p.x, py, p.x + Math.cos(p.rot) * p.size, py + Math.sin(p.rot) * p.size];
   }
+  return legendGrad(ctx, p.c1, p.seed, x0, y0, x1, y1);
+}
+
+/**
+ * 그라데이션 짓기 — 기하(댄 곳 (x0,y0) → 뗀 곳 (x1,y1)) · 몸 색 c1 · seed만 받는다(legendTone과 strokeTone이 같이 쓴다).
+ * c1이 전설 시그니처 색이나 그 밝은 짝일 때만 돌려주고 아니면 undefined
+ */
+function legendGrad(ctx: CanvasRenderingContext2D, c1: string, seed: number, x0: number, y0: number, x1: number, y1: number): Tone | undefined {
+  const pair = LEGEND.get(c1);
+  const sig = pair ? c1 : LITE_OF.get(c1);
+  if (!sig) return undefined;
   // 몸통 · 가닥 셋의 그라데이션. 가닥은 전환 자리를 lo~lo+spread로 엇갈린다
   const tones = (grad: (a: number) => CanvasGradient, body: number, lo: number, spread: number): Tone => {
-    const g = [grad(body), grad(lo + spread * hs(p.seed, 1)), grad(lo + spread * hs(p.seed, 2)), grad(lo + spread * hs(p.seed, 3))];
-    return (k) => { ctx.fillStyle = g[k ? 1 + Math.floor(hs(p.seed, k + 30) * 3) : 0]; };
+    const g = [grad(body), grad(lo + spread * hs(seed, 1)), grad(lo + spread * hs(seed, 2)), grad(lo + spread * hs(seed, 3))];
+    return (k) => { ctx.fillStyle = g[k ? 1 + Math.floor(hs(seed, k + 30) * 3) : 0]; };
   };
   if (sig === WEAPON_INK.flame) {
     // 화염만 거꾸로 — 밑동(안)은 빨강, 3할쯤부터 짙어져 끝(밖) 7할이 먹. 주황 혀도 밑동만 주황이다
     const fd = LEGEND.get(sig)?.[0] ?? INK;
     return tones((a) => {
       const g = ctx.createLinearGradient(x0, y0, x1, y1);
-      g.addColorStop(0, p.c1);
+      g.addColorStop(0, c1);
       g.addColorStop(a, sig);
       g.addColorStop(a + 0.12, fd);
       g.addColorStop(a + 0.24, INK);
@@ -1288,7 +1388,7 @@ function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: read
   if (!pair) {
     const g = ctx.createLinearGradient(x0, y0, x1, y1);
     g.addColorStop(0, sig);
-    g.addColorStop(0.45, p.c1);
+    g.addColorStop(0.45, c1);
     return () => { ctx.fillStyle = g; };
   }
   const [dark, lite] = pair;
@@ -1297,11 +1397,20 @@ function legendTone(ctx: CanvasRenderingContext2D, p: Bit, py: number, pts: read
     g.addColorStop(0, INK);
     g.addColorStop(a, INK);
     g.addColorStop(a + 0.16, dark);
-    g.addColorStop(a + 0.32, p.c1);
-    g.addColorStop(0.86, p.c1);
+    g.addColorStop(a + 0.32, c1);
+    g.addColorStop(0.86, c1);
     g.addColorStop(1, lite);
     return g;
   }, 0.14, 0.04, 0.3);
+}
+
+/**
+ * 필살 큰 획 칠하기 — 전설이면 legendTone과 같은 그라데이션(화염 거꾸로 포함), 아니면 undefined.
+ * (x0,y0) 댄 곳 → (x1,y1) 뗀 곳(그리는 좌표 — cam을 더한 뒤), seed = 가닥 전환 자리를 흩는 값.
+ * ink.ts brushLine · brushPath · brushArc의 tone 인자로 넘긴다
+ */
+export function strokeTone(ctx: CanvasRenderingContext2D, w: WeaponId, x0: number, y0: number, x1: number, y1: number, seed: number): Tone | undefined {
+  return w in WEAPON_LITE ? legendGrad(ctx, WEAPON_INK[w as keyof typeof WEAPON_LITE], seed, x0, y0, x1, y1) : undefined;
 }
 
 /** 붓 획 하나(stroke · sweep · zig) — 먹 획 + 벤 순간 속 색 + 공사중 빗금 */
