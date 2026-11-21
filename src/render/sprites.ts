@@ -587,10 +587,10 @@ const GREAT_LOOK: Record<GreatswordId, GreatLook> = {
   crane: { shape: 'truss', blade: '#74B654', hi: '#CFE6C0', guard: '#2C4A1E', w: 3 },
   brush: { shape: 'sumi', blade: PALETTE.INK, hi: '#4D8AE6', guard: '#5A4630', w: 3.4 },
   gold: { shape: 'royal', blade: '#E2B43A', hi: '#FFF1B8', guard: '#8A5A12', w: 3.2, edge: PALETTE.RED },
-  phoenix: { shape: 'wing', blade: '#FE946A', hi: '#FDC680', guard: '#5A2A14', w: 3 },
+  phoenix: { shape: 'wing', blade: '#E85A28', hi: '#FDC680', guard: '#5A2A14', w: 3 },
   tide: { shape: 'surf', blade: '#0072CD', hi: '#559FEF', guard: '#0E2C4E', w: 3 },
   volt: { shape: 'volt', blade: '#C8C832', hi: '#D7D866', guard: '#3E3E12', w: 2.8 },
-  icicle: { shape: 'icicle', blade: '#4FC8F0', hi: '#8ADFFE', guard: '#1E4E60', w: 2.6 },
+  icicle: { shape: 'icicle', blade: '#4FC8F0', hi: '#C4E6F2', guard: '#1E4E60', w: 2.6 },
   shade: { shape: 'smoke', blade: '#5E46B3', hi: '#8476D5', guard: PALETTE.INK, w: 3.2 },
 };
 

@@ -880,8 +880,8 @@ export const WEAPON_INK = {
   brick: '#A84846', rod: '#86642C', glass: '#3E9E6A',
   flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
   diadrill: '#20A7B6', thunder: '#7766CC', crane: '#74B654', brush: '#4D8AE6',
-  // 11-21 원소 다섯 — 영상 색조(불 주황 · 물 파랑 · 전기 노랑 · 얼음 하늘 · 어둠 남보라) 안에서 기존 스물여섯과 OKLab 거리가 가장 먼 색(DEVLOG 11-21 표)
-  phoenix: '#FE946A', tide: '#0072CD', volt: '#C8C832', icicle: '#4FC8F0', shade: '#5E46B3',
+  // 11-21 원소 다섯(불새 11-21 2판 = 짙은 주황, 파스텔 반려) — 영상 색조(불 주황 · 물 파랑 · 전기 노랑 · 얼음 하늘 · 어둠 남보라) 안에서 기존 스물여섯과 OKLab 거리가 가장 먼 색(DEVLOG 11-21 표)
+  phoenix: '#E85A28', tide: '#0072CD', volt: '#C8C832', icicle: '#4FC8F0', shade: '#5E46B3',
 } as const;
 /**
  * 전설 열셋의 밝은 짝 — 같은 색의 한 단 밝은 붓 색(2026-11-21 여덟 · 같은 날 원소 대검 다섯).
@@ -891,7 +891,7 @@ export const WEAPON_INK = {
 export const WEAPON_LITE = {
   flame: '#F2A03C', frost: '#A3D6EA', thunder: '#CDC6F4', onyx: '#B27DBE',
   crane: '#C2E39A', brush: '#A8C6F4', gold: '#EECF72', diadrill: '#8FE0C8',
-  phoenix: '#FDC680', tide: '#559FEF', volt: '#D7D866', icicle: '#8ADFFE', shade: '#8476D5',
+  phoenix: '#FDC680', tide: '#559FEF', volt: '#D7D866', icicle: '#C4E6F2', shade: '#8476D5',
 } as const;
 /** 옛 칼빛 설정값(저장값은 그대로) → 먹에 맞는 포인트 색. 철거칼 획 속(effects · weaponFx · sprites 참격 호) */
 export const SLASH_INK: Readonly<Record<string, string>> = {
