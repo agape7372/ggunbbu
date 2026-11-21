@@ -14,7 +14,7 @@ const USAGE = `이펙트 검수 하네스
   serve   개발 서버를 띄워 둔다 — 켜져 있으면 다른 명령이 그걸 써서 기동이 빠르다(Ctrl+C로 끔)
   sheet   장면마다 PNG 한 장 — 줄 = 무기, 칸 = 사건 뒤 틱 (--scale 1 = 폰 1배)
   strip   연속 프레임 띠 + 계측(무기 조각 넓이 · 태어난 조각) → strip-<장면>.png · motion.json
-          (--frames N · --every K · --cols N 접기, 기본 8)
+          (--frames N · --every K · --from N 사건 뒤 N틱부터 · --cols N 접기, 기본 8 · 한 장 폭 2400 안으로 줄어든다)
   movie   무기마다 서 있기 → 타격 → 층 깨기 → 완파 → 헛스윙(+필살) → <무기>.mp4 · <무기>-slow.mp4 (--keep)
 인자
   --weapons a,b   --scenes hit,floor,destroy,whiff,aura,special   --out <폴더, 기본 tmp/fx/out>
@@ -73,7 +73,7 @@ const drafts = list('--draft', '').map((f) => {
   if (!existsSync(projectPath(rel))) throw new Error(`초안 파일이 없다: ${f}`);
   return rel;
 });
-const opts = { scale: num('--scale'), gray: args.includes('--gray'), waza: cliOption('--waza', '', args) || undefined, frames: num('--frames'), every: num('--every'), cols: num('--cols') };
+const opts = { scale: num('--scale'), gray: args.includes('--gray'), waza: cliOption('--waza', '', args) || undefined, frames: num('--frames'), every: num('--every'), cols: num('--cols'), from: num('--from') };
 const { chromium } = optionalPackage(process.env.PLAYWRIGHT_MODULE ?? 'playwright', '--playwright-module');
 mkdirSync(out, { recursive: true });
 const png = (file, data) => writeFileSync(path.join(out, file), Buffer.from(data.split(',')[1], 'base64'));

@@ -21,7 +21,7 @@ interface Cell { label: string; cv: HTMLCanvasElement | null }
 interface Row { name: string; cells: Cell[]; gap?: number }
 /** 한 줄 = 무기 하나(초안이 있으면 「지금」 + 초안마다 한 줄) */
 interface Line { name: string; w: WeaponId; draft?: Draft }
-export interface Opts { scale?: number; gray?: boolean; waza?: WazaId; frames?: number; every?: number; cols?: number }
+export interface Opts { scale?: number; gray?: boolean; waza?: WazaId; frames?: number; every?: number; cols?: number; from?: number }
 
 // 장면 사전 — off = 사건 뒤 틱, crop = [폭, 높이, 위](논리 px), k = 시트 배율
 export const S: Record<string, Scene> = {
@@ -232,6 +232,9 @@ function summary(frames: MotionFrame[]) {
     /** 마지막 칸에도 정점의 5% 넘게 남았다 = 창 안에서 안 끝남(peakFrac은 창 안 값) */
     cut: frames[frames.length - 1].area > floor,
     peakFrame: peak.t,
+    peakArea: peak.area,
+    /** 창 안에서 가장 넓었던 상자 폭 · 높이(px) — 「둘레는 그대로」를 지금 줄과 견준다 */
+    maxBox: [Math.max(...frames.map((f) => f.w)), Math.max(...frames.map((f) => f.h))],
     peakFrac: last && last.t > 0 ? +(peak.t / last.t).toFixed(3) : null,
     birthFrames: frames.filter((f) => f.births > 0).length,
     birthPeakShare: total ? +(Math.max(...frames.map((f) => f.births)) / total).toFixed(3) : null,
@@ -259,7 +262,7 @@ function banded(crop: HTMLCanvasElement, f: MotionFrame, maxArea: number): HTMLC
 /** 연속 프레임 띠 — 줄마다 사건 틱부터 frames칸(every 틱 간격), 폰 1배 크롭 + 계측 띠 */
 export function stripPng(weapons: WeaponId[], name: string, draftNames: string[], opts: Opts): { png: string; motion: unknown[] } {
   const sc = sceneOf(name);
-  const N = opts.frames ?? 24, K = opts.every ?? 1;
+  const N = opts.frames ?? 24, K = opts.every ?? 1, F = opts.from ?? 0;
   const groups: { name: string; cells: Cell[] }[] = [];
   const motion: unknown[] = [];
   for (const l of lines(weapons, draftNames)) {
@@ -274,7 +277,7 @@ export function stripPng(weapons: WeaponId[], name: string, draftNames: string[]
       });
       if (at < 0) { born = 0; return false; }
       const d = t - at;
-      if (d % K === 0) {
+      if (d >= F && (d - F) % K === 0) {
         shots.push({ cv: crop(s, sc.crop, 1), f: { t: d, ...measure(), births: born } });
         born = 0;
       }
