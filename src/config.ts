@@ -880,7 +880,7 @@ export const WEAPON_INK = {
   brick: '#A84846', rod: '#86642C', glass: '#3E9E6A',
   flame: '#D93A22', frost: '#2E8DB8', onyx: '#74407F', gold: '#C49428',
   diadrill: '#20A7B6', thunder: '#7766CC', crane: '#74B654', brush: '#4D8AE6',
-  // 11-21 원소 다섯(불새 11-21 2판 = 짙은 주황, 파스텔 반려) — 영상 색조(불 주황 · 물 파랑 · 전기 노랑 · 얼음 하늘 · 어둠 남보라) 안에서 기존 스물여섯과 OKLab 거리가 가장 먼 색(DEVLOG 11-21 표)
+  // 11-21 원소 다섯(불새는 2판에서 짙은 주황으로 — 옅은 색 반려) — 영상 색조(불 주황 · 물 파랑 · 전기 노랑 · 얼음 하늘 · 어둠 남보라) 안에서 기존 스물여섯과 OKLab 거리가 가장 먼 색(DEVLOG 11-21 표)
   phoenix: '#E85A28', tide: '#0072CD', volt: '#C8C832', icicle: '#4FC8F0', shade: '#5E46B3',
 } as const;
 /**
