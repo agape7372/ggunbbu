@@ -363,11 +363,12 @@ function inkHit(x: number, y: number, k: number, core: string, own: boolean): vo
   drops(x, y, Math.round(1.5 + k), -Math.PI / 2 - 1.1, -Math.PI / 2 + 1.1, 180, 360 + 60 * k, 2.2, 0.3);
 }
 
-/** 층 붕괴(옛 판) — 큰 먹 터짐 · 땅에 떨어져 번지는 방울 · 층 밑면을 따라 눕는 엔소 · 옆으로 밀려 나오는 먼지 구름 · 재질 조각 */
-function inkCollapse(x: number, y: number, k: number, mat?: string): void {
+/** 층 붕괴(옛 판) — 큰 먹 터짐 · 땅에 떨어져 번지는 방울 · 층 밑면을 따라 눕는 엔소 · 옆으로 밀려 나오는 먼지 구름 · 재질 조각.
+ *  ring false = 전설 — 눕는 엔소를 긋지 않는다(층 깨기 · 완파를 제 그림으로 한다. 2026-11-21 사용자가 열세 자루에 똑같이 깔린 이 납작 고리를 빨간 선으로 짚음) */
+function inkCollapse(x: number, y: number, k: number, mat?: string, ring = true): void {
   blot(x + signed() * 8, y + 2, 12 + 2 * k, 0.2);
   drops(x, y, Math.round(5 + 3 * k), -Math.PI / 2 - 1.35, -Math.PI / 2 + 1.35, 240, 520, 3, 0.65, true);
-  ensoAt(x, y + 2, 20, 110 + 20 * k, 0.32, 6, 0.3);
+  if (ring) ensoAt(x, y + 2, 20, 110 + 20 * k, 0.32, 6, 0.3);
   shards(x, y, JUICE.floorCollapse.particles, mat, 1);
   puffs(x, y + 2, JUICE_SYS.PUFF_COLLAPSE, VIEW.LANE_W * 0.36, 12, 120); // 벤 자리(층 밑면)에서 옆으로 밀려 나온다
 }
@@ -791,7 +792,7 @@ export function spawnFromEvent(s: GameState, e: JuiceEvent): void {
     if (s.gimmick === 'glass') glassBurst(x, y, e.kind === 'floorCollapse' ? JUICE_SYS.GLASS_CHIPS : JUICE_SYS.GLASS_CHIPS_HIT);
     const k = tierK(e.combo ?? s.combo);
     // 오함마는 맞은 자리를 제 발묵으로 누르고, 그라인더는 불티 · 쇳가루로 갈리고, 삽은 흙 덩이 · 곡괭이는 돌 조각이 튄다(weaponFx) — 먹 튐을 겹치지 않는다
-    if (e.kind === 'floorCollapse') inkCollapse(x, y, k, e.mat);
+    if (e.kind === 'floorCollapse') inkCollapse(x, y, k, e.mat, !isLegend(s.weapon));
     else if (!isLegend(s.weapon)) inkHit(x, y, k, pointInk(s.weapon), OWN_SPLASH.has(s.weapon));
     return;
   }
