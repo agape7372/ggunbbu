@@ -215,14 +215,16 @@ export const volt: Recipe = {
     const H = 26 + 8 * n01();
     climb(arcPts(x, y, x + sgn() * 8, y - H, 6), { w: 1.6, crawl: 5 * F, life: 0.2, vy: -20, bulge: 1, fork: 7, dot: true }, c);
   },
-  // 칼 기운 — 칼날을 막대 삼아 고리 아크가 손잡이 쪽에서 떠나 하늘 쪽으로 솟았다 칼끝 쪽 날로 내려앉는다.
-  // 한 번에 고리 둘(큰 것 27~34 · 작은 것 20~26, 자리 · 각 · 굵기가 다르다) + 날 위를 기는 노랑 실 + 칼끝 두 갈래.
-  // 고리 하나 = 두 획. 목 = 시그니처 색 붓(붓머리를 눌러 댄 굵은 먹 3~5px → 짙은 올리브 → 노랑, 앞 4점만) ·
-  // 몸 = 밝은 짝 획에 종이색 속줄(목 끝에서 가늘게 이어 한 번 부풀었다 날에 뾰족하게 닿는다). 먹 테는 두르지 않는다.
+  // 칼 기운 — 고리 아크가 칼날을 감는다: 날 뒤에서 바깥 가장자리로 나와 하늘 쪽으로 솟았다가 날 앞을 건너
+  // 다리 쪽으로 작게 돌아 날 뒤로 든다(뒤를 지나는 데는 비워 둔다) → 조금 아래 바깥 가장자리에서 다음 바퀴가 나온다. 손잡이 → 칼끝 두 바퀴.
+  // 한 번에 바퀴 둘(바깥 굽이 큰 것 18~22 · 작은 것 14~18, 자리 · 각 · 굵기가 다르다) + 날 위를 기는 노랑 실 + 칼끝 두 갈래(14~19).
+  // 바퀴 하나 = 두 획. 목 = 시그니처 색 붓(붓머리를 눌러 댄 굵은 먹 3~5px → 짙은 올리브 → 노랑, 앞 4점만) ·
+  // 몸 = 밝은 짝 획에 종이색 속줄(목 끝에서 가늘게 이어 날 앞에서 가장 굵고 다리 쪽 가장자리에서 뾰족하게 든다). 먹 테는 두르지 않는다.
   // 한 획으로 그으면 그라데이션 축(머리 → 꼬리 곧은 줄)이 고리와 어긋나 먹 · 올리브가 나가는 다리를 다 덮어 먹 혀로 읽혔고,
   // 꼭대기를 칼끝 너머로 밀면 몸 전체가 밝은 짝이라 종이 위에서 사라졌다(4판 고침 회차 시안 다섯).
-  // 몸 쪽(날 아래)으로는 감지 않는다 — 주인공 다리를 덮는다. 부르는 틈 0.24초 · 사는 0.3초 남짓이라 고리가 늘 하나둘 떠 있다.
-  // 앞 회차: 8 = 날 위쪽 가는 실 하나 · 9 = 날을 넘나드는 굵은 실 + 부푼 마디(노랑 얼룩) · 10 = 반경 15~23 · 굵기 4.5(폰 1배 노랑 낙서)
+  // 다리 쪽 굽이는 5.5~7.5 — 작으면 날 테두리에 묻혀 감긴 게 안 보이고(1회차 3.5~5.5) 크면 주인공 다리를 덮는다. 부르는 틈 0.24초 · 사는 0.3초 남짓이라 바퀴가 늘 하나둘 떠 있다.
+  // 앞 회차: 8 = 날 위쪽 가는 실 하나 · 9 = 날을 넘나드는 굵은 실 + 부푼 마디(노랑 얼룩) · 10 = 반경 15~23 · 굵기 4.5(폰 1배 노랑 낙서) ·
+  // 4판 = 날 위쪽에만 솟는 고리 27~34(사용자: 칼에 더 감기게 · 칼 기운은 전체로 크지 않게)
   aura(b, _n, c) {
     const [hx, hy, tx, ty] = b;
     const L = Math.hypot(tx - hx, ty - hy) || 1;
@@ -239,22 +241,30 @@ export const volt: Recipe = {
       run.push(x + nx * o, y + ny * o);
     }
     later(t0, () => bent(run, 2.2, '', { body: liteOf(c), life: 0.26, dry: 0.1, pr: P_LINE, gr: 0.5 }));
+    let u = 0.03 + 0.04 * n01(); // 첫 바퀴가 날 뒤에서 나오는 자리(손잡이 쪽)
     for (let j = 0; j < 2; j++) {
-      const u0 = j ? 0.35 + 0.25 * n01() : 0.06 + 0.2 * n01();
-      const u1 = Math.min(1, u0 + 0.3 + 0.15 * n01());
-      const R = j ? 20 + 6 * n01() : 27 + 7 * n01();
+      const u0 = u;
+      const u1 = u0 + (j ? 0.26 : 0.3) + 0.06 * n01(); // 바깥 반 바퀴 끝 = 날 앞을 건너는 자리
+      const u2 = Math.min(0.97, u1 + 0.12 + 0.04 * n01()); // 다리 쪽 반 바퀴 끝 = 날 뒤로 드는 자리
+      u = u2 + 0.03; // 날 뒤를 지나는 틈
+      const R = j ? 14 + 4 * n01() : 18 + 4 * n01();
+      const r = 5.5 + 2 * n01(); // 날 테두리(반폭 3.5)보다 밖으로 나와야 감긴 게 보인다
       const a = Math.atan2(ny, nx) - (ux > 0 ? 1 : -1) * (0.15 + 0.2 * n01()) + sgn() * 0.2; // 법선에서 조금 하늘 쪽으로 · 고리마다 다르게
       const [dx, dy] = [Math.cos(a), Math.sin(a)];
-      const [ax, ay] = on(u0);
-      const [bx, by] = on(u1);
       const lean = (0.15 + 0.2 * n01()) * (u1 - u0) * L; // 꼭대기가 칼끝 쪽으로 조금 쏠린다
+      // 감는 각 th — 바깥 반(-90~90도, 4판 고리 그대로)은 날 바깥 가장자리(반폭 2.5)에서 나오고, 다리 쪽 반(90~270도)은 가장자리에서 든다
+      const th0 = Math.asin(2.5 / R) - Math.PI / 2;
+      const th1 = 1.5 * Math.PI - Math.asin(Math.min(1, 2.5 / r));
       const q: number[] = [];
-      for (let i = 0; i < 14; i++) {
-        const t = i / 13;
-        const e = i && i < 13 ? 1 : 0;
-        const h = R * Math.sin(Math.PI * t) + e * sgn() * 1.6;
-        const f = lean * Math.sin(Math.PI * t) + e * sgn() * 1.2;
-        q.push(ax + (bx - ax) * t + dx * h + ux * f, Math.min(GROUND - 4, ay + (by - ay) * t + dy * h + uy * f));
+      for (let i = 0; i < 19; i++) {
+        const out = i < 14;
+        const th = out ? th0 + ((Math.PI / 2 - th0) * i) / 13 : Math.PI / 2 + ((th1 - Math.PI / 2) * (i - 13)) / 5;
+        const e = i && i < 18 ? 1 : 0;
+        const [px, py] = on(out ? u0 + ((u1 - u0) * (th + Math.PI / 2)) / Math.PI : u1 + ((u2 - u1) * (th - Math.PI / 2)) / Math.PI);
+        const [ox, oy] = out ? [dx, dy] : [nx, ny];
+        const h = (out ? R : r) * Math.cos(th) + e * sgn() * (out ? 1.6 : 0.6);
+        const f = (out ? lean * Math.cos(th) : 0) + e * sgn() * 1.2;
+        q.push(px + ox * h + ux * f, Math.min(GROUND - 4, py + oy * h + uy * f));
       }
       const w = j ? 5 + 0.8 * n01() : 6 + n01();
       const life = 0.26 + 0.08 * n01();
@@ -263,7 +273,7 @@ export const volt: Recipe = {
         later(life * 0.06, () => bent(q.slice(6), w, PAPER, { body: liteOf(c), life, dry: 0.12, pr: P_CUT, gr: 0.3, hold: 0.6, vy: -8 }));
       });
     }
-    later(t0 + 7 * F, () => fork([hx, hy, tx, ty], 22 + 8 * n01(), 3.2, 0.22, c, -8)); // 칼끝 두 갈래
+    later(t0 + 7 * F, () => fork([hx, hy, tx, ty], 14 + 5 * n01(), 3.2, 0.22, c, -8)); // 칼끝 두 갈래 — 칼끝에서 20 안
   },
   every: 0.24,
   tint: true,

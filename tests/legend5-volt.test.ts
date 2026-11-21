@@ -1,5 +1,5 @@
 // 고압선 대검 4판 — 아래서 위로 기어오르는 S자 아크(먹 머리 → 노랑 꼬리 · 마디마다 굵기가 다름 · 굵은 마디 속 종이색 줄) →
-// 꼭대기 두 갈래 → 끊김 → 같은 밑동에서 다시 붙음 · 크기 순서 · 칼 기운은 날에서 솟는 고리(먹 목 + 노랑 몸) · 달(sweep) 없음 · 필살 상한.
+// 꼭대기 두 갈래 → 끊김 → 같은 밑동에서 다시 붙음 · 크기 순서 · 칼 기운은 날을 감는 바퀴(먹 목 + 노랑 몸 · 날 앞을 건너 다리 쪽으로) · 달(sweep) 없음 · 필살 상한.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RECIPES, pool, resetBladeFx, scaled, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
@@ -104,8 +104,18 @@ describe('고압선 — 아래서 기어오르는 아크', () => {
     expect(liveBits()).toHaveLength(0);
   });
 
-  it('칼 기운: 날 위 노랑 실 + 날에서 솟는 고리 둘(굵은 먹 목 → 노랑 몸 · 종이색 속줄) · 칼 둘레 40 안 · 땅에 닿지 않는다', () => {
-    const b = [189, 580, 205, 609] as const; // 서 있을 때 칼날(손 → 칼끝, 칼끝이 땅 1px 위)
+  // 서 있을 때 칼날(손 → 칼끝, 칼끝이 땅 1px 위) · 바깥(위쪽) 법선 · 날 따라 거리 · 날에서 거리
+  const b = [189, 580, 205, 609] as const;
+  const L = Math.hypot(b[2] - b[0], b[3] - b[1]);
+  const [ux, uy] = [(b[2] - b[0]) / L, (b[3] - b[1]) / L];
+  const along = ([x, y]: [number, number]): number => (x - b[0]) * ux + (y - b[1]) * uy;
+  const side = ([x, y]: [number, number]): number => (x - b[0]) * uy - (y - b[1]) * ux; // + 바깥 · − 다리 쪽
+  const fromBlade = (q: [number, number]): number => {
+    const a = Math.min(L, Math.max(0, along(q)));
+    return Math.hypot(q[0] - b[0] - ux * a, q[1] - b[1] - uy * a);
+  };
+
+  it('칼 기운: 날 위 노랑 실 + 날을 감는 바퀴 둘(굵은 먹 목 → 노랑 몸 · 종이색 속줄) — 바깥으로 솟았다 날 앞을 건너 다리 쪽으로 작게 돌아 날 뒤로 든다', () => {
     RECIPES.volt.aura!(b, 0, c);
     // 고리 둘은 0~11프레임 사이에 어긋나 선다 — 20프레임 동안 본 목 · 몸을 모은다(풀 칸은 다시 쓰이니 본 때 값을 떠 둔다)
     type Seen = { c1: string; c2: string; v: number; pts: [number, number][] };
@@ -129,27 +139,37 @@ describe('고압선 — 아래서 기어오르는 아크', () => {
     expect(nk.every((p) => p.c1 === c && !p.c2)).toBe(true); // 목 = 시그니처 색 붓(먹 머리) · 속줄 없음(먹 테가 되지 않게)
     expect(bd.every((p) => p.c1 === lite)).toBe(true); // 몸 = 밝은 짝(먹이 다시 묻지 않는다)
     expect(Math.max(...nk.map((p) => p.v))).toBeGreaterThan(6); // 굵은 먹 목
-    const L = Math.hypot(b[2] - b[0], b[3] - b[1]);
-    const off = ([x, y]: [number, number]): number => Math.abs((b[2] - b[0]) * (b[1] - y) - (b[0] - x) * (b[3] - b[1])) / L;
-    for (const p of nk) expect(off(p.pts[0])).toBeLessThan(3); // 날에서 떠나
-    for (const p of bd) expect(off(p.pts[p.pts.length - 1])).toBeLessThan(3); // 날로 돌아온다
-    expect(Math.max(...bd.flatMap((p) => p.pts.map(off)))).toBeGreaterThan(20); // 큰 고리는 20 넘게 바깥으로(10회차는 15~23)
-    for (const p of [...nk, ...bd]) {
-      for (const [x, y] of p.pts) {
-        expect(off([x, y])).toBeLessThan(40); // 칼 밖으로 크게 나가지 않는다(칼 길이 대비)
-        expect(y).toBeLessThan(VIEW.GROUND_Y);
-      }
+    const off = (q: [number, number]): number => Math.abs(side(q));
+    for (const p of nk) expect(off(p.pts[0])).toBeLessThan(3); // 날 바깥 가장자리에서 나와
+    for (const p of bd) expect(off(p.pts[p.pts.length - 1])).toBeLessThan(3); // 다리 쪽 가장자리로 든다
+    for (const p of bd) {
+      const s = p.pts.map(side);
+      expect(Math.max(...s)).toBeGreaterThan(10); // 바깥으로 솟고
+      expect(Math.min(...s)).toBeLessThan(-3.5); // 날 앞을 건너 날 테두리 밖 다리 쪽까지 감는다(4판은 바깥에만 솟았다)
+      expect(Math.min(...s)).toBeGreaterThan(-10); // 다리 쪽은 작게 — 주인공 다리를 덮지 않는다
     }
-    resetBladeFx();
-    RECIPES.volt.aura!(b, 0, c);
-    for (let i = 0; i < 20; i++) {
-      step(1);
-      for (const p of alive().filter((q) => q.k === 'zig')) for (const [x, y] of world(p)) {
-        expect(off([x, y])).toBeLessThan(40); // 갈래 끝 · 날 위 실 포함
-        expect(y).toBeLessThan(VIEW.GROUND_Y);
-      }
-    }
+    // 손잡이 → 칼끝 차례: 둘째 바퀴는 첫 바퀴가 날 뒤로 든 자리보다 칼끝 쪽에서 나온다(뒤를 지나는 데는 빈다)
+    expect(along(nk[1].pts[0])).toBeGreaterThan(along(bd[0].pts[bd[0].pts.length - 1]));
     step(60);
+    expect(liveBits()).toHaveLength(0);
+  });
+
+  it('칼 기운 크기 상한 — 마흔 번 불러도 칼날에서 25 안 · 칼끝 너머 20 안 · 땅 위(사용자 「검기운들은 전체적으로 너무 안컸으면」)', () => {
+    let [far, past] = [0, -Infinity];
+    for (let k = 0; k < 40; k++) {
+      RECIPES.volt.aura!(b, k, c);
+      for (let i = 0; i < 24; i++) {
+        step(1);
+        for (const p of alive()) if (p.k === 'zig') for (const q of world(p)) {
+          far = Math.max(far, fromBlade(q)); // 바퀴 · 갈래 끝 · 날 위 실 모두
+          past = Math.max(past, along(q) - L);
+          expect(q[1]).toBeLessThan(VIEW.GROUND_Y);
+        }
+      }
+      step(30);
+    }
+    expect(far).toBeLessThanOrEqual(25);
+    expect(past).toBeLessThan(20);
     expect(liveBits()).toHaveLength(0);
   });
 
