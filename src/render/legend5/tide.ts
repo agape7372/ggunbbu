@@ -1,206 +1,251 @@
-// 해일 대검(물) 레시피 — 공통 초승달(crescent.ts) 위에 짓는다. bladeFx RECIPES가 이어 붙이기만 한다.
-// 꼴(설계서 §6 · 사용자 영상 물): 몸을 두르는 초승달(꼬리 먹 → 파랑 → 앞날 밝은 짝) + 앞날 흰 거품(밝은 짝 획 속 종이빛) →
-// 2~3프레임 뒤 같은 호에서 파도 마루가 선다(앞으로 말려 꺾이는 갈퀴 획, 앞날 쪽일수록 높고 맨 끝은 말려 넘어가는 물마루) →
-// S자 물줄기가 앞으로 풀려 나가고 → 물방울이 호를 그리며 흩날려 떨어진다(셋에 하나 꼴로 먹물) · 땅엔 낮고 넓은 물 튐.
-// 불새(위로 솟는 불 혀 날개 · 떨어지는 불티) · 서리(곧게 솟는 얼음 가시 · 얼음 금)와 갈린다: 이쪽은 낮고 넓게 앞으로 말리는 갈퀴 · 거품 · 둥근 방울.
+// 해일 대검(물) 레시피 — 3판(설계서 DESIGN3 §2 「해일 대검」 줄). bladeFx RECIPES(surf)가 이어 붙이기만 한다.
+// 꼴: 땅(발 높이)에서 일어나 친 쪽 앞으로 크게 말리는 파도 하나(둥근 갈고리). 굵은 물 몸은 등이 땅에서 완만히 솟아
+// 마루에서 앞 → 아래 → 뒤로 감기는 나선이 된다. 말린 마루에서 흰 거품 줄이 둥근 갈퀴로 갈라진다. 마루는 하나다(톱니 · 지그재그 · MMM 금지).
+// 박자: 일어남(4프레임, 몸이 등 → 말림 차례로 그어진다) → 앞으로 무너짐(6프레임, 마루가 앞 땅으로 내리꽂힌다) →
+// 물방울이 포물선으로 튀고 땅엔 낮고 넓은 물 튐.
+// 사건마다 꼴은 같고 크기만 다르다: aura < whiff < hit < floor < destroy · 필살 마무리 = destroy 꼴을 친 방향으로.
+// 땅 파도(floor · destroy)의 굵은 몸은 주인공 둘레(좌우 ±22px) 바깥 앞쪽이고, 둘레엔 가늘게 들어가는 등 머리만 지난다.
+// 다른 넷과 갈림: 불새 = 친 자리 위 V 날개 · 고압선 = 가로 꺾은선 · 고드름 = 앞 공중 비스듬한 가시 다발 · 그림자 = 땅 · 몸 뒤 먹 번짐.
 // 문법(불변 13): 먹 + 포인트 색 하나 · 알파 지우기 금지(모양으로) · shadowBlur · 블룸 · 가운데 동그라미 별 · 원판 + 방사형 띠 · 아이콘 금지.
 // ⚠ bladeFx와 순환 import — 최상위에서 bladeFx 값을 부르지 않는다. 시험에서 이 파일을 bladeFx보다 먼저 import하지 않는다.
-import { PALETTE, VIEW } from '../../config';
-import { bent, drops, later, n01, sgn, sweep, type Recipe } from '../bladeFx';
-import { MOON, follow, liteOf, moonAt, moonPoint, moonsFor, paintMoon, pathLen, scatter, swingMoon, type Moon } from './crescent';
+import { PALETTE, VIEW, WEAPON_FX } from '../../config';
+import { bent, drops, later, n01, type Recipe } from '../bladeFx';
+import { follow, liteOf, moonPoint, pathLen, swingMoon } from './crescent';
 
-const FOAM = PALETTE.BG; // 거품 = 밝은 짝 획 속에 남는 종이빛(속 색)
+type V = readonly [number, number];
+const FOAM = PALETTE.BG; // 거품 = 밝은 짝 획 속에 남는 종이빛
+const FWD = 1; // 땅 파도가 무너지는 쪽 — 칼이 끝나는 쪽(오른쪽)
+const RISE = 4 / 60;
+const FALL = 6 / 60;
+const UP: V = [0, -1];
+const RIGHT: V = [FWD, 0];
 
 /** 진행 방향 ang의 법선 중 위쪽 */
 const upOf = (ang: number): number => {
   const a = ang - Math.PI / 2;
   return Math.sin(a) > 0 ? a + Math.PI : a;
 };
-
+/** 위(U)를 세운 파도의 앞 — U를 90° 돌린 둘 중 want 쪽에 가까운 것 */
+const fwdOf = (U: V, want: V): V => (-U[1] * want[0] + U[0] * want[1] >= 0 ? [-U[1], U[0]] : [U[1], -U[0]]);
 /**
- * 파도 갈퀴 — 호 위 (x, y)에서 위로 서다가 진행 쪽으로 꺾여 내리꽂히는 갈고리 한 붓(밑동이 굵고 끝이 날카롭다).
- * u = 앞날에 가까울수록 높다. 셋에 둘은 시그니처 몸(먹 밑동 → 파랑 → 밝은 짝), 하나는 밝은 짝 몸. 둘 다 종이빛 거품 속
- * (밝은 짝 몸만이면 한지 위에서 옅어 털 · 가시로 읽혔다)
+ * 땅 높이 — floor · destroy는 bladeReact가 scaled(친 자리, WEAPON_FX.SIZE) 안에서 부른다. 키운 뒤 땅에 닿을 자리를 미리 줄여 넣는다
+ * (put은 획 머리만 땅 위로 잘라 올려서, 머리만 잘리면 같은 파도의 다른 획과 어긋난다)
  */
-function claw(x: number, y: number, ang: number, u: number, i: number, k: number, c: string): void {
-  const n = upOf(ang);
-  const [nx, ny, fx, fy] = [Math.cos(n), Math.sin(n), Math.cos(ang), Math.sin(ang)];
-  const L = (9 + 20 * u ** 1.2) * k * (0.85 + 0.3 * n01());
-  const px = x + nx * L + fx * L * 0.3;
-  const py = y + ny * L + fy * L * 0.3;
-  const body = i % 3 === 2 ? liteOf(c) : c;
-  bent([x, y, px, py, px + fx * L * 0.55 - nx * L * 0.38, py + fy * L * 0.55 - ny * L * 0.38], (3.4 + 3.4 * u) * k, FOAM, {
-    body, pr: 1, dry: 0.3, gr: 0.2, hold: 0.6, life: 0.26 + 0.08 * u + 0.06 * n01(), vx: fx * 30 * k, vy: fy * 30 * k - 10 * k,
-  });
+const groundIn = (y: number): number => y + (VIEW.GROUND_Y - 2 - y) / WEAPON_FX.SIZE;
+
+/** 파도 한 꼴 — 몸 꺾은선(등 → 마루 → 나선) · 말림 중심 · 반지름 · 앞(F) · 위(U) · 무너져 닿는 자리 · 높이 */
+interface Wave { pts: number[]; cx: number; cy: number; r: number; F: V; U: V; land: V; H: number }
+
+/** 말림 위 t(0 = 마루 → 1 = 감긴 끝) 자리 — 앞 → 아래 → 뒤 → 위로 1.65π 돌고 반지름이 0.4배로 준다. add = 반지름에 더할 값 */
+function onCurl(w: Wave, t: number, add = 0): [number, number, number, number, number, number] {
+  const th = t * 1.65 * Math.PI;
+  const rr = w.r * (1 - 0.6 * t) + add;
+  const [c, s] = [Math.cos(th), Math.sin(th)];
+  const ex = w.U[0] * c + w.F[0] * s; // 중심에서 바깥
+  const ey = w.U[1] * c + w.F[1] * s;
+  return [w.cx + ex * rr, w.cy + ey * rr, ex, ey, -w.U[0] * s + w.F[0] * c, -w.U[1] * s + w.F[1] * c]; // 자리 · 바깥 · 도는 쪽
 }
 
 /**
- * 파도 마루 — 달 위 u0 → 앞날을 따라 물결이 서는 한 붓. 물결마다 완만한 등 → 마루 → 앞으로 넘어가 말린 끝 → 가파르게 떨어지는 앞면
- * (곧은 톱니는 번개 지그재그로 읽혔다 — 마디를 잘게 나눠 굽게 한다). 앞날 쪽일수록 높고 높이를 흩는다.
- * 시그니처 몸(꼬리 먹 → 파랑 → 앞날 밝은 짝) + 종이빛 거품 속. gr로 꼬리 → 앞날 차례로 그어진다
+ * (ox, oy) = 파도 밑동(땅) · 앞 F · 위 U · 높이 H. 등은 −0.55H에서 가늘게 땅을 타다 가파르게 솟아 (0.3H, H) 마루,
+ * 거기서 반지름 0.4H로 앞 → 아래 → 뒤로 감긴다. 무너지면 앞 1.0H 땅에 닿는다
  */
-const WAVE = [[0.3, 0.38], [0.55, 0.72], [0.76, 1], [0.95, 0.94], [1.1, 0.62]] as const;
-function crest(m: Moon, k: number, c: string, teeth: number, h: number, w: number, life: number, u0 = 0.3): void {
+function waveAt(ox: number, oy: number, F: V, U: V, H: number): Wave {
+  const at = (a: number, b: number): [number, number] => [ox + F[0] * a * H + U[0] * b * H, oy + F[1] * a * H + U[1] * b * H];
   const pts: number[] = [];
-  const du = (1 - u0) / teeth;
-  const lift = (u: number, d: number): [number, number] => {
-    const [x, y, ang] = moonPoint(m, u);
-    const n = upOf(ang);
-    return [x + Math.cos(n) * d, y + Math.sin(n) * d];
-  };
-  for (let j = 0; j < teeth; j++) {
-    const u = u0 + j * du;
-    const H = h * k * (0.45 + 0.55 * ((j + 1) / teeth) ** 1.3) * (0.7 + 0.6 * n01());
-    pts.push(...lift(u, w * 0.3));
-    for (const [a, b] of WAVE) pts.push(...lift(u + du * a, Math.max(w * 0.3, H * b)));
+  for (let j = 0; j <= 7; j++) {
+    const t = j / 7;
+    pts.push(...at(-0.55 + 0.85 * t, Math.sin((t * Math.PI) / 2) ** 1.8));
   }
-  pts.push(...lift(1, w * 0.3));
-  bent(pts, (3 + w * 0.25) * k, FOAM, { body: c, pr: 2, dry: 0.3, gr: 0.32, hold: 0.75, life });
+  const r = 0.4 * H;
+  const [px, py] = at(0.3, 1);
+  const w: Wave = { pts, cx: px - U[0] * r, cy: py - U[1] * r, r, F, U, land: at(1, 0), H };
+  for (let j = 1; j <= 11; j++) pts.push(...onCurl(w, j / 11).slice(0, 2));
+  return w;
 }
 
-/** 물마루 말림 — 달 앞날에서 위로 일어 앞으로 말려 넘어가는 굵은 고리(다 닫지 않는다). 시그니처 몸 + 안쪽 거품 한 획 */
-function lip(m: Moon, k: number, c: string): void {
-  const [x, y, ang] = moonPoint(m, 1);
-  const n = upOf(ang);
-  const R = Math.max(8, m.r * 0.32) * Math.min(1.4, k);
-  const cx = x + Math.cos(n) * R;
-  const cy = y + Math.sin(n) * R;
-  const a0 = n + Math.PI; // 중심에서 본 앞날
-  const s = -Math.sin(a0) * Math.cos(ang) + Math.cos(a0) * Math.sin(ang) >= 0 ? 1 : -1; // 앞으로 감기는 쪽
-  sweep(cx, cy, R, a0, s * Math.PI * 1.35, 5.2 * k, '', { body: c, pr: 1, dry: 0.35, gr: 0.22, life: 0.32, vx: Math.cos(ang) * 40 * k });
-  sweep(cx, cy, R * 0.62, a0 + s * 0.5, s * Math.PI * 0.95, 2.6 * k, FOAM, { body: liteOf(c), pr: 1, dry: 0.2, gr: 0.25, hold: 0.7, life: 0.28, vx: Math.cos(ang) * 40 * k });
+/** 칼끝 말림 — 이미 있는 꺾은선 pts 끝(앞 F · 위 U)에서 같은 나선을 잇는다(칼길 · 칼 기운) */
+function curlFrom(pts: number[], F: V, U: V, r: number): Wave {
+  const [px, py] = [pts[pts.length - 2], pts[pts.length - 1]];
+  const w: Wave = { pts, cx: px - U[0] * r, cy: py - U[1] * r, r, F, U, land: [px + F[0] * r * 2, py + F[1] * r * 2], H: r / 0.4 };
+  for (let j = 1; j <= 8; j++) pts.push(...onCurl(w, j / 8).slice(0, 2));
+  return w;
 }
 
-/** 앞날 흰 거품 — 달 앞 45%를 바깥으로 살짝 띄워 밝은 짝 획(속 종이빛)이 한 번 더 지나간다. 달군 속이 식은 뒤에도 거품으로 남는다 */
-function foam(m: Moon, w: number, life: number, c: string): void {
-  const out = 1 + (w * 0.35) / Math.max(1, m.r);
-  sweep(m.cx, m.cy, m.r * out, m.a0 + m.sw * 0.55, m.sw * 0.45, w * 0.55, FOAM, {
-    body: liteOf(c), dry: 0.45, pr: 1, gr: 0.12, hold: 0.85, life: life * 1.1,
-  });
+/** 물 몸 — 등 머리(먹)에서 가늘게 들어가 마루 쪽이 굵고 감긴 끝(밝은 짝)에서 빠진다. 4프레임에 다 일어나고 앞으로 밀린다 */
+function body(w: Wave, width: number, life: number, c: string, push: number): void {
+  bent(w.pts, width, '', { body: c, pr: 3, dry: 0.3, gr: Math.min(0.6, RISE / life), life, vx: w.F[0] * push, vy: w.F[1] * push });
 }
 
-/** S자 물줄기 — (x, y)에서 ang 쪽으로 len, 위아래로 한 번씩 굽이치며 풀려 나간다(먹 머리 → 파랑 → 밝은 짝 한 붓 + 거품 곁 획) */
-function stream(x: number, y: number, ang0: number, len: number, k: number, c: string): void {
-  const ang = Math.cos(ang0) >= 0 ? -0.18 : Math.PI + 0.18; // 가로로 풀린다(달 끝 기울기를 따르면 세로로 솟아 불길로 읽혔다)
-  const n = upOf(ang);
-  const [nx, ny, fx, fy] = [Math.cos(n), Math.sin(n), Math.cos(ang), Math.sin(ang)];
-  const A = len * 0.16;
+/** 마루 거품 줄 — 말림 바깥을 따라 마루 → 앞 → 아래로 내려가는 밝은 짝 획(속 종이빛) */
+function lipFoam(w: Wave, width: number, life: number, c: string): void {
   const pts: number[] = [];
-  const side: number[] = [];
+  for (let j = 0; j <= 6; j++) pts.push(...onCurl(w, -0.08 + (0.5 * j) / 6, width * 0.55).slice(0, 2));
+  bent(pts, width * 0.5, FOAM, { body: liteOf(c), pr: 1, dry: 0.25, gr: 0.3, hold: 0.8, life });
+}
+
+/** 말림 통 — 몸은 끝으로 가늘게 빠져 안쪽 감김이 안 보인다(둥근 문 꼴로 읽혔다). 마루 앞 → 감긴 끝을 고른 굵기로 한 번 더 눌러 갈고리를 세운다 */
+function barrel(w: Wave, width: number, life: number, c: string): void {
+  const pts: number[] = [];
+  for (let j = 0; j <= 8; j++) pts.push(...onCurl(w, 0.2 + (0.8 * j) / 8).slice(0, 2));
+  bent(pts, width * 0.62, '', { body: c, pr: 4, dry: 0.3, gr: 0.25, life, vx: w.F[0] * 20, vy: w.F[1] * 20 });
+}
+
+/** 거품 갈퀴 — 말린 마루 바깥에서 갈라져 나와 앞 · 아래로 둥글게 꺾이는 짧은 갈고리 n개(곧은 가시 · 톱니가 아니다) */
+function fingers(w: Wave, n: number, width: number, life: number, c: string): void {
+  for (let i = 0; i < n; i++) {
+    const [x, y, ex, ey, tx, ty] = onCurl(w, -0.06 + 0.11 * i, width * 0.4); // 마루 꼭대기 → 조금 앞(앞으로 뻗으면 화면 밖)
+    const L = w.r * (0.7 - 0.12 * i) * (0.85 + 0.3 * n01());
+    const p = (e: number, t: number): number[] => [x + ex * L * e + tx * L * t, y + ey * L * e + ty * L * t];
+    bent([x, y, ...p(0.5, 0.15), ...p(0.78, 0.5), ...p(0.72, 0.88), ...p(0.5, 1.12)], width * 0.42, FOAM, {
+      body: liteOf(c), pr: 1, dry: 0.3, gr: 0.35, hold: 0.7, life: life * (0.8 + 0.25 * n01()), vx: w.F[0] * 30, vy: w.F[1] * 30,
+    });
+  }
+}
+
+/** 무너짐 — 말림 앞자리에서 앞으로 둥글게 넘어가 땅(land)에 내리꽂히는 한 붓(6프레임에 다 그어진다) */
+function collapse(w: Wave, width: number, life: number, c: string): void {
+  const [x0, y0] = onCurl(w, 1 / 3);
+  const [x2, y2] = w.land;
+  const [qx, qy] = [x0 + w.F[0] * w.H * 0.4 + w.U[0] * w.r * 0.2, y0 + w.F[1] * w.H * 0.4 + w.U[1] * w.r * 0.2];
+  const pts: number[] = [];
   for (let j = 0; j <= 6; j++) {
     const t = j / 6;
-    const o = A * Math.sin(t * Math.PI * 2) * (1 - 0.35 * t) + A * 0.5 * t * t; // 끝은 위로 들린다
-    pts.push(x + fx * len * t + nx * o, y + fy * len * t + ny * o);
-    side.push(x + fx * len * (0.15 + t * 0.8) + nx * (o + 4 * k), y + fy * len * (0.15 + t * 0.8) + ny * (o + 4 * k));
+    const [a, b, d] = [(1 - t) ** 2, 2 * t * (1 - t), t * t];
+    pts.push(a * x0 + b * qx + d * x2, a * y0 + b * qy + d * y2);
   }
-  const o = { pr: 1, dry: 0.3, gr: 0.25, vx: fx * 50 * k, vy: fy * 50 * k };
-  bent(pts, 5 * k, '', { ...o, body: c, life: 0.34 });
-  bent(side.slice(4), 2.4 * k, FOAM, { ...o, body: liteOf(c), hold: 0.7, life: 0.3 });
+  bent(pts, width * 0.6, FOAM, { body: liteOf(c), pr: 1, dry: 0.3, gr: Math.min(0.6, FALL / life), hold: 0.75, life });
 }
 
-/** 물방울 — (x, y)에서 ang 쪽(위로 조금 들어)으로 부채로 튀어 호를 그리며 떨어진다. 시그니처 · 밝은 짝 반반(시그니처는 셋에 하나 꼴로 먹물) */
-function spray(x: number, y: number, ang: number, n: number, k: number, c: string, spd = 260): void {
-  const a = ang - Math.cos(ang) * 0.5; // 앞으로 가면 위로 든다
+/** 물방울 — (x, y)에서 앞(F) · 위(U) 사이 부채로 튀어 포물선을 그리며 떨어진다. 시그니처 · 밝은 짝 반반(시그니처는 셋에 하나 꼴로 먹물) */
+function spray(x: number, y: number, F: V, U: V, n: number, k: number, c: string, spd = 240): void {
+  const ang = (al: number): number => Math.atan2(F[1] * Math.cos(al) + U[1] * Math.sin(al), F[0] * Math.cos(al) + U[0] * Math.sin(al));
+  const a0 = ang(0.45);
+  const a1 = a0 + Math.atan2(Math.sin(ang(1.3) - a0), Math.cos(ang(1.3) - a0));
   const half = Math.ceil(n / 2);
-  drops(x, y, half, a - 0.55, a + 0.35, spd * 0.5 * k, spd * k, 2.6 * k, c, 900, true);
-  if (n - half > 0) drops(x, y, n - half, a - 0.35, a + 0.55, spd * 0.45 * k, spd * 0.9 * k, 2.1 * k, liteOf(c), 900, true);
+  drops(x, y, half, a0, a1, spd * 0.55 * k, spd * k, 2.6 * k, c, 900, true);
+  if (n > half) drops(x, y, n - half, a0, a1, spd * 0.45 * k, spd * 0.85 * k, 2 * k, liteOf(c), 900, true);
 }
 
-/** 땅 물 튐 — 발밑에서 낮고 넓게 양옆으로 퍼지는 물 혀 둘(밝은 짝 + 거품 속) + 낮게 깔리는 방울 */
-function splash(x: number, k: number, c: string, n = 4): void {
-  const y = VIEW.GROUND_Y - 2;
+/** 땅 물 튐 — 닿은 자리에서 땅을 따라 낮고 넓게 양옆으로 퍼지는 물 혀 둘(밝은 짝 + 거품 속) + 낮게 깔리는 방울 */
+function splash(x: number, y: number, k: number, c: string, n: number): void {
   for (const d of [-1, 1]) {
-    const L = (26 + 10 * n01()) * k;
-    bent([x + d * 6 * k, y, x + d * L * 0.6, y - L * 0.32, x + d * L, y - L * 0.18], 3.4 * k, FOAM, {
+    const L = (24 + 8 * n01()) * k * (d === FWD ? 1.2 : 0.8);
+    bent([x + d * 4 * k, y, x + d * L * 0.55, y - L * 0.2, x + d * L, y - L * 0.08], 3.2 * k, FOAM, {
       body: liteOf(c), pr: 1, dry: 0.3, gr: 0.2, hold: 0.6, life: 0.3, vx: d * 40 * k,
     });
-    drops(x + d * 8 * k, y - 3, Math.ceil(n / 2), d > 0 ? -0.75 : Math.PI + 0.35, d > 0 ? -0.35 : Math.PI + 0.75, 140 * k, 240 * k, 2.2 * k, c, 900, true);
+    drops(x + d * 6 * k, y - 2, Math.ceil(n / 2), d > 0 ? -0.7 : Math.PI + 0.35, d > 0 ? -0.35 : Math.PI + 0.7, 120 * k, 220 * k, 2 * k, c, 900, true);
   }
 }
 
-/** 한 사건 — 달을 긋고(앞날 거품) → 2~3프레임 뒤 파도 갈퀴로 바뀌고 → 물마루가 말리고 → 물방울로 흩어진다 */
-function surge(m: Moon, w: number, life: number, k: number, c: string, teeth: number, h: number, sprays: number, withLip: boolean): void {
-  paintMoon(m, w, c, life);
-  foam(m, w, life, c);
-  later(0.04, () => crest(m, k, c, teeth, h, w, life * 1.25));
-  if (withLip) later(0.07, () => lip(m, k, c));
-  scatter(0.12, sprays, (i) => {
-    const [x, y, ang] = moonPoint(m, 0.45 + (0.55 * i) / Math.max(1, sprays - 1));
-    spray(x, y, ang, 2, k, c);
+/**
+ * 한 사건 — 일어남(몸) → 마루가 말리며 거품 줄 · 갈퀴(3프레임) → 앞으로 무너짐(4프레임) → 닿은 자리에서 물방울 · 땅 물 튐(10프레임).
+ * ground = 땅 파도(닿은 자리에 물 튐). 크기는 H · width로만 다르다
+ */
+function surge(w: Wave, width: number, life: number, k: number, c: string, nf: number, sprays: number, ground: boolean): void {
+  body(w, width, life, c, 28 * k);
+  later(RISE * 0.75, () => {
+    barrel(w, width, life * 0.85, c);
+    lipFoam(w, width, life * 0.8, c);
+    fingers(w, nf, width, life * 0.75, c);
   });
+  later(RISE, () => collapse(w, width, life * 0.9, c));
+  later(RISE + FALL, () => {
+    spray(w.land[0], w.land[1] - 2, w.F, w.U, sprays, k, c);
+    if (ground) splash(w.land[0], w.land[1], k, c, 4);
+  });
+}
+
+/**
+ * 땅 파도 — 등 머리가 주인공 발치(x − 10)에서 가늘게 시작해 앞으로 솟는다. 굵은 몸 · 마루는 둘레(±22px) 밖이고
+ * 마루는 키운 뒤 주인공 앞 약 60px, 거품 갈퀴 끝까지 화면 폭 안(콤보 단이 커도 넘지 않게 k를 1.3에서 자른다)
+ */
+function groundWave(x: number, y: number, H: number): Wave {
+  return waveAt(x + FWD * (0.55 * H - 10), groundIn(y), RIGHT, UP, H);
 }
 
 export const tide: Recipe = {
   trail: { w: 12, dry: 0.3 },
   own: true,
-  // 칼길 — 몸을 두르는 굵은 초승달(참격 호 그대로) + 앞날 거품 → 앞쪽 셋이 파도 갈퀴로 → 칼끝에서 물방울이 앞으로 흩날린다
+  // 칼길 — 칼이 지나간 호를 물 몸으로 긋고 칼끝에서 그대로 파도 마루로 말려 감긴다(말림 바깥 거품 줄 · 갈퀴 하나) → 말린 끝에서 물방울
   swing(fx, fy, w, life, c, turn, grow) {
     const m = swingMoon(fx, fy, turn, grow);
     const s = Math.max(0.8, w / 12);
-    paintMoon(m, w * 1.5, c, life * 0.8);
-    foam(m, w * 1.5, life * 0.8, c);
-    later(0.04, () => crest(m, s, c, 3, 15, w, life * 1.1, 0.4));
-    later(0.09, () => {
-      const [x, y, ang] = moonPoint(m, 1);
-      spray(x, y, ang, 3, 0.8 * s, c);
+    const [, , ang, out] = moonPoint(m, 1);
+    const U: V = [Math.cos(out), Math.sin(out)];
+    const pts: number[] = [];
+    for (let j = 0; j <= 8; j++) pts.push(...moonPoint(m, 0.35 + (0.65 * j) / 8).slice(0, 2)); // 칼길 앞 65%만 — 몸을 두르는 달이 아니라 칼끝 파도의 등
+    const wv = curlFrom(pts, fwdOf(U, [Math.cos(ang), Math.sin(ang)]), U, 14 * s);
+    bent(wv.pts, w * 1.1, '', { body: c, pr: 3, dry: 0.35, gr: 0.2, life: life * 0.85 });
+    later(0.03, () => {
+      barrel(wv, w * 0.9, life * 0.75, c);
+      lipFoam(wv, w * 0.9, life * 0.7, c);
+      fingers(wv, 1, w * 0.9, life * 0.6, c);
     });
+    later(0.08, () => spray(wv.land[0], wv.land[1], wv.F, wv.U, 3, 0.8 * s, c));
   },
+  // 타격 — 맞은 층 밑에서 작은 파도가 일어나 앞으로 말려 무너진다(물방울 셋)
   hit(x, y, k, c) {
-    const [m] = moonsFor('hit', x, y, k);
-    surge(m, MOON.hit.w, MOON.hit.life, k * 0.8, c, 3, 17, 2, false);
+    const H = 26 * Math.min(k, 1.5);
+    surge(waveAt(x - FWD * 0.3 * H, y + 0.4 * H, RIGHT, UP, H), 6.5 * Math.min(k, 1.4), 0.3, k * 0.8, c, 1, 3, false);
   },
-  // 층 깨기 — 큰 달이 파도 · 물마루로 → 물방울 · 땅 쪽으로 물이 쏟아져 발밑에 낮게 튄다
+  // 층 깨기 — 발치에서 중간 파도가 솟아 앞 땅으로 무너진다 → 닿은 자리 물 튐
   floor(x, y, k, c) {
-    const [m] = moonsFor('floor', x, y, k);
-    surge(m, MOON.floor.w, MOON.floor.life, k, c, 4, 22, 3, true);
-    later(0.14, () => splash(x, k * 0.8, c, 2));
+    const K = Math.min(k, 1.3);
+    surge(groundWave(x, y, 36 * K), 9.5 * K, 0.36, K, c, 2, 4, true);
   },
-  // 완파 — 두 겹 달이 몸 앞뒤로(뒤 = 먹 한 획, 앞 = 물) → 앞 달이 파도 · 물마루 → S자 물줄기가 앞으로 풀리고 → 방울 많이 · 땅에 넓게 튐
+  // 완파 — 가장 큰 파도 하나가 주인공 앞 땅에서 솟아 크게 말리고(갈퀴 셋) 앞으로 무너진다 → 물방울 많이 · 땅에 넓게 튐.
+  // 주인공 높이에 가로로 몰리는 띠 · 몸을 두르는 고리 없음
   destroy(x, y, k, c) {
-    const [back, front] = moonsFor('destroy', x, y, k);
-    paintMoon(back, MOON.destroy.w * 0.5, '', MOON.destroy.life);
-    surge(front, MOON.destroy.w, MOON.destroy.life, k, c, 6, 30, 4, true);
-    later(0.09, () => {
-      const [sx, sy, ang] = moonPoint(front, 1);
-      stream(sx, sy, ang, 70 * k, k, c);
-    });
-    later(0.12, () => splash(x, k, c, 6));
+    const K = Math.min(k, 1.3);
+    surge(groundWave(x, y, 50 * K), 13 * K, 0.44, K, c, 3, 6, true);
   },
-  // 헛스윙 — 작은 달 + 칼끝에서 떨어지는 방울 둘
+  // 헛스윙 — 칼끝에서 가장 작은 파도 하나(말림까지) + 방울 둘
   whiff(x, y, c) {
-    const [m] = moonsFor('whiff', x, y, 1);
-    paintMoon(m, MOON.whiff.w, c, MOON.whiff.life, false);
-    later(0.06, () => {
-      const [sx, sy, ang] = moonPoint(m, 1);
-      spray(sx, sy, ang, 2, 0.7, c, 180);
-    });
+    const w = waveAt(x - FWD * 4, y + 4, RIGHT, UP, 11);
+    body(w, 3, 0.2, c, 20);
+    later(RISE + 0.02, () => spray(w.land[0], w.land[1], RIGHT, UP, 2, 0.6, c, 200));
   },
-  // 칼 기운 — 젖은 날: 날을 따라 방울이 떨어지고, 세 번에 한 번 작은 거품 갈퀴가 날 끝 쪽에 선다
+  // 칼 기운 — 젖은 날: 날을 따라 방울이 떨어지고, 세 번에 한 번 날 위에 아주 작은 말림 하나가 선다
   aura(b, n, c) {
     const u = 0.35 + n01() * 0.65;
     const x = b[0] + (b[2] - b[0]) * u;
     const y = b[1] + (b[3] - b[1]) * u;
     const ang = Math.atan2(b[3] - b[1], b[2] - b[0]);
     drops(x, y, 1, ang - 0.3, ang + 0.3, 30, 80, n % 2 ? 2.2 : 1.7, n % 2 ? liteOf(c) : c, 900, true);
-    if (n % 3 === 0) claw(x, y, ang, 0.35, 1, 0.7, c); // i 1 = 밝은 짝 거품 몸(먹 밑동이 날에 붙으면 털로 읽힌다)
+    if (n % 3 === 0) {
+      const U: V = [Math.cos(upOf(ang)), Math.sin(upOf(ang))];
+      const F = fwdOf(U, [Math.cos(ang), Math.sin(ang)]);
+      const w = curlFrom([x - F[0] * 6, y - F[1] * 6, x, y], F, U, 3.2);
+      bent(w.pts, 2.2, '', { body: liteOf(c), pr: 3, dry: 0.25, gr: 0.3, life: 0.24, vx: F[0] * 20, vy: F[1] * 20 });
+    }
   },
   every: 0.1,
   tint: true,
   waza: {
-    // 필살 큰 획을 따라 — 뿌리 → 끝으로 파도 갈퀴가 서고, 끝에서 물방울이 흩날린다(k 1에서 즉시 + later ≤ 9 + 3 + 6 = 18)
+    // 필살 큰 획을 따라 — 뿌리 → 끝으로 작은 파도가 차례로 일어나(획 진행 쪽으로 말림) 무너지고, 끝에서 물방울.
+    // k 1에서 즉시 + later ≤ 파도 5 × 3 + 방울 3 × 2 = 21
     along(pts, k, c, dur) {
-      const n = Math.min(9, Math.max(3, Math.round(pathLen(pts) / 45)));
-      follow(pts, 0, dur, n, (x, y, ang, u, i) => claw(x, y, ang, 0.4 + 0.6 * u, i, k, c));
-      follow(pts, dur * 0.5 + 0.04, dur * 0.5, 3, (x, y, ang) => spray(x, y, ang, 2, k, c));
-    },
-    // 마무리 — 친 방향으로 볼록한 달 하나가 파도 · 물마루 · S자 물줄기 · 방울로
-    bloom(x, y, ang, k, c) {
-      const m = moonAt(x, y, MOON.floor.r * k, ang, MOON.floor.span, sgn() < 0 ? 1 : -1);
-      surge(m, MOON.floor.w * k, MOON.floor.life, k, c, 5, 24, 4, true);
-      later(0.09, () => {
-        const [sx, sy, a] = moonPoint(m, 1);
-        stream(sx, sy, a, 60 * k, k, c);
+      const n = Math.min(5, Math.max(3, Math.round(pathLen(pts) / 70)));
+      follow(pts, 0, dur, n, (x, y, ang, u) => {
+        const U: V = [Math.cos(upOf(ang)), Math.sin(upOf(ang))];
+        const H = (19 + 12 * u) * k;
+        const w = waveAt(x, y, fwdOf(U, [Math.cos(ang), Math.sin(ang)]), U, H);
+        body(w, 4.5 * k, 0.32, c, 24 * k);
+        later(RISE * 0.75, () => fingers(w, 1, 4.5 * k, 0.24, c));
+        later(RISE, () => collapse(w, 4.5 * k, 0.26, c));
       });
+      follow(pts, dur * 0.5 + RISE + FALL, dur * 0.5, 3, (x, y, ang) => {
+        const U: V = [Math.cos(upOf(ang)), Math.sin(upOf(ang))];
+        spray(x, y, fwdOf(U, [Math.cos(ang), Math.sin(ang)]), U, 2, k, c);
+      });
+    },
+    // 마무리 — 완파 꼴(큰 파도 하나)을 친 방향 ang으로 세운다: ang 쪽으로 솟아 오른쪽 돌림 앞으로 말려 무너진다
+    bloom(x, y, ang, k, c) {
+      const U: V = [Math.cos(ang), Math.sin(ang)];
+      const F = fwdOf(U, Math.abs(U[0]) > 0.9 ? [0, 1] : RIGHT); // 가로로 치면 땅 쪽으로 무너진다
+      const H = 52 * k;
+      surge(waveAt(x - F[0] * 0.3 * H - U[0] * 0.5 * H, y - F[1] * 0.3 * H - U[1] * 0.5 * H, F, U, H), 10 * k, 0.44, k, c, 3, 6, false);
     },
   },
 };
