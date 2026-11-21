@@ -45,6 +45,12 @@ export default { destroy(x, y, k, c) { /* 새 박자 */ now.destroy(x, y, k, c);
 - 바꿔 끼우는 건 `RECIPES`에 든 대검뿐이다(키는 무기 id가 아니라 shape. phoenix → wing · tide → surf · shade → smoke, `sprites.ts` `GREAT_LOOK`).
 - `bladeFx.ts` 안에 있는 전설 일곱(wave · crystal · bolt · jag · truss · sumi · royal)은 비공개 도우미를 쓴다. 초안은 export된 것(`put` · `bent` · `line` · `later` · `n01`)으로 짓거나, 필요한 도우미를 export한다.
 - 연장 무기 타격(`weaponFx.ts` `TOOLS`)과 필살 몸통(`wazaShow.ts`가 캔버스에 바로 그리는 큰 획)은 초안 범위 밖이다. src를 고치고 고치기 전 띠를 먼저 뽑아 둔다.
+- 엔진 한계(11-22 박자 시범에서 드러남, 초안으로 못 함):
+  - 획은 이동만 된다. 회전 · 변형은 안 된다.
+  - 획은 머리부터만 깎인다. 꼬리부터 깎는 손잡이가 없어 몸을 두 획으로 나눠 돌아갔다(해일 위 몸 · 밑동).
+  - `bent`가 중력 `g`를 안 넘긴다. 초안이 `put`을 직접 부르는 `bentG`를 따로 뒀다.
+  - 고압선 첫 번쩍 두 칸(+0 · +1)이 공통 주스의 화면 반전 칸과 겹친다.
+  - 고압선 레시피의 필살 마무리 `bloom`이 같은 아크 함수를 부른다. 새 안을 넣으면 필살 마무리 박자도 같이 바뀐다.
 
 ### 계측 띠 읽는 법
 
