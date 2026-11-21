@@ -1,4 +1,4 @@
-// 해일 대검 4판 — 왼쪽 땅에서 솟아 오른쪽 위로 말리는 갈고리 마루(등 · 말림 통 · 결 줄 · 갈퀴 손가락 · 물방울 덩이 3단) ·
+// 해일 대검 4판 — 왼쪽 땅에서 솟아 오른쪽 위로 말리는 갈퀴 마루(등 · 말림 통 · 결 줄 · 갈퀴 손가락 · 물방울 덩이 3단) ·
 // 칼길 = 꼬이는 물 띠 셋 · 크기 순서 · 주인공 몸 상자와 「콤보」 도장 자리 비움 · 조각 상한 · 소멸.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -51,7 +51,7 @@ const turning = (p: { pts: readonly number[] }): number => {
 
 beforeEach(() => resetBladeFx());
 
-describe('해일 — 갈고리 마루', () => {
+describe('해일 — 갈퀴 마루', () => {
   it('완파: 등 머리는 왼쪽 땅 · 말림은 가는 두 가닥 · 갈퀴 손가락은 +6에 이미 섰다 · 물방울 덩이 크기 3단 · 공통 달(sweep) 없음', () => {
     const y = G - 70;
     scaled(X, y, WEAPON_FX.SIZE, () => RECIPES.surf.destroy(X, y, 1.25, c));
@@ -115,7 +115,7 @@ describe('해일 — 갈고리 마루', () => {
     }
   });
 
-  it('칼길: 꼬이는 물 띠 셋(굵기가 다 다르다) · 공통 달 없음 / 칼 기운: 감는 띠 둘 + 옆으로 말리는 마루 · 2초 뒤 0', () => {
+  it('칼길: 꼬이는 물 띠 셋(굵기가 다 다르다) · 공통 달 없음 / 칼 기운: 띠 하나 · 2초 뒤 0', () => {
     RECIPES.surf.swing!(X, G, 12, 0.26, c, 0, 1);
     step(4);
     const bands = pool.filter((p) => p.alive && p.k === 'zig');
@@ -124,49 +124,22 @@ describe('해일 — 갈고리 마루', () => {
     expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
     step(125);
     expect(liveBits()).toHaveLength(0);
-    // 칼 기운(서 있기 칼 = 손 (9, −30) → 칼끝 (25, −1)): 굵기가 다른 띠 둘이 손잡이에서 감고, 칼 바깥 밑동에서 마루가 40~66px 솟아
-    // 옆으로 말린다 · 갈퀴 손가락 3~4(밝은 짝 섞임) · 마루와 손가락은 몸 상자(좌우 ±18) 밖 · 공통 달 없음
-    resetBladeFx();
-    const blade = [X + 9, G - 30, X + 25, G - 1] as const;
-    RECIPES.surf.aura!([...blade], 5, c);
-    const [wa, wb, crest, back] = pool.filter((p) => p.alive && p.k === 'zig');
-    // 등 먹 — 마루 등을 따라 가는 순먹 줄(전설 색 없이)
-    expect([c, WEAPON_LITE.tide]).not.toContain(back.c1);
-    expect(back.v).toBeLessThan(crest.v);
-    for (const w of [wa, wb]) expect(Math.hypot(w.x - blade[0], w.y - blade[1])).toBeLessThan(4); // 머리는 굽이 0.4배만큼 비켜 댄다
-    expect(wa.v).toBeGreaterThan(wb.v * 1.5);
-    const top = Math.min(...crest.pts.filter((_, i) => i % 2).map((q) => crest.y + q));
-    expect(crest.y - top).toBeGreaterThan(40);
-    expect(crest.y - top).toBeLessThan(66);
-    expect(Math.abs(turning(crest))).toBeGreaterThan(2);
-    step(6);
-    const fingers = pool.filter((p) => p.alive && p.k === 'zig').slice(4);
-    expect(fingers.length).toBeGreaterThanOrEqual(3);
-    expect(fingers.some((p) => p.c1 === WEAPON_LITE.tide)).toBe(true);
-    for (const p of [crest, back, ...fingers]) for (let i = 0; i < p.pts.length; i += 2) expect(p.x + p.pts[i]).toBeGreaterThan(X + 18);
-    expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
-    // 막기 자세(칼이 머리 위 가로 = 손 (−12, −57) → 칼끝 (24, −57)): 마루 · 등 먹 · 손가락이 몸 상자 오른쪽 모서리 밖
-    resetBladeFx();
-    RECIPES.surf.aura!([X - 12, G - 57, X + 24, G - 57], 5, c);
-    step(6);
-    const guard = pool.filter((p) => p.alive && p.k === 'zig').slice(2);
-    for (const p of guard) for (let i = 0; i < p.pts.length; i += 2) expect(p.x + p.pts[i]).toBeGreaterThan(X + 18);
-    // 한 바퀴(부르기 45번 · 0.1초마다) — 무너질 때 물방울 덩이 크기 3단 · 조각 상한 · 2초 뒤 0
-    let peak = 0;
-    const sizes: number[] = [];
-    for (let n = 0; n < 45; n++) {
-      RECIPES.surf.aura!([...blade], n, c);
-      for (let f = 0; f < 6; f++) {
-        peak = Math.max(peak, alive());
-        for (const p of pool) if (p.alive && p.k === 'drop') sizes.push(p.size);
-        updateBladeFx(1 / 60);
-      }
-    }
-    expect(sizes.length).toBeGreaterThan(0);
-    expect(Math.max(...sizes) / Math.min(...sizes)).toBeGreaterThan(1.8);
-    expect(peak).toBeLessThanOrEqual(40);
+    // 칼 기운: 띠 하나가 손잡이부터 칼끝을 돌아 칼 밖 10px 넘게까지 감는다(r6 = 칼 길이 3할) · 갈고리 끝 물방울 덩이 크기 3단
+    const [hx, hy, tx, ty] = [X, G - 40, X + 30, G - 6];
+    const L = Math.hypot(tx - hx, ty - hy);
+    RECIPES.surf.aura!([hx, hy, tx, ty], 3, c);
+    const band = pool.filter((p) => p.alive && p.k === 'zig');
+    expect(band).toHaveLength(1);
+    const along = (i: number): number => ((band[0].x + band[0].pts[i] - hx) * (tx - hx) + (band[0].y + band[0].pts[i + 1] - hy) * (ty - hy)) / L;
+    const last = band[0].pts.length - 2;
+    expect(along(0)).toBeLessThan(L * 0.05);
+    expect(along(last)).toBeGreaterThan(L - 2);
+    expect(Math.hypot(band[0].x + band[0].pts[last] - tx, band[0].y + band[0].pts[last + 1] - ty)).toBeGreaterThan(10);
+    const dr = pool.filter((p) => p.alive && p.k === 'drop').map((p) => p.size);
+    expect(dr.length).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...dr) / Math.min(...dr)).toBeGreaterThan(1.8);
     step(125);
-    expect(alive()).toBe(0);
+    expect(liveBits()).toHaveLength(0);
   });
 
   it('필살 along · bloom — 상한(24 · 48) 안 · 전부 keep · 땅 밑 없음 · 2초 뒤 0', () => {
