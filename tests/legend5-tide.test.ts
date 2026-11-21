@@ -1,67 +1,126 @@
-// 해일 대검 3판 — 땅에서 앞으로 말리는 파도 하나(둥근 갈고리) · 일어남 → 무너짐 → 물방울 박자 · 조각 상한 · 소멸.
+// 해일 대검 4판 — 왼쪽 땅에서 솟아 오른쪽 위로 말리는 호쿠사이 마루(등 · 말림 통 · 결 줄 · 갈퀴 손가락 · 물방울 덩이 3단) ·
+// 칼길 = 꼬이는 물 띠 셋 · 크기 순서 · 주인공 몸 상자와 「콤보」 도장 자리 비움 · 조각 상한 · 소멸.
 // ⚠ legend5는 bladeFx와 순환 import — bladeFx를 먼저 들인다
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RECIPES, pool, resetBladeFx, scaled, updateBladeFx, weaponAlong, weaponBloom } from '../src/render/bladeFx';
 import { liveBits } from '../src/render/weaponFx';
-import { PALETTE, VIEW, WEAPON_FX, WEAPON_INK, WEAPON_LITE } from '../src/config';
+import { VIEW, WEAPON_FX, WEAPON_INK, WEAPON_LITE } from '../src/config';
 
 const c = WEAPON_INK.tide;
+const G = VIEW.GROUND_Y;
+const X = VIEW.LANE_X[0];
+type P = { x: number; y: number; r: number };
 const alive = (): number => pool.filter((p) => p.alive).length;
 const step = (n: number): void => { for (let i = 0; i < n; i++) updateBladeFx(1 / 60); };
-/** 물 몸(시그니처 색 꺾은 획)의 월드 점들 */
-const bodyPts = (): [number, number][] => {
-  const p = pool.find((q) => q.alive && q.k === 'zig' && q.c1 === c);
-  if (!p) return [];
-  const out: [number, number][] = [];
-  for (let i = 0; i + 1 < p.pts.length; i += 2) out.push([p.x + p.pts[i], p.y + p.pts[i + 1]]);
-  return out;
+/** 살아 있는 꺾은 획의 월드 점들(반폭 r 포함) */
+const strokePts = (): P[] =>
+  pool.filter((p) => p.alive && p.k === 'zig').flatMap((p) => {
+    const out: P[] = [];
+    for (let i = 0; i + 1 < p.pts.length; i += 2) out.push({ x: p.x + p.pts[i], y: p.y + p.pts[i + 1], r: p.v / 2 });
+    return out;
+  });
+/** 사건 하나를 2초 돌리며 획 점을 다 모은다(획은 움직인다 — 사는 내내) · 최대 조각 수 */
+function run(ev: 'hit' | 'floor' | 'destroy', k: number, y: number): { pts: P[]; peak: number } {
+  resetBladeFx();
+  scaled(X, y, WEAPON_FX.SIZE, () => RECIPES.surf[ev](X, y, k, c));
+  const pts: P[] = [];
+  let peak = 0;
+  for (let i = 0; i < 130; i++) {
+    pts.push(...strokePts());
+    peak = Math.max(peak, alive());
+    updateBladeFx(1 / 60);
+  }
+  return { pts, peak };
+}
+const box = (pts: P[]): { w: number; h: number } => {
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+};
+/** 휘어 간 각의 합(라디안, 화면에서 시계 방향 +) — 말림이면 크다 */
+const turning = (p: { pts: readonly number[] }): number => {
+  let sum = 0;
+  for (let i = 4; i + 1 < p.pts.length; i += 2) {
+    const a = Math.atan2(p.pts[i - 1] - p.pts[i - 3], p.pts[i - 2] - p.pts[i - 4]);
+    const b = Math.atan2(p.pts[i + 1] - p.pts[i - 1], p.pts[i] - p.pts[i - 2]);
+    sum += Math.atan2(Math.sin(b - a), Math.cos(b - a));
+  }
+  return sum;
 };
 
 beforeEach(() => resetBladeFx());
 
-describe('해일 — 말리는 파도 하나', () => {
-  it('타격: 즉시는 물 몸 하나(달 · 호 조각 없음) · 몸은 마루 하나에 앞으로 감긴 갈고리 · 무너짐은 거품 속 · 2초 뒤 0', () => {
-    RECIPES.surf.hit(180, 400, 1, c);
-    expect(alive()).toBe(1);
-    expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false); // 공통 초승달(sweep) 없음
-    const pts = bodyPts();
-    expect(pts.length).toBeGreaterThan(15); // 굽은 몸(마디 여럿)
-    // 마루는 하나 — 꼭대기(가장 높은 점)까지 오르기만 하고, 톱니(오르내림 반복)가 없다
-    const top = pts.reduce((m, q, i) => (q[1] < pts[m][1] ? i : m), 0);
-    for (let i = 1; i <= top; i++) expect(pts[i][1]).toBeLessThanOrEqual(pts[i - 1][1] + 0.01);
-    // 갈고리 — 감긴 끝은 꼭대기보다 낮고, 가장 앞 점보다 뒤로 말려 들어왔다
-    const end = pts[pts.length - 1];
-    expect(end[1]).toBeGreaterThan(pts[top][1] + 5);
-    expect(end[0]).toBeLessThan(Math.max(...pts.map((q) => q[0])) - 3);
-    step(5); // 4프레임 뒤 — 거품 줄 · 갈퀴 · 무너짐(밝은 짝 몸 + 종이빛 속)
-    const foam = pool.filter((p) => p.alive && p.k === 'zig' && p.c2 === PALETTE.BG);
-    expect(foam.length).toBeGreaterThanOrEqual(2);
-    expect(foam.every((p) => p.c1 === WEAPON_LITE.tide)).toBe(true);
+describe('해일 — 호쿠사이 마루', () => {
+  it('완파: 등 머리는 왼쪽 땅 · 말림 통은 한 바퀴 넘게 감긴다 · 갈퀴 손가락 다섯 넘게 · 물방울 덩이 크기 3단 · 공통 달(sweep) 없음', () => {
+    const y = G - 70;
+    scaled(X, y, WEAPON_FX.SIZE, () => RECIPES.surf.destroy(X, y, 1.25, c));
+    step(14); // 솟음 + 말림 + 갈퀴(키운 그림 1.2배)
+    const zig = pool.filter((p) => p.alive && p.k === 'zig');
+    expect(zig.some((p) => p.c1 === c && p.y > G - 6 && p.x < X - 70)).toBe(true); // 큰 마루 밑동 = 왼쪽 땅
+    expect(zig.some((p) => p.c1 === c && turning(p) > Math.PI * 1.1)).toBe(true); // 말림 통
+    expect(zig.filter((p) => p.c1 === WEAPON_LITE.tide).length).toBeGreaterThanOrEqual(5); // 갈퀴 손가락(밝은 짝)
+    expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
+    step(10);
+    const sizes = pool.filter((p) => p.alive && p.k === 'drop').map((p) => p.size);
+    expect(sizes.length).toBeGreaterThanOrEqual(10);
+    expect(Math.max(...sizes) / Math.min(...sizes)).toBeGreaterThan(2.2); // 큰 것 · 중간 · 가루
+  });
+
+  it('크기: 헛스윙 < 타격 < 층 깨기 < 완파 · 완파는 화면 폭 6~9할 · 높이는 주인공 키 3배 넘게 · 타격은 완파의 3할 넘게', () => {
+    resetBladeFx();
+    RECIPES.surf.whiff!(X + 30, G - 90, c);
+    let whiff = 0;
+    for (let i = 0; i < 40; i++) {
+      const p = strokePts();
+      if (p.length) whiff = Math.max(whiff, box(p).w);
+      updateBladeFx(1 / 60);
+    }
+    const hit = box(run('hit', 1, G - 84).pts);
+    const floor = box(run('floor', 1, G - 60).pts);
+    const destroy = box(run('destroy', 1.25, G - 70).pts);
+    expect(whiff).toBeLessThan(hit.w);
+    expect(hit.w).toBeLessThan(floor.w);
+    expect(floor.w).toBeLessThan(destroy.w);
+    expect(destroy.w).toBeGreaterThan(VIEW.W * 0.6);
+    expect(destroy.w).toBeLessThan(VIEW.W * 0.95);
+    expect(destroy.h).toBeGreaterThan(55 * 3);
+    expect(hit.w).toBeGreaterThan(destroy.w * 0.3);
+  });
+
+  it('자리: 획은 주인공 몸 상자(발 위 0~60 · 좌우 ±18)와 오른쪽 아래 「콤보」 도장 자리를 밟지 않는다 · 화면 안 · 땅 밑 없음', () => {
+    const hero = (p: P): boolean => Math.abs(p.x - X) < 18 + p.r && p.y > G - 60 - p.r;
+    // 도장(renderer drawComboMark): 가운데 x = 레인 + 96, y ≤ 땅 − 숫자 반 − 25. 콤보 100(단 1.5)부터 세 자리 · 글자가 커져 왼쪽 · 위로 넓다
+    const stamp = (k: number) => (p: P): boolean => (k >= 1.5 ? p.x > X + 42 - p.r && p.y > G - 98 - p.r : p.x > X + 60 - p.r && p.y > G - 86 - p.r);
+    for (let s = 0; s < 6; s++) {
+      for (const [ev, k, y] of [['floor', 1, G - 60], ['floor', 1.8, G - 60], ['destroy', 1.25, G - 70], ['destroy', 1.8, G - 70]] as const) {
+        const { pts, peak } = run(ev, k, y);
+        expect(pts.filter(hero), `${ev} ${k} 주인공`).toHaveLength(0);
+        expect(pts.filter(stamp(k)), `${ev} ${k} 도장`).toHaveLength(0);
+        expect(pts.every((p) => p.y <= G + 1 && p.x > -40 && p.x < VIEW.W + 20)).toBe(true);
+        expect(peak).toBeLessThanOrEqual(40);
+        expect(liveBits()).toHaveLength(0);
+      }
+      expect(run('hit', 1, G - 84).pts.filter(stamp(1)), '타격 도장').toHaveLength(0);
+      expect(run('hit', 1.5, G - 84).pts.filter(stamp(1.5)), '타격 도장 1.5').toHaveLength(0);
+    }
+  });
+
+  it('칼길: 꼬이는 물 띠 셋(굵기가 다 다르다) · 공통 달 없음 / 칼 기운: 띠 하나 · 2초 뒤 0', () => {
+    RECIPES.surf.swing!(X, G, 12, 0.26, c, 0, 1);
+    step(4);
+    const bands = pool.filter((p) => p.alive && p.k === 'zig');
+    expect(bands).toHaveLength(3);
+    expect(new Set(bands.map((p) => p.v)).size).toBe(3);
+    expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
+    step(125);
+    expect(liveBits()).toHaveLength(0);
+    RECIPES.surf.aura!([X, G - 40, X + 30, G - 6], 2, c);
+    expect(pool.filter((p) => p.alive && p.k === 'zig')).toHaveLength(1);
     step(125);
     expect(liveBits()).toHaveLength(0);
   });
 
-  it('완파: 몸은 땅에서 솟고 굵은 마루는 주인공 둘레(±22px) 앞 바깥 · 땅 밑 없음 · 조각 상한 안 · 2초 뒤 0', () => {
-    const [x, y] = [180, VIEW.GROUND_Y - 70];
-    scaled(x, y, WEAPON_FX.SIZE, () => RECIPES.surf.destroy(x, y, 1.25, c));
-    const pts = bodyPts();
-    expect(pts[0][1]).toBeGreaterThan(VIEW.GROUND_Y - 6); // 등 머리 = 발 높이
-    const top = pts.reduce((m, q) => (q[1] < m[1] ? q : m));
-    expect(top[0]).toBeGreaterThan(x + 22); // 마루는 앞쪽 바깥
-    expect(VIEW.GROUND_Y - top[1]).toBeGreaterThan(70); // 주인공보다 높이 솟는다(가로 띠가 아니다)
-    let peak = 0;
-    for (let i = 0; i < 130; i++) {
-      peak = Math.max(peak, alive());
-      expect(pool.every((p) => !p.alive || p.y <= VIEW.GROUND_Y)).toBe(true);
-      expect(pool.some((p) => p.alive && p.k === 'sweep')).toBe(false);
-      updateBladeFx(1 / 60);
-    }
-    expect(peak).toBeGreaterThan(10);
-    expect(peak).toBeLessThanOrEqual(40);
-    expect(liveBits()).toHaveLength(0);
-  });
-
-  it('필살 along · bloom — 상한(24 · 48) 안 · 전부 keep · 2초 뒤 0', () => {
+  it('필살 along · bloom — 상한(24 · 48) 안 · 전부 keep · 땅 밑 없음 · 2초 뒤 0', () => {
     let born = 0;
     weaponAlong('tide', [0, 600, 300, 200, 700, 100], 1, 0.35);
     for (let i = 0; i < 130; i++) {
@@ -72,11 +131,27 @@ describe('해일 — 말리는 파도 하나', () => {
     expect(born).toBeGreaterThan(3);
     expect(born).toBeLessThanOrEqual(24);
     expect(liveBits()).toHaveLength(0);
-    weaponBloom('tide', 300, 300, -Math.PI / 2, 1.4);
-    let peak = 0;
-    for (let i = 0; i < 130; i++) { peak = Math.max(peak, alive()); updateBladeFx(1 / 60); }
-    expect(peak).toBeGreaterThan(5);
-    expect(peak).toBeLessThanOrEqual(48);
-    expect(liveBits()).toHaveLength(0);
+    for (const [x, y, ang, k] of [[300, 300, -Math.PI / 2, 1.4], [180, G - 2, -Math.PI / 2, 1], [180, 300, 0, 0.5]] as const) {
+      weaponBloom('tide', x, y, ang, k);
+      let peak = 0;
+      for (let i = 0; i < 130; i++) {
+        peak = Math.max(peak, alive());
+        expect(pool.every((p) => !p.alive || p.y <= G)).toBe(true);
+        updateBladeFx(1 / 60);
+      }
+      expect(peak).toBeGreaterThan(5);
+      expect(peak).toBeLessThanOrEqual(48);
+      expect(liveBits()).toHaveLength(0);
+    }
+    // 낙관 마무리(wazaShow) = 도장 가운데 ± (구멍 59 + 30)에서 바깥으로 — 마루가 부른 자리 뒤로 30 넘게 넘어오면 「끝」을 덮는다
+    for (const d of [-1, 1]) {
+      for (let s = 0; s < 6; s++) {
+        weaponBloom('tide', 180 + d * 89, 360, d > 0 ? 0 : Math.PI, 0.75);
+        for (let i = 0; i < 130; i++) {
+          expect(strokePts().filter((p) => d * (p.x - 180) - p.r < 59), `낙관 도장 ${d}`).toHaveLength(0);
+          updateBladeFx(1 / 60);
+        }
+      }
+    }
   });
 });
