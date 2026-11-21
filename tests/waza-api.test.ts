@@ -8,6 +8,7 @@ import {
   RECIPES, drawBladeFx, drops, line, pool, resetBladeFx, samplePath, strokeTone, updateBladeFx, weaponAlong, weaponBloom, type Bit, type WazaArt,
 } from '../src/render/bladeFx';
 import { TOOL_RECIPES, liveBits } from '../src/render/weaponFx';
+import { greatLook } from '../src/render/sprites';
 import { drawWazaShot } from '../src/render/wazaShow';
 
 const INK = PALETTE.INK;
@@ -150,9 +151,24 @@ describe('strokeTone', () => {
   });
 });
 
+/** 원소 다섯(legend5)은 hit 한 번이 초승달 → 원소 → 흩어짐 한 벌이라 기본 판(표본마다 hit)으로는 상한을 넘는다 —
+ *  제 waza가 늘 있으니(아래 「모든 무기 waza」) 기본 판 대상이 아니다. 기본 판은 앞으로 waza 없이 들어올 무기의 비상구 */
+const LEGEND5 = new Set(['wing', 'surf', 'volt', 'icicle', 'smoke']);
+const BASE_IDS = WEAPON_IDS.filter((w) => !LEGEND5.has(greatLook(w)?.shape ?? ''));
+const hasWaza = (w: (typeof WEAPON_IDS)[number]): boolean => {
+  const g = greatLook(w);
+  return !!(g ? RECIPES[g.shape].waza : TOOL_RECIPES[w]?.waza);
+};
+
+it('모든 무기가 제 waza를 가진다 — 필살에서 기본 판은 안 돈다', () => {
+  expect(BASE_IDS).toHaveLength(WEAPON_IDS.length - 5);
+  for (const w of WEAPON_IDS) expect(hasWaza(w), w).toBe(true);
+});
+
 /** 상한 — 기본 판 · 제 판(waza) 둘 다 지킨다 */
-function limits(): void {
-  it('26 무기 모두 짧은 획에서도 조각 1개 이상, 2초 뒤엔 0, 그리다 던지지 않는다', () => {
+function limits(ids: readonly (typeof WEAPON_IDS)[number][] = WEAPON_IDS): void {
+  const WEAPON_IDS = ids;
+  it('무기 모두 짧은 획에서도 조각 1개 이상, 2초 뒤엔 0, 그리다 던지지 않는다', () => {
     for (const w of WEAPON_IDS) {
       const { total } = run(() => {
         weaponAlong(w, SHORT, 1, 0.25);
@@ -211,7 +227,7 @@ describe('weaponAlong · weaponBloom 기본 판(waza 없음)', () => {
     stash.clear();
   });
 
-  limits();
+  limits(BASE_IDS);
 
   it('dur 동안 뿌리 → 끝 차례: 시작 표본은 바로, 끝 표본은 dur 뒤에 나온다', () => {
     resetBladeFx();
