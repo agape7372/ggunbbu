@@ -21,7 +21,7 @@ import { CAMERA, STACK, STAGE, VIEW } from '../config';
  * 되돌리려면 config.ts CAMERA 주석의 개정 사유부터 뒤집을 것.
  *
  * core에 둔 이유: stage.ts가 건물 생김 높이(화면 맨 위 + STAGE.SPAWN_ABOVE)를 이 값으로 낸다.
- * 순수 목표값만 반환한다. 프레임간 보간(`CAMERA.LERP`)은 renderer가 쥔다 — 여기에 상태를 두면
+ * 순수 값만 반환한다. 앞 프레임 카메라는 renderer가 쥔다(cameraClamp) — 여기에 상태를 두면
  * 테스트가 시뮬 상태만으로 카메라를 단언할 수 없게 된다.
  */
 export function cameraFollowY(s: GameState): number {
@@ -41,7 +41,19 @@ export function holdSpawn(s: GameState): boolean {
   return true;
 }
 
-/** 건물이 생기는 높이 = 화면 맨 위(카메라 목표) + STAGE.SPAWN_ABOVE. 지시서(stage.ts)와 아케이드 1막 · 토코톤(spawner.ts)이 같이 쓴다 */
+/**
+ * 화면 카메라 한 프레임(11-22 2차 · 원작 영상 실측): 오를 땐 발을 화면 바닥에서 FOLLOW_Y에 묶고,
+ * 떨어질 땐 땅 자리(화면 바닥)에 묶는다. 그 사이 띠에선 안 움직인다. 보간은 없다.
+ * 앞 프레임 값은 부르는 쪽(renderer · 검수 도구)이 쥔다.
+ */
+export function cameraClamp(cam: number, y: number): number {
+  return Math.max(0, y - CAMERA.FOLLOW_Y, Math.min(cam, y));
+}
+
+/**
+ * 건물이 생기는 높이 = 화면 맨 위 + STAGE.SPAWN_ABOVE. 지시서(stage.ts)와 아케이드 1막 · 토코톤(spawner.ts)이 같이 쓴다.
+ * 화면 카메라는 발 높이까지 올라가 있을 수 있다(cameraClamp 위쪽 끝) — 그 끝으로 잡아야 화면 안에서 안 생긴다.
+ */
 export function spawnTopY(s: GameState): number {
-  return VIEW.GROUND_Y - VIEW.FIELD_TOP + cameraFollowY(s) + STAGE.SPAWN_ABOVE;
+  return VIEW.GROUND_Y - VIEW.FIELD_TOP + Math.min(CAMERA.MAX, s.player.y) + STAGE.SPAWN_ABOVE;
 }

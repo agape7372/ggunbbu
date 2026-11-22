@@ -8,8 +8,8 @@ import { wazaShowState } from '../../src/render/wazaShow';
 import { greatLook } from '../../src/render/sprites';
 import { advance, makeState } from '../../src/core/sim';
 import { makeFloor, makeStack } from '../../src/core/building';
-import { cameraFollowY } from '../../src/core/camera';
-import { CAMERA, VIEW } from '../../src/config';
+import { cameraClamp } from '../../src/core/camera';
+import { VIEW } from '../../src/config';
 import type { GameState, InputFrame, Material, WazaId, WeaponId } from '../../src/core/types';
 
 type Draft = Partial<Recipe>;
@@ -55,10 +55,7 @@ function frame(s: GameState): void {
   ctx.setTransform(2, 0, 0, 2, 0, 0);
   ctx.fillStyle = '#F4F1E8'; ctx.fillRect(0, 0, 360, 780);
   drawGame(ctx, s);
-  const want = cameraFollowY(s);
-  cam += (want - cam) * CAMERA.LERP;
-  if (Math.abs(want - cam) < 0.5) cam = want;
-  cam = Math.max(s.player.y - CAMERA.KEEP_TOP, Math.min(cam, Math.max(0, s.player.y - CAMERA.KEEP_BOTTOM)));
+  cam = cameraClamp(cam, s.player.y);
   s.events = [];
 }
 

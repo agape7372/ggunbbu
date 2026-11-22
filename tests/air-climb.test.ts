@@ -42,7 +42,7 @@ describe('공중 베기 — 매달려 베고, 층을 깨며 오른다 (11-22)', 
     it(`약한 8층: 한 번 뛰어 연타 ${period}틱으로 여덟 층을 다 깬다 — 땅에 안 닿고 화면보다 높이 오른다`, () => {
       const r = airRun(w(8), 200, period);
       expect(r.cuts).toBe(8);
-      expect(r.floors).toBeGreaterThan(9);
+      expect(r.peak).toBeGreaterThan(VIEW.FIELD_H - VIEW.FIELD_TOP);
       expect(r.cam).toBeGreaterThan(400);
     });
 

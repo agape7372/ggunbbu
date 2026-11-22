@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cameraFollowY, holdSpawn, spawnTopY } from '../src/core/camera';
+import { cameraClamp, cameraFollowY, holdSpawn, spawnTopY } from '../src/core/camera';
 import { makeState } from '../src/core/sim';
 import { CAMERA, PLAYER, STACK, VIEW } from '../src/config';
 
@@ -27,6 +27,27 @@ describe('카메라 (11-22: 발 추종)', () => {
     expect(cameraFollowY(s)).toBeCloseTo(40, 6);
     s.player.y = apex;
     expect(cameraFollowY(s)).toBeGreaterThan(350);
+  });
+
+  // ★11-22 2차 — 원작 영상 실측(벤치마크 §10): 보간 없이 묶는다. 오를 땐 발이 화면 바닥에서 FOLLOW_Y,
+  // 떨어질 땐 땅 자리. 그 사이 띠에선 화면이 안 움직인다.
+  it('화면 카메라: 오를 땐 발을 FOLLOW_Y에, 떨어질 땐 땅 자리에 묶는다 — 내려서면 이미 0이다', () => {
+    let cam = 0;
+    const feet = (y: number) => y - (cam = cameraClamp(cam, y)); // 화면 바닥에서 발까지
+    for (let y = 0; y <= 500; y += 25) expect(feet(y)).toBe(Math.min(y, CAMERA.FOLLOW_Y)); // 오르는 내내 한 자리
+    const top = cam;
+    for (let y = 500; y > 500 - CAMERA.FOLLOW_Y; y -= 10) { feet(y); expect(cam).toBe(top); } // 꼭대기 띠에선 안 움직인다
+    for (let y = 400; y >= 0; y -= 25) expect(feet(y)).toBe(0); // 떨어지는 내내 땅 자리
+    expect(cam).toBe(0);
+  });
+
+  it('화면 카메라가 가장 높이 가도(발 높이) 새 건물은 화면 위에서 생긴다', () => {
+    const s = makeState();
+    for (const y of [0, 60, 300, 900]) {
+      s.player.y = y;
+      const screenTop = cameraClamp(1e9, y) + VIEW.FIELD_H - VIEW.FIELD_TOP;
+      expect(spawnTopY(s)).toBeGreaterThan(screenTop);
+    }
   });
 
   it('공중 베기 상한까지 올라가도 카메라가 놓치지 않는다', () => {

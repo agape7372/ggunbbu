@@ -20,7 +20,7 @@ import { setFxMask } from './weaponFx';
 import { backdropKey, drawChapterBackdrop, type BackdropInput } from './background';
 import { drawRubbleHeaps, drawSceneLive } from './scenery';
 import { backdropPaper } from './assets';
-import { cameraFollowY } from '../core/camera';
+import { cameraClamp } from '../core/camera';
 import { spawnCueCd } from '../core/landmark';
 import { vibrate } from '../platform/native';
 import {
@@ -41,10 +41,7 @@ import * as fx from './screenfx';
 
 /** 흔들림 진폭(px). 이벤트가 addTrauma로 쌓고 반감기 SHAKE_HALF_LIFE_F로 줄어든다. */
 let trauma = 0;
-/**
- * 카메라 보간 상태 (08-30 4차). cameraFollowY는 순수 목표값만 내고, 프레임간 추격은 여기서 한다 —
- * 목표값을 그대로 쓰면 데드존 진입 순간 화면이 툭 튄다. drawGame이 매 프레임 한 번 전진시킨다.
- */
+/** 화면 카메라(앞 프레임 값). drawGame이 매 프레임 cameraClamp로 한 번 전진시킨다 — 식과 근거는 core/camera */
 let smoothCam = 0;
 /** 이 판에서 부순 층 수 — 양옆 잔해 더미(scenery.drawRubbleHeaps)가 읽는다 */
 let razed = 0;
@@ -497,11 +494,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   const slow = slowFactor(s);
   tickEffects(slow);
 
-  const camTarget = cameraFollowY(s);
-  smoothCam += (camTarget - smoothCam) * CAMERA.LERP * slow;
-  if (Math.abs(camTarget - smoothCam) < 0.5) smoothCam = camTarget;
-  // 빠르게 솟거나 떨어져 보간이 뒤처져도 졸라맨은 화면 안에 둔다
-  smoothCam = Math.max(s.player.y - CAMERA.KEEP_TOP, Math.min(smoothCam, Math.max(0, s.player.y - CAMERA.KEEP_BOTTOM)));
+  smoothCam = cameraClamp(smoothCam, s.player.y);
   const cam = smoothCam;
   const [sx, sy, rot] = shakeNow();
   trauma -= 0.693 / JUICE_SYS.SHAKE_HALF_LIFE_F * trauma;
