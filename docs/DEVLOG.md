@@ -2566,3 +2566,8 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 관문: tsc 0 · 시험 1277 통과 · 실제 렌더러 16프레임 한 장(`tmp/climb/sheet.png` · 앞 판은 `sheet-before.png` · git 밖).
 - 못 본 것: 실기기 손맛 · 빌드 · 2막 탑(낙뢰 예고는 화면 고정이라 그대로일 것). 미커밋 · 미게시.
 - 손잡이: `CAMERA.RISE_Y`(올리면 더 높이 떠 보이고 머리 위 건물이 덜 보인다 · 4층 보이는 한계 = 232) · `FALL_Y`.
+
+### 승격 (11-22, `b6a36ee`)
+- 사용자: 「앱승격까지」. main · release/1.0 `b6a36ee` 앞감기 push(`366b13e..b6a36ee`) · Pages run 45021344996 성공(`main-DssmNa7m.js`에 RISE_Y 220 · FALL_Y 130 · UNLOCK_SCORE 15e5).
+- 시험판: 배포 전 라이브 = 지난 판 `index-DsVkEb1v` 확인. `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview`에 덮어쓰기(옛 파일 안 지움) → `vercel deploy --prod`. 라이브 `index-_Ikmecdd.js` · `main-DhTb22Dh.js`에 같은 값.
+- 못 본 것: 실기기 손맛 · Play 판(이번에도 안 올림).
