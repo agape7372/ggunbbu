@@ -12,7 +12,7 @@
 // 문법(불변 13): 먹 머리 → 시그니처 색 꼬리 · 알파 지우기 금지(모양으로) · shadowBlur · 블룸 · 별 · 원판 + 방사형 띠 · 아이콘 금지.
 // ⚠ bladeFx와 순환 import — 최상위에서 bladeFx 값을 부르지 않는다. 시험에서 이 파일을 bladeFx보다 먼저 import하지 않는다.
 import { PALETTE, VIEW, WEAPON_FX } from '../../config';
-import { bent, drops, later, n01, samplePath, sgn, type Recipe } from '../bladeFx';
+import { bent, drops, later, n01, put, samplePath, sgn, type Recipe } from '../bladeFx';
 import { follow, liteOf, moonPoint, pathLen, swingMoon } from './geom';
 
 type V = readonly [number, number];
@@ -125,60 +125,152 @@ const tipOf = (pts: number[]): [number, number, number] => {
  * 한 판의 꼴 — w = 몸 굵기(px) · life · nf = 갈퀴 손가락 수 · ng = 결 줄 수 · nd = 물방울 덩이를 떨굴 손가락 수 ·
  * t0 = 등이 시작하는 자리(0 = 땅) · fan = 손가락이 나는 말림 범위 [th0, th1] · len = 손가락 길이(로컬) · k = 방울 크기
  */
-interface Look { w: number; life: number; nf: number; ng: number; nd: number; t0: number; fan: readonly [number, number]; len: number; k: number }
+interface Look {
+  w: number; life: number; nf: number; ng: number; nd: number; t0: number; fan: readonly [number, number]; len: number; k: number;
+  /** 쏟아지는 세기(타격은 작게) */
+  fall?: number;
+  /** 키운 축 = 주인공 발 x · 사건 y. 주면 쏟아지는 획이 주인공 몸 상자 · 「콤보」 도장 · 땅 밑으로 들어가지 않게 깊이를 멈춘다 */
+  at?: readonly [number, number];
+}
+
+/** 꺾은 획 + 중력 — 엔진 bent와 같고 g(px/s², 화면 아래)만 더 넘긴다(bent는 g를 안 받는다 · put으로 직접) */
+type SO = NonNullable<Parameters<typeof bent>[3]> & { g?: number; rest?: readonly [number, number]; safe?: readonly [number, number] };
 
 /**
- * 마루 한 판 — 등(먹 밑동 → 마루 → 앞끝, 솟음) → 말림 통(마루 앞 위 먹 → 앞 · 아래 · 안으로, 말림) · 결 줄 →
- * 갈퀴 손가락(말림이 닿을 때 차례로) → 갈퀴 끝 물방울 덩이(무너짐). 다 선 뒤 몸은 앞으로, 갈퀴는 앞 · 아래로 처진다
+ * 쏟아짐을 어디까지 줄까(0 = 표류 rest만 · 1 = 다) — 키운 뒤 월드 자리를 사는 내내 짚어 획 점(반폭 포함)이
+ * 주인공 몸 상자(발 위 0~60 · 좌우 ±18) · 「콤보」 도장(세 자리 콤보의 넓은 자리) · 땅 밑 · 화면 밖에 들면 줄인다.
+ * 층 깨기는 마루가 머리 바로 위에서 일어나 조금만 떨어져도 상자에 닿았다 — 머리 위 획만 덜 내려앉고 나머지는 그대로 쏟아진다.
+ * ponytail: 주인공이 사건 x에 서 있다고 본다(bladeFx가 레인 x로 부른다). 다른 자리에서 부르면 safe를 넘기지 않는다
+ */
+function fallRoom(pts: readonly number[], w: number, o: SO): number {
+  const [cx, cy] = o.safe ?? [0, 0];
+  const K = WEAPON_FX.SIZE;
+  const T = (o.life ?? 0.26) * WEAPON_FX.LIFE;
+  const r = (w * K) / 2;
+  const G = VIEW.GROUND_Y;
+  const [rx, ry] = o.rest ?? [0, 0];
+  const hits = (m: number): boolean => {
+    const vx = rx + m * ((o.vx ?? 0) - rx);
+    const vy = ry + m * ((o.vy ?? 0) - ry);
+    const g = m * (o.g ?? 0);
+    // 엔진 updateBladeFx와 같은 셈(속도에 중력을 먼저 더하고 자리를 옮긴다 · 1/60초씩) — 식 하나로 풀면 끝에서 1~2px 모자랐다
+    let [dx, dy, uy] = [0, 0, K * vy];
+    for (let t = 0; t <= T + F60; t += F60) {
+      if (t > 0) {
+        uy += K * g * F60;
+        dx += K * vx * F60;
+        dy += uy * F60;
+      }
+      for (let i = 0; i + 1 < pts.length; i += 2) {
+        const x = cx + K * (pts[i] - cx) + dx;
+        const y = cy + K * (pts[i + 1] - cy) + dy;
+        if (Math.abs(x - cx) < 18 + r && y > G - 60 - r) return true;
+        if (x > cx + 42 - r && y > G - 98 - r) return true;
+        if (y > G + 1 || x < -40 || x > VIEW.W + 20) return true;
+      }
+    }
+    return false;
+  };
+  if (!hits(1)) return 1;
+  let [lo, hi] = [0, 1];
+  for (let j = 0; j < 6; j++) {
+    const m = (lo + hi) / 2;
+    if (hits(m)) hi = m;
+    else lo = m;
+  }
+  return lo;
+}
+
+function bentG(pts: number[], w: number, core: string, o: SO): void {
+  const [x, y] = pts;
+  const m = o.safe && o.g ? fallRoom(pts, w, o) : 1;
+  const [rx, ry] = o.rest ?? [0, 0];
+  put('zig', x, y, {
+    life: o.life ?? 0.26, size: 0, v: w, c1: o.body ?? PALETTE.INK, c2: core, dry: o.dry ?? 0.3, pr: o.pr ?? 2, gr: o.gr ?? 0.15, hold: o.hold,
+    vx: rx + m * ((o.vx ?? 0) - rx), vy: ry + m * ((o.vy ?? 0) - ry), g: m * (o.g ?? 0), fd: o.fd, fe: o.fe, ge: o.ge,
+    pts: pts.map((q, i) => q - (i % 2 ? y : x)),
+  });
+}
+/** 등 꺾은선(월드) t0 → t1만 */
+function backPts(cr: Crest, t0: number, t1: number, n: number): number[] {
+  const pts: number[] = [];
+  for (let i = 0; i <= n; i++) pts.push(...toW(cr, ...backAt(cr, t0 + ((t1 - t0) * i) / n)));
+  return pts;
+}
+
+/**
+ * 마루 한 판 — 11-22 박자 판: 예비(밑동 그루터기가 느리게 부푼다) → 솟음(마루 · 앞끝이 급하게 넘어간다) → 정점에서 2~3칸 버티기 →
+ * 무너짐(꼭대기부터: 마루 · 입술 · 갈퀴가 앞 · 아래로 쏟아지고 가닥마다 처지는 때가 다르다 → 결 줄 → 밑동 그루터기) →
+ * 끝(물방울 덩이가 늦게 끊겨 땅에 닿으며 끝난다).
+ * 몸 한 획을 밑동 그루터기 + 위 몸(등 중턱 → 마루 → 앞끝) 두 획으로 갈랐다 — 획은 머리(댄 곳)부터만 깎이니 한 획이면 밑동부터 사라진다.
+ * 쏟아짐 = 중력(g)과 위로 살짝 든 첫 속도 — 정점에서 버티다 점점 빨리 떨어진다. 주인공 · 도장 위로는 fallRoom이 깊이를 멈춘다
  */
 function surge(cr: Crest, L: Look, c: string): void {
   const drift = 14 * Math.min(L.k, 1.1); // 단이 높아도 표류는 묶는다(오른쪽 아래 「콤보」 도장 쪽으로 흘러가지 않게)
   const [vx, vy] = [cr.F[0] * drift, cr.F[1] * drift];
   const half = L.w / 2 / cr.H; // 몸 반폭(로컬)
-  bent(ridge(cr, L.t0, PI * 0.5, 0, 8, 5), L.w, '', { body: c, pr: 3, dry: 0.14, gr: Math.min(0.6, (RISE * 1.3) / L.life), life: L.life, vx, vy });
-  // 말림 — 붓 두 가닥. r6까지는 굵은 통 한 획(몸 굵기 9할 · 1.44π 감김)이라 머리(꼭대기 뒤)와 꼬리(말림 밑)가 위아래로 붙어
-  // 먹 → 파랑이 윗변을 통째로 먹으로 칠했다(윗면 납작한 검은 네모로 읽힘 · 11-22 검수). 가닥마다 머리와 꼬리를 떼어 길을 따라 색이 바뀌게.
-  // 입술 = 꼭대기 뒤에서 가늘게 대(누름 cut — 머리가 뭉툭하게 잘리지 않는다) 앞 · 아래로 둥글게 넘긴다
-  later(RISE * 0.3, () => bent(curlPts(cr, -PI * 0.14, PI * 0.8, 10), L.w * 0.44, '', {
-    body: c, pr: 0, dry: 0.36, gr: Math.min(0.6, (CURL * 0.9) / L.life), life: L.life * 0.92, vx, vy,
+  const gr = Math.min(0.6, (RISE * 1.3) / L.life);
+  const fall = L.fall ?? 1;
+  const S = { safe: L.at, rest: [vx, vy] as const }; // 쏟아지는 획마다 — 자리를 밟으면 표류 쪽으로 줄인다
+  // 위 몸 — 먼저 넣어 그루터기 밑에 깔린다(머리 먹이 그루터기에 덮인다). ge 2 = 처음엔 거의 안 나가다 마루를 급하게 넘는다.
+  // 몸을 한 획(밑동부터)으로 두고 중력을 주면 밑동이 땅 밑으로 내려가 엔진이 획을 0.12초로 잘라 +14에 몸이 통째로 사라졌다(11-22 시안)
+  bentG(ridge(cr, L.t0 + 0.14, PI * 0.5, 0, 7, 5), L.w, '', {
+    body: c, pr: 3, dry: 0.14, gr, ge: 2, life: L.life * 0.8, fd: 0.42, fe: 1.3,
+    vx: vx * 1.6, vy: -50 * fall, g: 420 * fall, ...S, // 700은 마루가 주인공 몸 상자까지 내려앉았다
+  });
+  // 밑동 그루터기 — 예비: 느리게(ge 1.6) 먼저 부푼다. 지금 판 밑동처럼 몸이 무너지기 시작할 때 같이 깎인다 —
+  // 수명 0.82는 위 몸이 떠난 뒤 왼쪽 아래에 진한 먹 덩이로 홀로 남았다(11-22 검수)
+  bentG(backPts(cr, L.t0, L.t0 + 0.34, 4), L.w, '', { body: c, pr: 0, dry: 0.14, gr: gr * 1.1, ge: 1.6, life: L.life * 0.5, fd: 0.55, fe: 1.2, vx, vy });
+  // 입술 — 꼭대기 뒤에서 앞 · 아래로 넘긴다. 위 몸보다 조금 늦게 · 세게 쏟아진다
+  later(RISE * 0.3, () => bentG(curlPts(cr, -PI * 0.14, PI * 0.8, 10), L.w * 0.44, '', {
+    body: c, pr: 0, dry: 0.36, gr: Math.min(0.6, (CURL * 0.9) / L.life), life: L.life * 0.8, fd: 0.4, fe: 1.3,
+    vx: vx * 2, vy: -45 * fall, g: 500 * fall, ...S,
   }));
-  // 속 말림 = 앞끝에서 안으로 감기는 더 가는 가닥(마른 붓 결) — 결 줄이 있는 판만(작은 예비 마루 · 헛스윙은 입술만, 조각 상한)
-  if (L.ng) later(RISE * 0.3 + CURL * 0.45, () => bent(curlPts(cr, PI * 0.5, PI * 1.42, 10, half * 0.4), L.w * 0.28, '', {
-    body: c, pr: 0, dry: 0.45, gr: Math.min(0.6, CURL / L.life), life: L.life * 0.85, vx, vy,
+  // 속 말림
+  if (L.ng) later(RISE * 0.3 + CURL * 0.45, () => bentG(curlPts(cr, PI * 0.5, PI * 1.42, 10, half * 0.4), L.w * 0.28, '', {
+    body: c, pr: 0, dry: 0.45, gr: Math.min(0.6, CURL / L.life), life: L.life * 0.78, fd: 0.42, fe: 1.3,
+    vx: vx * 1.8, vy: -35 * fall, g: 400 * fall, ...S,
   }));
-  // 결 줄 — 몸 획 안쪽에서 등을 따라 가다 끝에서 제 작은 마루로 감긴다. 줄마다 깊이 · 시작 · 끝 높이가 엇갈린다(겹 · 평행 금지)
+  // 결 줄 — 위 몸을 따라 조금 늦게 처진다
   for (let j = 0; j < L.ng; j++) {
     const d = half * 1.6 + [0.05, 0.2, 0.11][j % 3] + 0.03 * n01();
     const t0 = Math.max(L.t0 + 0.06, [0.14, 0.42, 0.06][j % 3] + 0.06 * n01());
     const t1 = [0.84, 0.74, 0.5][j % 3] - 0.05 * n01();
-    later((1.5 + 1.2 * j + n01()) * F60, () => bent(grainPts(cr, t0, t1, d, 0.07 + 0.025 * n01()), L.w * (0.4 - 0.07 * j), '', {
-      body: c, pr: 0, dry: 0.45, gr: Math.min(0.6, (5 * F60) / L.life), life: L.life * (0.82 + 0.1 * n01()), vx, vy,
+    later((1.5 + 1.2 * j + n01()) * F60, () => bentG(grainPts(cr, t0, t1, d, 0.07 + 0.025 * n01()), L.w * (0.4 - 0.07 * j), '', {
+      body: c, pr: 0, dry: 0.45, gr: Math.min(0.6, (5 * F60) / L.life), life: L.life * (0.8 + 0.1 * n01()), fd: 0.5, fe: 1.3,
+      vx: vx * 1.4, vy: -40 * fall, g: (260 + 60 * j) * fall, ...S,
     }));
   }
-  // 갈퀴 손가락 — 입술이 그어지는 동안 뒤에서 앞으로 차례로(간격 · 길이 · 감김이 제각각). 셋에 하나는 먹 뿌리 손가락.
-  // r6은 말림이 다 감긴 뒤에 나서 완파 +10~16에야 보였다 — 말리는 +4~6에 이미 서 있게 당기고 빨리 긋는다
+  // 갈퀴 손가락 — 서는 때는 지금 판 그대로. 쏟아짐은 가닥마다 다르게: 위로 드는 첫 속도 · 중력 · 깎이는 때를 엇갈린다(한꺼번에 X)
   const ths: number[] = [];
   for (let i = 0; i < L.nf; i++) ths.push(L.fan[0] + (L.fan[1] - L.fan[0]) * ((i + 0.5 + 0.5 * sgn()) / L.nf));
   ths.sort((p, q) => p - q);
-  const tips: [number, number, number, number][] = [];
-  const sag = 20 * Math.min(L.k, 1.1) * (cr.H / 100); // 갈퀴는 몸보다 앞 · 아래(−U)로 처진다
+  const tips: [number, number, number, number, number, number, number][] = [];
+  const GS = [1.15, 0.8, 1.35, 0.95, 1.25, 0.7] as const;
   ths.forEach((th, i) => {
-    // 입술 아래로 갈수록 짧다(긴 갈퀴는 마루 위 앞). 맨 아래 갈퀴가 길게 처지면 「콤보」 도장까지 내려왔다
     const low = (th - L.fan[0]) / (L.fan[1] - L.fan[0] || 1);
     const len = L.len * (0.65 + 0.5 * n01()) * (i === 1 || i === L.nf - 2 ? 1.2 : 1) * (1 - 0.35 * low);
     const pts = fingerPts(cr, th, half * 0.7, len, 1.9 + 1.3 * n01());
     const dark = i % 3 === 1;
     const at = RISE * 0.5 + CURL * 0.4 * low + 0.5 * sgn() * F60;
-    tips.push([...tipOf(pts), at]);
-    later(at, () => bent(pts, L.w * (0.42 + 0.22 * n01()), dark ? '' : FOAM, {
+    const fx = vx * 1.5;
+    const fy = -(40 + 35 * ((i * 2) % 3)) * fall; // 위로 드는 첫 속도 — 정점에서 버티는 때가 가닥마다 다르다
+    const fg = 600 * GS[i % 6] * fall; // 900은 갈퀴가 「콤보」 도장 · 주인공 자리까지 떨어졌다
+    tips.push([...tipOf(pts), at, fx, fy, fg]);
+    later(at, () => bentG(pts, L.w * (0.42 + 0.22 * n01()), dark ? '' : FOAM, {
       body: dark ? c : liteOf(c), pr: 1, dry: 0.3, gr: 0.11, hold: 0.7, life: L.life * (0.72 + 0.25 * n01()),
-      vx: vx * 1.3 - cr.U[0] * sag, vy: vy * 1.3 - cr.U[1] * sag,
+      fd: 0.32 + 0.07 * ((i * 3) % 4), fe: 1.2, vx: fx, vy: fy, g: fg, ...S,
     }));
   });
-  // 끊긴 물방울 덩이 — 긴 손가락 끝에서, 끝이 가는 쪽을 조금 들어 앞으로
+  // 끊긴 물방울 덩이 — 쏟아지는 갈퀴 끝에서 늦게 끊긴다(끝 자리는 그때까지 처진 높이만 옮긴다 — 앞으로도 옮기면 덩이가 「콤보」 도장 위에 떨어졌다 · 11-22 시안)
   tips.sort((p, q) => Math.hypot(q[0] - cr.ox, q[1] - cr.oy) - Math.hypot(p[0] - cr.ox, p[1] - cr.oy));
-  tips.slice(0, L.nd).forEach(([x, y, ang, at], i) => {
-    later(at + (4 + 2.5 * i + 2 * n01()) * F60, () => clump(x, y, ang - 0.6 + 0.3 * sgn(), (150 + 70 * n01()) * L.k, 4 + (i % 3), L.k, c));
+  // 가장 긴 갈퀴 끝(화면 오른쪽 끝)에서 앞으로 던지면 +30~+40에 「콤보」 도장 옆에 몰렸다(11-22 검수) →
+  // 무너지는 등 안쪽(마루 아래 · 주인공 왼쪽)에서 끊겨 거의 곧게 · 조금 뒤로 떨어진다. +36 안에 땅에 닿게 일찍 끊는다
+  tips.slice(0, L.nd).forEach(([, , , at], i) => {
+    const dt = (7 + 2 * i + n01()) * F60 * (L.life / 0.56) ** 2;
+    const s = (at + dt - RISE * 0.3) * WEAPON_FX.LIFE; // 입술이 난 뒤 흐른 초(키운 그림은 later가 1.2배 늦다)
+    const [x, y] = toW(cr, ...backAt(cr, 0.5 + 0.1 * i, half * 2)); // 말림 밑(주인공 바로 위)에서 끊겨 주인공 위로 쏟아졌다 → 등 안쪽(주인공 왼쪽)
+    later(at + dt, () => clump(x + vx * 2 * s, y + (-45 * s + 250 * s * s) * fall, PI / 2 + 0.45 + 0.2 * sgn(), (60 + 40 * n01()) * L.k, 4 + (i % 3), L.k, c));
   });
 }
 
@@ -222,28 +314,28 @@ export const tide: Recipe = {
     const K = Math.min(k, 1.5);
     const H = 60 * Math.min(K, 1.2); // 키우기 전 — 1.6배면 폭 ~110. 콤보 고비(flare)도 K 1.5로 부르니 꼴은 1.2에서 묶고 단은 굵기 · 방울로만
     const cr: Crest = { ox: x - 0.68 * H, oy: y - 24 + 0.5 * H, F: RIGHT, U: UP, H, ca: jit(0.55, 0.08), ra: jit(0.42, 0.06), rb: jit(0.3, 0.06), sy: 0.72 };
-    surge(cr, { w: 7 * K, life: 0.42, nf: 3, ng: 1, nd: 2, t0: 0.12, fan: [0.04 * PI, 0.45 * PI], len: 0.34, k: 0.8 * K }, c);
+    surge(cr, { w: 7 * K, life: 0.42, nf: 3, ng: 1, nd: 2, t0: 0.12, fan: [0.04 * PI, 0.45 * PI], len: 0.34, k: 0.8 * K, fall: 0.55, at: [x, y] }, c);
   },
   // 층 깨기 — 왼쪽 땅에서 중간 마루가 솟아 주인공 머리 위로 말린다(완파의 6할) · 갈퀴 넷 · 결 줄 둘
   floor(x, y, k, c) {
     const K = Math.min(k, 1.5);
     const cr = groundCrest(x, y, x - 174, 112, jit(0.86, 0.05), jit(0.38, 0.06), jit(0.22, 0.05));
-    surge(cr, { w: 11 * K, life: 0.48, nf: 4, ng: 2, nd: 2, t0: 0, fan: [0.02 * PI, 0.45 * PI], len: 0.32, k: K }, c);
+    surge(cr, { w: 11 * K, life: 0.48, nf: 4, ng: 2, nd: 2, t0: 0, fan: [0.02 * PI, 0.45 * PI], len: 0.32, k: K, fall: 0.8, at: [x, y] }, c);
   },
   // 완파 — 앞에 작은 마루가 먼저 일고(예비) → 왼쪽 땅에서 큰 마루가 솟아 화면 위쪽으로 크게 말린다(폭 ~250 · 높이 ~190) →
   // 갈퀴 손가락 여섯이 앞 · 아래로 처지며 끝에서 물방울 덩이가 끊기고, 마루 꼭대기 뒤로도 물보라 덩이
   destroy(x, y, k, c) {
     const K = Math.min(k, 1.5);
     const small = groundCrest(x, y, x - 124, 58, jit(0.7, 0.08), 0.42, 0.3);
-    surge(small, { w: 8, life: 0.4, nf: 2, ng: 0, nd: 1, t0: 0.05, fan: [0.1 * PI, 0.45 * PI], len: 0.42, k: 0.8 }, c);
+    surge(small, { w: 8, life: 0.4, nf: 2, ng: 0, nd: 1, t0: 0.05, fan: [0.1 * PI, 0.45 * PI], len: 0.42, k: 0.8, at: [x, y] }, c);
     // 높이 · 폭은 콤보 단과 상관없이 묶는다(화면 폭 9할 · 콤보가 클수록 도장도 커진다) — 단은 굵기 · 방울로만.
     // 밑동은 화면 안(x 20). r6은 x −24 화면 밖에서 솟았다 — 오른쪽 끝을 그대로 두려고 마루를 가파르게(ca 0.92 → 0.8),
     // 말림을 덜 납작하게(가로 0.42 → 0.34 · 세로 0.25 → 0.26) 줄였다
     const cr = groundCrest(x, y, x - 160, 190, jit(0.8, 0.04), jit(0.34, 0.05), jit(0.26, 0.05));
     later(0.5 * F60, () => {
-      surge(cr, { w: 17 * Math.min(K, 1.35), life: 0.56, nf: 6, ng: 3, nd: 3, t0: 0, fan: [0, 0.44 * PI], len: 0.35, k: K }, c);
+      surge(cr, { w: 17 * Math.min(K, 1.35), life: 0.56, nf: 6, ng: 3, nd: 3, t0: 0, fan: [0, 0.44 * PI], len: 0.35, k: K, at: [x, y] }, c);
       const [px, py] = toW(cr, cr.ca - 0.05, 1.02);
-      later(RISE + CURL, () => clump(px, py, -PI * 0.72 + 0.15 * sgn(), 170 * K, 5, K, c)); // 꼭대기 뒤 물보라
+      later(RISE + CURL * 0.4, () => clump(px, py, -PI * 0.72 + 0.15 * sgn(), 90 * K, 4, K, c)); // 꼭대기 뒤 물보라(넷 — 다섯이면 한 사건 조각이 41까지 갔다) — 170은 높이 떠 먹 방울이 +28~+40 공중에 머물렀다(11-22 검수) → 일찍 · 낮게
     });
   },
   // 헛스윙 — 칼끝에서 작은 갈퀴 하나 + 방울 덩이 하나

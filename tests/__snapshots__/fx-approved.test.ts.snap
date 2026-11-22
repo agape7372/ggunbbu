@@ -113,19 +113,19 @@ exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > tide 1`] = `
 {
   "aura": "c035bdc59ccd80e3",
-  "floorCollapse": "ab0301f61ae5917b",
-  "hit": "addb0f5102b555fe",
-  "slash": "cc5f0bd9cdfc600f",
-  "stackDestroy": "30c98a659d06c1a2",
+  "floorCollapse": "f9774a2e23713a40",
+  "hit": "a2062fbb81ca171c",
+  "slash": "f7ce0947df0b7acf",
+  "stackDestroy": "8ac373e126d5db56",
 }
 `;
 
 exports[`사용자가 고른 이펙트 판 — 바뀌면 지금 | 새 안 비교부터(고른 뒤에만 -u) > volt 1`] = `
 {
   "aura": "c035bdc59ccd80e3",
-  "floorCollapse": "dd10cd2da157e73d",
-  "hit": "87a0b7aefb20ac00",
+  "floorCollapse": "7a416b4bdf17fd18",
+  "hit": "0cc8f16bda9918b1",
   "slash": "63d45eec7486a4c5",
-  "stackDestroy": "2af893754d081bcb",
+  "stackDestroy": "2d6fe34da6d9a92f",
 }
 `;

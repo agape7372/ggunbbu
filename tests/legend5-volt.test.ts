@@ -36,7 +36,7 @@ function reach(fire: () => void): { h: number; w: number; peak: number } {
 beforeEach(() => resetBladeFx());
 
 describe('고압선 — 아래서 기어오르는 아크', () => {
-  it('타격: 먹 점 점화 → 실이 밑동에서 위로 휘며 그어진다(아래 절반 먹 머리 · 위 절반 노랑) → 굵은 마디(실의 1.8배 넘게 · 종이색 속 · 실보다 먼저 가라앉는다) → 두 갈래 → 다시 붙음 · 2초 뒤 0', () => {
+  it('타격: 먹 점 점화 → 실이 밑동에서 위로 휘며 그어진다(아래 절반 먹 머리 · 위 절반 노랑) → 굵은 마디(실의 1.8배 넘게 · 종이색 속 · 실보다 먼저 가라앉는다) → 두 갈래 → 다시 붙지 않는다(깜빡임 금지 · 11-22) · 2초 뒤 0', () => {
     RECIPES.volt.hit(180, 500, 1, c);
     const dots = alive().filter((p) => p.k === 'spat');
     expect(dots.length).toBeGreaterThan(0);
@@ -66,7 +66,7 @@ describe('고압선 — 아래서 기어오르는 아크', () => {
     const before = alive().filter((p) => p.k === 'spat').length;
     let relit = false;
     for (let i = 0; i < 20; i++) { step(1); relit ||= alive().filter((p) => p.k === 'spat').length > before; }
-    expect(relit).toBe(true); // 같은 밑동에서 다시 붙는다(새 점화 먹 점)
+    expect(relit).toBe(false); // 다시 붙지 않는다 — 꺼졌다 켜지는 것은 눈이 아프다(사용자 11-22 「깜빡임은 다 빼 눈아파」)
     step(125);
     expect(liveBits()).toHaveLength(0);
   });

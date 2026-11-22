@@ -12,6 +12,7 @@
 import { PALETTE, VIEW } from '../../config';
 import { bent, later, n01, put, samplePath, scaled, sgn, type Recipe } from '../bladeFx';
 import { liteOf, moonPoint, pathLen, swingMoon } from './geom';
+import { strike } from './voltStrike';
 
 const INK = PALETTE.INK;
 const PAPER = PALETTE.BG;
@@ -202,13 +203,13 @@ export const volt: Recipe = {
     climb(pts, { w: Math.max(1.4, w * 0.2), crawl: life * 0.3, life, vy: 0, bulge: 2, fork: w * 1.3, dot: true }, c);
   },
   hit(x, y, k, c) {
-    surge(x, y, SIZE.hit, k, c);
+    strike('hit', x, y, k, c); // 11-22 박자 판(voltStrike) — 제자리에 서서 자라 버티다 한 번에 사그라진다
   },
   floor(x, y, k, c) {
-    surge(x, y, SIZE.floor, k, c);
+    strike('floor', x, y, k, c);
   },
   destroy(x, y, k, c) {
-    surge(x, y, SIZE.destroy, Math.min(k, 1.4), c);
+    strike('destroy', x, y, k, c);
   },
   // 헛스윙 — 칼끝 자리에서 작은 아크 하나가 위로 기어올라 두 갈래로 끊긴다
   whiff(x, y, c) {
