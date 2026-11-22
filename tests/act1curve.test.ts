@@ -67,7 +67,7 @@ describe('1막 곡선/토코톤', () => {
 
   it('토코톤 p>1 구간은 현대 테마 고정', () => {
     const s = makeState({ seed: 3, mode: 'tokoton' });
-    s.score = ACT1.UNLOCK_SCORE + 1;
+    s.score = ACT1.OPS_P_SCORE + 1;
     s.stackSpawnCd = 1;
     advance(s, EMPTY_INPUT);
     expect(s.p).toBeGreaterThan(1);

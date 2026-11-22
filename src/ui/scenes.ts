@@ -865,7 +865,7 @@ export function createApp(
       // 특별작전: 시작 p 를 점수로 주입하고 목표를 따라 센다 (C3)
       opRun = { id: op.id, buildings: 0 };
       state.p = GIMMICK.START_P[op.id];
-      state.score = Math.floor(ACT1.UNLOCK_SCORE * state.p);
+      state.score = Math.floor(ACT1.OPS_P_SCORE * state.p);
     }
     scoreBase = state.score;
     butterChallenge = false;

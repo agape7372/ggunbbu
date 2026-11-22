@@ -523,8 +523,9 @@ it('철거칼은 쥐고 있어도 첫 누름 한 번뿐', () => {
 const HOLD_IDS = IDS.filter((id) => WEAPON[id].holdRepeat);
 
 /** 가드 · 점프 없이 바닥에서 쥐고만 있다. 누름 셈이 닫히면(판 처음 · 깔림 뒤 · 쪽지) 다시 누르고, 깔리면 10틱 뒤부터 눌러 빠진다.
- *  liftAll = 반복 타격도 밀어 올리게(휘두름이 나간 다음 틱부터 맞으니 advance 앞에서 끄면 그 휘두름 전체에 먹는다) */
-function holdOnly(s: GameState, ticks: number, liftAll = false): void {
+ *  liftAll = 반복 타격도 밀어 올리게(휘두름이 나간 다음 틱부터 맞으니 advance 앞에서 끄면 그 휘두름 전체에 먹는다)
+ *  p0 = 점수를 0에 묶어 1막 가장 느린 판에 둔다(11-22 해금 점수를 줄여 1분 안에도 난이도가 올라 대조가 흐려졌다) */
+function holdOnly(s: GameState, ticks: number, liftAll = false, p0 = false): void {
   let pinAt = -1;
   for (let t = 0; t < ticks && !s.over; t++) {
     const p = s.player;
@@ -538,6 +539,7 @@ function holdOnly(s: GameState, ticks: number, liftAll = false): void {
       f = { ...EMPTY_INPUT, attackHeld: true, attack: p.holdTick === 0 || !!s.perk?.offer };
     }
     if (liftAll) p.attackHold = false;
+    if (p0) s.score = 0;
     advance(s, f);
     s.events.length = 0;
   }
@@ -628,10 +630,10 @@ describe('쥔 채 반복 타격은 끌어내린다', () => {
   });
 
   it('가드 없이 쥐고만 있으면 1분 안에 목숨 셋을 다 잃는다(아케이드 · 고정 시드)', () => {
-    for (const w of HOLD_IDS) for (const seed of [1, 2, 3]) {
+    for (const w of HOLD_IDS) for (const seed of [1, 2, 3]) for (const p0 of [false, true]) {
       const s = arcadeRun(w, seed);
-      holdOnly(s, 3600);
-      expect(s.over, `${w} 시드 ${seed}`).toBe('gameover');
+      holdOnly(s, 3600, false, p0);
+      expect(s.over, `${w} 시드 ${seed}${p0 ? ' · p 0' : ''}`).toBe('gameover');
     }
   });
 
@@ -655,11 +657,11 @@ describe('쥔 채 반복 타격은 끌어내린다', () => {
     }
   });
 
-  it('반복 타격도 밀어 올리면 같은 손이 1분 동안 목숨을 하나도 안 잃는다 — 위 시험이 그 구멍을 잡는다', () => {
+  it('반복 타격도 밀어 올리면 같은 손이 가장 느린 판에서 1분 동안 목숨을 하나도 안 잃는다 — 위 시험이 그 구멍을 잡는다', () => {
     for (const w of HOLD_IDS) {
       const s = arcadeRun(w, 1);
       const lives = s.lives;
-      holdOnly(s, 3600, true);
+      holdOnly(s, 3600, true, true);
       expect(s.lives, w).toBe(lives);
     }
   });

@@ -5,7 +5,7 @@
 import type { GameState, InputFrame } from '../core/types';
 import { enterBonus } from '../core/sim';
 import { enterAct2Phase } from '../core/act2';
-import { GUARD_GAUGE, PLAYER, SCORE, TICK, WAZA_GAUGE } from '../config';
+import { ACT1, GUARD_GAUGE, PLAYER, SCORE, TICK, WAZA_GAUGE } from '../config';
 import { freezeSaves, loadSave, saveSave } from '../storage';
 import { BLADE_IDS, BODY_IDS, LETTERS_IDS, MASK_IDS, WAZA_IDS, WEAPON_IDS } from '../meta/loadout';
 import { phaseName } from '../content';
@@ -177,17 +177,17 @@ export function mountDebugMenu(getState: () => GameState | null, open = true): v
 
   (
     [
-      ['1구역', 0, 0, 0],
-      ['2구역', 1, 0.25, 2_500_000],
-      ['3구역', 2, 0.5, 5_000_000],
-      ['4구역', 3, 0.75, 7_500_000],
+      ['1구역', 0, 0],
+      ['2구역', 1, 0.25],
+      ['3구역', 2, 0.5],
+      ['4구역', 3, 0.75],
     ] as const
-  ).forEach(([label, chapter, p, score]) => {
+  ).forEach(([label, chapter, p]) => {
     mk(label, withState((s) => {
       s.mode = 'act1';
       s.chapter = chapter;
       s.p = p;
-      s.score = score;
+      s.score = Math.ceil(p * ACT1.UNLOCK_SCORE);
       s.act2Phase = null;
       s.boss = null;
       s.stack = null;

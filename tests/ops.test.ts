@@ -29,7 +29,7 @@ function runBot(id: OpId, seed: number): { buildings: number; ticks: number; unl
   const s = makeState({ seed });
   s.gimmick = id;
   s.chapter = op.themeIndex;
-  s.score = Math.floor(ACT1.UNLOCK_SCORE * GIMMICK.START_P[id]);
+  s.score = Math.floor(ACT1.OPS_P_SCORE * GIMMICK.START_P[id]);
   s.guardGauge = 50;
   let buildings = 0;
   let unlocked = false;

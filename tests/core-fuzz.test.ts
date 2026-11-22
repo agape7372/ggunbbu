@@ -31,7 +31,7 @@ const scn: Scn[] = [
   // 무기는 seed % WEAPONS — 고유 규칙이 있는 무기 가운데 앞 씨앗(1~6)에 안 걸리는 것을 1막으로 한 판씩
   ...[7, 8, 9, 10, 12, 15, 17].map((seed): Scn => ({ name: `act1-w${seed}`, make: (k) => makeState({ seed: k }), ticks: 2500, bot: 0.5, seed })),
   { name: 'op-orbit', ticks: 3000, bot: 0.6, seed: 2, make: (k) => {
-    const s = makeState({ seed: k }); s.gimmick = 'orbit'; s.chapter = 3; s.p = GIMMICK.START_P.orbit; s.score = Math.floor(ACT1.UNLOCK_SCORE * s.p); return s;
+    const s = makeState({ seed: k }); s.gimmick = 'orbit'; s.chapter = 3; s.p = GIMMICK.START_P.orbit; s.score = Math.floor(ACT1.OPS_P_SCORE * s.p); return s;
   } },
   { name: 'tokoton', make: (k) => makeState({ seed: k, mode: 'tokoton' }), ticks: 4000, bot: 0.7, seed: 3 },
   { name: 'bonus-1', ticks: 2000, bot: 0.5, seed: 4, make: (k) => { const s = makeState({ seed: k }); enterBonus(s, 1); return s; } },

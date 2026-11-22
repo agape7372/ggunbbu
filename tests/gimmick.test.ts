@@ -187,7 +187,7 @@ describe('특별작전은 구역 경계를 넘어도 그 구역에 머문다', (
   it('기믹 판은 경계·2막 문턱을 넘는 점수에도 act1에 남고, 기본 판은 넘어간다', () => {
     for (const g of ['glass', 'orbit', 'none'] as const) {
       const s = arcade(g);
-      s.score = ACT1.UNLOCK_SCORE; // 경계 셋과 2막 문턱을 한꺼번에 넘긴 점수
+      s.score = ACT1.OPS_P_SCORE; // 경계 셋과 2막 문턱을 한꺼번에 넘긴 점수
       advance(s, EMPTY_INPUT);
       if (g === 'none') {
         expect(s.mode).not.toBe('act1');

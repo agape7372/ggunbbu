@@ -657,7 +657,7 @@ export function grantMercyLife(s: GameState): void {
 // 모드 전환(구역 · 2막 · 버터바 들고 남)은 시간차 필살(s.wazaRun)이 터진 뒤로 미룬다 — 전환이 s.stack을 비워
 // 베어 둔 건물 · 쓴 게이지가 사라졌다. 넷 다 조건에 !s.wazaRun을 둔다(stepAct1 둘 · stepTokoton · stepBonus)
 function stepAct1(s: GameState): void {
-  s.p = Math.min(1, s.score / ACT1.UNLOCK_SCORE);
+  s.p = Math.min(1, s.score / (s.gimmick === 'none' ? ACT1.UNLOCK_SCORE : ACT1.OPS_P_SCORE));
 
   // 챕터 전환 → 해금 이벤트 + 버터바 보너스 스테이지 진입
   // 특별작전(기믹 판)은 시간제라 경계를 넘어도 그 구역에 머문다 — 난이도만 p를 따라 오른다
@@ -697,7 +697,7 @@ function trySpawn(s: GameState): void {
 // ── 토코톤 ──────────────────────────────────────────────────────
 function stepTokoton(s: GameState): void {
   const elapsedMin = s.tick / 3600;
-  s.p = Math.min(TOKOTON.P_MAX, s.score / ACT1.UNLOCK_SCORE + elapsedMin * TOKOTON.P_PER_MIN);
+  s.p = Math.min(TOKOTON.P_MAX, s.score / ACT1.OPS_P_SCORE + elapsedMin * TOKOTON.P_PER_MIN);
   // p>1 은 현대 테마 고정. 그 전에는 2분 주기 챕터 순환 [설계]
   if (s.p > 1) s.chapter = ACT1.CHAPTER_THEMES.length - 1;
   else s.chapter = Math.floor(s.tick / TOKOTON.CHAPTER_CYCLE_TICKS) % ACT1.CHAPTER_THEMES.length;
