@@ -2575,3 +2575,4 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 ## 2026-11-22 4차 — 조금 더 띄움 (`feat/jump-climb`)
 - 사용자: 「좀만 더 띄워도 될거같은데」. `CAMERA.RISE_Y` 220 → 270(화면 48%) · `FALL_Y` 130 → 160. 머리 위로 보이는 건물 4.2 → 3.5층(시험은 세 층 넘게로 고침). 4층 한계(232)는 12px밖에 안 올라 눈에 안 띄어 넘겼다.
 - 관문: tsc 0 · 시험 1277 통과 · 오름 시트(`tmp/climb/sheet.png`)로 구도 확인.
+- 승격(사용자 「앱승격까지」): main · release/1.0 `a66b41c` 앞감기 push · Pages run 45023022866 성공(`main-DwoT24b1.js`에 RISE_Y 270 · FALL_Y 160) · 시험판 `index-CpXohuBQ`(배포 전 라이브 = `_Ikmecdd` 확인 · 같은 값).
