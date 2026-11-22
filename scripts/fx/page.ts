@@ -1,7 +1,7 @@
 // 이펙트 검수 하네스 — 페이지 안에서 도는 쪽(scripts/fx/fx.mjs가 import('/scripts/fx/page.ts')로 싣는다).
 // 가짜 시계 · 틱 루프 · 장면 사전 · 크롭 · 시트 · 계측은 여기 한 벌뿐이다. 본보기 = tmp/wazafx/legfx2.mjs · wazacap.mjs.
 // tsconfig include에 들어 있어 src API가 바뀌면 `npx tsc --noEmit`이 여기서 깨진다.
-import { consumeEvents, drawGame, initRenderer } from '../../src/render/renderer';
+import { consumeEvents, drawGame, initRenderer, setFeedbackOptions } from '../../src/render/renderer';
 import { RECIPES, drawBladeFx, pool, resetBladeFx, seedBladeFx, type Recipe } from '../../src/render/bladeFx';
 import { tickEffects } from '../../src/render/effects';
 import { wazaShowState } from '../../src/render/wazaShow';
@@ -21,7 +21,7 @@ interface Cell { label: string; cv: HTMLCanvasElement | null }
 interface Row { name: string; cells: Cell[]; gap?: number }
 /** 한 줄 = 무기 하나(초안이 있으면 「지금」 + 초안마다 한 줄) */
 interface Line { name: string; w: WeaponId; draft?: Draft }
-export interface Opts { scale?: number; gray?: boolean; waza?: WazaId; frames?: number; every?: number; cols?: number; from?: number }
+export interface Opts { scale?: number; gray?: boolean; waza?: WazaId; frames?: number; every?: number; cols?: number; from?: number; flash?: boolean }
 
 // 장면 사전 — off = 사건 뒤 틱, crop = [폭, 높이, 위](논리 px), k = 시트 배율
 export const S: Record<string, Scene> = {
@@ -86,6 +86,8 @@ function crop(s: GameState, [cw, ch, top]: Crop, k: number): HTMLCanvasElement {
 function run(line: Line, sc: Scene, input: (t: number) => Partial<InputFrame>, onTick: (s: GameState, t: number, at: number) => boolean, opts: Opts = {}, maxT = 600): void {
   fake += 1000 / 60;
   tickEffects(); // fxLastNow를 가짜 시계에 맞춘다 — 첫 프레임 dt가 판마다 1/60
+  // 화면 번쩍임(다침 붉은 면 · 완파 반전 · 필살 반전)은 기본으로 끈다 — 무기 이펙트와 상관없이 양쪽 줄에 똑같이 깜빡여 판정 영상에서 눈이 아프다(11-22 지적). --flash면 게임 기본(2)
+  setFeedbackOptions({ flashLevel: opts.flash ? 2 : 0 });
   initRenderer(); // resetRunState(effects · screenfx · boss · landmark · wazaShow) + smoothCam 0
   resetBladeFx();
   seedBladeFx(7);

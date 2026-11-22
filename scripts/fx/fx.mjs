@@ -18,7 +18,7 @@ const USAGE = `이펙트 검수 하네스
   movie   무기마다 서 있기 → 타격 → 층 깨기 → 완파 → 헛스윙(+필살) → <무기>.mp4 · <무기>-slow.mp4 (--keep)
 인자
   --weapons a,b   --scenes hit,floor,destroy,whiff,aura,special   --out <폴더, 기본 tmp/fx/out>
-  --draft <파일>[,<파일>…]   --gray   --waza <필살 id>   --playwright-module <폴더>(또는 PLAYWRIGHT_MODULE)
+  --draft <파일>[,<파일>…]   --flash(화면 번쩍임 켬 · 기본 끔)   --gray   --waza <필살 id>   --playwright-module <폴더>(또는 PLAYWRIGHT_MODULE)
 예
   node scripts/fx/fx.mjs serve
   node scripts/fx/fx.mjs strip --weapons phoenix --scenes destroy --frames 30 --cols 6
@@ -73,7 +73,7 @@ const drafts = list('--draft', '').map((f) => {
   if (!existsSync(projectPath(rel))) throw new Error(`초안 파일이 없다: ${f}`);
   return rel;
 });
-const opts = { scale: num('--scale'), gray: args.includes('--gray'), waza: cliOption('--waza', '', args) || undefined, frames: num('--frames'), every: num('--every'), cols: num('--cols'), from: num('--from') };
+const opts = { scale: num('--scale'), gray: args.includes('--gray'), waza: cliOption('--waza', '', args) || undefined, frames: num('--frames'), every: num('--every'), cols: num('--cols'), from: num('--from'), flash: args.includes('--flash') };
 const { chromium } = optionalPackage(process.env.PLAYWRIGHT_MODULE ?? 'playwright', '--playwright-module');
 mkdirSync(out, { recursive: true });
 const png = (file, data) => writeFileSync(path.join(out, file), Buffer.from(data.split(',')[1], 'base64'));

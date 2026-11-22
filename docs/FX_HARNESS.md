@@ -25,6 +25,8 @@ Playwright는 레포에 없다(불변 6). `--playwright-module <폴더>`나 환�
 공통 인자: `--weapons a,b` · `--scenes hit,floor,destroy,whiff,aura,special` · `--out <폴더>`(기본 `tmp/fx/out`) · `--draft <파일>[,…]`.
 인자 없이 부르면 사용법이 나온다. 페이지 쪽 코드(가짜 시계 · 장면 사전 · 크롭 · 시트 · 계측)는 `scripts/fx/page.ts` 한 벌이고 `tsc`가 같이 본다.
 
+화면 번쩍임(다침 붉은 면 · 완파 반전 · 필살 반전)은 기본으로 끄고 찍는다. 무기 이펙트와 상관없이 양쪽 줄에 똑같이 깜빡여 판정 영상이 눈 아프다(11-22). 게임 그대로 보려면 `--flash`.
+
 같은 인자면 같은 그림이 나온다(run마다 `resetBladeFx` + `seedBladeFx`).
 
 ### 초안 — 워크트리 없이
