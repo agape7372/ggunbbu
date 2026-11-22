@@ -96,7 +96,7 @@ describe('점프 — 단발 엣지 (08-30 5차)', () => {
     const apex = (PLAYER.JUMP_V0 * PLAYER.JUMP_V0) / (2 * PLAYER.GRAVITY);
     // 머리 끝(apex + 키)이 필드 하단선을 넘어선다 = 고정 카메라로는 못 담는다.
     expect(apex + PLAYER.H).toBeGreaterThan(VIEW.FIELD_H);
-    // 카메라가 따라가면 발은 화면 바닥에서 RISE_Y에 머문다 — 머리 위로 건물 네 층이 보인다.
-    expect(CAMERA.RISE_Y + PLAYER.H + 4 * VIEW.FLOOR_H).toBeLessThan(VIEW.FIELD_H - VIEW.FIELD_TOP);
+    // 카메라가 따라가면 발은 화면 바닥에서 RISE_Y에 머문다 — 머리 위로 건물 세 층이 넘게 보인다.
+    expect(CAMERA.RISE_Y + PLAYER.H + 3 * VIEW.FLOOR_H).toBeLessThan(VIEW.FIELD_H - VIEW.FIELD_TOP);
   });
 });

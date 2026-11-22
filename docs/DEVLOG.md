@@ -2571,3 +2571,7 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 사용자: 「앱승격까지」. main · release/1.0 `b6a36ee` 앞감기 push(`366b13e..b6a36ee`) · Pages run 45021344996 성공(`main-DssmNa7m.js`에 RISE_Y 220 · FALL_Y 130 · UNLOCK_SCORE 15e5).
 - 시험판: 배포 전 라이브 = 지난 판 `index-DsVkEb1v` 확인. `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview`에 덮어쓰기(옛 파일 안 지움) → `vercel deploy --prod`. 라이브 `index-_Ikmecdd.js` · `main-DhTb22Dh.js`에 같은 값.
 - 못 본 것: 실기기 손맛 · Play 판(이번에도 안 올림).
+
+## 2026-11-22 4차 — 조금 더 띄움 (`feat/jump-climb`)
+- 사용자: 「좀만 더 띄워도 될거같은데」. `CAMERA.RISE_Y` 220 → 270(화면 48%) · `FALL_Y` 130 → 160. 머리 위로 보이는 건물 4.2 → 3.5층(시험은 세 층 넘게로 고침). 4층 한계(232)는 12px밖에 안 올라 눈에 안 띄어 넘겼다.
+- 관문: tsc 0 · 시험 1277 통과 · 오름 시트(`tmp/climb/sheet.png`)로 구도 확인.
