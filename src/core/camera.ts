@@ -1,8 +1,9 @@
 import type { GameState } from './types';
-import { CAMERA, PLAYER, STAGE, VIEW } from '../config';
+import { CAMERA, STACK, STAGE, VIEW } from '../config';
 
 /**
- * 세로 추종 카메라 — **데드존 + 상한**.
+ * 세로 추종 카메라 — **발 추종**(11-22 개정: 발이 CAMERA.FOLLOW_Y를 넘으면 1:1. 정본 = config CAMERA 주석 끝 문단).
+ * 아래 08-30 기록(데드존 150 · 상한 150)은 그때까지의 경위다 — 그 규칙은 실제 판에서 한 번도 안 움직였다.
  *
  * 플레이어 머리가 필드 상단에서 `DEADZONE`만큼 아래에 오면 그때부터 따라 올라간다.
  * 지상 근처에서는 0이라 지면·낙하물·예고 마커가 붙박이로 보이고, 높이 뛸수록 화면이 따라간다.
@@ -24,8 +25,20 @@ import { CAMERA, PLAYER, STAGE, VIEW } from '../config';
  * 테스트가 시뮬 상태만으로 카메라를 단언할 수 없게 된다.
  */
 export function cameraFollowY(s: GameState): number {
-  const want = s.player.y + PLAYER.H + CAMERA.HEADROOM - (VIEW.FIELD_H - CAMERA.DEADZONE);
-  return Math.max(0, Math.min(CAMERA.MAX, want));
+  // ★11-22: 발이 FOLLOW_Y를 넘으면 1:1 추종(config CAMERA 주석). 위 08-30 기록의 「상한 150」은 낡았다
+  return Math.max(0, Math.min(CAMERA.MAX, s.player.y - CAMERA.FOLLOW_Y));
+}
+
+/**
+ * 높이 떠 있는 동안엔 다음 건물 대기를 예고 직전에 세워 둔다(11-22) — 내려온 뒤 화면 맨 위에서 예고부터 들어온다.
+ * 안 세우면 생김 높이가 카메라를 따라 올라가 높이 부술수록 다음 건물을 오래 기다린다(숙련 봇 1-1 실측 34초 → 42초).
+ * 예고가 이미 시작됐거나 붙어 오기(대기가 예고 길이보다 짧다)는 그대로 센다. true면 이번 틱은 세지 않는다.
+ * 1막 · 토코톤(sim.trySpawn)과 지시서(stage.ts)가 같이 쓴다.
+ */
+export function holdSpawn(s: GameState): boolean {
+  if (s.stackSpawnCd < STACK.SPAWN_CUE_TICKS || cameraFollowY(s) <= 0) return false;
+  s.stackSpawnCd = Math.max(s.stackSpawnCd, STACK.SPAWN_CUE_TICKS + 1);
+  return true;
 }
 
 /** 건물이 생기는 높이 = 화면 맨 위(카메라 목표) + STAGE.SPAWN_ABOVE. 지시서(stage.ts)와 아케이드 1막 · 토코톤(spawner.ts)이 같이 쓴다 */

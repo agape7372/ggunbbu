@@ -58,6 +58,7 @@ function frame(s: GameState): void {
   const want = cameraFollowY(s);
   cam += (want - cam) * CAMERA.LERP;
   if (Math.abs(want - cam) < 0.5) cam = want;
+  cam = Math.max(s.player.y - CAMERA.KEEP_TOP, Math.min(cam, Math.max(0, s.player.y - CAMERA.KEEP_BOTTOM)));
   s.events = [];
 }
 

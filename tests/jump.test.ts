@@ -92,11 +92,11 @@ describe('점프 — 단발 엣지 (08-30 5차)', () => {
     expect(s.player.attackFromAir).toBe(true);
   });
 
-  it('정점이 필드를 살짝 넘는다 — 그래서 데드존 카메라가 필요하다 (설계 전제)', () => {
+  it('정점이 필드를 살짝 넘는다 — 그래서 추종 카메라가 필요하다 (설계 전제)', () => {
     const apex = (PLAYER.JUMP_V0 * PLAYER.JUMP_V0) / (2 * PLAYER.GRAVITY);
     // 머리 끝(apex + 키)이 필드 하단선을 넘어선다 = 고정 카메라로는 못 담는다.
     expect(apex + PLAYER.H).toBeGreaterThan(VIEW.FIELD_H);
-    // 그래도 카메라 상한 안에서 전부 담긴다.
-    expect(apex + PLAYER.H + CAMERA.HEADROOM).toBeLessThan(VIEW.FIELD_H + CAMERA.MAX);
+    // 카메라가 따라가면 발은 화면 바닥에서 FOLLOW_Y에 머문다 — 머리가 필드 안이다.
+    expect(CAMERA.FOLLOW_Y + PLAYER.H).toBeLessThan(VIEW.FIELD_H - VIEW.FIELD_TOP);
   });
 });

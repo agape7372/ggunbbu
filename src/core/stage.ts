@@ -11,7 +11,7 @@ import { DEBRIS_RANDS } from './combat';
 import { rngSkip } from './rng';
 import { STAGES, type SecretId, type StageDef } from './stages';
 import { makeFloor, makeStack } from './building';
-import { spawnTopY } from './camera';
+import { holdSpawn, spawnTopY } from './camera';
 import { spawnBolt, stepEntities } from './act2';
 import { initBoss, stepBoss } from './boss';
 import { initLandmark, stepLandmark } from './landmark';
@@ -155,6 +155,7 @@ function stepScript(s: GameState): void {
     else { s.stackSpawnCd = 0; st.wait = base; }
   }
   // 1막 trySpawn과 같은 셈 — 0이 된 다음 틱에 나온다(▼ 예고 · incoming 소리가 그 박을 안다)
+  if (holdSpawn(s)) return;
   if (s.stackSpawnCd > 0) { s.stackSpawnCd -= 1; return; }
   if (st.wait > 0) { st.wait -= 1; return; }
   const items = steps[st.step].items;

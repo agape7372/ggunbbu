@@ -1,53 +1,59 @@
 import { describe, it, expect } from 'vitest';
-import { cameraFollowY } from '../src/core/camera';
+import { cameraFollowY, holdSpawn, spawnTopY } from '../src/core/camera';
 import { makeState } from '../src/core/sim';
-import { CAMERA, PLAYER, VIEW } from '../src/config';
+import { CAMERA, PLAYER, STACK, VIEW } from '../src/config';
 
-// ★08-30 4차 계약 개정 (사용자 실플레이 영상 판정: "카메라가 고정되어있잖아").
-// 이 파일이 그 전까지 가드하던 계약은 "정점에서도 ≤30px" = 사실상 고정 카메라였고,
-// 그게 지적받은 화면이다. 새 계약은 셋이다:
-//   ① 데드존 아래에서는 cam=0 — 지상 구간은 지면·낙하물·예고 마커가 붙박이로 보인다
-//   ② 높이 뛰면 카메라가 실제로 따라 올라간다
-//   ③ 올라가는 거리에는 상한이 있다(CAMERA.MAX) — 지면이 무한정 멀어지지 않는다
-// ⚠ cam>0이면 지면선은 화면 아래로 밀려난다. 그건 렌더 변환상 못 피한다(config CAMERA 주석).
-// "지면 소실 0%"는 더 이상 계약이 아니다 — 대신 거리 상한 + renderer의 지면 인디케이터가 진다.
-describe('카메라 (08-30 4차: 데드존 추종 + 거리 상한)', () => {
+// ★11-22 계약 개정 (사용자: "점프, 카메라 따라가기가 너무 역동적이지 않음. 원작처럼 높게 올라가서 다다다다다").
+// 08-30 4차 계약(발 381px부터 · 상한 150)은 실제 판에서 한 번도 안 움직였다 — 뛰면 그 전에 밑면에 막힌다.
+// 새 계약:
+//   ① 발이 FOLLOW_Y 아래면 cam=0 — 땅 연타 구간은 화면이 붙박이다
+//   ② 그 위로는 발 높이를 1:1로 따라간다
+//   ③ 높이 떠 있는 동안엔 다음 건물 대기를 예고 직전에 세워 둔다(내려온 뒤 화면 맨 위에서 들어온다)
+// cam>0이면 지면선은 화면 아래로 밀린다(렌더 변환상 못 피한다) — renderer의 지면 인디케이터가 진다.
+describe('카메라 (11-22: 발 추종)', () => {
   const apex = (PLAYER.JUMP_V0 * PLAYER.JUMP_V0) / (2 * PLAYER.GRAVITY);
-  /** cam이 0을 벗어나기 시작하는 발 높이 */
-  const onset = VIEW.FIELD_H - CAMERA.DEADZONE - PLAYER.H - CAMERA.HEADROOM;
 
-  it('데드존 아래에서는 cam=0 — 지상 구간은 화면이 붙박이다', () => {
+  it('FOLLOW_Y 아래에서는 cam=0 — 땅 구간은 화면이 붙박이다', () => {
     const s = makeState();
-    for (const y of [0, 60, 140, 250, Math.floor(onset)]) {
+    for (const y of [0, 60, CAMERA.FOLLOW_Y]) {
       s.player.y = y;
       expect(cameraFollowY(s)).toBe(0);
     }
   });
 
-  it('정점에서는 카메라가 실제로 올라간다 (구 계약 24px → 최소 150px)', () => {
+  it('그 위로는 발 높이를 1:1로 따라간다 — 빈 점프 정점에서 400px쯤', () => {
     const s = makeState();
-    s.player.y = apex;
-    expect(cameraFollowY(s)).toBeGreaterThanOrEqual(150);
-  });
-
-  it('데드존을 넘으면 발 높이를 1:1로 따라간다 (상한 전까지)', () => {
-    const s = makeState();
-    const y = onset + 40;
-    s.player.y = y;
+    s.player.y = CAMERA.FOLLOW_Y + 40;
     expect(cameraFollowY(s)).toBeCloseTo(40, 6);
+    s.player.y = apex;
+    expect(cameraFollowY(s)).toBeGreaterThan(350);
   });
 
-  it('cam은 CAMERA.MAX를 절대 넘지 않는다 — 지면이 무한정 멀어지지 않는다', () => {
+  it('공중 베기 상한까지 올라가도 카메라가 놓치지 않는다', () => {
+    // 가장 높이 가는 길 = 밑면이 상한에 닿은 채 마지막 층을 깨고 솟는다
+    const top = PLAYER.AIR_CUT_CEIL + VIEW.FLOOR_H + (PLAYER.AIR_CUT_RISE_V * PLAYER.AIR_CUT_RISE_V) / (2 * PLAYER.GRAVITY);
+    expect(CAMERA.MAX).toBeGreaterThan(top - CAMERA.FOLLOW_Y);
+  });
+
+  it('높이 떠 있으면 다음 건물 대기가 예고 직전에 선다 — 내려오면 다시 센다', () => {
     const s = makeState();
-    for (const y of [apex, apex * 2, 5000]) {
-      s.player.y = y;
-      expect(cameraFollowY(s)).toBeLessThanOrEqual(CAMERA.MAX);
-    }
+    s.stackSpawnCd = STACK.RESPAWN_TICKS;
+    s.player.y = 600;
+    expect(holdSpawn(s)).toBe(true);
+    expect(s.stackSpawnCd).toBe(STACK.RESPAWN_TICKS);
+    s.stackSpawnCd = STACK.SPAWN_CUE_TICKS; // 지시서 대기(예고 길이와 같다)도 예고 앞에서 선다
+    expect(holdSpawn(s)).toBe(true);
+    expect(s.stackSpawnCd).toBe(STACK.SPAWN_CUE_TICKS + 1);
+    s.player.y = CAMERA.FOLLOW_Y;
+    expect(holdSpawn(s)).toBe(false);
   });
 
-  it('폐기된 1:1 추종(정점에서 415px)보다 한참 짧다', () => {
-    // 08-30 1차가 폐기한 규칙 = max(0, y − 140). 그 정점 값의 절반 미만으로 묶는다.
-    expect(CAMERA.MAX).toBeLessThan((apex - 140) * 0.5);
+  it('예고가 시작됐거나 붙어 오기면 안 세운다 — 그땐 화면 맨 위(카메라) 위에서 생긴다', () => {
+    const s = makeState();
+    s.stackSpawnCd = STACK.SPAWN_CUE_TICKS - 1;
+    s.player.y = 600;
+    expect(holdSpawn(s)).toBe(false);
+    expect(spawnTopY(s)).toBeGreaterThan(s.player.y + PLAYER.H + 300);
   });
 
   it('점프 정점 ≈ 8.2층 [원작 이식] (원작 980px/120px층 = 8.17층과 층 단위 일치)', () => {

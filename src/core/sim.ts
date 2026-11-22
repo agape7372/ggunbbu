@@ -3,6 +3,7 @@
 // act2/보스 스테핑은 act2.ts/boss.ts (M4/M5)에서 이 파일에 연결된다.
 
 import type { GameState, InputFrame } from './types';
+import { holdSpawn } from './camera';
 import { makePlayer, stepPlayer, collectBuffers, guardActive, attackActive, carryUnderStack } from './player';
 import { stackPhysics, stepStack, damageStack } from './building';
 import { tryHitStack, tryGuardBounce, destroyStack, breakCombo, cutCombo, addGauge, addScore, registerHit, wonAlready } from './combat';
@@ -689,6 +690,7 @@ function stepVary(s: GameState): void {
 
 function trySpawn(s: GameState): void {
   if (!s.stack) {
+    if (holdSpawn(s)) return;
     if (s.stackSpawnCd > 0) s.stackSpawnCd -= 1;
     else spawnAct1Building(s);
   }

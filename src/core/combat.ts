@@ -107,6 +107,7 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
   const [lo, hi] = attackRange(footY, reachOf(s));
   const mat = stack.floors.length > 0 ? stack.floors[0].mat : 'weak';
   const yHit = stack.y;
+  const f0 = stack.floors[0];
   const res = damageStack(stack, lane, lo, hi, hitDamage(s));
   if (res === 'miss') return false;
   s.hitAt = s.tick;
@@ -118,6 +119,15 @@ export function tryHitStack(s: GameState, lane: Lane, footY: number): boolean {
     stack.vy = Math.max(stack.vy, liftOf(s) * (MAT_LIFT[mat] ?? 1) * (s.stage?.liftMul ?? 1));
     stack.resting = false;
   } else if (s.mode !== 'act2') stack.y = Math.max(0, stack.y - (WEAPON[s.weapon].holdPull ?? 0));
+
+  // ★11-22 공중에서 맨 아래층을 깨면 위층이 내려앉지 않는다 — 밑면이 한 층 올라가고 몸이 따라 솟는다(PLAYER 주석).
+  // 매달림은 player.carryUnderStack이 s.hitAt으로 읽는다. 쥔 채 갈기(드릴류) · 버터바 판 · 명물 판(s.lm)은 그대로
+  const p = s.player;
+  if (p.attackFromAir && p.y > 0 && !grind && s.mode !== 'bonus' && !s.lm
+    && res === 'collapse' && stack.floors[0] !== f0 && stack.y < PLAYER.AIR_CUT_CEIL) {
+    if (stack.floors.length > 0) stack.y += f0.h;
+    p.vy = Math.max(p.vy, PLAYER.AIR_CUT_RISE_V);
+  }
 
   if (res === 'collapse') {
     const isButter = mat === 'butter';

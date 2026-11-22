@@ -500,6 +500,8 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   const camTarget = cameraFollowY(s);
   smoothCam += (camTarget - smoothCam) * CAMERA.LERP * slow;
   if (Math.abs(camTarget - smoothCam) < 0.5) smoothCam = camTarget;
+  // 빠르게 솟거나 떨어져 보간이 뒤처져도 졸라맨은 화면 안에 둔다
+  smoothCam = Math.max(s.player.y - CAMERA.KEEP_TOP, Math.min(smoothCam, Math.max(0, s.player.y - CAMERA.KEEP_BOTTOM)));
   const cam = smoothCam;
   const [sx, sy, rot] = shakeNow();
   trauma -= 0.693 / JUICE_SYS.SHAKE_HALF_LIFE_F * trauma;
@@ -632,7 +634,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // 추종 카메라를 폐기했던 근거가 "지면이 화면 밖"이었다. 카메라는 되살리되 그 정보만은
   // 화면에 붙박아 둔다: 바닥변의 지면선 + 플레이어 레인의 착지 눈금.
   if (cam > 0.5) {
-    const a = Math.min(1, cam / CAMERA.MAX);
+    const a = Math.min(1, cam / CAMERA.GROUND_FADE);
     ctx.save();
     ctx.globalAlpha = 0.14 + 0.30 * a;
     ctx.fillStyle = PALETTE.INK;

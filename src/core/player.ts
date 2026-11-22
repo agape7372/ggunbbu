@@ -197,6 +197,12 @@ function startAttack(p: PlayerState, fromAir: boolean): void {
  * ③ 붙어 내려가기는 건물이 움직인 뒤 carryUnderStack이 맡는다(10-28) — ②만으로는 5차 중력이 건물보다
  *   빨라 박고 7틱 만에 떨어져 나갔다.
  */
+/** 공중에서 벤 건물에 매달려 있는 동안인가 — 붙여 두고(carryUnderStack) 머리 박음 반응을 끈다.
+ *  명물 판(s.lm)은 옛 규칙 그대로다 — 구층탑 같은 판은 「공중 타격은 뛸 때마다 한 번」에 맞춰 좁게 재 둔 값이라 따로 다시 재야 옮긴다 */
+function airHang(s: GameState, p: PlayerState): boolean {
+  return !s.lm && p.attackFromAir && s.tick - s.hitAt <= PLAYER.AIR_HANG_TICKS;
+}
+
 function contactWithStack(s: GameState, p: PlayerState): void {
   const st = s.stack;
   if (!st || s.mode === 'bonus') return;
@@ -216,7 +222,7 @@ function contactWithStack(s: GameState, p: PlayerState): void {
   if (p.vy > 0 && headroom > 0) {
     p.y = headroom;
     p.vy = 0;
-    s.events.push({ kind: 'headBonk' });
+    if (!airHang(s, p)) s.events.push({ kind: 'headBonk' }); // 베며 오르는 중엔 베기가 반응이다
     return;
   }
 
@@ -244,11 +250,15 @@ function contactWithStack(s: GameState, p: PlayerState): void {
 export function carryUnderStack(s: GameState, dt: number): void {
   const p = s.player;
   const st = s.stack;
-  if (!st || st.resting || st.vy >= 0 || s.mode === 'bonus' || p.y <= 0) return;
+  if (!st || s.mode === 'bonus' || p.y <= 0) return;
   if (p.pose === 'special' || p.pose === 'pinned' || p.pose === 'dead') return;
+  // ★11-22 공중에서 벤 건물엔 잠깐 매달린다 — 베기에 떠밀려 올라가는 건물에도 붙어 있어야 다음 베기가 닿는다
+  // (그 전엔 공중 타격 1번 뒤 전부 헛스윙이었다 · tests/air-climb.test.ts)
+  const hang = airHang(s, p);
+  if (!hang && (st.resting || st.vy >= 0)) return;
   // 0.5px = 붙어 내려가던 틱의 부동소수 오차만 받는다(튜닝값 아님)
-  if (p.y + PLAYER.H < st.y - 0.5) return;
-  if (p.vy > 0) s.events.push({ kind: 'headBonk' }); // 올라가다 이번 틱에 처음 닿았다
+  if (p.y + PLAYER.H < st.y - (hang ? PLAYER.AIR_HANG_GAP : 0.5)) return;
+  if (p.vy > 0 && !hang) s.events.push({ kind: 'headBonk' }); // 올라가다 이번 틱에 처음 닿았다
   p.y = st.y - PLAYER.H;
   p.vy = st.vy + PLAYER.GRAVITY * dt;
   if (p.y <= 0) land(s, p);
