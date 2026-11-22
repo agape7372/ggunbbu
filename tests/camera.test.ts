@@ -31,14 +31,20 @@ describe('카메라 (11-22: 발 추종)', () => {
 
   // ★11-22 2차 — 원작 영상 실측(벤치마크 §10): 보간 없이 묶는다. 오를 땐 발이 화면 바닥에서 FOLLOW_Y,
   // 떨어질 땐 땅 자리. 그 사이 띠에선 화면이 안 움직인다.
-  it('화면 카메라: 오를 땐 발을 FOLLOW_Y에, 떨어질 땐 땅 자리에 묶는다 — 내려서면 이미 0이다', () => {
+  // ★11-22 3차 — 사용자 「점프했을때 땅이랑 너무 안떨어져서 답답해」: 묶는 자리를 90 · 0에서 RISE_Y · FALL_Y로 올렸다.
+  it('화면 카메라: 오를 땐 발을 RISE_Y에, 떨어질 땐 FALL_Y에 묶는다 — 내려서기 전에 이미 0이다', () => {
     let cam = 0;
     const feet = (y: number) => y - (cam = cameraClamp(cam, y)); // 화면 바닥에서 발까지
-    for (let y = 0; y <= 500; y += 25) expect(feet(y)).toBe(Math.min(y, CAMERA.FOLLOW_Y)); // 오르는 내내 한 자리
+    for (let y = 0; y <= 600; y += 25) expect(feet(y)).toBe(Math.min(y, CAMERA.RISE_Y)); // 오르는 내내 한 자리
     const top = cam;
-    for (let y = 500; y > 500 - CAMERA.FOLLOW_Y; y -= 10) { feet(y); expect(cam).toBe(top); } // 꼭대기 띠에선 안 움직인다
-    for (let y = 400; y >= 0; y -= 25) expect(feet(y)).toBe(0); // 떨어지는 내내 땅 자리
+    for (let y = 600; y > 600 - (CAMERA.RISE_Y - CAMERA.FALL_Y); y -= 10) { feet(y); expect(cam).toBe(top); } // 꼭대기 띠에선 안 움직인다
+    for (let y = 450; y >= 0; y -= 25) expect(feet(y)).toBe(Math.min(y, CAMERA.FALL_Y)); // 떨어지는 내내 한 자리, 끝은 화면 안에서 땅으로
     expect(cam).toBe(0);
+  });
+
+  it('건물 밑 점프(밑면 200px에 머리가 막힌다)는 화면이 안 움직인다 — 뜬 높이가 그대로 보인다', () => {
+    expect(cameraClamp(0, 200 - PLAYER.H)).toBe(0);
+    expect(CAMERA.FALL_Y).toBeGreaterThan(VIEW.FLOOR_H); // 떨어질 때도 땅에서 한 층 넘게 떠 보인다
   });
 
   it('화면 카메라가 가장 높이 가도(발 높이) 새 건물은 화면 위에서 생긴다', () => {

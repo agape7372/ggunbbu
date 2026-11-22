@@ -42,17 +42,18 @@ export function holdSpawn(s: GameState): boolean {
 }
 
 /**
- * 화면 카메라 한 프레임(11-22 2차 · 원작 영상 실측): 오를 땐 발을 화면 바닥에서 FOLLOW_Y에 묶고,
- * 떨어질 땐 땅 자리(화면 바닥)에 묶는다. 그 사이 띠에선 안 움직인다. 보간은 없다.
+ * 화면 카메라 한 프레임(11-22 2차 · 원작 영상 실측): 오를 땐 발을 화면 바닥에서 RISE_Y에 묶고,
+ * 떨어질 땐 FALL_Y에 묶는다. 그 사이 띠에선 안 움직인다. 보간은 없다.
+ * 3차: 두 자리를 90 · 0에서 올렸다(「땅이랑 너무 안떨어져서 답답해」 — config CAMERA 주석). 발이 FALL_Y 밑이면 0이다.
  * 앞 프레임 값은 부르는 쪽(renderer · 검수 도구)이 쥔다.
  */
 export function cameraClamp(cam: number, y: number): number {
-  return Math.max(0, y - CAMERA.FOLLOW_Y, Math.min(cam, y));
+  return Math.max(0, y - CAMERA.RISE_Y, Math.min(cam, y - CAMERA.FALL_Y));
 }
 
 /**
  * 건물이 생기는 높이 = 화면 맨 위 + STAGE.SPAWN_ABOVE. 지시서(stage.ts)와 아케이드 1막 · 토코톤(spawner.ts)이 같이 쓴다.
- * 화면 카메라는 발 높이까지 올라가 있을 수 있다(cameraClamp 위쪽 끝) — 그 끝으로 잡아야 화면 안에서 안 생긴다.
+ * 화면 카메라는 발 높이보다 높이 못 간다(cameraClamp 위쪽 끝 = 발 − FALL_Y) — 발 높이로 잡으면 화면 안에서 안 생긴다.
  */
 export function spawnTopY(s: GameState): number {
   return VIEW.GROUND_Y - VIEW.FIELD_TOP + Math.min(CAMERA.MAX, s.player.y) + STAGE.SPAWN_ABOVE;
