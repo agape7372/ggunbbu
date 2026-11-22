@@ -2545,3 +2545,7 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 관문: tsc 0 · 시험 1276 통과 · 빌드 OK · 실제 렌더러 16프레임 한 장(`tmp/climb/sheet.png` · git 밖)으로 구도 확인.
 - 못 본 것: 실기기 손맛(보간 없는 카메라가 폰에서 눈에 어떤지) · 2막 탑 · 사용자 대역 재측정.
 - 게시(사용자 「올려」): 시험판 `index-DsVkEb1v`(`dca9d38` · 라이브 번들에서 FOLLOW_Y 90 · AIR_CUT_RISE_V 520 · UNLOCK_SCORE 15e5 확인). main 합침 · Pages · Play는 안 했다.
+
+### 승격 (11-22, `0dd44dc`)
+- 사용자: 「일단 합치고 앱 승격」. 승격 main · release/1.0 `0dd44dc` 앞감기 push · Pages run 45012080914 성공(`main-CHcliuiY.js`에 FOLLOW_Y 90 · AIR_CUT_RISE_V 520 · UNLOCK_SCORE 15e5). 시험판은 앞서 `index-DsVkEb1v`로 게시.
+- 못 본 것: 실기기 손맛 · Play 판(이번에도 안 올림).
