@@ -1,12 +1,13 @@
 // 이펙트 검수 하네스 — 페이지 안에서 도는 쪽(scripts/fx/fx.mjs가 import('/scripts/fx/page.ts')로 싣는다).
 // 가짜 시계 · 틱 루프 · 장면 사전 · 크롭 · 시트 · 계측은 여기 한 벌뿐이다. 본보기 = tmp/wazafx/legfx2.mjs · wazacap.mjs.
 // tsconfig include에 들어 있어 src API가 바뀌면 `npx tsc --noEmit`이 여기서 깨진다.
-import { consumeEvents, drawGame, initRenderer, setFeedbackOptions } from '../../src/render/renderer';
+import { consumeEvents, drawGame, initRenderer, setFeedbackOptions, setInvulnLook, type InvulnLook } from '../../src/render/renderer';
 import { RECIPES, drawBladeFx, pool, resetBladeFx, seedBladeFx, type Recipe } from '../../src/render/bladeFx';
 import { tickEffects } from '../../src/render/effects';
 import { wazaShowState } from '../../src/render/wazaShow';
 import { greatLook } from '../../src/render/sprites';
 import { advance, makeState } from '../../src/core/sim';
+import { hurtPlayer } from '../../src/core/combat';
 import { makeFloor, makeStack } from '../../src/core/building';
 import { cameraClamp } from '../../src/core/camera';
 import { VIEW } from '../../src/config';
@@ -15,13 +16,14 @@ import type { GameState, InputFrame, Material, WazaId, WeaponId } from '../../sr
 type Draft = Partial<Recipe>;
 type Crop = [w: number, h: number, top: number];
 /** after = 이 틱까지의 사건은 건너뛴다(hit은 첫 타격 1틱을 넘기고 둘째 16틱을 잡는다) */
-interface Scene { floors: Material[] | null; total?: number; y?: number; gauge?: boolean; kind: string; after?: number; off: number[]; crop: Crop; k: number }
+/** hurt = 1틱에 다친다(피격 무적 표시 판정) — 계측은 무기 조각 대신 졸라맨 먹 화소 */
+interface Scene { floors: Material[] | null; total?: number; y?: number; gauge?: boolean; hurt?: boolean; kind: string; after?: number; off: number[]; crop: Crop; k: number }
 interface Cell { label: string; cv: HTMLCanvasElement | null }
 /** gap = 이 줄 위에 더 띄울 틈(띠를 접을 때 구간 사이) */
 interface Row { name: string; cells: Cell[]; gap?: number }
-/** 한 줄 = 무기 하나(초안이 있으면 「지금」 + 초안마다 한 줄) */
-interface Line { name: string; w: WeaponId; draft?: Draft }
-export interface Opts { scale?: number; gray?: boolean; waza?: WazaId; frames?: number; every?: number; cols?: number; from?: number; flash?: boolean }
+/** 한 줄 = 무기 하나(초안이 있으면 「지금」 + 초안마다 한 줄 · --invuln이면 무적 표시 두 안) */
+interface Line { name: string; w: WeaponId; draft?: Draft; look?: InvulnLook }
+export interface Opts { scale?: number; gray?: boolean; waza?: WazaId; frames?: number; every?: number; cols?: number; from?: number; flash?: boolean; invuln?: boolean }
 
 // 장면 사전 — off = 사건 뒤 틱, crop = [폭, 높이, 위](논리 px), k = 시트 배율
 export const S: Record<string, Scene> = {
@@ -31,6 +33,7 @@ export const S: Record<string, Scene> = {
   destroy: { floors: ['weak'], total: 4, y: 60, kind: 'stackDestroy', off: [0, 3, 6, 10, 16, 24, 34], crop: [300, 330, 290], k: 0.68 },
   whiff: { floors: null, kind: 'slash', off: [0, 2, 4, 7, 10], crop: [170, 170, 450], k: 1.2 },
   special: { floors: ['mid', 'mid', 'mid', 'mid'], y: 140, gauge: true, kind: 'special', off: [10, 14, 18, 24, 34, 44], crop: [360, 560, 60], k: 0.42 },
+  hurt: { floors: null, hurt: true, kind: 'hurt', off: [0, 1, 2, 3, 30, 60, 89, 90], crop: [130, 150, 475], k: 1.3 },
 };
 
 // ── 가짜 시계 · 캔버스 ───────────────────────────────────────
@@ -86,6 +89,7 @@ function run(line: Line, sc: Scene, input: (t: number) => Partial<InputFrame>, o
   tickEffects(); // fxLastNow를 가짜 시계에 맞춘다 — 첫 프레임 dt가 판마다 1/60
   // 화면 번쩍임(다침 붉은 면 · 완파 반전 · 필살 반전)은 기본으로 끈다 — 무기 이펙트와 상관없이 양쪽 줄에 똑같이 깜빡여 판정 영상에서 눈이 아프다(11-22 지적). --flash면 게임 기본(2)
   setFeedbackOptions({ flashLevel: opts.flash ? 2 : 0 });
+  setInvulnLook(line.look ?? 'line');
   initRenderer(); // resetRunState(effects · screenfx · boss · landmark · wazaShow) + smoothCam 0
   resetBladeFx();
   seedBladeFx(7);
@@ -98,6 +102,7 @@ function run(line: Line, sc: Scene, input: (t: number) => Partial<InputFrame>, o
     let at = -1;
     for (let t = 1; t <= maxT; t++) {
       advance(s, { ...IN, ...input(t) });
+      if (sc.hurt && t === 1) hurtPlayer(s);
       s.stackSpawnCd = Math.max(s.stackSpawnCd, 9999);
       const hit = at < 0 && t > (sc.after ?? 0) && s.events.some((e) => e.kind === sc.kind);
       frame(s);
@@ -106,12 +111,13 @@ function run(line: Line, sc: Scene, input: (t: number) => Partial<InputFrame>, o
     }
   } finally {
     if (shape) RECIPES[shape] = ORIG[shape];
+    setInvulnLook('line');
   }
 }
 
 /** 장면 입력 — 본보기와 같다(hit은 둘째 타격 16틱을 잡는다) */
 const inputOf = (name: string) => (t: number): Partial<InputFrame> => ({
-  attack: name !== 'special' && name !== 'aura' && (t === 1 || (name === 'hit' && t === 16)),
+  attack: name !== 'special' && name !== 'aura' && name !== 'hurt' && (t === 1 || (name === 'hit' && t === 16)),
   special: name === 'special' && t === 4,
 });
 const sceneOf = (name: string): Scene => {
@@ -168,8 +174,9 @@ function sheet(rows: Row[], title: string, gray = false): string {
   return c.toDataURL('image/png');
 }
 
-/** 줄 목록 — 초안이 있으면 무기 하나 × (「지금」 + 초안), 없으면 무기마다 */
-function lines(weapons: WeaponId[], draftNames: string[]): Line[] {
+/** 줄 목록 — 초안이 있으면 무기 하나 × (「지금」 + 초안), --invuln이면 무기 하나 × (밝은 테 · 옛 점멸), 없으면 무기마다 */
+function lines(weapons: WeaponId[], draftNames: string[], opts: Opts = {}): Line[] {
+  if (opts.invuln) return [{ name: '밝은 테', w: weapons[0], look: 'line' }, { name: '옛 점멸', w: weapons[0], look: 'blink' }];
   if (!draftNames.length) return weapons.map((w) => ({ name: w, w }));
   if (weapons.length !== 1) throw new Error('초안을 줄 땐 --weapons에 무기 하나만');
   const w = weapons[0];
@@ -198,7 +205,7 @@ export function recipesIntact(): boolean {
 }
 
 export function sheetPng(weapons: WeaponId[], name: string, draftNames: string[], opts: Opts): string {
-  const rows = lines(weapons, draftNames).map((l) => ({ name: l.name, cells: cells(l, name, opts) }));
+  const rows = lines(weapons, draftNames, opts).map((l) => ({ name: l.name, cells: cells(l, name, opts) }));
   const w = draftNames.length ? ` · ${weapons[0]}` : '';
   return sheet(rows, `${name}${w} — 줄 = ${draftNames.length ? '지금 · 초안' : '무기'}, 칸 = 사건 뒤 틱${opts.scale ? ` · ×${opts.scale}` : ''}`, opts.gray);
 }
@@ -211,11 +218,23 @@ function measure(): { area: number; w: number; h: number } {
   mctx.clearRect(0, 0, mcv.width, mcv.height);
   drawBladeFx(mctx, cam);
   const d = mctx.getImageData(0, 0, mcv.width, mcv.height).data;
+  return countBox(d, mcv.width, (i) => d[i + 3] !== 0);
+}
+
+/** 졸라맨 먹 화소 — 한지보다 어둡고 차가운(파랑 ≥ 빨강) 화소 수. 먹 #1A1A20 · 옅은 먹 #A9A7AE는 차갑고 배경 그림은 다 따뜻하다(11-23 실측).
+ *  hurt 장면은 무기 조각이 없어 이걸로 꺼짐 · 다시 켜짐을 센다 */
+function inkArea(c: HTMLCanvasElement): { area: number; w: number; h: number } {
+  const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+  return countBox(d, c.width, (i) => d[i] + d[i + 1] + d[i + 2] < 600 && d[i + 2] >= d[i]); // 한지 #F4F1E8 = 717 · 옅은 먹 = 510
+}
+
+/** keep(화소 첫 바이트 자리)이 참인 화소 수와 그 상자 폭 · 높이 */
+function countBox(d: Uint8ClampedArray, width: number, keep: (i: number) => boolean): { area: number; w: number; h: number } {
   let area = 0, x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
-  for (let i = 3, n = 0; i < d.length; i += 4, n++) {
-    if (d[i] === 0) continue;
+  for (let i = 0, n = 0; i < d.length; i += 4, n++) {
+    if (!keep(i)) continue;
     area++;
-    const x = n % mcv.width, y = (n / mcv.width) | 0;
+    const x = n % width, y = (n / width) | 0;
     if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
   }
   return { area, w: x1 < 0 ? 0 : x1 - x0 + 1, h: y1 < 0 ? 0 : y1 - y0 + 1 };
@@ -277,7 +296,7 @@ export function stripPng(weapons: WeaponId[], name: string, draftNames: string[]
   const N = opts.frames ?? 24, K = opts.every ?? 1, F = opts.from ?? 0;
   const groups: { name: string; cells: Cell[] }[] = [];
   const motion: unknown[] = [];
-  for (const l of lines(weapons, draftNames)) {
+  for (const l of lines(weapons, draftNames, opts)) {
     const shots: { cv: HTMLCanvasElement; f: MotionFrame }[] = [];
     const alive = pool.map((p) => p.alive), seed = pool.map((p) => p.seed);
     let born = 0;
@@ -290,7 +309,8 @@ export function stripPng(weapons: WeaponId[], name: string, draftNames: string[]
       if (at < 0) { born = 0; return false; }
       const d = t - at;
       if (d >= F && (d - F) % K === 0) {
-        shots.push({ cv: crop(s, sc.crop, 1), f: { t: d, ...measure(), births: born } });
+        const c = crop(s, sc.crop, 1);
+        shots.push({ cv: c, f: { t: d, ...(sc.hurt ? inkArea(c) : measure()), births: born } });
         born = 0;
       }
       return shots.length >= N;
@@ -318,7 +338,7 @@ export function stripPng(weapons: WeaponId[], name: string, draftNames: string[]
 export function movieFrames(weapons: WeaponId[], draftNames: string[], opts: Opts): { name: string; frames: string[] }[] {
   const small = document.createElement('canvas'); small.width = 360; small.height = 780;
   const sg = small.getContext('2d')!;
-  return lines(weapons, draftNames).map((l) => {
+  return lines(weapons, draftNames, opts).map((l) => {
     const frames: string[] = [];
     const snap = (cap: string): void => {
       sg.filter = opts.gray ? 'grayscale(1)' : 'none';
@@ -326,11 +346,15 @@ export function movieFrames(weapons: WeaponId[], draftNames: string[], opts: Opt
       sg.filter = 'none';
       sg.fillStyle = '#1A1A20'; sg.font = 'bold 13px sans-serif';
       sg.fillText(cap, 8, 772);
-      if (draftNames.length) sg.fillText(l.name, 8, 16);
+      if (draftNames.length || opts.invuln) sg.fillText(l.name, 8, 16);
       frames.push(small.toDataURL('image/jpeg', 0.86));
     };
     const seg = (name: string, cap: string, ticks: number, attackAt: number[]): void =>
       run(l, sceneOf(name), (t) => ({ attack: attackAt.includes(t) }), (_s, t) => { snap(cap); return t >= ticks; }, opts);
+    if (opts.invuln) { // 무적 표시 두 안 — 다친 뒤 무적 내내 서 있다가 베고, 끝나고 조금 더
+      seg('hurt', '피격 무적', 120, [40, 56, 72]);
+      return { name: l.name, frames };
+    }
     seg('aura', '서 있기', 70, []);
     seg('hit', '타격', 62, [4, 20, 36]);
     seg('floor', '층 깨기', 50, [4]);

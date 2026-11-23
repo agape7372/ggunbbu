@@ -534,9 +534,9 @@ export function drawMask(
 }
 
 /** pts를 순서대로 잇는 폴리라인 획. 관절 굽힘은 점 3개 이상으로 표현. */
-function stroke(c: CanvasRenderingContext2D, pts: [number, number][]): void {
+function stroke(c: CanvasRenderingContext2D, pts: [number, number][], color = LINE): void {
   if (pts.length < 2) return;
-  c.strokeStyle = LINE;
+  c.strokeStyle = color;
   c.lineWidth = LINE_W;
   c.lineCap = 'round';
   c.lineJoin = 'round';
@@ -547,14 +547,14 @@ function stroke(c: CanvasRenderingContext2D, pts: [number, number][]): void {
 }
 
 /** 윤곽선 원. fill이 주어지면 채우고 나서 윤곽선을 그린다. */
-function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill?: string): void {
+function circle(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill?: string, color = LINE): void {
   c.beginPath();
   c.arc(cx, cy, r, 0, Math.PI * 2);
   if (fill) {
     c.fillStyle = fill;
     c.fill();
   }
-  c.strokeStyle = LINE;
+  c.strokeStyle = color;
   c.lineWidth = LINE_W;
   c.stroke();
 }
@@ -1259,7 +1259,7 @@ function polyline(c: CanvasRenderingContext2D, pts: readonly (readonly [number, 
   c.stroke();
 }
 
-function drawLiveBody(ctx: CanvasRenderingContext2D, b: Body, x: number, footY: number): void {
+function drawLiveBody(ctx: CanvasRenderingContext2D, b: Body, x: number, footY: number, ink: string): void {
   // 돈 몸은 점만 가로로 줄인다 — 캔버스를 줄이면 선 굵기까지 얇아져 옆으로 선 순간 졸라맨이 사라진다(머리는 늘 동그랗게)
   const k = turnK(b.turn);
   const X = (p: Pt): [number, number] => [p[0] * k, p[1]];
@@ -1288,8 +1288,8 @@ function drawLiveBody(ctx: CanvasRenderingContext2D, b: Body, x: number, footY: 
   ctx.arc(hx, hy, HEAD_R, 0, Math.PI * 2);
   ctx.stroke();
   swordBody(ctx, playerWeapon, gx, gy, tx, ty, H);
-  for (const l of lines) stroke(ctx, l);
-  circle(ctx, hx, hy, HEAD_R);
+  for (const l of lines) stroke(ctx, l, ink);
+  circle(ctx, hx, hy, HEAD_R, undefined, ink);
   swordBody(ctx, playerWeapon, gx, gy, tx, ty);
   ctx.restore();
 }
@@ -1602,14 +1602,16 @@ export function initSprites(): void {
 // 공개 draw* API
 // ══════════════════════════════════════════════════════════════
 
-/** x=레인 중심 캔버스 x, footCanvasY=발 위치 캔버스 y. animTick으로 2프레임 모션 */
+/** x=레인 중심 캔버스 x, footCanvasY=발 위치 캔버스 y. animTick으로 2프레임 모션.
+ *  ink = 이번 한 번만 몸 선 색(피격 무적 표시 · renderer invulnView). 살아 있는 몸에만 듣는다 — 구운 프레임(깔림 · 사망)은 캐시라 제 색 */
 export function drawPlayer(
   ctx: CanvasRenderingContext2D,
   pose: PlayerPose,
   animTick: number,
   x: number,
   footCanvasY: number,
-  facing: 1 | -1 = 1
+  facing: 1 | -1 = 1,
+  ink: string | null = null,
 ): void {
   initSprites();
   if (live) {
@@ -1620,7 +1622,7 @@ export function drawPlayer(
       slashArc(ctx);
       ctx.restore();
     }
-    drawLiveBody(ctx, live, x, footCanvasY);
+    drawLiveBody(ctx, live, x, footCanvasY, ink ?? LINE);
     return;
   }
   const footY = footCanvasY + playerBob(pose, animTick);

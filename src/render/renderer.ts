@@ -50,6 +50,18 @@ let shakeT = 0;
 let kickY = 0;
 let kickV = 0;
 const haptic: HapticCounters = { hit: 0, bossHit: 0 };
+/** 피격 무적 표시(11-23) — 'line' = 선을 옅은 먹으로(기본, 꺼지지 않는다) · 'blink' = 옛 점멸. 고르는 곳은 시험판 디버그 메뉴뿐이라 출시 판은 늘 'line' */
+export type InvulnLook = 'line' | 'blink';
+let invulnLook: InvulnLook = 'line';
+export function setInvulnLook(v: InvulnLook): void { invulnLook = v; }
+
+/** 이 프레임 졸라맨 — draw = 그리나, ink = 선 색(null = 제 색). 피격 직후(≤HIT_IFRAMES)만 바뀐다.
+ *  필살 자세 · 필살 연출이 도는 동안은 제 색 그대로(긴 필살의 터짐 순간에 졸라맨이 꺼지거나 바래지 않게) */
+export function invulnView(ticks: number, special: boolean, look: InvulnLook = invulnLook): { draw: boolean; ink: string | null } {
+  if (ticks <= 0 || ticks > PLAYER.HIT_IFRAMES || special) return { draw: true, ink: null };
+  return look === 'blink' ? { draw: ticks % 6 < 4, ink: null } : { draw: true, ink: JUICE_SYS.INVULN_INK };
+}
+
 let shakeLevel: 0 | 1 | 2 = 2;
 let vibrationOn = true;
 
@@ -564,15 +576,14 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // ★08-30 계약 개정: 관통 시각화(반투명·스침 획·착지 위험 표시)는 전부 제거했다.
   // 밑면이 막고 누르는 세계에서는 "통과 중"이라는 상태 자체가 없다 — 없는 것을 그리면 거짓말이다.
   // 접촉 피드백은 core가 발행하는 headBonk 이벤트(먼지·소리·진동)가 진다.
-  // 피격 직후(≤HIT_IFRAMES)만 점멸 — 디버그 상시 무적은 통짜로 그린다 (08-30, D-2).
-  // 필살 무적이 그 구간으로 내려와도 필살 연출이 도는 동안은 통짜(긴 필살의 터짐 순간에 졸라맨이 꺼지지 않게)
+  // 피격 직후(≤HIT_IFRAMES)만 무적 표시 — 기본은 선을 옅은 먹으로(꺼졌다 켜지지 않는다, 불변 13). 옛 점멸은 시험판에서만 고른다(invulnView)
   drawWazaMid(ctx, cam); // 갈라진 건물 · 월하난무의 밤과 달 — 건물 위, 졸라맨 아래(졸라맨이 달을 등지고 선다)
-  const shortInvuln = s.player.invulnTicks > 0 && s.player.invulnTicks <= PLAYER.HIT_IFRAMES && !wazaShowState();
+  const inv = invulnView(s.player.invulnTicks, s.player.pose === 'special' || !!wazaShowState());
   setPlayerWeapon(s.weapon);
   const move = moveBody(s); // 평소 몸 연기 — 필살 중에도 불러 자세 바뀜을 놓치지 않는다
   setLiveBody(wazaBody(s, wazaShowState(), kitOf(s.weapon)) ?? move, slashOf(s.weapon)); // 필살 몸 연기 — 그리는 동안만(칼 기운 · 졸라맨 · 마스크 · 안전모가 같은 몸을 본다)
   bladeAura(s); // 대검 칼 기운 — 지금 포즈의 칼날에서
-  if (!shortInvuln || s.player.invulnTicks % 6 < 4 || s.player.pose === 'special') {
+  if (inv.draw) {
     const px = VIEW.LANE_X[s.player.lane];
     const footY = g - s.player.y;
     // 몸 반응 — 착지 3틱은 납작하게(y 0.9), 점프 3틱은 홀쭉하게(x 0.92). 발 기준이라 발은 안 뜬다.
@@ -586,7 +597,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
       ctx.scale(sqX, sqY);
       ctx.translate(-px, -footY);
     }
-    drawPlayer(ctx, s.player.pose, s.player.poseTick, px, footY);
+    drawPlayer(ctx, s.player.pose, s.player.poseTick, px, footY, 1, inv.ink);
     drawMask(ctx, s.player.pose, s.player.poseTick, px, footY);
     if (s.hat && !hatFlying()) drawHat(ctx, s.player.pose, s.player.poseTick, px, footY); // 받는 중엔 날아오는 쪽이 그린다
     if (squash) ctx.restore();

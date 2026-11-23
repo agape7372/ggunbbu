@@ -791,6 +791,8 @@ export const JUICE_SYS = {
   LAND_DUST: 4,
   // 종이 오려내기 후광 — 오프스크린 캐시는 기본 HALO_SS배(졸라맨 프레임 후광은 프레임 배율을 따른다)
   HALO_PX: 1.75, HALO_SS: 2,
+  // 피격 무적 동안 졸라맨 선 = 옅은 먹(style.css --ink3, 먹 사다리 한지 쪽). 점멸(꺼졌다 켜짐) 대신 — 불변 13 깜빡임 금지(11-23, renderer invulnView)
+  INVULN_INK: '#A9A7AE',
   // 달군 속(ink.hotCore) — 벤 순간 포인트 색 속 한가운데 종이빛 줄의 굵기(속 굵기에 곱함) · 식는 데 드는 몫(포인트 색이 보이는 동안 중)
   HOT_W: 0.7, HOT_U: 0.7,
   // 사망 — 붉은 번쩍 틱·파티클 배속·틀 지속

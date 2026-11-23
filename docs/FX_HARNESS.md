@@ -22,7 +22,8 @@ Playwright는 레포에 없다(불변 6). `--playwright-module <폴더>`나 환�
 | `serve` | 서버 + 브라우저를 띄워 둔다(주소는 `tmp/fx/.server`). 떠 있으면 다른 명령이 그걸 쓴다 | 한 회차에 여러 번 뽑을 때. 새로 띄우면 약 30초 · 떠 있으면 한 번에 2~8초 |
 | `movie` | `<무기>.mp4`(제 속도) · `<무기>-slow.mp4`(0.3배속). `--waza <id>`면 필살까지 | 사용자 판정 · 마지막 확인 |
 
-공통 인자: `--weapons a,b` · `--scenes hit,floor,destroy,whiff,aura,special` · `--out <폴더>`(기본 `tmp/fx/out`) · `--draft <파일>[,…]`.
+공통 인자: `--weapons a,b` · `--scenes hit,floor,destroy,whiff,aura,special,hurt` · `--out <폴더>`(기본 `tmp/fx/out`) · `--draft <파일>[,…]`.
+`--invuln`(11-23) = 줄이 피격 무적 표시 두 안(밝은 테 · 옛 점멸)이 된다. `strip --invuln --scenes hurt --every 1`(3틱 간격이면 점멸이 꺼지는 칸을 비켜 간다) · `movie --invuln`(다침 → 무적 구간만). `hurt` 장면의 넓이는 무기 조각이 아니라 졸라맨 먹 화소(차가운 어두운 화소)라 `relit`이 몸의 꺼짐을 센다.
 인자 없이 부르면 사용법이 나온다. 페이지 쪽 코드(가짜 시계 · 장면 사전 · 크롭 · 시트 · 계측)는 `scripts/fx/page.ts` 한 벌이고 `tsc`가 같이 본다.
 
 화면 번쩍임(다침 붉은 면 · 완파 반전 · 필살 반전)은 기본으로 끄고 찍는다. 무기 이펙트와 상관없이 양쪽 줄에 똑같이 깜빡여 판정 영상이 눈 아프다(11-22). 게임 그대로 보려면 `--flash`.

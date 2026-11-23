@@ -17,8 +17,9 @@ const USAGE = `이펙트 검수 하네스
           (--frames N · --every K · --from N 사건 뒤 N틱부터 · --cols N 접기, 기본 8 · 한 장 폭 2400 안으로 줄어든다)
   movie   무기마다 서 있기 → 타격 → 층 깨기 → 완파 → 헛스윙(+필살) → <무기>.mp4 · <무기>-slow.mp4 (--keep)
 인자
-  --weapons a,b   --scenes hit,floor,destroy,whiff,aura,special   --out <폴더, 기본 tmp/fx/out>
+  --weapons a,b   --scenes hit,floor,destroy,whiff,aura,special,hurt   --out <폴더, 기본 tmp/fx/out>
   --draft <파일>[,<파일>…]   --flash(화면 번쩍임 켬 · 기본 끔)   --gray   --waza <필살 id>   --playwright-module <폴더>(또는 PLAYWRIGHT_MODULE)
+  --invuln   줄 = 피격 무적 표시 두 안(밝은 테 · 옛 점멸, 첫 무기) — strip/sheet는 --scenes hurt, movie는 다침 → 무적 구간만
 예
   node scripts/fx/fx.mjs serve
   node scripts/fx/fx.mjs strip --weapons phoenix --scenes destroy --frames 30 --cols 6
@@ -73,7 +74,7 @@ const drafts = list('--draft', '').map((f) => {
   if (!existsSync(projectPath(rel))) throw new Error(`초안 파일이 없다: ${f}`);
   return rel;
 });
-const opts = { scale: num('--scale'), gray: args.includes('--gray'), waza: cliOption('--waza', '', args) || undefined, frames: num('--frames'), every: num('--every'), cols: num('--cols'), from: num('--from'), flash: args.includes('--flash') };
+const opts = { scale: num('--scale'), gray: args.includes('--gray'), waza: cliOption('--waza', '', args) || undefined, frames: num('--frames'), every: num('--every'), cols: num('--cols'), from: num('--from'), flash: args.includes('--flash'), invuln: args.includes('--invuln') };
 const { chromium } = optionalPackage(process.env.PLAYWRIGHT_MODULE ?? 'playwright', '--playwright-module');
 mkdirSync(out, { recursive: true });
 const png = (file, data) => writeFileSync(path.join(out, file), Buffer.from(data.split(',')[1], 'base64'));
@@ -123,7 +124,7 @@ try {
       for (const m of r.motion) {
         const notes = [];
         if (m.summary?.cut) notes.push(' ← 창 안에서 안 끝남(peakFrac은 창 안 값, --frames를 늘려 끝까지)');
-        if (m.summary?.relit && ['hit', 'floor', 'destroy'].includes(sc)) notes.push(` ← 깜빡임 ${m.summary.relit}번: 꺼졌다 다시 켜진다(금지 — 눈이 아프다)`);
+        if (m.summary?.relit && ['hit', 'floor', 'destroy', 'hurt'].includes(sc)) notes.push(` ← 깜빡임 ${m.summary.relit}번: 꺼졌다 다시 켜진다(금지 — 눈이 아프다)`);
         console.log(`strip ${sc} ${m.row} ${JSON.stringify(m.summary)}${notes.join('')}`);
       }
       console.log(`strip-${sc}.png ${ms(t1)}`);
@@ -131,7 +132,7 @@ try {
     writeFileSync(path.join(out, 'motion.json'), JSON.stringify(motion.length === 1 ? motion[0] : motion, null, 1) + '\n');
   } else {
     const ff = (a) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...a]);
-    for (const w of names.length ? weapons.slice(0, 1) : weapons) {
+    for (const w of names.length || opts.invuln ? weapons.slice(0, 1) : weapons) {
       const t1 = Date.now();
       const rows = await page.evaluate((a) => window.__fx.movieFrames(...a), [[w], names, opts]);
       const dirs = rows.map((r, i) => {

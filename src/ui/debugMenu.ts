@@ -10,6 +10,7 @@ import { freezeSaves, loadSave, saveSave } from '../storage';
 import { BLADE_IDS, BODY_IDS, LETTERS_IDS, MASK_IDS, WAZA_IDS, WEAPON_IDS } from '../meta/loadout';
 import { phaseName } from '../content';
 import { playSfx } from '../audio/audio';
+import { setInvulnLook, type InvulnLook } from '../render/renderer';
 
 export const DEBUG_TITLE_TAPS = 7;
 
@@ -222,6 +223,13 @@ export function mountDebugMenu(getState: () => GameState | null, open = true): v
   const fallBtn = mk('낙하×1', () => {
     cycleFallMul();
     fallBtn.textContent = `낙하×${runtime.fallMul}`;
+  });
+  // 피격 무적 표시 두 안 고르기(11-23) — 시험판에서만 보인다(이 메뉴는 DEV_TOOLS일 때만 붙는다). 출시 판은 기본 「밝은 테」만
+  let look: InvulnLook = 'line';
+  const lookBtn = mk('무적 표시:밝은 테', () => {
+    look = look === 'line' ? 'blink' : 'line';
+    setInvulnLook(look);
+    lookBtn.textContent = `무적 표시:${look === 'line' ? '밝은 테' : '옛 점멸'}`;
   });
 
   const bb = mk(buddhaLabel(), () => {
