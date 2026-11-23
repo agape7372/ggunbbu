@@ -209,6 +209,8 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 >    `manifest.json`의 `version · url · checksum`에 서명(`sig`)하고, 앱(`src/platform/ota.ts` `signedOk`)은 박힌 공개 키(`otaKey`)로 맞을 때만 받는다.
 >    Capgo 공개 키만으로는 안 된다(sessionKey가 비면 평문 체크섬만 본다 · `CapgoUpdater.java:844-860`). 키가 없거나 앱 키와 짝이 안 맞으면 발행이 멈춘다.
 >    키를 잃으면 OTA가 멈추고 새 키 + 새 AAB로만 고친다 → `D:keysackup-keys.ps1`로 백업(폴더 전체를 훑으니 따로 적을 것 없음).
+>    **11-23 공개 키 둘**: 앱 `otaKey.spki`는 키 둘이고 둘 중 하나로 맞으면 받는다. 둘째 개인 키는 평소 안 쓰고 위치는 주인만 안다 — 첫 키를 잃으면 `OTA_KEY=<둘째 키>`로 서명한다(AAB 다시 낼 필요 없음).
+>    발행 전 짝 확인은 소스가 아니라 **빌드 산출물**(`dist` · 동기화했으면 `shell/android/app/src/main/assets/public`)에 서명 키의 짝이 들어 있는지 본다. 앱 묶음이 없으면 dist만 보고 경고를 낸다 — 그땐 마지막 AAB를 구운 체크아웃에서 확인한다.
 > 4. **출시 빌드만 OTA로 낸다(11-18 · 11-19 main 합침)**: `ota-release`는 `GUNBBU_RELEASE=1`이 없으면 굽지 않고(`--dry-run` 포함), 빌드 뒤 `dist/release-build.txt` 표식이 없어도 멈춘다.
 > 5. **환불 확인 함수(11-18 · 11-19 main 합침)**: `ota/api/refund.ts`가 같은 Vercel 프로젝트로 나간다(`/api/refund`). 켜려면 Vercel 환경 변수 `PLAY_SA_JSON`(Play Console 「재무 데이터 보기」 권한 서비스 계정 JSON) + 앱 빌드 변수 `VITE_REFUND_URL=https://<우리 호스트>/api/refund` + 처리방침에 「환불 확인 때 결제 토큰을 보냄」 한 줄. 둘 중 하나라도 비면 앱은 묻지 않는다(1회 상품은 Play 보유 목록 대조로 따로 거둔다).
 

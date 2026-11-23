@@ -2,7 +2,7 @@
 // 다운로드 경로 자체는 네이티브 플러그인 몫이라 여기서 테스트하지 않는다(계약만 가드).
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { compareVersions, parseManifest, initOta, otaKey, signedOk } from '../src/platform/ota';
-import { signManifest } from '../scripts/ota-sign.mjs';
+import { publicKeyOf, signManifest } from '../scripts/ota-sign.mjs';
 
 describe('OTA 버전 비교', () => {
   it('자리별로 숫자 비교한다 (문자열 비교가 아니다)', () => {
@@ -113,17 +113,45 @@ describe('매니페스트 서명', () => {
     delete (globalThis as Record<string, unknown>).window;
   });
 
-  it('앱 키 짝으로 서명한 것만 맞다 — 서명 없음 · 다른 키 · 서명 뒤 바꿈은 틀림', async () => {
-    const mine = await pair();
-    const theirs = await pair();
-    otaKey.spki = mine.spki;
-    const signed = signManifest(plain, mine.pem);
+  // 11-23 공개 키 둘: 하나를 잃어도 남은 키로 낸 판을 받는다
+  it('키1 짝 서명도 키2 짝 서명도 받는다 — 모르는 키 · 서명 없음 · 깨진 서명은 틀림', async () => {
+    const k1 = await pair();
+    const k2 = await pair();
+    const stranger = await pair();
+    otaKey.spki = [k1.spki, k2.spki];
+    const signed = signManifest(plain, k1.pem);
     expect(await signedOk(signed)).toBe(true);
+    expect(await signedOk(signManifest(plain, k2.pem))).toBe(true);
+    expect(await signedOk(signManifest(plain, stranger.pem))).toBe(false);
     expect(await signedOk(plain)).toBe(false);
-    expect(await signedOk(signManifest(plain, theirs.pem))).toBe(false);
-    expect(await signedOk({ ...signed, url: 'https://ota.example.com/bundles/evil.zip' })).toBe(false);
-    expect(await signedOk({ ...signed, checksum: 'def' })).toBe(false);
+    expect(await signedOk({ ...signed, sig: 'AAAA' })).toBe(false);
     expect(parseManifest(signed, BASE)?.sig).toBe(signed.sig);
+  });
+
+  it('서명 뒤 판 · 주소 · 체크섬을 바꾸면 어느 키로 서명했든 틀림', async () => {
+    const k1 = await pair();
+    const k2 = await pair();
+    otaKey.spki = [k1.spki, k2.spki];
+    for (const k of [k1, k2]) {
+      const signed = signManifest(plain, k.pem);
+      expect(await signedOk({ ...signed, url: 'https://ota.example.com/bundles/evil.zip' })).toBe(false);
+      expect(await signedOk({ ...signed, checksum: 'def' })).toBe(false);
+      expect(await signedOk({ ...signed, version: '9.9.9' })).toBe(false);
+    }
+  });
+
+  it('앱에 박힌 공개 키는 서로 다른 P-256 둘이다', async () => {
+    expect(shipped).toHaveLength(2);
+    expect(new Set(shipped).size).toBe(2);
+    for (const spki of shipped) {
+      const raw = Uint8Array.from(atob(spki), (c) => c.charCodeAt(0));
+      await expect(crypto.subtle.importKey('spki', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify'])).resolves.toBeTruthy();
+    }
+  });
+
+  it('게시 쪽 publicKeyOf는 앱에 박는 꼴(SPKI base64)과 같다 — ota-release가 이 글자로 산출물을 뒤진다', async () => {
+    const k = await pair();
+    expect(publicKeyOf(k.pem)).toBe(k.spki);
   });
 
   it('켠 앱은 서명 없는 매니페스트로 받지도 예약하지도 않고, 서명이 맞으면 받는다', async () => {
@@ -131,7 +159,7 @@ describe('매니페스트 서명', () => {
     vi.stubEnv('VITE_OTA_BASE', BASE);
     vi.resetModules();
     const fresh = await import('../src/platform/ota');
-    fresh.otaKey.spki = mine.spki;
+    fresh.otaKey.spki = [mine.spki];
     const calls: string[] = [];
     const up = {
       current: async () => { calls.push('current'); return { bundle: { id: 'b', version: 'builtin' }, native: '1.0.0' }; },

@@ -27,21 +27,31 @@ const CHECK_DELAY_MS = 3000;
  * 매니페스트 서명(2026-11-18 어뷰징 점검): 배포처(Vercel) 계정이 털려 manifest.json · zip을 같이 바꿔도 이 공개 키의 짝(개인 키,
  * 레포 밖 D:\keys\gunbbu\ota-sign.pem)이 없으면 서명을 못 만든다 → 받지 않는다. 체크섬은 같은 매니페스트에서 오므로 그것만으로는 못 막는다.
  * 서명 = scripts/ota-sign.mjs(같은 글 형식). 시험은 spki를 갈아 끼운다. 냥수제비 src/net/ota.ts 이식
+ * 공개 키는 둘이다(2026-11-23, 1.0 첫 AAB 전): 둘 중 하나로 맞으면 받는다. 앞 = 평소 서명 키, 뒤 = 평소 안 쓰는 둘째 키(개인 키는 따로 둔다).
+ * 하나를 잃어도 남은 키로 OTA를 낸다. 키를 바꾸면 새 AAB가 나가야 폰이 안다 — ota-release가 산출물 안의 키로 짝을 본다.
  */
-export const otaKey = { spki: 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAElJ7TSLndVxRIxXg3AWMXO+3dtQy93vwPIhleGOXrjNoSHZTlDNuZIDqzM4trB/mXDFSy/XoIGQGRjrD+Dv+H0A==' };
+export const otaKey = {
+  spki: [
+    'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAElJ7TSLndVxRIxXg3AWMXO+3dtQy93vwPIhleGOXrjNoSHZTlDNuZIDqzM4trB/mXDFSy/XoIGQGRjrD+Dv+H0A==',
+    'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiMe5xLcj7SWeAnqpT723iS+GqpGNHWcbTBrxC9tK/QF4xsXA0qGLRPAKcqXEnlChlYZMj952K/4NJzmUt4Rfqw==',
+  ],
+};
 type Signable = { version: string; url: string; checksum: string; sig?: unknown };
 export const otaMessage = (m: Signable): string => `gunbbu-ota\n${m.version}\n${m.url}\n${m.checksum}`;
 const bytes = (b64: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
-/** 서명이 맞나. 없음 · 틀림 · 웹 crypto 없음 = false(받지 않는다) */
+/** 서명이 앱 공개 키 둘 중 하나와 맞나. 없음 · 둘 다 틀림 · 웹 crypto 없음 = false(받지 않는다) */
 export async function signedOk(m: Signable): Promise<boolean> {
   if (typeof m.sig !== 'string') return false;
-  try {
-    const key = await crypto.subtle.importKey('spki', bytes(otaKey.spki), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
-    return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, bytes(m.sig), new TextEncoder().encode(otaMessage(m)));
-  } catch {
-    return false;
+  for (const spki of otaKey.spki) {
+    try {
+      const key = await crypto.subtle.importKey('spki', bytes(spki), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+      if (await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, bytes(m.sig), new TextEncoder().encode(otaMessage(m)))) return true;
+    } catch {
+      // 이 키로는 못 본다 — 다음 키
+    }
   }
+  return false;
 }
 
 interface OtaManifest {

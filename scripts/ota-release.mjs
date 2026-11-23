@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlink
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { collectFiles, makeZip } from './lib/zip.mjs';
-import { OTA_KEY, signManifest, verifyManifest } from './ota-sign.mjs';
+import { OTA_KEY, publicKeyOf, signManifest, verifyManifest } from './ota-sign.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP = 4; // ota/bundles/에 남길 최근 번들 수
@@ -69,7 +69,7 @@ if (process.env.GUNBBU_RELEASE !== '1') {
 // 매니페스트 서명 키(scripts/ota-sign.mjs): 없으면 판을 못 낸다 — 서명 없는 판은 앱(src/platform/ota.ts signedOk)이 안 받는다
 const otaPem = dryRun ? '' : existsSync(OTA_KEY) ? readFileSync(OTA_KEY, 'utf8') : null;
 if (otaPem === null) {
-  console.error(`발행 중단: OTA 서명 키가 없습니다: ${OTA_KEY} → 백업(D:/keys-backup)에서 되살리기. 잃었으면 새 키 + 앱 공개 키 교체 + 새 AAB`);
+  console.error(`발행 중단: OTA 서명 키가 없습니다: ${OTA_KEY} → 백업(D:/keys-backup)에서 되살리기. 잃었으면 둘째 개인 키를 OTA_KEY=<경로>로 넘긴다. 둘 다 잃었으면 새 키 + 앱 공개 키 교체 + 새 AAB`);
   process.exit(1);
 }
 
@@ -192,13 +192,22 @@ const manifest = signManifest({
   releasedAt: new Date().toISOString(),
   minNative,
 }, otaPem);
-// 앱에 박힌 공개 키와 짝인지 쓰기 전에 맞대 본다 — 어긋난 판이 나가면 모든 앱이 OTA를 못 받고 새 AAB로만 고친다
-const appKey = /spki: '([^']+)'/.exec(readFileSync(path.join(root, 'src', 'platform', 'ota.ts'), 'utf8'))?.[1] ?? '';
-if (!verifyManifest(manifest, appKey)) {
+// 서명한 개인 키의 짝(공개 키)이 **빌드 산출물** 안에 있는지 쓰기 전에 맞대 본다(11-23). 폰이 가진 건 소스가 아니라 구운 묶음이다 —
+// 소스에서 키를 꺼내면, 키를 바꾸고 AAB를 다시 안 낸 폰과 어긋나도 통과했다. 어긋난 판이 나가면 모든 앱이 OTA를 못 받고 새 AAB로만 고친다.
+// 산출물 = 방금 구운 dist(이 OTA 묶음 · 다음 판을 받을 키) + Capacitor 동기화 뒤의 앱 묶음(AAB에 실리는 판, 있을 때만)
+const signKey = publicKeyOf(otaPem);
+const appBundle = path.join(root, 'shell', 'android', 'app', 'src', 'main', 'assets', 'public');
+const outs = [distDir, appBundle].filter((d) => existsSync(d));
+const lacks = outs.filter((d) => !collectFiles(d).some((f) => f.name.endsWith('.js') && f.data.includes(signKey)));
+if (lacks.length || !verifyManifest(manifest, signKey)) {
   if (prevVersionSrc !== null) writeFileSync(versionFile, prevVersionSrc);
-  console.error('발행 중단: 서명이 앱 공개 키(src/platform/ota.ts otaKey)와 짝이 안 맞습니다.');
+  console.error('발행 중단: 서명한 개인 키의 짝이 앱 산출물에 없습니다 — 이 판을 받을 수 있는 폰이 없습니다.');
+  for (const d of lacks) console.error(`   키 없음: ${path.relative(root, d)}`);
+  console.error('src/platform/ota.ts otaKey에 그 공개 키가 있는지, 앱 묶음이 그 소스로 구워졌는지(npm --prefix shell run web:build → sync) 보세요.');
   process.exit(1);
 }
+console.log(`서명 키 짝 확인: ${outs.map((d) => path.relative(root, d)).join(' · ')}`);
+if (!outs.includes(appBundle)) console.log('⚠ 앱 묶음(shell/android/.../assets/public)이 없어 dist만 봤다 — 폰에 깔린 AAB에 이 키가 있는지는 마지막 AAB를 구운 체크아웃에서 확인할 것.');
 
 const otaDir = path.join(root, 'ota');
 const bundlesDir = path.join(otaDir, 'bundles');
