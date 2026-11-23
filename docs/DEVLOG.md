@@ -2576,3 +2576,24 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 사용자: 「좀만 더 띄워도 될거같은데」. `CAMERA.RISE_Y` 220 → 270(화면 48%) · `FALL_Y` 130 → 160. 머리 위로 보이는 건물 4.2 → 3.5층(시험은 세 층 넘게로 고침). 4층 한계(232)는 12px밖에 안 올라 눈에 안 띄어 넘겼다.
 - 관문: tsc 0 · 시험 1277 통과 · 오름 시트(`tmp/climb/sheet.png`)로 구도 확인.
 - 승격(사용자 「앱승격까지」): main · release/1.0 `a66b41c` 앞감기 push · Pages run 45023022866 성공(`main-DwoT24b1.js`에 RISE_Y 270 · FALL_Y 160) · 시험판 `index-CpXohuBQ`(배포 전 라이브 = `_Ikmecdd` 확인 · 같은 값).
+
+## 2026-11-23 — OTA 공개 키 둘 · 무적 점멸 대체 (`feat/ota-two-keys-invuln-line`)
+게임 봇 · 주인 위임 결정 둘(■ Dev 11-23, `Game-studio/knowledge/game-refs/ota-publish-verify.md` §1 · `pixel-sprite-rules.md` 무적 점멸 대체).
+
+### OTA 공개 키 둘 (1.0 첫 AAB 전에)
+- 왜: 키 하나가 단일 장애점이었다. 서명 개인 키를 잃으면 OTA가 멈추고 새 AAB로만 고친다. 첫 AAB 전이라 지금 넣으면 비용이 없다.
+- `src/platform/ota.ts` `otaKey.spki` = 키 둘(앞 = 평소 서명 키, 뒤 = 평소 안 쓰는 둘째 키). `signedOk`는 둘 중 하나로 맞으면 받고, 다 틀리면 지금처럼 거부한다.
+- 둘째 키 쌍은 node `crypto`(P-256)로 만들었다. 개인 키는 레포 밖 별도 폴더에 두었고 위치는 주인만 안다(커밋 · 로그에 안 적음). 소스엔 공개 키만 들어갔다. **주인 몫: `backup-keys.ps1`을 다시 돌려 새 키를 백업에 넣기.**
+- 발행 전 짝 확인(`scripts/ota-release.mjs`): 옛 판은 소스 `ota.ts`에서 정규식으로 키를 꺼내 맞댔다 — 키를 바꾸고 AAB를 다시 안 낸 폰과 어긋나도 통과하는 구멍(gotchas 11-23). 이제 **서명한 개인 키의 짝**(`ota-sign.mjs` `publicKeyOf`)이 빌드 산출물 안에 있는지 본다: 방금 구운 `dist`와, Capacitor 동기화를 했으면 `shell/android/app/src/main/assets/public`. 앱 묶음이 없으면 dist만 보고 경고한다.
+- 확인: 이 체크아웃 `dist`(npm run build)에서 키1 짝 · 키2 짝은 찾고 모르는 키 짝은 못 찾았다(같은 식을 손으로 돌림). 출시 환경 변수가 없어 `ota:release` 전체는 안 돌렸다.
+- 시험 `tests/ota.test.ts`: 키1 서명 통과 · 키2 서명 통과 · 모르는 키 · 서명 없음 · 깨진 서명 거부 · 두 키 어느 쪽이든 서명 뒤 판 · 주소 · 체크섬 변조 거부 · 박힌 키가 서로 다른 P-256 둘 · `publicKeyOf` = 앱에 박는 꼴.
+
+### 무적 점멸 → 밝은 테
+- 불변 13 깜빡임 금지(사용자 「깜빡임은 눈 아파」)에 걸리던 피격 무적 점멸(`invulnTicks % 6 < 4`, 1초 10번 꺼짐)을 바꿨다. 리버스 블러드와 같은 안: 외곽선을 밝은 사다리 칸으로.
+- 새 판: 무적 동안 졸라맨을 계속 그리고 몸 선(머리 고리 포함)만 옅은 먹 `JUICE_SYS.INVULN_INK` #A9A7AE(style.css `--ink3`, 먹 사다리의 한지 쪽)로 바꾼다. 한지 후광 · 칼 · 마스크 · 안전모는 제 색. 무적이 끝나면 먹으로 돌아온다. 필살 중은 예전처럼 제 색.
+- 판정은 `renderer.ts` `invulnView` 한 곳(순수 함수 · 가드 `tests/invuln-look.test.ts`). 선 색은 `drawPlayer`의 `ink` 인자로 살아 있는 몸에만 넘긴다 — 구운 프레임(깔림 · 사망)은 캐시라 안 바꾼다(그 자세는 피격 무적과 거의 안 겹친다).
+- 두 안 고르기: 시험판 디버그 메뉴(로고 7연타 뒤, `DEV_TOOLS`에서만 붙는다) 「무적 표시:밝은 테 ↔ 옛 점멸」. 출시 판엔 메뉴가 없어 늘 밝은 테. 저장은 안 한다(부팅마다 밝은 테).
+- 판정 자료(`scripts/fx` 하네스에 `hurt` 장면 · `--invuln` 줄 더함): `tmp/fx/invuln/strip-hurt.png`(24틱 1틱 간격) · `full/strip-hurt.png` + `motion.json`(96틱) · `sword.mp4` · `sword-slow.mp4`(나란히) · 폰 1배 `phone-line.jpg` · `phone-blink.jpg`(무적 58틱 남은 칸 = 점멸이 꺼진 칸). git 밖.
+- 계측(96틱, 졸라맨 먹 화소): 밝은 테 `relit` 0 · 옛 점멸 `relit` 15.
+- 못 본 것: 실기기 · 밤 판(야간 작전 먹 막 위에서 옅은 먹이 묻히는지) · 2막 배경. 미머지 · 미게시.
+- 관문: tsc 0 · 시험 93파일 1284 통과 / 12 건너뜀 · `npm run build` 통과.
