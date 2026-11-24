@@ -17,6 +17,19 @@ export interface AdsPort {
 const TEST_REWARDED_AD_UNIT_ID = 'ca-app-pub-3940256099942544/5224354917';
 // 실 ID는 빌드 변수(VITE_ADMOB_REWARDED_ID)로 주입 — 없으면 테스트 단위.
 const REWARDED_AD_UNIT_ID = (import.meta.env.VITE_ADMOB_REWARDED_ID as string | undefined) || TEST_REWARDED_AD_UNIT_ID;
+// 실 단위는 실 앱 ID로 구운 AAB(versionCode가 LIVE_MIN_BUILD 이상)에서만 쓴다. 앱 ID는 네이티브라 OTA로 안 바뀌는데
+// .env.production의 실 단위는 OTA 묶음에도 실리므로, 시험 앱 ID 앱(시험 AAB code<10 · 비공개 테스트 기기)은 런타임에 시험 단위로 돌린다.
+// shell/android/app/build.gradle 이 같은 값으로 두 방향(시험 앱 ID + code 10 이상 · 실 앱 ID + code 10 미만)을 막는다.
+const LIVE_MIN_BUILD = 10;
+async function rewardedUnitId(): Promise<string> {
+  try {
+    const app = (window as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor?.Plugins?.App as
+      { getInfo?: () => Promise<{ build?: string }> } | undefined;
+    return Number((await app?.getInfo?.())?.build) >= LIVE_MIN_BUILD ? REWARDED_AD_UNIT_ID : TEST_REWARDED_AD_UNIT_ID;
+  } catch {
+    return TEST_REWARDED_AD_UNIT_ID; // 빌드 번호를 못 읽으면 시험 단위(무효 트래픽이 없는 쪽)
+  }
+}
 
 // 플러그인 이벤트 — @capacitor-community/admob RewardAdPluginEvents와 짝
 const REWARD_EVENT = 'onRewardedVideoAdReward';
@@ -131,8 +144,9 @@ async function showNativeRewarded(): Promise<AdResult> {
     for (const h of [rewardHandle, dismissHandle, failHandle, showFailHandle]) if (h) handles.push(h);
 
     // ★prepare 림보 상한(08-30 검증): settle 경주는 prepare 이후에야 시작되므로 여기가 사각.
+    const adId = await rewardedUnitId();
     await Promise.race([
-      admob.prepareRewardVideoAd!({ adId: REWARDED_AD_UNIT_ID }),
+      admob.prepareRewardVideoAd!({ adId }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('prepare timeout')), PREPARE_TIMEOUT_MS)),
     ]);
 

@@ -142,16 +142,19 @@ Android 12+ 시스템 스플래시와 androidx 호환 경로(API 24~30)가 같�
 - [ ] **Data Safety 폼** — 「수집·공유 예」(Google Mobile Ads SDK: 대략적 위치·진단·광고 ID 등·앱 상호작용).
       개발자가 직접 수집하는 데이터는 없음. 항목별 답은 [STORE_LISTING.md](STORE_LISTING.md) 「데이터 보안」이 정본
 - [ ] **광고 ID 선언** — 「예, 광고 목적」 (같은 문서)
-- [ ] **실 AdMob ID 교체** — 지금 매니페스트의 앱 ID(`AndroidManifest.xml`)와 광고 단위 ID(`src/platform/ads.ts`)는
-      둘 다 Google 공식 테스트 값이다. 실 ID로 바꾼 AAB를 올려야 광고 수익이 생긴다(짝값 표는 `shell/README.md`).
-      앱 ID는 네이티브라 AAB 재빌드가 필요하다
+- [ ] **실 AdMob ID 연결 (2026-11-24 발급, 연결 끝 · 굽기만 남음)** — 앱 ID `ca-app-pub-6546297621990185~6639112182` · 보상형 단위 `ca-app-pub-6546297621990185/4012948841`.
+      앱 ID는 네이티브라 AAB 재빌드가 필요하고, **출시 굽기 명령에만** 있다(매니페스트는 `${admobAppId}` 자리표시, 기본 = Google 테스트 앱 ID):
+      `npm run version:native -- <versionName> 10` → `GUNBBU_RELEASE=1 npm run web:build` → `npx cap sync android` → `cd shell/android && ./gradlew bundleRelease -PadmobAppId=ca-app-pub-6546297621990185~6639112182`
+      단위는 `.env.production`의 `VITE_ADMOB_REWARDED_ID`(출시 검사가 읽는다). 이 값은 OTA 묶음에도 실리지만 `ads.ts`가 **versionCode ≥ `LIVE_MIN_BUILD`(10)인 앱에서만** 쓴다
+      (`App.getInfo().build` 런타임 판정, 못 읽으면 시험 단위). 그래서 이미 구운 시험 AAB(code1)나 비공개 테스트 기기는 OTA를 받아도 시험 광고다(테스터가 실광고를 눌러 무효 트래픽이 되는 일 없음).
+      gradle이 두 방향을 막는다(우회 없음): 시험 앱 ID + code ≥ 10 · 실 앱 ID + code < 10. 시험 AAB는 code 10 미만으로 굽는다. 짝값 표는 `shell/README.md`
 - [ ] **릴리스 가드 통과** — 테스트 ID가 실려 나가는 걸 기계가 막는다(2026-10-27).
       웹: `GUNBBU_RELEASE=1 VITE_ADMOB_REWARDED_ID=ca-app-pub-<발급 값> npm run build` — `VITE_SELLER_INFO`는 레포의 `.env.production`(커밋됨, 공개 사업자 정보)에서 빌드가 읽는다. `scripts/check-release.mjs`가 빌드 맨 앞에서
       빈 값·테스트 단위·형식 오류면 중단한다(`npm run check:release`로 단독 실행).
       셸 env만이 아니라 Vite가 번들에 굽는 `.env` · `.env.local` · `.env.production` · `.env.production.local` 값도 같이 본다(2026-11-13, 같은 키는 셸 env가 이김).
       그래서 `.env.local`에 `VITE_TESTER=1`을 둔 채 릴리스 빌드하면 멈춘다. `--mark`도 같은 값을 보므로 표식도 안 찍힌다.
       `VITE_SELLER_INFO`는 8자 이상이어야 한다(상호 · 대표 · 연락처). 빈 값이나 점 하나 같은 자리표시는 멈춘다.
-      셸: `bundleRelease`·`assembleRelease`는 `AndroidManifest.xml`의 AdMob 앱 ID에 테스트 발행자 번호가 있으면 GradleException.
+      셸: `bundleRelease`·`assembleRelease`는 AdMob 앱 ID(`-PadmobAppId`, 없으면 테스트 값)에 테스트 발행자 번호가 있으면 GradleException.
       테스트 ID로 일부러 굽는 내부 시험만 `-PallowTestAds`. 디버그 빌드는 막지 않는다
       웹 번들 표식: 릴리스 모드로 끝까지 빌드되면 `dist/release-build.txt`가 생기고(`check-release.mjs --mark`), `bundleRelease`·`assembleRelease`는
       앱에 실린 `assets/public/release-build.txt`가 없으면 GradleException. `GUNBBU_RELEASE=1 npm run web:build` 뒤 `npx cap sync android`까지 해야 들어온다.

@@ -10,6 +10,9 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// AdMob 앱 ID(네이티브) — 기본 = Google 공식 테스트 앱 ID. 실 ID는 출시 굽기 때만 -PadmobAppId=ca-app-pub-…~… (docs/RELEASE.md §7)
+def admobAppId = (findProperty('admobAppId') ?: 'ca-app-pub-3940256099942544~3347511713').toString()
+
 // 릴리스 산출물(assembleRelease·bundleRelease)은 key.properties 없이 굽지 않는다 — 없으면 위 서명 설정이 조용히 빠져
 // 무서명 AAB가 나오고 Play 업로드에서야 발각된다. 디버그 빌드·동기화는 영향 없음.
 // Android Studio 「Generate Signed Bundle」은 서명 정보를 -P 로 주입하므로 통과시킨다.
@@ -26,12 +29,18 @@ gradle.taskGraph.whenReady { graph ->
     }
     // 테스트 AdMob 앱 ID(발행자 3940256099942544)를 단 채 릴리스가 나가면 Play 심사·수익 단계에서야 발각된다.
     // 디버그 빌드는 막지 않는다. 일부러 테스트 ID로 릴리스를 굽는 경우(내부 시험 등)만 -PallowTestAds 로 우회.
-    if (wantsRelease && !project.hasProperty('allowTestAds')) {
-        def manifestText = file('src/main/AndroidManifest.xml').text
-        def adId = (manifestText =~ /APPLICATION_ID"[^>]*value="([^"]*)"/)
-        if (adId.find() && adId.group(1).contains('3940256099942544')) {
-            throw new GradleException("AndroidManifest 의 AdMob 앱 ID가 Google 테스트 값이다 (${adId.group(1)}) — 실 앱 ID로 바꾸거나, 일부러 굽는 거라면 -PallowTestAds (정본: docs/RELEASE.md)")
-        }
+    if (wantsRelease && !project.hasProperty('allowTestAds') && admobAppId.contains('3940256099942544')) {
+        throw new GradleException("AdMob 앱 ID가 Google 테스트 값이다 (${admobAppId}) — -PadmobAppId=<실 앱 ID> 로 주거나, 일부러 굽는 거라면 -PallowTestAds (정본: docs/RELEASE.md)")
+    }
+    // 앱 ID(네이티브)와 광고 단위(웹, OTA로 감)의 짝 — src/platform/ads.ts 는 versionCode ≥ LIVE_MIN_BUILD 인 앱에서만 실 단위를 쓴다.
+    // 시험 앱 ID에 높은 코드를 달면 OTA가 그 앱에 실 단위를 보내고(광고 안 뜸), 실 앱 ID에 낮은 코드를 달면 실광고 AAB가 시험 단위로 돈다. 우회 없음.
+    def liveMinBuild = ((rootProject.file('../../src/platform/ads.ts').text =~ /LIVE_MIN_BUILD = (\d+)/)[0][1]).toInteger()
+    def code = android.defaultConfig.versionCode
+    if (wantsRelease && admobAppId.contains('3940256099942544') && code >= liveMinBuild) {
+        throw new GradleException("시험 AdMob 앱 ID인데 versionCode ${code} ≥ LIVE_MIN_BUILD ${liveMinBuild} — OTA가 이 앱에 실 광고 단위를 보낸다. 시험 AAB는 versionCode < ${liveMinBuild}")
+    }
+    if (wantsRelease && !admobAppId.contains('3940256099942544') && code < liveMinBuild) {
+        throw new GradleException("실 AdMob 앱 ID인데 versionCode ${code} < LIVE_MIN_BUILD ${liveMinBuild} — 이 앱은 시험 단위를 쓴다. npm run version:native -- <versionName> ${liveMinBuild} 로 올릴 것")
     }
     // CAP_SERVER_URL(시험판 껍데기) env가 남은 셸에서 sync하면 앱이 실린 번들 대신 그 원격 주소를 띄운다.
     // 일부러 굽는 내부 시험만 -PallowServerUrl. 출시 셸은 env 없이 npx cap sync android 를 다시 한다.
@@ -53,6 +62,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+        manifestPlaceholders = [admobAppId: admobAppId]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

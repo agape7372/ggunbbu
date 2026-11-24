@@ -61,3 +61,28 @@ describe('ads 경주', () => {
     expect(await ads.showRewarded('revive')).toBe('skip');
   });
 });
+
+describe('광고 단위 고르기 — 실 단위는 versionCode ≥ 10 앱에서만(OTA가 시험 앱 ID 앱에 실 단위를 못 보낸다)', () => {
+  const LIVE = 'ca-app-pub-1234567890123456/1234567890';
+  const TEST = 'ca-app-pub-3940256099942544/5224354917';
+  async function unitFor(getInfo?: () => Promise<{ build?: string }>): Promise<string> {
+    vi.resetModules();
+    vi.stubEnv('VITE_ADMOB_REWARDED_ID', LIVE);
+    const f = fakeAdMob(async (emit) => { await tick(); emit('onRewardedVideoAdReward', { amount: 1 }); emit('onRewardedVideoAdDismissed'); return { amount: 1 }; });
+    vi.stubGlobal('window', { Capacitor: { Plugins: { AdMob: f.plugin, ...(getInfo ? { App: { getInfo } } : {}) } } });
+    const { createAdsPort: fresh } = await import('../src/platform/ads');
+    expect(await fresh().showRewarded('revive')).toBe('ok');
+    return (f.plugin.prepareRewardVideoAd.mock.calls[0] as unknown as [{ adId: string }])[0].adId;
+  }
+  afterEach(() => vi.unstubAllEnvs());
+  it.each(['1', '9', '', 'abc'])('빌드 %s → 시험 단위', async (b) => {
+    expect(await unitFor(async () => ({ build: b }))).toBe(TEST);
+  });
+  it('빌드 번호를 못 읽으면(플러그인 없음 · getInfo 실패) → 시험 단위', async () => {
+    expect(await unitFor()).toBe(TEST);
+    expect(await unitFor(async () => { throw new Error('x'); })).toBe(TEST);
+  });
+  it.each(['10', '11'])('빌드 %s(실 앱 ID AAB) → 실 단위', async (b) => {
+    expect(await unitFor(async () => ({ build: b }))).toBe(LIVE);
+  });
+});

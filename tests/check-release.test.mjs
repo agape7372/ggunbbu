@@ -74,3 +74,14 @@ it('셸 build.gradle 이 릴리스 작업에서 앱에 실린 capacitor.config.j
   expect(gradle).toContain('allowServerUrl');
   expect(gradle).toMatch(/server\?\.url/);
 });
+
+it('레포 .env.production 의 광고 단위 · ads.ts 의 LIVE_MIN_BUILD · 셸 gradle 짝(실 ID를 출시 빌드에만)', () => {
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  expect(checkRelease(releaseEnv(root, { GUNBBU_RELEASE: '1', VITE_TESTER: '' }))).toEqual([]); // 실 단위 형식 · 테스트 발행자 아님 · 판매자 표시
+  const live = /LIVE_MIN_BUILD = (\d+)/.exec(readFileSync(new URL('../src/platform/ads.ts', import.meta.url), 'utf8'));
+  expect(live).not.toBeNull();
+  const gradle = readFileSync(new URL('../shell/android/app/build.gradle', import.meta.url), 'utf8');
+  expect(gradle).toContain('LIVE_MIN_BUILD'); // gradle 이 같은 상수를 읽어 시험 앱 ID + 높은 코드 · 실 앱 ID + 낮은 코드를 막는다
+  expect(gradle).toContain('manifestPlaceholders');
+  expect(readFileSync(new URL('../shell/android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8')).toContain('${admobAppId}');
+});

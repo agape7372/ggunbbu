@@ -38,10 +38,11 @@
 
         <!-- AdMob 앱 ID. Ads SDK(@capacitor-community/admob)가 실려 있는데 이 meta-data가
              없으면 앱이 **기동 시점에 크래시**한다 (podoal 실측) — 플러그인 제거 전까지 절대 빼지 말 것.
-             ⚠현재는 Google 공식 테스트 앱 ID — Play 제출 전 실 AdMob 앱 ID로 교체(README 짝값 표). -->
+             값은 build.gradle 의 manifestPlaceholders(admobAppId)가 채운다 — 기본 = Google 공식 테스트 앱 ID,
+             실 앱 ID는 출시 굽기 때만 -PadmobAppId (docs/RELEASE.md §7). -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="${admobAppId}" />
 
         <!-- 광고 SDK는 기본값이면 앱이 켜지자마자 측정 자료를 Google로 보낸다. 처리방침은
              「광고 보기 버튼을 누르지 않으면 전송되지 않습니다」라고 적었으니, 첫 광고 요청
