@@ -2622,3 +2622,4 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 저장 호환: 키 · 형식 그대로(`butterTierReached` · `butterBest`). 옛 `homeJob: 'butter'`는 `toJob`이 `'event'`로 읽는다. 가드 = `tests/home-logic.test.ts` 「저장 호환: 옛 버터바 저장 → 새 판 로드 → 기록 · 회차 · 일감 그대로」.
 - 시험: `tests/event-stages.test.ts`(시드 셋 × 봇이 치며 구역 경계 셋을 넘어 2막까지, bonus 0틱 · `bonusEnter` 0 · 해금 1 · 2 · 3) · home-logic(일감 순서 · 목록에 버터바 · 회차 열림) · 쪽지 · 기믹 · 필살 지연 시험은 버터바 대신 구역 경계를 넘는 꼴로 고침.
 - 캡처(360×640 ×3, `tmp/event-stages/`, git 밖): `before-*`(origin/main) · `after-*`. 메뉴 `01` · 목록 `02` · 버터바 회차 `03` · 뒤로 `04` · 아케이드 경계 앞 `10` · 경계 `11-cross-*` · 뒤 `12`.
+- 시험 광고 AAB 다시 구움(11-24, 아이콘 교체 판 `a9409a9` 기준): 같은 길(`-PallowDevWeb -PallowTestAds`), versionCode 1 유지. `D:\gunbbu-builds\gunbbu-1.0.0-code1-testads.aab` 덮어씀 — 12,537,076 B · sha256 `91f34d54b0af3943213b47d442db97d39b90617ecb4796298ccd915e99e08841` · 서명 지문 업로드 키와 같음 · `.so` 0. 이 줄 시점에 main · release/1.0 승격 push는 아직 안 됐다(권한 거부).
