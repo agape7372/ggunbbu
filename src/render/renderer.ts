@@ -50,9 +50,10 @@ let shakeT = 0;
 let kickY = 0;
 let kickV = 0;
 const haptic: HapticCounters = { hit: 0, bossHit: 0 };
-/** 피격 무적 표시(11-23) — 'line' = 선을 옅은 먹으로(기본, 꺼지지 않는다) · 'blink' = 옛 점멸. 고르는 곳은 시험판 디버그 메뉴뿐이라 출시 판은 늘 'line' */
+/** 피격 무적 표시 — 'blink' = 점멸(기본 · 출시 판) · 'line' = 선을 옅은 먹으로(시험판 디버그 메뉴에서만 고른다).
+ *  11-24 사용자가 두 안을 폰에서 비교하고 점멸을 골랐다(「건뿌는 옛 점멸이 나아」) — 기본을 밝은 테로 되돌리지 마라 */
 export type InvulnLook = 'line' | 'blink';
-let invulnLook: InvulnLook = 'line';
+let invulnLook: InvulnLook = 'blink';
 export function setInvulnLook(v: InvulnLook): void { invulnLook = v; }
 
 /** 이 프레임 졸라맨 — draw = 그리나, ink = 선 색(null = 제 색). 피격 직후(≤HIT_IFRAMES)만 바뀐다.
@@ -576,7 +577,7 @@ export function drawGame(ctx: CanvasRenderingContext2D, s: GameState): void {
   // ★08-30 계약 개정: 관통 시각화(반투명·스침 획·착지 위험 표시)는 전부 제거했다.
   // 밑면이 막고 누르는 세계에서는 "통과 중"이라는 상태 자체가 없다 — 없는 것을 그리면 거짓말이다.
   // 접촉 피드백은 core가 발행하는 headBonk 이벤트(먼지·소리·진동)가 진다.
-  // 피격 직후(≤HIT_IFRAMES)만 무적 표시 — 기본은 선을 옅은 먹으로(꺼졌다 켜지지 않는다, 불변 13). 옛 점멸은 시험판에서만 고른다(invulnView)
+  // 피격 직후(≤HIT_IFRAMES)만 무적 표시 — 기본은 점멸(11-24 사용자 선택, 불변 13 예외). 밝은 테는 시험판에서만 고른다(invulnView)
   drawWazaMid(ctx, cam); // 갈라진 건물 · 월하난무의 밤과 달 — 건물 위, 졸라맨 아래(졸라맨이 달을 등지고 선다)
   const inv = invulnView(s.player.invulnTicks, s.player.pose === 'special' || !!wazaShowState());
   setPlayerWeapon(s.weapon);

@@ -224,9 +224,9 @@ export function mountDebugMenu(getState: () => GameState | null, open = true): v
     cycleFallMul();
     fallBtn.textContent = `낙하×${runtime.fallMul}`;
   });
-  // 피격 무적 표시 두 안 고르기(11-23) — 시험판에서만 보인다(이 메뉴는 DEV_TOOLS일 때만 붙는다). 출시 판은 기본 「밝은 테」만
-  let look: InvulnLook = 'line';
-  const lookBtn = mk('무적 표시:밝은 테', () => {
+  // 피격 무적 표시 두 안 고르기(11-23) — 시험판에서만 보인다(이 메뉴는 DEV_TOOLS일 때만 붙는다). 기본 = 옛 점멸(11-24 사용자 선택 · 출시 판도 이것)
+  let look: InvulnLook = 'blink';
+  const lookBtn = mk('무적 표시:옛 점멸', () => {
     look = look === 'line' ? 'blink' : 'line';
     setInvulnLook(look);
     lookBtn.textContent = `무적 표시:${look === 'line' ? '밝은 테' : '옛 점멸'}`;

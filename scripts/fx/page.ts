@@ -89,7 +89,7 @@ function run(line: Line, sc: Scene, input: (t: number) => Partial<InputFrame>, o
   tickEffects(); // fxLastNow를 가짜 시계에 맞춘다 — 첫 프레임 dt가 판마다 1/60
   // 화면 번쩍임(다침 붉은 면 · 완파 반전 · 필살 반전)은 기본으로 끈다 — 무기 이펙트와 상관없이 양쪽 줄에 똑같이 깜빡여 판정 영상에서 눈이 아프다(11-22 지적). --flash면 게임 기본(2)
   setFeedbackOptions({ flashLevel: opts.flash ? 2 : 0 });
-  setInvulnLook(line.look ?? 'line');
+  setInvulnLook(line.look ?? 'blink'); // 안 주면 게임 기본(점멸)
   initRenderer(); // resetRunState(effects · screenfx · boss · landmark · wazaShow) + smoothCam 0
   resetBladeFx();
   seedBladeFx(7);
@@ -111,7 +111,7 @@ function run(line: Line, sc: Scene, input: (t: number) => Partial<InputFrame>, o
     }
   } finally {
     if (shape) RECIPES[shape] = ORIG[shape];
-    setInvulnLook('line');
+    setInvulnLook('blink');
   }
 }
 

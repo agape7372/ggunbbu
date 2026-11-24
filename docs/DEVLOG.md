@@ -2598,3 +2598,4 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 못 본 것: 실기기 · 밤 판(야간 작전 먹 막 위에서 옅은 먹이 묻히는지) · 2막 배경. 미머지 · 미게시.
 - 관문: tsc 0 · 시험 93파일 1284 통과 / 12 건너뜀 · `npm run build` 통과.
 - 승격(11-23, 주인 「결정후 앱승격까지」): main · release/1.0 `3e45a12` 앞감기 push(`9d783e4..3e45a12`) · Pages run 45188819475 성공(`main-A-C1lIxY.js`에 INVULN_INK #A9A7AE · 공개 키 둘, 「무적 표시」 글자는 없음 = 출시 판엔 토글 없음) · 시험판 `index-DhGu_akp` · `main-Hcjjd9H0`(배포 전 라이브 = `CpXohuBQ` 확인 · 디버그 메뉴 「무적 표시:밝은 테 ↔ 옛 점멸」 눌러 확인, 캡처 `tmp/promote/preview-debug-menu.png` git 밖). OTA 발행 · AAB · 스토어는 안 했다.
+- 11-24 주인 폰 판정 「건뿌는 옛 점멸이 나아」 → 기본(출시 판)을 옛 점멸로 되돌렸다. 밝은 테 코드는 지우지 않고 시험판 디버그 메뉴 「무적 표시」 토글에만 남겼다(토글 기본도 점멸). 불변 13에 예외 한 줄 · `tests/invuln-look.test.ts`를 새 기본에 맞춤 · `scripts/fx` 하네스 기본도 점멸.
