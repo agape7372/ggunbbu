@@ -3,14 +3,15 @@
 import type { Act2Phase, Mode } from '../core/types';
 import { ACT2_INTRO, CHAPTER_LINES, ENDING_FULL_COMBO, ENDING_LINES } from './story';
 import { ACT2_PHASES, BOSS_NAME, ITEM_COPY, regionOf, TAGLINE, WAZA_COPY } from './world';
-import { butterChallengeEnd, butterEnterLines, pickQuip, SCREENS } from './screens';
+import { butterChallengeEnd, EVENT_STAGES, pickQuip, SCREENS, type EventId } from './screens';
 import { CAPTIONS, destroyedCaption, onomatoFor } from './juice';
 
+export type { EventId };
 export {
   ACT2_PHASES,
   BOSS_NAME,
   butterChallengeEnd,
-  butterEnterLines,
+  EVENT_STAGES,
   CAPTIONS,
   destroyedCaption,
   ENDING_FULL_COMBO,

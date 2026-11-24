@@ -20,12 +20,15 @@ function arcade(seed = 7): GameState {
   return s;
 }
 
-/** 버터바를 끝내고 아케이드로 돌아오는 틱까지 — 쪽지가 뜬다 */
-function finishBonus(s: GameState): void {
-  enterBonus(s, 1);
-  s.bonus!.queue = [];
-  s.stackSpawnCd = 0;
+/** 아케이드 첫 구역 경계를 넘는 한 틱 — 쪽지가 뜬다(11-24부터 버터바를 거치지 않는다).
+ *  몇 번이고 다시 넘게 구역을 0으로 되돌린 뒤 점수를 경계에 둔다 */
+function crossZone(s: GameState): void {
+  s.chapter = 0;
+  s.score = Math.ceil(ACT1.UNLOCK_SCORE * ACT1.CHAPTER_BOUNDS[0]);
   advance(s, EMPTY_INPUT);
+}
+function zoneOffer(s: GameState): void {
+  crossZone(s);
   s.events.length = 0;
 }
 
@@ -183,17 +186,17 @@ describe('초반 기다림 — 생김 높이', () => {
 describe('현장 조건 — 제안 · 고르기', () => {
   it('perk가 없는 판(토코톤 · 작전 · 지시서 · 버터바 도전)은 쪽지가 안 뜬다', () => {
     const s = makeState();
-    finishBonus(s);
+    zoneOffer(s);
     expect(s.mode).toBe('act1');
     expect(s.perk).toBeNull();
   });
 
-  it('버터바에서 돌아오면 쪽지가 뜨고 판이 선다 — 이벤트 하나', () => {
+  it('구역 경계를 넘으면 버터바 없이 쪽지가 뜨고 판이 선다 — 이벤트 하나', () => {
     const s = arcade();
-    enterBonus(s, 1);
-    s.bonus!.queue = [];
-    s.stackSpawnCd = 0;
-    advance(s, EMPTY_INPUT);
+    crossZone(s);
+    expect(s.mode).toBe('act1');
+    expect(s.bonus).toBeNull();
+    expect(s.events.some((e) => e.kind === 'bonusEnter')).toBe(false);
     expect(s.events.filter((e) => e.kind === 'perkOffer')).toHaveLength(1);
     const o = s.perk!.offer!;
     expect(PERK[o.a].side).toBe('safe');
@@ -207,7 +210,7 @@ describe('현장 조건 — 제안 · 고르기', () => {
 
   it('점프 = 왼쪽 · 공격 = 오른쪽, 고를 때 이벤트 하나', () => {
     const l = arcade(3);
-    finishBonus(l);
+    zoneOffer(l);
     const a = l.perk!.offer!.a;
     pick(l, JUMP);
     expect(l.perk!.picked).toEqual([a]);
@@ -215,7 +218,7 @@ describe('현장 조건 — 제안 · 고르기', () => {
     expect(l.events.filter((e) => e.kind === 'perkPick')).toEqual([{ kind: 'perkPick', n: 0 }]);
 
     const r = arcade(3);
-    finishBonus(r);
+    zoneOffer(r);
     const b = r.perk!.offer!.b;
     pick(r, ATTACK);
     expect(r.perk!.picked).toEqual([b]);
@@ -223,7 +226,7 @@ describe('현장 조건 — 제안 · 고르기', () => {
 
   it('연타가 이어지면 안 고른다(손을 CALM틱 놓아야) — AUTO틱이 지나면 왼쪽', () => {
     const s = arcade(5);
-    finishBonus(s);
+    zoneOffer(s);
     const a = s.perk!.offer!.a;
     for (let i = 0; i < PERK_RUN.AUTO - 1; i++) advance(s, i % 6 === 0 ? ATTACK : EMPTY_INPUT);
     expect(s.perk!.offer).not.toBeNull();
@@ -238,7 +241,7 @@ describe('현장 조건 — 제안 · 고르기', () => {
       const shown: PerkId[] = [];
       for (let round = 0; round < 4; round++) {
         s.hat = true;
-        finishBonus(s);
+        zoneOffer(s);
         const o = s.perk!.offer;
         if (round === 3) { expect(o).toBeNull(); break; } // 넷째는 없다(MAX 3)
         expect(o).not.toBeNull();
@@ -304,7 +307,7 @@ describe('현장 조건 — 효과', () => {
 
   it('속전속결 가드 최대 -25 — 고르는 순간 게이지가 줄고 회복도 거기서 멈춘다', () => {
     const s = arcade(11);
-    finishBonus(s);
+    zoneOffer(s);
     s.perk!.offer!.b = 'rush';
     pick(s, ATTACK);
     expect(s.guardGauge).toBe(GUARD_GAUGE.MAX - 25);
@@ -329,7 +332,7 @@ describe('현장 조건 — 효과', () => {
 
   it('새 안전모 = 고르는 순간 쓴다', () => {
     const s = arcade(2);
-    finishBonus(s);
+    zoneOffer(s);
     s.perk!.offer!.a = 'hat';
     pick(s, JUMP);
     expect(s.hat).toBe(true);

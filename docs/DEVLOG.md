@@ -2612,3 +2612,13 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - **시험 광고 AAB(비공개 테스트용, 코드 1)**: 실 AdMob ID가 아직 없다. `RELEASE.md` §7이 정한 「일부러 굽는 내부 시험」 길로만 구웠다 — 웹은 `GUNBBU_RELEASE` 없이 `npm --prefix shell run web:build`(시험 광고 단위), `npx cap sync android`, 셸은 `gradlew bundleRelease -PallowDevWeb -PallowTestAds`. 가드 코드는 그대로다. 산출물 `shell/android/app/build/outputs/bundle/release/app-release.aab`(복사본 `D:\gunbbu-builds\gunbbu-1.0.0-code1-testads.aab`) 12,577,672 B, sha256 `ce4b45e67b5a62892d3aefcc9edee3d516f805b3c57ecf7c6b82e6e9ec310c38`. `jarsigner -verify` 통과 · 서명 지문이 위 업로드 키와 같다. §7-1-4: `.so` 0개 → 16KB 정렬 해당 없음. **이 AAB는 실광고가 아니라 프로덕션에 올리지 않는다.**
 - 관문: `npm test` 93파일 1284 통과 / 12 건너뜀 · `npm run build`(tsc · 예산) 통과.
 - 남음(사용자): 실 AdMob 앱 ID · 보상형 단위 ID → 실광고 AAB(`GUNBBU_RELEASE=1` · versionCode 올림) · Play 콘솔 상품 17개 · 비공개 테스트 12명 × 14일 · keystore 백업 확인(`backup-keys.ps1`). 미머지 · 미푸시.
+
+## 2026-11-24 — 아케이드에서 버터바 뺌 · 홈 「이벤트 스테이지」 (`feat/event-stages`)
+- 사용자: 「건뿌 아케이드 중간에 버터바챌린지가 왜 나와? 버터바챌린지는 이벤트잖아. 그냥 버터바챌린지 없애고 이벤트 스테이지라는 항목으로 대체해, 그 안에서 고를 수 있게.」
+- 원인: `src/core/sim.ts` `stepAct1`이 구역 경계(`chapterOf`)를 넘을 때마다 `enterBonus(s, ch)`를 불러 버터바(mode `bonus`)로 들어갔다.
+- 고침(core): 구역 경계에선 `chapterUnlock` 이벤트 + 건물 정리(옛 버터바 복귀와 같은 `stack = null` · `RESPAWN_TICKS`) + 현장 조건 쪽지(`openOffer`)만 한다. 쪽지를 내미는 곳이 버터바 복귀에서 구역 경계로 옮겨 갔다. 야근(토코톤)의 주기 버터바는 그대로다.
+- 화면: 홈 일감 `butter` → `event`(「이벤트 스테이지」). 누르면 이벤트 목록(`overlay` `events` 화면) → 버터바 챌린지 → 회차 고르기(뒤로 = 목록). 챌린지가 끝나면 목록으로 돌아온다. 목록 = `content/screens.ts` `EVENT_STAGES` 한 줄씩, 들어가는 길은 `scenes` `openEvent` 한 줄씩.
+- 회차 열림: 1회차는 처음부터 열림(판에서 안 만나니 잠가 두면 못 연다). 2 · 3회차는 아케이드에서 그 구역 경계를 넘을 때 열린다 — 같은 저장 값 `butterTierReached`를 그 자리에서 올린다.
+- 저장 호환: 키 · 형식 그대로(`butterTierReached` · `butterBest`). 옛 `homeJob: 'butter'`는 `toJob`이 `'event'`로 읽는다. 가드 = `tests/home-logic.test.ts` 「저장 호환: 옛 버터바 저장 → 새 판 로드 → 기록 · 회차 · 일감 그대로」.
+- 시험: `tests/event-stages.test.ts`(시드 셋 × 봇이 치며 구역 경계 셋을 넘어 2막까지, bonus 0틱 · `bonusEnter` 0 · 해금 1 · 2 · 3) · home-logic(일감 순서 · 목록에 버터바 · 회차 열림) · 쪽지 · 기믹 · 필살 지연 시험은 버터바 대신 구역 경계를 넘는 꼴로 고침.
+- 캡처(360×640 ×3, `tmp/event-stages/`, git 밖): `before-*`(origin/main) · `after-*`. 메뉴 `01` · 목록 `02` · 버터바 회차 `03` · 뒤로 `04` · 아케이드 경계 앞 `10` · 경계 `11-cross-*` · 뒤 `12`.

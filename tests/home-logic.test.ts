@@ -1,6 +1,7 @@
 // 홈 현장: 일감 순서 · 「착수」 동작과 키 얼굴이 같은 판단 · 마지막 일감 저장 · 넓은 화면 키 밀기
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { JOBS, butterTier, confirmLabel, homeFaces, jobAction, nextStage, stepJob, toJob, type HomeFacts } from '../src/ui/homeLogic';
+import { JOBS, butterTier, confirmLabel, homeFactsOf, homeFaces, jobAction, nextStage, stepJob, toJob, type HomeFacts } from '../src/ui/homeLogic';
+import { EVENT_STAGES } from '../src/content';
 import { STAGES } from '../src/core/stages';
 import { emptyRecord, type StageRecord } from '../src/meta/stageRecord';
 import { DEFAULT_LAYOUT, KEY_ACTIONS, resolveLayout, spreadSide } from '../src/input/layout';
@@ -15,10 +16,10 @@ const facts = (o: Partial<HomeFacts> = {}): HomeFacts => ({
 });
 
 describe('일감 순서', () => {
-  it('아케이드 · 작업 지시서 · 구역 작전 · 야근 · 버터바, 끝에서 돈다', () => {
-    expect(JOBS).toEqual(['arcade', 'stage', 'ops', 'tokoton', 'butter']);
-    expect(stepJob('arcade', -1)).toBe('butter');
-    expect(stepJob('butter', 1)).toBe('arcade');
+  it('아케이드 · 작업 지시서 · 구역 작전 · 야근 · 이벤트 스테이지, 끝에서 돈다', () => {
+    expect(JOBS).toEqual(['arcade', 'stage', 'ops', 'tokoton', 'event']);
+    expect(stepJob('arcade', -1)).toBe('event');
+    expect(stepJob('event', 1)).toBe('arcade');
     expect(stepJob('stage', 1)).toBe('ops');
   });
   it('저장값 검증: 모르는 값 → 아케이드', () => {
@@ -26,6 +27,9 @@ describe('일감 순서', () => {
     expect(toJob('stage2')).toBe('arcade');
     expect(toJob(3)).toBe('arcade');
     expect(toJob(undefined)).toBe('arcade');
+  });
+  it('저장 호환: 옛 일감 butter(버터바 챌린지) → 이벤트 스테이지', () => {
+    expect(toJob('butter')).toBe('event');
   });
 });
 
@@ -44,10 +48,19 @@ describe('확인 동작', () => {
     expect(jobAction('tokoton', facts())).toEqual({ k: 'deny' });
     expect(jobAction('tokoton', facts({ act2Cleared: true }))).toEqual({ k: 'tokoton' });
   });
-  it('버터바: 0 잠김 · 1회차 바로 · 2회차부터 고르기', () => {
-    expect(jobAction('butter', facts())).toEqual({ k: 'deny' });
-    expect(jobAction('butter', facts({ butterTierReached: 1 }))).toEqual({ k: 'butter1' });
-    expect(jobAction('butter', facts({ butterTierReached: 2 }))).toEqual({ k: 'butterPick', tier: 2 });
+  it('이벤트 스테이지: 늘 열려 있고 목록(고르기)부터', () => {
+    expect(jobAction('event', facts())).toEqual({ k: 'events' });
+    expect(confirmLabel(jobAction('event', facts()))).toBe('고르기');
+  });
+  it('이벤트 목록에 버터바 챌린지가 있다', () => {
+    expect(EVENT_STAGES.map((e) => e.id)).toContain('butter');
+    expect(EVENT_STAGES.find((e) => e.id === 'butter')?.name).toBe('버터바 챌린지');
+  });
+  it('버터바 회차: 1회차는 처음부터 · 그 위는 저장 값(옛 기록 그대로)', () => {
+    expect(butterTier(facts())).toBe(1);
+    expect(butterTier(facts({ butterTierReached: 1 }))).toBe(1);
+    expect(butterTier(facts({ butterTierReached: 2 }))).toBe(2);
+    expect(butterTier(facts({ butterTierReached: 3 }))).toBe(3);
     expect(butterTier(facts({ allOpen: true }))).toBe(3);
   });
 });
@@ -106,5 +119,20 @@ describe('마지막 일감 저장', () => {
     expect(loadSave().homeJob).toBe('arcade');
     store.set(SAVE_KEY, JSON.stringify({ bestArcade: 1, homeJob: 'zzz' }));
     expect(loadSave().homeJob).toBe('arcade');
+  });
+  it('저장 호환: 옛 버터바 저장 → 새 판 로드 → 기록 · 회차 · 일감 그대로', () => {
+    // 11-24 전 기기의 저장 — 버터바 일감을 골라 둔 채 2회차까지 만나고 회차별 최고점을 남겼다
+    const old = { ...structuredClone(DEFAULT_SAVE), homeJob: 'butter', butterTierReached: 2, butterBest: { 1: 12_345, 2: 67_890 } };
+    store.set(SAVE_KEY, JSON.stringify(old));
+    const d = loadSave();
+    expect(d.butterTierReached).toBe(2);
+    expect(d.butterBest).toEqual({ 1: 12_345, 2: 67_890 });
+    expect(d.homeJob).toBe('event');
+    expect(butterTier(homeFactsOf(d, 1, false))).toBe(2);
+    // 다시 써도 같은 키 · 같은 값(형식 안 바뀜)
+    saveSave(d);
+    const again = JSON.parse(store.get(SAVE_KEY)!);
+    expect(again.butterTierReached).toBe(2);
+    expect(again.butterBest).toEqual({ 1: 12_345, 2: 67_890 });
   });
 });

@@ -24,9 +24,7 @@ export const SCREENS = {
     tokoton: '야근',
     tokotonSub: '끝없이 떨어진다',
     tokotonLocked: '2막을 깨면 열림',
-    butter: '버터바 챌린지',
-    butterSub: (round: number) => `${round}회차까지`,
-    butterLocked: '판에서 만나면 열림',
+    event: '이벤트 스테이지',
     ops: '구역 작전',
   },
 
@@ -79,6 +77,12 @@ export const SCREENS = {
     best: (n: number) => `최고 ${n.toLocaleString('ko-KR')}`,
     challengeEnd: '버터바 챌린지 끝!',
     rounds: ['1회차 · 얇은 겹', '2회차 · 세 겹', '3회차 · 100겹 타워'] as const,
+  },
+
+  /** 홈 일감 「이벤트 스테이지」 — 들어가면 EVENT_STAGES 목록에서 고른다 */
+  events: {
+    title: '이벤트 스테이지',
+    short: '이벤트',
   },
 
   tokoton: {
@@ -305,6 +309,8 @@ export function butterChallengeEnd(score: number): readonly string[] {
   return [SCREENS.butter.challengeEnd, SCREENS.result.score(score)];
 }
 
-export function butterEnterLines(chapterLines: readonly string[]): readonly string[] {
-  return [...chapterLines, '', SCREENS.butter.banner];
-}
+/** 이벤트 스테이지 목록 — 위에서부터 그 순서로 보인다. 새 이벤트는 여기 한 줄 + scenes `openEvent`의 들어가는 길 */
+export const EVENT_STAGES = [
+  { id: 'butter', name: '버터바 챌린지', sub: '세 회차 · 30초 안에 다 베기' },
+] as const;
+export type EventId = (typeof EVENT_STAGES)[number]['id'];
