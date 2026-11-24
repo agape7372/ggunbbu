@@ -660,13 +660,16 @@ export function grantMercyLife(s: GameState): void {
 function stepAct1(s: GameState): void {
   s.p = Math.min(1, s.score / (s.gimmick === 'none' ? ACT1.UNLOCK_SCORE : ACT1.OPS_P_SCORE));
 
-  // 챕터 전환 → 해금 이벤트 + 버터바 보너스 스테이지 진입
+  // 챕터 전환 → 해금 이벤트 + 구역 사이 현장 조건 쪽지. 버터바는 판에 끼지 않는다 — 홈 「이벤트 스테이지」에서만 고른다
   // 특별작전(기믹 판)은 시간제라 경계를 넘어도 그 구역에 머문다 — 난이도만 p를 따라 오른다
   const ch = chapterOf(s.p);
   if (ch > s.chapter && s.gimmick === 'none' && !s.wazaRun) {
     s.chapter = ch;
     s.events.push({ kind: 'chapterUnlock', n: ch });
-    enterBonus(s, ch); // 회차 = 통과한 경계 수 (1~3)
+    // 새 구역은 새 건물부터(옛 버터바 복귀와 같은 정리). 쪽지는 perk가 있는 판만 · 다음 틱부터 판이 선다
+    s.stack = null;
+    s.stackSpawnCd = STACK.RESPAWN_TICKS;
+    openOffer(s);
     return;
   }
 
@@ -768,7 +771,5 @@ function stepBonus(s: GameState): void {
     s.bonus = null;
     s.stack = null;
     s.stackSpawnCd = STACK.RESPAWN_TICKS;
-    // 아케이드 구역 사이 — 현장 조건 쪽지(perk가 있는 판만 · 다음 틱부터 판이 선다)
-    if (b.returnMode === 'act1') openOffer(s);
   }
 }

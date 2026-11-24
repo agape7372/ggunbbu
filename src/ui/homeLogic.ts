@@ -7,11 +7,12 @@ import type { Material, StageDiff, Theme } from '../core/types';
 import { diffUnlocked, recordOf, type StageRecord } from '../meta/stageRecord';
 import type { KeyFace, KeyFaces } from '../input/touch';
 
-export const JOBS = ['arcade', 'stage', 'ops', 'tokoton', 'butter'] as const;
+export const JOBS = ['arcade', 'stage', 'ops', 'tokoton', 'event'] as const;
 export type JobId = (typeof JOBS)[number];
 
-/** 저장값 검증 — 모르는 값은 아케이드 */
+/** 저장값 검증 — 모르는 값은 아케이드. 옛 일감 'butter'(11-24 전 버터바 챌린지) = 이벤트 스테이지 */
 export function toJob(v: unknown): JobId {
+  if (v === 'butter') return 'event';
   return (JOBS as readonly unknown[]).includes(v) ? (v as JobId) : 'arcade';
 }
 
@@ -45,8 +46,7 @@ export type JobGo =
   | { k: 'stageMap' }
   | { k: 'ops' }
   | { k: 'tokoton' }
-  | { k: 'butter1' }
-  | { k: 'butterPick'; tier: number }
+  | { k: 'events' }
   | { k: 'deny' };
 
 /** 다음 차례 판 = 아직 못 깬 첫 판. 다 깼으면 null */
@@ -54,8 +54,10 @@ export function nextStage(recs: Readonly<Record<string, StageRecord>>): string |
   return STAGES.find((d) => recordOf(recs, d.id).lamp === 0)?.id ?? null;
 }
 
+/** 버터바 챌린지에서 열린 회차 수. 1회차는 처음부터 열려 있다(11-24, 판에서 안 만나니 잠가 두면 못 연다).
+ *  2 · 3회차는 아케이드에서 그 구역 경계를 넘으면 열린다(옛 「판에서 만난 회차」와 같은 저장 값 butterTierReached) */
 export function butterTier(f: HomeFacts): number {
-  return f.allOpen ? Math.max(3, f.butterTierReached) : f.butterTierReached;
+  return f.allOpen ? Math.max(3, f.butterTierReached) : Math.max(1, f.butterTierReached);
 }
 
 export function jobAction(job: JobId, f: HomeFacts): JobGo {
@@ -69,18 +71,14 @@ export function jobAction(job: JobId, f: HomeFacts): JobGo {
     }
     case 'ops': return { k: 'ops' };
     case 'tokoton': return f.act2Cleared || f.allOpen ? { k: 'tokoton' } : { k: 'deny' };
-    case 'butter': {
-      const tier = butterTier(f);
-      if (tier <= 0) return { k: 'deny' };
-      return tier === 1 ? { k: 'butter1' } : { k: 'butterPick', tier };
-    }
+    case 'event': return { k: 'events' };
   }
 }
 
 /** 「착수」 = 바로 들어간다 · 「고르기」 = 고르는 화면이 먼저 · 「잠김」 = 못 들어간다 */
 export function confirmLabel(go: JobGo): '착수' | '고르기' | '잠김' {
   if (go.k === 'deny') return '잠김';
-  return go.k === 'stageMap' || go.k === 'ops' || go.k === 'butterPick' ? '고르기' : '착수';
+  return go.k === 'stageMap' || go.k === 'ops' || go.k === 'events' ? '고르기' : '착수';
 }
 
 /** 매달린 건물 — 판에서 쓰는 층(core makeStack · makeFloor)으로만 짓는다 */
@@ -99,7 +97,7 @@ export function nextStageDef(recs: Readonly<Record<string, StageRecord>>) {
 
 export function jobBuilding(job: JobId, f: HomeFacts, homeTheme: Theme): JobBuilding {
   switch (job) {
-    case 'butter': return { variant: 'butterbar', theme: homeTheme, floors: BUTTER_FLOORS };
+    case 'event': return { variant: 'butterbar', theme: homeTheme, floors: BUTTER_FLOORS };
     case 'tokoton': return { variant: 'building', theme: 'modern', floors: TOKOTON_FLOORS };
     case 'ops': return { variant: 'building', theme: homeTheme, floors: OPS_FLOORS };
     case 'arcade': return { variant: 'building', theme: homeTheme, floors: ARCADE_FLOORS };

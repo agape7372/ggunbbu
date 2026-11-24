@@ -178,7 +178,8 @@ describe('시간차 필살 중엔 모드를 바꾸지 않는다', () => {
       const burst = log.find((e) => e.kind === 'wazaBurst') as { n: number } | undefined;
       expect(burst?.n).toBe(12);
       expect(log.some((e) => e.kind === 'stackDestroy')).toBe(true);
-      expect(s.mode).toBe(where === 'act2' ? 'act2' : 'bonus');
+      expect(s.mode).toBe(where === 'act2' ? 'act2' : where === 'tokoton' ? 'bonus' : 'act1');
+      if (where === 'chapter') expect(s.chapter).toBe(1); // 11-24부터 아케이드 구역 경계는 버터바 없이 act1에 남는다
     });
   }
 });

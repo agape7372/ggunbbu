@@ -6,6 +6,7 @@
 import type { SaveData, SaveSettings } from '../storage';
 import { HAT, SUPPLY, TICK } from '../config';
 import { SCREENS, TAGLINE } from '../content';
+import { EVENT_STAGES, type EventId } from '../content';
 import { playSfx } from '../audio/audio';
 import { ITEM_COPY, regionOf } from '../content/world';
 import type { PlayerPose } from '../core/types';
@@ -22,7 +23,7 @@ import { STAGE_MODE, STAGE_TEXT, fmtStageTime } from '../content/stages';
 import { STAGES } from '../core/stages';
 import type { Theme } from '../core/types';
 import { recordOf } from '../meta/stageRecord';
-import { JOBS, butterTier, homeFactsOf, jobBuilding, nextStage, stepJob, type HomeFacts, type JobId } from './homeLogic';
+import { JOBS, homeFactsOf, jobBuilding, nextStage, stepJob, type HomeFacts, type JobId } from './homeLogic';
 import { paintHang } from './homeArt';
 import type { StageDiff } from '../core/types';
 import { paintMissions, type MissionView, type TakeKind } from './missionView';
@@ -51,6 +52,7 @@ export type OverlayScreen =
   | 'pause'
   | 'settings'
   | 'butter'
+  | 'events'
   | 'gameover'
   | 'opsend'
   | 'ending'
@@ -159,6 +161,8 @@ export interface OverlayHandlers {
   onBoot(): void;
   /** 홈 이웃 일감(크레인 양옆)을 눌렀다 */
   onJob(dir: -1 | 1): void;
+  /** 이벤트 스테이지 목록에서 하나를 골랐다 */
+  onEvent(id: EventId): void;
   onButterRound(round: number): void;
   onButterBack(): void;
   onOpenSettings(): void;
@@ -229,6 +233,7 @@ export interface OverlayApi {
   showStory(lines: readonly string[], opts?: StoryOpts): void;
   showPause(v: PauseView): void;
   showSettings(s: SaveSettings, fromPause: boolean): void;
+  showEvents(): void;
   showButterPick(tier: number): void;
   showGameOver(v: GameOverView): void;
   showOpsEnd(v: OpsEndView): void;
@@ -317,7 +322,7 @@ const FIELD_SCREENS: ReadonlySet<OverlayScreen> = new Set(['title', ...RESULTS])
 
 /** 홈 크레인 양옆 이웃 일감 이름 — 짧게 */
 const JOB_SHORT: Record<JobId, string> = {
-  arcade: '아케이드', stage: STAGE_MODE.title, ops: SCREENS.menu.ops, tokoton: SCREENS.menu.tokoton, butter: '버터바',
+  arcade: '아케이드', stage: STAGE_MODE.title, ops: SCREENS.menu.ops, tokoton: SCREENS.menu.tokoton, event: SCREENS.events.short,
 };
 
 /** 크레인 팔 — 위 · 아래 현 + X자 격자 */
@@ -477,10 +482,19 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       ${frameSvg(9, 4, 5, 9)}
       <div class="ov-body">
         <header class="meta-band"><h2 class="meta-title">버터바 챌린지</h2></header>
-        <p class="meta-lead">판에서 만나 본 회차만 열린다.</p>
+        <p class="meta-lead">아케이드에서 구역을 넘으면 다음 회차가 열린다.</p>
         <div class="bt-rounds" data-el="butter-rounds"></div>
       </div>
-      <nav class="ov-nav" aria-label="이동"><button type="button" class="inkseal" data-act="butter-back">홈</button><span class="nav-stamp">버터바</span><span></span></nav>
+      <nav class="ov-nav" aria-label="이동"><button type="button" class="inkseal" data-act="butter-back">뒤로</button><span class="nav-stamp">버터바</span><span></span></nav>
+    </div>
+
+    <div class="ov-screen ov-meta" data-screen="events" hidden>
+      ${frameSvg(9, 4, 5, 9)}
+      <div class="ov-body">
+        <header class="meta-band"><h2 class="meta-title">${SCREENS.events.title}</h2></header>
+        <div class="bt-rounds" data-el="event-list"></div>
+      </div>
+      <nav class="ov-nav" aria-label="이동"><button type="button" class="inkseal" data-act="events-back">홈</button><span class="nav-stamp">${SCREENS.events.short}</span><span></span></nav>
     </div>
 
     <div class="ov-screen ov-field ov-rp" data-screen="gameover" hidden></div>
@@ -686,12 +700,10 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'tokoton':
         st = f.act2Cleared || f.allOpen ? m.tokotonSub : m.tokotonLocked;
         break;
-      case 'butter': {
-        nm = `<b>${m.butter}</b>`;
-        const tier = butterTier(f);
-        st = tier > 0 ? m.butterSub(tier) : m.butterLocked;
+      case 'event':
+        nm = `<b>${m.event}</b>`;
+        st = EVENT_STAGES.map((e) => `<span class="ln">${e.name}</span>`).join('');
         break;
-      }
     }
     const parts: [string, string][] = [['slip-top', top], ['slip-nm', nm], ['slip-st', st]];
     for (const [k, html] of parts) {
@@ -699,7 +711,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       el.innerHTML = html;
       el.hidden = !html;
     }
-    $('slip').classList.toggle('long', v.job === 'butter');
+    $('slip').classList.toggle('long', v.job === 'event');
     // 줄(.ln)마다 끊어 읽는다 — 붙여 읽으면 「집행기최고」처럼 붙는다
     const read = (el: HTMLElement): string => {
       const lines = [...el.querySelectorAll('.ln')].map((ln) => ln.textContent);
@@ -785,6 +797,12 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
     paintLevel($('set-shake'), s.shakeLevel);
     paintLevel($('set-flash'), s.flashLevel);
     $('set-layout-state').textContent = isDefaultLayout(s.buttonLayout) ? '기본 배치' : '바꾼 배치';
+  }
+
+  function paintEvents(): void {
+    $('event-list').innerHTML = EVENT_STAGES.map((e, i) =>
+      `<button type="button" class="stroke s${i + 1}" style="--i:${i}" data-act="event" data-event="${e.id}">`
+      + `<b>${escapeHtml(e.name)}</b><span>${escapeHtml(e.sub)}</span></button>`).join('');
   }
 
   function paintButter(tier: number): void {
@@ -1041,6 +1059,8 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       case 'butter-2': h.onButterRound(2); break;
       case 'butter-3': h.onButterRound(3); break;
       case 'butter-back': h.onButterBack(); break;
+      case 'events-back': h.onMetaBack(); break;
+      case 'event': h.onEvent(t.getAttribute('data-event') as EventId); break;
       case 'stage':
       case 'hang': h.onJobTap(); break;
       case 'stage-back': if (!stageUi.back()) h.onMetaBack(); break;
@@ -1202,6 +1222,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         $('training-row').hidden = fromPause; // 수습 교육도 홈에서만 — 판 도중에 새 판을 열지 않는다
       });
     },
+    showEvents(): void { enter('events', paintEvents); },
     showButterPick(tier: number): void { enter('butter', () => paintButter(tier)); },
     showGameOver(v: GameOverView): void {
       enter('gameover', () => {

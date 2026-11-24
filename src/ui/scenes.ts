@@ -9,7 +9,7 @@ import { enterAct2Phase, continueFromCheckpoint } from '../core/act2';
 import { judgeStage, stageScript, stageSeed, startStage } from '../core/stage';
 import { LESSONS, startTraining as setupTraining, trainingGuide, trainingKeys } from '../core/training';
 import { STAGES } from '../core/stages';
-import { ACT1, AUDIO, GIMMICK, OPERATION, PALETTE, PERK, TEACH, TRAINING, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
+import { ACT1, AUDIO, BONUS, GIMMICK, OPERATION, PALETTE, PERK, TEACH, TRAINING, UI_FLOW, VIEW, WAZA_GAUGE } from '../config';
 import { dustMul } from '../core/perks';
 import { drawGame, drawFieldStill, consumeEvents, initRenderer, setFeedbackOptions, applyCosmetics } from '../render/renderer';
 import { butterTier, homeFaces, jobAction, stepJob, type HomeFacts, type JobId } from './homeLogic';
@@ -27,7 +27,7 @@ import {
   STORY,
   SCREENS,
   butterChallengeEnd,
-  butterEnterLines,
+  type EventId,
   hudModeLabel,
   phaseBanner,
   pickQuip,
@@ -1278,8 +1278,15 @@ export function createApp(
     goPlay();
   }
 
+  /** 이벤트 스테이지 목록(content EVENT_STAGES)에서 고른 이벤트로 들어가는 길 — 이벤트가 늘면 여기 한 줄 */
+  function openEvent(id: EventId): void {
+    switch (id) {
+      case 'butter': overlay.showButterPick(butterTier(homeFactsFromSave(save, debugOpen()))); break;
+    }
+  }
+
   function startButterChallenge(round: number): void {
-    const cap = debugOpen() ? 3 : save.butterTierReached;
+    const cap = butterTier(homeFactsFromSave(save, debugOpen()));
     if (round < 1 || round > cap) return;
     lastRun = () => startButterChallenge(round);
     runLabel = SCREENS.butter.short;
@@ -1464,8 +1471,7 @@ export function createApp(
       case 'stageMap': overlay.showStages(stageOpts()); break;
       case 'ops': overlay.showOps(opsOpts()); break;
       case 'tokoton': startTokoton(); break;
-      case 'butter1': startButterChallenge(1); break;
-      case 'butterPick': overlay.showButterPick(go.tier); break;
+      case 'events': overlay.showEvents(); break;
     }
   }
 
@@ -1477,7 +1483,8 @@ export function createApp(
     onBoot: enterTitleFromBoot,
     onJob: (dir) => { if (!overlay.modalOpen()) moveJob(dir); },
     onButterRound: (round) => { playSfx('uiOk'); startButterChallenge(round); },
-    onButterBack: () => { playSfx('uiBack'); overlay.showTitle(titleView()); },
+    onEvent: (id) => { playSfx('uiOk'); openEvent(id); },
+    onButterBack: () => { playSfx('uiBack'); overlay.showEvents(); },
     onOpenSettings: () => { playSfx('uiBlip'); openSettings(); },
     onStorySkip: () => skipStory(true),
     onPauseResume: () => { playSfx('uiBlip'); resumePause(); },
@@ -1951,10 +1958,6 @@ export function createApp(
     if (s.mode === 'training') { if (s.over) finishTraining(true); return; } // 교육판은 엔딩 · 게임오버를 안 탄다
     if (endStageIfDue(s)) return; // 지시서 판은 아케이드 엔딩 · 게임오버 카드 · 부활을 절대 안 탄다
     if (endOpIfDue(s)) return;
-    // 버터바를 지나 새 구역으로 돌아왔다 — 구역 이름을 한 번 자막으로 (C11)
-    if (wasMode === 'bonus' && s.mode === 'act1' && !butterChallenge && !opRun) {
-      showCaps(runCaps.observe({ combo: s.combo, score: s.score, zone: s.chapter }));
-    }
     if (wasMode !== 'act2' && s.mode === 'act2' && wasMode !== 'bonus') {
       persist();
       noteKind('act2Enter');
@@ -1968,15 +1971,17 @@ export function createApp(
       showOverlay([SCREENS.butter.banner], 60 * 2, undefined, wipe);
       return;
     }
-    if (s.mode === 'bonus' && wasMode === 'act1') {
+    // 아케이드 구역 경계 — 구역 이야기 + 도장. 버터바는 끼지 않는다(11-24, 홈 「이벤트 스테이지」로 옮김).
+    // 넘은 경계 수만큼 버터바 챌린지 회차가 열린다(옛 「판에서 만난 회차」와 같은 저장 값)
+    if (s.mode === 'act1' && !opRun && s.events.some((e) => e.kind === 'chapterUnlock')) {
       const ch = s.chapter;
       save.unlockedChapters = Math.max(save.unlockedChapters, ch);
-      save.butterTierReached = Math.max(save.butterTierReached, s.bonus?.round ?? 0);
+      save.butterTierReached = Math.max(save.butterTierReached, Math.min(ch, BONUS.ROUNDS.length));
       saveSave(save);
-      bgm('butter');
-      showOverlay(butterEnterLines(STORY.chapters[Math.min(ch, 3)]), 60 * 3, undefined, {
-        ...wipe, stamps: [SCREENS.stamps.zone(Math.min(ch, 3) + 1)],
-      });
+      showOverlay(STORY.chapters[Math.min(ch, 3)], 60 * 3, () => {
+        goPlay();
+        showCaps(runCaps.observe({ combo: s.combo, score: s.score, zone: s.chapter })); // 구역 이름 자막 한 번 (C11)
+      }, { ...wipe, stamps: [SCREENS.stamps.zone(Math.min(ch, 3) + 1)] });
       return;
     }
     if (butterChallenge && wasMode === 'bonus' && s.mode === 'act1') {
@@ -1985,8 +1990,8 @@ export function createApp(
       const perfect = s.events.some((e) => e.kind === 'bonusPerfect');
       persist();
       showOverlay(butterChallengeEnd(s.score), 60 * 3, () => {
-        goTitle(false); // 회차 고르는 화면으로 — 다음 회차를 바로 고르게
-        overlay.showButterPick(butterTier(homeFactsFromSave(save, debugOpen())));
+        goTitle(false); // 이벤트 스테이지 목록으로 — 다른 이벤트 · 다음 회차를 바로 고르게
+        overlay.showEvents();
       }, {
         ...wipe,
         stamps: [...(newBest ? [SCREENS.stamps.best] : []), ...(perfect ? [SCREENS.stamps.perfect] : [])],

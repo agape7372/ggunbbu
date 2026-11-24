@@ -190,7 +190,8 @@ describe('특별작전은 구역 경계를 넘어도 그 구역에 머문다', (
       s.score = ACT1.OPS_P_SCORE; // 경계 셋과 2막 문턱을 한꺼번에 넘긴 점수
       advance(s, EMPTY_INPUT);
       if (g === 'none') {
-        expect(s.mode).not.toBe('act1');
+        expect(s.chapter).toBeGreaterThan(0); // 기본 판은 구역을 넘는다(11-24부터 버터바 없이 act1에서 바로)
+        expect(s.events.some((e) => e.kind === 'chapterUnlock')).toBe(true);
       } else {
         expect(s.mode).toBe('act1');
         expect(s.chapter).toBe(0);
