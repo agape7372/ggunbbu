@@ -145,7 +145,7 @@
   `tmp/fonts-src/`에 둔다, gitignore. 없으면 Google Fonts 저장소에서 받는다).
   주석 한 줄 때문이면 서브셋에 있는 말로 주석을 고치는 쪽이 싸다(11-12 주석의 「빽」 한 글자로 떨어졌다). CSS 주석은 안 본다.
 - 디버그 APK: `npm --prefix shell run web:build` → `npm --prefix shell run sync` → `npm --prefix shell run apk`.
-  릴리스 빌드는 `shell/android/key.properties`가 없거나 광고 ID가 테스트 값이거나 웹 번들에 `release-build.txt` 표식이 없거나 앱에 실린 `capacitor.config.json`에 `server.url`이 있으면 gradle이 멈춘다(`docs/RELEASE.md`).
+  릴리스 빌드는 서명 정보(`GUNBBU_KEY_PROPS` · `shell/android/key.properties` · `D:/keys/gunbbu/key.properties` 순)가 없거나 광고 ID가 테스트 값이거나 웹 번들에 `release-build.txt` 표식이 없거나 앱에 실린 `capacitor.config.json`에 `server.url`이 있으면 gradle이 멈춘다(`docs/RELEASE.md`).
 - 브라우저 확인: `.claude/launch.json` → 프리뷰(포트 5173), 모바일 뷰포트 375×812.
   화면 검수는 화면비 여럿으로 — 375×812만 보면 무대가 높이에 먼저 닿는 넓은 기기(사용자 실기기 416×657)에서
   메뉴가 화면 폭 61%에 갇힌 걸 못 본다(10-28). 메뉴 폭 ÷ 화면 폭을 숫자로 잰다.
@@ -181,7 +181,7 @@ core/통합/테스트는 메인이 직접.
 - 네이티브(Capacitor/AdMob/OTA)는 `src/platform/`에서만 만난다. 접근은 `window.Capacitor.Plugins`
   **런타임 조회만** — 정적/동적 bare import 금지(웹 번들 오염·WebView 무음 null). 플러그인 패키지는
   `shell/`에만 있고 루트 런타임 의존성은 0을 유지한다. 결제는 `src/platform/iap.ts`만 만난다(구매 → 지급 · 저장 → 지급 표식(IndexedDB strict) → 소비 · 승인 순서. 저장이 안 써지면 소비하지 않는다. 결제 장부 `paid` · 환불 회수 `revokePaid`. 11-18 고침 · 11-19 main 합침).
-- 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>`이 갱신한다(변수가 없으면 발행이 멈춘다. 기본 주소 없음). 매니페스트는 레포 밖 `D:keysgunbbuota-sign.pem`으로 서명하고 앱은 서명이 맞을 때만 받는다(`scripts/ota-sign.mjs` · `ota.ts` `otaKey`. 11-18 고침 · 11-19 main 합침).
+- 웹 번들 버전 = `src/version.ts` 단일 출처. 손으로 고치지 말고 `GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>`이 갱신한다(변수가 없으면 발행이 멈춘다. 기본 주소 없음). 매니페스트는 레포 밖 `D:/keys/gunbbu/ota-sign.pem`으로 서명하고 앱은 서명이 맞을 때만 받는다(`scripts/ota-sign.mjs` · `ota.ts` `otaKey`. 11-18 고침 · 11-19 main 합침).
   **앱 공개 키는 둘이다(11-23, 1.0 첫 AAB 전)**: 둘째 개인 키는 평소 안 쓰고 위치는 주인만 안다(첫 키를 잃었을 때만 `OTA_KEY`로 넘긴다). 발행 전 짝 확인은 소스가 아니라 빌드 산출물(`dist` · 앱 묶음)의 키로 한다. 가드 `tests/ota.test.ts`.
 - 에셋 예산 게이트: `npm run build`가 `scripts/check-budget.mjs`로 dist·이미지 상한과 중복을 검사한다.
 - 앱 아이콘 원본 = `assets/brand/src/gunbbu-icon.svg` 하나. 굽기 = `node scripts/gen-native-icons.mjs --playwright-module <playwright 폴더>`

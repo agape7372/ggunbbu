@@ -2,7 +2,10 @@ apply plugin: 'com.android.application'
 
 // levain 셸 정본 이식(08-30): key.properties 기반 서명 — 파일 없으면 조용히 스킵(디버그 빌드 영향 0)
 def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
+// 냥수제비 방식(11-24): 환경 변수 GUNBBU_KEY_PROPS 우선 → shell/android/key.properties → 레포 밖 D:/keys/gunbbu/key.properties
+// (워크트리마다 비밀번호 파일을 복사하지 않는다. 비밀번호는 어디에도 출력하지 않는다)
+def keystorePropertiesFile = System.getenv('GUNBBU_KEY_PROPS') ? new File(System.getenv('GUNBBU_KEY_PROPS'))
+    : (rootProject.file('key.properties').exists() ? rootProject.file('key.properties') : new File('D:/keys/gunbbu/key.properties'))
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
@@ -13,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 gradle.taskGraph.whenReady { graph ->
     def wantsRelease = graph.allTasks.any { it.project == project && it.name ==~ /(?i)(assemble|bundle)Release/ }
     if (wantsRelease && !keystorePropertiesFile.exists() && !project.hasProperty('android.injected.signing.store.file')) {
-        throw new GradleException("shell/android/key.properties 없음 — 서명 없이 릴리스를 굽지 않는다 (storeFile·storePassword·keyAlias·keyPassword 필요, 정본: docs/RELEASE.md)")
+        throw new GradleException("key.properties 없음(${keystorePropertiesFile}) — 서명 없이 릴리스를 굽지 않는다 (storeFile·storePassword·keyAlias·keyPassword 필요, 정본: docs/RELEASE.md)")
     }
     // 릴리스 웹 번들(GUNBBU_RELEASE=1 npm run build, 루트 scripts/check-release.mjs --mark)만 AAB로 나간다.
     // 그 없이 구운 번들은 시험 광고 단위 · 시험 결제가 열린 채 실린다. 앱에 실린 표식 파일이 없으면 막는다.
@@ -49,7 +52,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

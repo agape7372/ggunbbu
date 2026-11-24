@@ -23,7 +23,7 @@ npm run dev           # 웹 확인 (Chrome 모바일 뷰포트)
 ## 1-1. ★APK/AAB를 새로 구우면 OTA도 같이 발행한다 (levain 2026-08-24 실사고)
 
 > ★2026-10-25: 1.0은 OTA가 꺼져 있어(§8) 이 절은 **OTA를 켠 뒤부터** 적용한다. 그 전까지 `src/version.ts`(웹 번들 버전,
-> 지금 0.1.0)는 앱 동작에 쓰이지 않는다. 설정 화면 맨 아래 버전은 앱에서는 셸 `versionName`을, 웹에서는 번들 버전을 보여 준다.
+> 지금 1.0.0)는 앱 동작에 쓰이지 않는다. 설정 화면 맨 아래 버전은 앱에서는 셸 `versionName`을, 웹에서는 번들 버전을 보여 준다.
 
 **증상**: 새로 설치한 APK가 홈으로 나갔다 오면 옛날 화면으로 되돌아간다. 브라우저(dev)는 최신인데 폰만 구버전 — "폰이랑 브라우저 버전이 다른" 상태.
 
@@ -99,20 +99,17 @@ Android 12+ 시스템 스플래시와 androidx 호환 경로(API 24~30)가 같�
 `BridgeActivity`가 곧바로 `AppTheme.NoActionBar`로 바꾸므로 사실상 보이지 않는다. 위 `@capacitor/assets` 명령으로
 다시 만들지 않는다 — PNG 재생성은 `scripts/gen-native-icons.mjs`(런처·스플래시·웹·스토어 아이콘 전부). 아이콘 원본은 `assets/brand/src/gunbbu-icon.svg` 하나(10-31 「먹 한 획」으로 교체).
 
-## 5. 서명·키스토어 (★미생성 — 사용자 작업)
+## 5. 서명·키스토어 (★2026-11-24 생성됨 — 업로드 키)
 
-★2026-08-30 확인: `D:\keys\gunbbu\`는 **없다**. 이 절은 levain 절차서를 이식하며 "완료"로 잘못
-따라온 문장이었다(levain은 `D:\keys\levain\`에 실재). 릴리스 AAB를 굽기 전에 새로 만들어야 한다.
+`D:\keys\gunbbu\gunbbu.keystore`(RSA 2048 · PKCS12 · 별칭 `gunbbu` · 유효 30년) + 같은 폴더의 `key.properties`(서명 정보) ·
+`PASSWORD-BACKUP.txt`(비밀번호 · 인증서 SHA-256). 비밀번호는 이 폴더에만 있고 레포 · 문서 · 보고에 옮기지 않는다.
+`D:\keys\backup-keys.ps1`이 폴더 전체를 백업한다.
 
-```bash
-# 예시 — 비밀번호는 사용자가 정하고 credentials.txt에 같이 남긴다
-keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
-  -alias gunbbu -keyalg RSA -keysize 2048 -validity 10000
-```
-
-- 생성 후: `shell/android/key.properties` 작성 — storeFile·storePassword·keyAlias·keyPassword.
-  `shell/android/.gitignore`가 `key.properties`·`*.jks`·`*.keystore`를 막는다(2026-10-25 추가). 그래도 커밋 전에 `git status`로 한 번 본다.
-- **키 분실 = Play 업데이트 영구 불가.** 생성 즉시 keystore와 credentials.txt를 별도 백업.
+- 셸 gradle(`shell/android/app/build.gradle`)은 서명 정보를 환경 변수 `GUNBBU_KEY_PROPS` → `shell/android/key.properties` →
+  `D:/keys/gunbbu/key.properties` 순으로 찾는다(냥수제비 방식). 워크트리마다 비밀번호 파일을 복사하지 않는다. 하나도 없으면 릴리스가 멈춘다.
+  `shell/android/.gitignore`가 `key.properties`·`*.jks`·`*.keystore`를 막는다. 그래도 커밋 전에 `git status`로 한 번 본다.
+- 인증서 지문 확인: `keytool -list -v -keystore D:/keys/gunbbu/gunbbu.keystore`(비밀번호는 프롬프트에 입력).
+- **키 분실 = Play 업데이트 영구 불가.**
 - 릴리스: `cd android && JAVA_HOME="D:/android-toolchain/jdk21" ./gradlew bundleRelease`
   → `android/app/build/outputs/bundle/release/app-release.aab`
 - Play App Signing 사용(업로드 키 분리) 권장.
@@ -149,7 +146,7 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
       둘 다 Google 공식 테스트 값이다. 실 ID로 바꾼 AAB를 올려야 광고 수익이 생긴다(짝값 표는 `shell/README.md`).
       앱 ID는 네이티브라 AAB 재빌드가 필요하다
 - [ ] **릴리스 가드 통과** — 테스트 ID가 실려 나가는 걸 기계가 막는다(2026-10-27).
-      웹: `GUNBBU_RELEASE=1 VITE_ADMOB_REWARDED_ID=ca-app-pub-<발급 값> VITE_SELLER_INFO="상호 · 대표 · 연락처" npm run build` — `scripts/check-release.mjs`가 빌드 맨 앞에서
+      웹: `GUNBBU_RELEASE=1 VITE_ADMOB_REWARDED_ID=ca-app-pub-<발급 값> npm run build` — `VITE_SELLER_INFO`는 레포의 `.env.production`(커밋됨, 공개 사업자 정보)에서 빌드가 읽는다. `scripts/check-release.mjs`가 빌드 맨 앞에서
       빈 값·테스트 단위·형식 오류면 중단한다(`npm run check:release`로 단독 실행).
       셸 env만이 아니라 Vite가 번들에 굽는 `.env` · `.env.local` · `.env.production` · `.env.production.local` 값도 같이 본다(2026-11-13, 같은 키는 셸 env가 이김).
       그래서 `.env.local`에 `VITE_TESTER=1`을 둔 채 릴리스 빌드하면 멈춘다. `--mark`도 같은 값을 보므로 표식도 안 찍힌다.
@@ -188,6 +185,7 @@ keytool -genkeypair -v -keystore D:/keys/gunbbu/gunbbu.keystore \
 4. **16KB 메모리 페이지 대응 확인.** 네이티브 `.so`가 있으면 16KB 정렬이어야 한다(targetSdk 36).
    2026-10-25 기준 디버그 APK에는 `.so`가 0개였다(`unzip -l <apk> | grep "\.so$"`).
    릴리스 AAB로 다시 세어 보고, 하나라도 나오면 정렬(`zipalign -c -P 16 -v 4`)을 점검한다. 결과는 여기에 기록한다.
+   **2026-11-24 기록**: 시험 광고 AAB(`versionName 1.0.0` · `versionCode 1`)의 `unzip -l <aab> | grep -c ".so$"` = **0**. 네이티브 `.so`가 없어 16KB 정렬은 해당 없다. 플러그인을 더하거나 바꾼 뒤엔 다시 센다.
 5. **광고 ID 선언.** 앱 콘텐츠에서 「예, 광고 목적」 (STORE_LISTING.md).
 6. **실광고가 라이브인 동안 테스터에게 광고를 눌러 달라고 하지 않는다.** 본인 기기에서 누르는 것도 포함이다.
    무효 트래픽으로 판정되면 AdMob 계정이 정지될 수 있다. 확인용은 테스트 광고 단위 ID나 테스트 기기 등록으로만 한다.
@@ -237,7 +235,7 @@ Capgo 클라우드 URL 3종 공백으로 차단) · `scripts/ota-release.mjs`(�
 **릴리스 절차**
 
 ```bash
-# 공통: GUNBBU_RELEASE=1 + 실 광고 ID(VITE_ADMOB_REWARDED_ID) + VITE_SELLER_INFO (출시 검사 · 없으면 멈춘다)
+# 공통: GUNBBU_RELEASE=1 + 실 광고 ID(VITE_ADMOB_REWARDED_ID). VITE_SELLER_INFO는 .env.production이 준다(출시 검사 · 없으면 멈춘다)
 GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version>   # 예: 1.0.1 — 빌드 → zip → sha256 → 서명 → ota/ 산출물 (변수 · 키가 없으면 멈춘다)
 GUNBBU_RELEASE=1 npm run ota:release -- <version> --dry-run   # 파일 쓰기 없이 빌드·zip·체크섬만 확인 (배포처 · 키 없이 된다)
 GUNBBU_RELEASE=1 VITE_OTA_BASE=https://<우리 호스트> npm run ota:release -- <version> --min-native=<x.y>   # 새 네이티브 플러그인을 전제한 번들이면
@@ -254,7 +252,7 @@ curl -s https://<우리 호스트>/manifest.json   # version 확인
   어긋날 수 없게. levain은 이게 수동이라 그 파일에 "⚠ 수동 갱신" 경고가 붙어 있었다.
   발행 후 이 변경분을 **커밋할 것**.
 - **셸 `versionName`과 비교해 죽은 발행을 막는다** — OTA는 네이티브보다 높은 버전만 적용된다.
-  현재 셸은 `versionName "1.0"`이므로 첫 OTA는 `1.0.1` 이상.
+  현재 셸은 `versionName "1.0.0"`이므로 첫 OTA는 `1.0.1` 이상.
 - **워킹트리가 더러우면 경고한다** — zip은 지금 작업 중인 파일을 그대로 싣는다(옆 세션 동승 사고 방지).
 - 그리고 `dist/`를 파일 단위로 먼저 비운다 — ★디렉터리째 `rmSync(recursive)`는 이 환경에서
   **에러 없이 실패한다**(DEVLOG 08-30 `cpSync` 무음 크래시와 같은 계열). 안 비우면 지난 빌드
