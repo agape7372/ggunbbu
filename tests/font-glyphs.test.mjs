@@ -21,7 +21,8 @@ it('every non-ASCII character in the source is inside the font subset', () => {
   const { text } = JSON.parse(readFileSync(join(root, 'src/assets/font-glyphs.json'), 'utf8'));
   const have = new Set(text);
   const pages = readdirSync(join(root, 'public')).filter((n) => n.endsWith('.html')).map((n) => join(root, 'public', n));
-  const files = [...walk(join(root, 'src')), join(root, 'index.html'), ...pages];
+  // .env.production 의 VITE_SELLER_INFO(판매자 표시)는 빌드 변수로 화면에 실린다 — 소스 밖 글자도 서브셋에 있어야 한다
+  const files = [...walk(join(root, 'src')), join(root, 'index.html'), join(root, '.env.production'), ...pages];
   const missing = new Map();
   for (const f of files) {
     for (const ch of readFileSync(f, 'utf8')) {

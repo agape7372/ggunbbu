@@ -62,6 +62,7 @@ def source_chars():
     files += glob.glob(os.path.join(ROOT, 'src', '**', '*.json'), recursive=True)
     files.append(os.path.join(ROOT, 'index.html'))
     files += glob.glob(os.path.join(ROOT, 'public', '*.html'))  # 개인정보처리방침 등 앱 안에서 여는 문서
+    files += glob.glob(os.path.join(ROOT, '.env.production'))  # 빌드 변수로 화면에 실리는 글(판매자 표시 VITE_SELLER_INFO)
     chars = set()
     for f in files:
         if f.endswith('font-glyphs.json'):
