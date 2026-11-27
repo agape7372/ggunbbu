@@ -467,7 +467,7 @@ describe('출근부 · 일당 · 월급', () => {
 });
 
 function facts(over: Partial<Facts> = {}): Facts {
-  return { buildings: 0, runs: 0, specials: 0, guards: 0, bosses: 0, kitRuns: 0, stageClears: 0, weapons: 1, book: 9, license: 0, chapters: 0, ...over };
+  return { buildings: 0, runs: 0, specials: 0, guards: 0, bosses: 0, kitRuns: 0, stageClears: 0, stageStamps: 0, weapons: 1, book: 9, license: 0, chapters: 0, ...over };
 }
 
 describe('신입 과제', () => {
@@ -543,12 +543,13 @@ describe('평생 값', () => {
   it('저장에서 지시서 · 무기 · 도감 수를 읽는다', () => {
     const f = factsOf({
       stats: { buildings: 1, runs: 2, specials: 3, guards: 4, bosses: 5, kitRuns: 6 },
-      stages: { '1-1': { lamp: 1 }, '1-2': { lamp: 0 } },
+      stages: { '1-1': { lamp: 1, stamps: 5 }, '1-2': { lamp: 0, stamps: 31 } },
       owned: ['hammer', 'amber'],
       license: 1,
       unlockedChapters: 2,
     }, 12);
     expect(f.stageClears).toBe(1);
+    expect(f.stageStamps).toBe(7); // 0b00101 = 둘 · 0b11111 = 다섯
     expect(f.weapons).toBe(2);
     expect(f.book).toBe(12);
     expect(f.chapters).toBe(2);

@@ -49,7 +49,7 @@ export interface MissionDef {
 }
 
 /** 평생 값 — 실적 · 신입 과제가 읽는다 */
-export type StatKey = 'buildings' | 'specials' | 'guards' | 'bosses' | 'runs' | 'stageClears' | 'weapons' | 'book' | 'license';
+export type StatKey = 'buildings' | 'specials' | 'guards' | 'bosses' | 'runs' | 'stageClears' | 'stageStamps' | 'weapons' | 'book' | 'license';
 
 export interface MissionProgress {
   id: string;

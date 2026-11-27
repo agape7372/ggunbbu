@@ -171,6 +171,8 @@
 .st-time.miss { color: var(--ink2); }
 .st-time small { font: 700 15px/1 var(--body); }
 .st-master { font: 700 15px/1.3 var(--body); }
+.st-side { display: flex; flex-direction: column; align-self: center; }
+.st-tally { font: 700 13.5px/1.3 var(--body); color: var(--ink2); }
 .st-line { font: 700 15px/1.4 var(--body); }
 .st-reason { padding-left: 8px; border-left: 4px solid var(--seal); font: 700 15px/1.45 var(--body); }
 .st-news { font: 700 15px/1.4 var(--body); }

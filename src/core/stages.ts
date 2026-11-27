@@ -28,10 +28,10 @@ export interface StageDef {
 
 export const STAGES: readonly StageDef[] = [
   // ── 1 서쪽 회랑: 베기 · 지면 가드 · 정석 ──
-  { id: '1-1', region: 0, theme: 'europe', speed: 0, secret: 'noGuard', par: 2700, master: 1860,
-    script: 'www wwww wwwww wmwww . wwww mwwww wwmwww . mmwww wmwwww' },
-  { id: '1-2', region: 0, theme: 'europe', speed: 0, secret: 'noBreak', par: 3210, master: 2220,
-    script: 'wmwm hwwww whmww hhww mwwww~ . whhww hmwww~ . hhhww . hhmwww~' },
+  { id: '1-1', region: 0, theme: 'europe', speed: 0, secret: 'noGuard', par: 2280, master: 1620,
+    script: 'www wwwww wwwwww wmwwwww . wwmwwww mwwmwww . mmwwwwww' },
+  { id: '1-2', region: 0, theme: 'europe', speed: 0, secret: 'noBreak', par: 2790, master: 2100,
+    script: 'wmwmww hwwwwww whmhhww mwwww~ . hmwww~ hhhwhhww . hhmwww~' },
   { id: '1-B', region: 0, theme: 'europe', speed: 0, secret: 'bellNoCut', par: 3660, master: 1110,
     script: '', boss: 'bell' },
   // ── 2 강턱 시장: 빠른 낙하 · 붙어 오기 · 성급한 건물 ──
@@ -51,8 +51,8 @@ export const STAGES: readonly StageDef[] = [
   // ── 4 철근 해안: 번개(철근) ──
   { id: '4-1', region: 3, theme: 'modern', speed: 0.2, secret: 'airBolt', par: 3090, master: 2340,
     script: 'wmww . Z wwmww . Z2 mwww . wwww+Z mmww . Z3 wmww+Z . wwmww+Z2 . wmwww+Z .. wmwwww+Z2' },
-  { id: '4-2', region: 3, theme: 'modern', speed: 0.17, secret: 'noSpecial', par: 3270, master: 2250,
-    script: 'wmww wwmww . mwww~ R2 . wmwww! Z . wmwww R3 . hmww! . R4 hmww+Z . hmwww!+Z' },
+  { id: '4-2', region: 3, theme: 'modern', speed: 0.17, secret: 'noSpecial', par: 3270, master: 2280,
+    script: 'wmww wwmww . mww~ R2 . wmwww! Z . wmwwww R3 . hmww! . R4 hmww+Z2 . hmwww!+Z' },
   { id: '4-B', region: 3, theme: 'modern', speed: 0, secret: 'cargoAir', par: 4170, master: 3210,
     script: '', boss: 'crane' },
   // ── 본사: 전부 섞고 집행기 ──

@@ -83,13 +83,13 @@ describe('판 위 한 줄과 진척', () => {
     expect(arcadeBar(s)).toBeNull();
   });
 
-  it('걸음 셈은 쉼을 뺀다 — 보스 아닌 판은 총 걸음 = 봇이 깬 판의 splits 수, 1-2는 건물 9채', () => {
+  it('걸음 셈은 쉼을 뺀다 — 보스 아닌 판은 총 걸음 = 봇이 깬 판의 splits 수, 1-2는 건물 7채', () => {
     for (const d of STAGES.filter((x) => !x.boss)) {
       const run = runStage(d.id, 1);
       expect(run.result.cleared, d.id).toBe(true);
       expect(workTotal(d.id), d.id).toBe(run.result.splits.length);
     }
-    expect(workTotal('1-2')).toBe(9);
+    expect(workTotal('1-2')).toBe(7);
   });
 
   it('못 깬 진척: 대본 중이면 걸음, 명물 앞이면 명물 이름(집행기는 자기 이름)', () => {
@@ -142,6 +142,15 @@ describe('철거 보고서 한 장', () => {
     const v = endView({ ...base, kind: 'real', result: r, step: 3, phase: 'script', news: mergeResult(rec, r, 'd').news, rec: null });
     expect(v.time).toBe('3/7');
     expect(v.reason).toBe('사유: 미완료.');
+  });
+
+  it('최고 콤보 한 줄: 진짜 판엔 차고(못 깬 판도) 연습엔 빈다', () => {
+    const r = result({ score: 12340, peakCombo: 87 });
+    const real = endView({ ...base, kind: 'real', result: r, news: mergeResult(rec, r, 'd').news, rec: null });
+    expect(real.tally).toBe('최고 콤보 87');
+    const miss = result({ cleared: false, score: 5, peakCombo: 2 });
+    expect(endView({ ...base, kind: 'real', result: miss, news: mergeResult(rec, miss, 'd').news, rec: null }).tally).toBe('최고 콤보 2');
+    expect(endView({ ...base, kind: 'practice', result: r, news: null, rec: null }).tally).toBe('');
   });
 
   it('보스 연습은 기록 없이 시간 · 깼나만, 퇴장 대사 없음. 보스 판을 진짜로 깼으면 대사가 선다', () => {

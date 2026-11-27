@@ -25,6 +25,7 @@ export const STAGE_MODE = {
   par: '기한',
   master: '전임자',
   myBest: '내 기록',
+  peakCombo: '최고 콤보',
   none: '없음',
   /** 전임자 도장을 처음 찍은 날 */
   masterBeat: ['전임자보다 빨랐다.', '전임자는 어디 갔는지 모른다.'],

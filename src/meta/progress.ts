@@ -6,6 +6,7 @@ import { ACHIEVES, hash32 } from './missions';
 import { SALARY_DAILY } from './catalog';
 import { LOOK_EARNED, WEAPON_IDS } from './loadout';
 import type { DailyState, MissionDef, MissionProgress, StatKey } from './types';
+import { STAMP_KEYS, hasStamp } from './stageRecord';
 
 export interface Reward {
   dust?: number;
@@ -168,7 +169,7 @@ export type Facts = Record<StatKey, number> & { kitRuns: number; chapters: numbe
 
 export interface FactSource {
   stats: { buildings: number; runs: number; specials: number; guards: number; bosses: number; kitRuns: number };
-  stages: Readonly<Record<string, { lamp: number }>>;
+  stages: Readonly<Record<string, { lamp: number; stamps: number }>>;
   owned: readonly string[];
   license: number;
   unlockedChapters: number;
@@ -179,6 +180,7 @@ export function factsOf(s: FactSource, book: number): Facts {
   return {
     ...s.stats,
     stageClears: Object.values(s.stages).filter((r) => r.lamp > 0).length,
+    stageStamps: Object.values(s.stages).reduce((n, r) => n + STAMP_KEYS.filter((k) => hasStamp(r.stamps, k)).length, 0),
     weapons: WEAPON_IDS.filter((id) => id === 'sword' || s.owned.includes(id)).length,
     book,
     license: s.license,

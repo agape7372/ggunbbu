@@ -260,7 +260,8 @@ export function stageReport(v: StageEndView): { html: string; stamp: string } {
     };
   }
   // 시간 옆에 전임자 한 줄(보고서 한 장 높이 안에 들게)
-  const trow = `<div class="st-trow">${time}${v.diff === 1 && v.master ? `<p class="st-master">${esc(v.master)}</p>` : ''}</div>`;
+  const side = `${v.diff === 1 && v.master ? `<p class="st-master">${esc(v.master)}</p>` : ''}${v.tally ? `<p class="st-tally">${esc(v.tally)}</p>` : ''}`;
+  const trow = `<div class="st-trow">${time}${side ? `<div class="st-side">${side}</div>` : ''}</div>`;
   const head = v.diff === 1 ? stampRows(v)
     : v.diff === 0 && v.cleared ? `<p class="st-line">${STAGE_MODE.diffNote[0]}</p>` : '';
   const reason = v.reason ? `<p class="st-reason">${esc(v.reason)}</p>` : '';

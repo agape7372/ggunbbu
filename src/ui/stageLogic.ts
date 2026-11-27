@@ -193,6 +193,8 @@ export interface StageEndView {
   riddle: string;
   firstClear: boolean;
   newBest: boolean;
+  /** 최고 콤보 한 줄(연습이면 '') */
+  tally: string;
   /** 전 기록 시간 글(없으면 '') */
   prevBest: string;
   outro: readonly string[];
@@ -235,6 +237,7 @@ export function endView(o: {
     riddle: STAGE_TEXT[r.id]?.riddle ?? '',
     firstClear: !!news?.firstClear,
     newBest: !!news?.newBest,
+    tally: o.kind === 'practice' ? '' : `${STAGE_MODE.peakCombo} ${r.peakCombo.toLocaleString('ko-KR')}`,
     prevBest: news?.newBest && news.prevBest > 0 ? fmtStageTime(news.prevBest) : '',
     outro: def.boss && r.cleared && o.kind !== 'practice'
       ? stageOutro(r.id, { secret: r.stamps.secret, finishSpecial: o.finishSpecial, extra: r.extra })
