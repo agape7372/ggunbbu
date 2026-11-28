@@ -2684,3 +2684,4 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 쪽지 맨 아래 주홍 띠 `.hf-go`(지도 `.mp-go`와 같은 꼴). 글 = `homeLogic.slipLabel`: 아케이드 · 야근 「착수」, 지시서 · 작전 · 이벤트 「고르기」(쪽지 누름이 목록부터), 잠김이면 띠 없음. 누름은 쪽지 누름 그대로.
 - 관문: `tsc` 깨끗 · 시험 1301 통과 / 12 건너뜀 · `final-b` 홈 셋 × 360×640 · 390×844 · 416×657 위반 0. 실기기 못 봄.
 - 본 뒤 안 고친 후보: 상점 무기 칸이 첫 화면 아래로 잘림 · 지도 펼친 면 「특기 사항」 빈 점선 상자 · 홈 꼬리표 세로 글. `final-b`의 홈 「조작 구역」 겹침은 11-15 홈 전면화 뒤 오탐.
+- 승격(11-28, 사용자 「앱승격」): main · release/1.0 `d3c1d21..04abd0a` 앞감기 push · Pages run 46153894542 성공 · 시험판 라이브 `index-r-4LBxWT` 확인 뒤 `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview` 덮어쓰기 → `vercel deploy --prod` · 라이브 `index-B6txBdb7.js`(CSS `.hf-go` 실림). OTA · AAB · `release/play-1.0.0` 손대지 않음.
