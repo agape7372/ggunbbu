@@ -112,7 +112,8 @@
 .st-slot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font: 700 15px/1 var(--body); }
 .st-got,
 .st-empty { flex: none; width: 60px; height: 60px; display: grid; place-content: center; text-align: center; font-style: normal; }
-.st-empty { border: 3px dashed var(--ink3); }
+/* 아직 안 찍힌 도장 — 찍힌 도장(.st-got)과 같은 자리 · 기울기 · 글, 옅은 먹 테만(점선 빈칸은 깨진 그림으로 읽혔다 · 11-28) */
+.st-empty { border: 2.5px solid var(--ink3); color: var(--ink3); font: 700 14px/1.15 var(--body); rotate: -5deg; padding: 6px; }
 .st-got { background: var(--ink); color: var(--paper); font: 700 14px/1.15 var(--body); clip-path: var(--sealclip); rotate: -5deg; padding: 6px; }
 .mp-more .st-riddle { font: 700 14px/1.4 var(--body); color: var(--ink2); }
 .mp-more .st-note { font: 500 13.5px/1.4 var(--body); color: var(--ink2); overflow-wrap: anywhere; word-break: keep-all; }

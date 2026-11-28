@@ -28,7 +28,7 @@
 .sh-big, .sh-ghost, .sh-aura, .sh-flash {
   position: absolute;
   left: 78%; /* 70%면 칼 몸통 · 코등이가 능력치 줄 끝(증감 칸)을 덮었다(10-31 캡처) */
-  top: 50%;
+  top: 40%; /* 할 일 인장이 오른쪽 아래로 가며 위로 올림(11-28) */
   width: 94px;
   height: 236px;
   translate: -50% -50%;
@@ -105,7 +105,8 @@
 .sh-fx .on { color: var(--paper); background: var(--ink); border: 1px solid var(--ink); }
 .sh-fx .off { color: var(--ink2); background: var(--paper); border: 1px dashed var(--ink3); }
 
-.sh-hact { margin-top: 10px; }
+/* 할 일(사기 · 장착)은 칼 그림 오른쪽 아래 — 글 기둥 밑에 한 줄을 따로 쓰면 칼꽂이가 첫 화면 밖으로 밀렸다(11-28) */
+.sh-hact { position: absolute; right: 20px; bottom: 0; z-index: 1; }
 .sh-hact .sh-act { height: 56px; padding: 0 22px 3px 20px; align-items: flex-start; }
 .sh-hact .sh-act b { font-size: 30px; }
 

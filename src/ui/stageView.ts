@@ -124,7 +124,7 @@ function slipHtml(o: StageListOpts, id: string): string {
       <p class="st-reg">${esc(rg.name)}<span class="nav-stamp mp-sign">${STAGE_MODE.navStamp}</span></p>
       ${lines === t.order ? '' : `<p class="st-lines">${spans(dropName(lines, rg.name))}</p>`}
       <div class="st-order">${dropName(t.order, rg.name).map((l) => `<p>${esc(l)}</p>`).join('')}</div>
-      <div class="st-slot"><span>${STAGE_MODE.stamps[3]}</span>${got ? `<i class="st-got">${STAGE_MODE.stamps[3]}</i>` : '<i class="st-empty"></i>'}</div>
+      <div class="st-slot"><span>${STAGE_MODE.stamps[3]}</span>${got ? `<i class="st-got">${STAGE_MODE.stamps[3]}</i>` : `<i class="st-empty">${STAGE_MODE.stamps[3]}</i>`}</div>
       <p class="st-riddle">${esc(t.riddle)}</p>
       ${t.note ? `<p class="st-note">${STAGE_MODE.note} · ${esc(t.note)}</p>` : ''}
       <p class="mp-note">${spans(notes)}</p>

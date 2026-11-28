@@ -724,7 +724,7 @@ img { display: block; -webkit-user-drag: none; }
   height: var(--field-h, 610px);
   background: transparent;
   pointer-events: none;
-  --tw: max(50px, calc(var(--fr-x, 0px) - 6px));
+  --tw: max(60px, calc(var(--fr-x, 0px) - 6px)); /* 60 = 가로 붓글씨 두 자(25px)가 테 안에 든다. 쪽지 왼끝(64) 안쪽 */
 }
 .ov-field button { pointer-events: auto; color: var(--ink); }
 .ov-field button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
@@ -790,7 +790,7 @@ img { display: block; -webkit-user-drag: none; }
 .hf-tab.tr::before { right: 0; }
 .hf-tab.t1 { top: 590px; }
 .hf-tab.t2 { top: 686px; }
-.hf-tab > b:first-child { writing-mode: vertical-rl; font: 400 26px/1 var(--brush); }
+.hf-tab > b:first-child { font: 400 25px/1 var(--brush); white-space: nowrap; } /* 가로 두 글자(세로 한 자씩은 단어로 안 읽혔다 · 11-28). 붓글씨 하한 25 */
 .hf-tab i { font: 400 15px/1 var(--black); font-style: normal; }
 .hf-tab i:empty { display: none; }
 /* 받을 것 점 = 먹(주홍은 착수 키 하나) — 글자와 안 겹치게 바깥 모서리 */
