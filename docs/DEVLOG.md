@@ -2692,3 +2692,4 @@ tsc 클린 · **118 green** · build 통과 · Pages CI green.
 - 지도 펼친 면: 특기 사항 빈 점선 상자 → 안 찍힌 도장(찍힌 도장과 같은 자리 · −5° · 글, 옅은 먹 테).
 - 홈 꼬리표: 세로 한 자씩 → 가로 붓글씨 25px, `--tw` 최소 50 → 60(쪽지 왼끝 64 안쪽).
 - 관문: `tsc` 깨끗 · 시험 1301 통과 · 세 화면비 캡처 새 위반 0(상점 `sh-grp` 1px 넘침은 전부터).
+- 승격(11-29, 사용자 「앱승격」): main · release/1.0 `e6a7347..a5ce2ac` 앞감기 push · Pages run 46157884914 성공 · 시험판 라이브 `index-B6txBdb7` 확인 뒤 `VITE_TESTER=1` 빌드 → `D:\gunbbu-preview` 덮어쓰기 → `vercel deploy --prod` · 라이브 `index-BJg7B04w.js`(CSS `main-CAOL1ha2` · `.sh-hact` · `.st-empty` 새 규칙 실림). OTA · AAB 손대지 않음.
