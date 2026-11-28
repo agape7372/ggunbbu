@@ -99,12 +99,12 @@ export function advance(s: GameState, input: InputFrame): void {
   const wantSpecial = s.player.bufSpecial > 0;
   s.player.bufSpecial = 0;
   if (wantSpecial && s.player.pose !== 'dead' && s.player.pose !== 'special') {
-    // 시간차 필살이 아직 안 터졌으면 새 필살은 거부 — 베어 둔 건물이 사라지지 않게
-    if (s.wazaGauge < WAZA_GAUGE.COST || !hasSpecialTarget(s) || s.wazaRun) {
-      // 조용한 무반응 금지 (08-30, D-5·P1-4): 게이지 부족·허공 발동은 거부음으로 알린다.
-      // 허공(대상 0)에 게이지 100을 태우던 경로도 여기서 봉인 — 소모 없이 거부.
-      s.events.push({ kind: 'guardDenied' });
+    // ★11-28 사용자 「제한 다 없애」: 거부는 게이지 부족뿐이다. 대상이 없어도(공중 · 허공) 나가고,
+    // 시간차 필살이 아직 안 터졌으면 그걸 지금 터뜨린 뒤 새 필살을 낸다 — 베어 둔 건물이 멈춘 채 남지 않게
+    if (s.wazaGauge < WAZA_GAUGE.COST) {
+      s.events.push({ kind: 'guardDenied' }); // 조용한 무반응 금지 (08-30, D-5)
     } else {
+      if (s.wazaRun) flushWazaRun(s);
       triggerSpecial(s);
     }
   }
@@ -241,15 +241,6 @@ function stepDebris(s: GameState): void {
   }
 }
 // ── 필살기 ──────────────────────────────────────────────────────
-/** 필살이 의미를 갖는 대상이 하나라도 있는가 — 없으면 발동 자체를 거부한다 (08-30, P1-4) */
-function hasSpecialTarget(s: GameState): boolean {
-  if (s.stack || s.boss || s.lm || s.groundRocks > 0) return true;
-  for (const e of s.entities) {
-    if (e.kind === 'rock' || e.kind === 'bolt' || e.kind === 'shot') return true;
-  }
-  return false;
-}
-
 function triggerSpecial(s: GameState): void {
   const p = s.player;
   const wasPinned = p.pose === 'pinned';
@@ -303,6 +294,14 @@ const runOf = (w: GameState['waza']) => (w in WAZA_RUN ? WAZA_RUN[w as WazaRunId
 function isFrozen(s: GameState, stack: NonNullable<GameState['stack']>): boolean {
   const r = s.wazaRun;
   return r !== null && r.stack === stack && runOf(r.id)!.freeze;
+}
+
+/** 도는 시간차 필살을 지금 끝낸다 — 아직 안 터졌으면 바로 터뜨리고, 남은 타는 버린다 */
+function flushWazaRun(s: GameState): void {
+  const r = s.wazaRun!;
+  const cfg = runOf(r.id)!;
+  if (r.t < cfg.burst) wazaBurst(s, r, cfg.floorMul, cfg.bossDmg);
+  s.wazaRun = null;
 }
 
 /** 시간차 필살 한 틱 — 연참 · 검풍 한 타, 터짐, 끝. 히트스톱 동안은 advance가 먼저 돌아가서 안 센다 */

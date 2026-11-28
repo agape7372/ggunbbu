@@ -114,14 +114,18 @@ describe('시간차 필살', () => {
     expect(evs.find((e) => e.kind === 'wazaBurst')?.n).toBe(0);
   });
 
-  it('시간차 필살이 도는 동안 새 필살은 거부', () => {
-    const { s } = fire('dalmuri');
+  it('시간차 필살이 도는 동안 새 필살을 누르면 앞의 것을 바로 터뜨리고 새로 낸다 (11-28)', () => {
+    const st = tower();
+    const { s } = fire('dalmuri', st);
     s.wazaGauge = WAZA_GAUGE.MAX;
     s.player.pose = 'idle';
     s.hitstop = 0;
     advance(s, inp({ special: true }));
-    expect(s.events.some((e) => e.kind === 'guardDenied')).toBe(true);
-    expect(s.wazaGauge).toBe(WAZA_GAUGE.MAX);
+    expect(s.events.some((e) => e.kind === 'guardDenied')).toBe(false);
+    expect(s.events.some((e) => e.kind === 'wazaBurst')).toBe(true);
+    expect(s.stack).not.toBe(st); // 베어 둔 건물은 터졌다
+    expect(s.player.pose).toBe('special');
+    expect(s.wazaRun?.t).toBe(1); // 새 필살이 처음부터 돈다(발동 틱에 한 칸)
   });
 
   it('면역 건물은 터질 때 맨 아래층만 깎는다', () => {

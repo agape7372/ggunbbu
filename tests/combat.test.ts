@@ -268,7 +268,7 @@ describe('필살기', () => {
     const s = makeState();
     s.wazaGauge = 100;
     s.guardGauge = 100;
-    // 08-30: 허공 필살은 거부된다(P1-4) — 회피 대상(낙하 화산탄)을 두고 무적만 검증
+    // 무적만 검증(낙하 화산탄을 둔 판)
     s.entities.push({ kind: 'rock', lane: 0, y: 600, vy: 0, hp: 2 });
     advance(s, inp({ special: true }));
     withStack(s, 30, 'hard');

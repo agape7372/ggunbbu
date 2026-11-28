@@ -84,13 +84,14 @@ describe('필살 재설계 (08-30)', () => {
     expect(s.stack!.floors.length).toBe(8 - SPECIAL.AGEBA_FLOORS);
   });
 
-  it('허공 필살은 거부되고 게이지를 태우지 않는다', () => {
+  it('허공 필살도 나간다 (11-28 제한 없앰 — 공중에서 대상이 없어도)', () => {
     const s = makeState();
     s.wazaGauge = WAZA_GAUGE.MAX;
+    s.player.y = 200; s.player.vy = 0; s.player.pose = 'jump';
     advance(s, inp({ special: true })); // 스택·보스·투사체·더미 전무
-    expect(s.wazaGauge).toBe(WAZA_GAUGE.MAX);
-    expect(s.player.pose).not.toBe('special');
-    expect(s.events.some((e) => e.kind === 'guardDenied')).toBe(true);
+    expect(s.wazaGauge).toBe(0);
+    expect(s.player.pose).toBe('special');
+    expect(s.events.some((e) => e.kind === 'guardDenied')).toBe(false);
   });
 
   it('게이지 부족 필살은 거부음 이벤트를 낸다 (조용한 무반응 금지)', () => {
