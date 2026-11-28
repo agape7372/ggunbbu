@@ -23,7 +23,7 @@ import { STAGE_MODE, STAGE_TEXT, fmtStageTime } from '../content/stages';
 import { STAGES } from '../core/stages';
 import type { Theme } from '../core/types';
 import { recordOf } from '../meta/stageRecord';
-import { JOBS, homeFactsOf, jobBuilding, nextStage, stepJob, type HomeFacts, type JobId } from './homeLogic';
+import { JOBS, homeFactsOf, jobBuilding, nextStage, slipLabel, stepJob, type HomeFacts, type JobId } from './homeLogic';
 import { paintHang } from './homeArt';
 import type { StageDiff } from '../core/types';
 import { paintMissions, type MissionView, type TakeKind } from './missionView';
@@ -412,6 +412,7 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
         <span class="s-top" data-el="slip-top"></span>
         <span class="s-nm" data-el="slip-nm"></span>
         <span class="s-st" data-el="slip-st"></span>
+        <span class="seal hf-go" data-el="slip-go" aria-hidden="true"></span>
       </button>
       <span class="hf-dots" data-el="dots" aria-hidden="true">${JOBS.map(() => '<i></i>').join('')}</span>
       <button type="button" class="hf-tab tl t1" data-act="tab-missions" data-badge-host><b>미션</b><i data-el="nav-today"></i><b class="dot" data-badge hidden></b></button>
@@ -712,6 +713,9 @@ export function mountOverlay(root: HTMLElement, h: OverlayHandlers): OverlayApi 
       el.hidden = !html;
     }
     $('slip').classList.toggle('long', v.job === 'event');
+    const go = slipLabel(v.job, f);
+    $('slip-go').textContent = go;
+    $('slip-go').hidden = !go;
     // 줄(.ln)마다 끊어 읽는다 — 붙여 읽으면 「집행기최고」처럼 붙는다
     const read = (el: HTMLElement): string => {
       const lines = [...el.querySelectorAll('.ln')].map((ln) => ln.textContent);

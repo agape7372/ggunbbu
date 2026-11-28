@@ -1,6 +1,6 @@
 // 홈 현장: 일감 순서 · 「착수」 동작과 키 얼굴이 같은 판단 · 마지막 일감 저장 · 넓은 화면 키 밀기
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { JOBS, butterTier, confirmLabel, homeFactsOf, homeFaces, jobAction, nextStage, stepJob, toJob, type HomeFacts } from '../src/ui/homeLogic';
+import { JOBS, butterTier, confirmLabel, homeFactsOf, homeFaces, jobAction, nextStage, slipLabel, stepJob, toJob, type HomeFacts } from '../src/ui/homeLogic';
 import { EVENT_STAGES } from '../src/content';
 import { STAGES } from '../src/core/stages';
 import { emptyRecord, type StageRecord } from '../src/meta/stageRecord';
@@ -80,6 +80,14 @@ describe('키 얼굴 = 확인 동작', () => {
     expect([f.jump.label, f.guard.label]).toEqual(['이전', '다음']);
     expect(f.special).toEqual({ label: '', tone: 'rest' });
     expect(homeFaces('ops', facts()).attack.label).toBe('고르기');
+  });
+  it('쪽지 주홍 띠 = 쪽지 누름: 지시서는 늘 지도(고르기) · 잠김이면 띠 없음', () => {
+    expect(slipLabel('arcade', facts())).toBe('착수');
+    expect(slipLabel('stage', facts())).toBe('고르기');
+    expect(slipLabel('ops', facts())).toBe('고르기');
+    expect(slipLabel('event', facts())).toBe('고르기');
+    expect(slipLabel('tokoton', facts())).toBe('');
+    expect(slipLabel('tokoton', facts({ act2Cleared: true }))).toBe('착수');
   });
 });
 

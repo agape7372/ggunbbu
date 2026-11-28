@@ -81,6 +81,13 @@ export function confirmLabel(go: JobGo): '착수' | '고르기' | '잠김' {
   return go.k === 'stageMap' || go.k === 'ops' || go.k === 'events' ? '고르기' : '착수';
 }
 
+/** 홈 쪽지 맨 아래 주홍 띠 글 — 쪽지 누름(scenes onJobTap)을 따른다: 지시서는 늘 지도부터라 「고르기」. 잠김이면 띠가 없다 */
+export function slipLabel(job: JobId, f: HomeFacts): '착수' | '고르기' | '' {
+  const label = confirmLabel(jobAction(job, f));
+  if (label === '잠김') return '';
+  return job === 'stage' ? '고르기' : label;
+}
+
 /** 매달린 건물 — 판에서 쓰는 층(core makeStack · makeFloor)으로만 짓는다 */
 export interface JobBuilding { variant: 'building' | 'butterbar'; theme: Theme; floors: readonly Material[] }
 
